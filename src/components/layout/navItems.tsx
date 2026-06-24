@@ -68,6 +68,12 @@ export const navGroups: NavGroup[] = [
         hint: "Seguimiento de OC y creación desde sugerencias",
       },
       {
+        to: "/recepciones",
+        label: "Recepciones",
+        icon: IconInventory,
+        hint: "Qué viene en camino, qué llegó y cómo llegó",
+      },
+      {
         to: "/proveedores",
         label: "Proveedores",
         icon: IconSuppliers,

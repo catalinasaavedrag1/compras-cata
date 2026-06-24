@@ -15,6 +15,7 @@ import { PurchaseOrdersPage } from "../pages/PurchaseOrdersPage";
 import { AlertsPage } from "../pages/AlertsPage";
 import { CampaignOpportunitiesPage } from "../pages/CampaignOpportunitiesPage";
 import { ChannelMarginPage } from "../pages/ChannelMarginPage";
+import { ReceptionsPage } from "../pages/ReceptionsPage";
 import { InventoryAnalysisPage } from "../pages/InventoryAnalysisPage";
 import { SalesAnalysisPage } from "../pages/SalesAnalysisPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -36,6 +37,7 @@ export default function AppRoutes() {
           <Route path="/categorias" element={<CategoriesPage />} />
           <Route path="/proveedores" element={<SuppliersPage />} />
           <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
+          <Route path="/recepciones" element={<ReceptionsPage />} />
           <Route path="/alertas" element={<AlertsPage />} />
           <Route path="/inventario" element={<InventoryAnalysisPage />} />
           <Route path="/ventas" element={<SalesAnalysisPage />} />

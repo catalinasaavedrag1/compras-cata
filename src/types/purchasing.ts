@@ -308,6 +308,44 @@ export interface CreatedCampaign {
 }
 
 // ----------------------------------------------------------------------------
+//  Recepciones de mercadería (vista del comprador, no logística pesada)
+// ----------------------------------------------------------------------------
+
+export type ReceptionStatus =
+  | "scheduled" // programada, aún no despachada
+  | "in_transit" // en tránsito
+  | "received" // recibida completa
+  | "partial" // recibida parcial
+  | "with_issues" // recibida con problemas de calidad
+  | "delayed"; // debió llegar y no llegó
+
+export interface ReceptionItem {
+  sku: string;
+  productName: string;
+  expected: number;
+  received: number;
+  issue?: string;
+}
+
+export interface Reception {
+  id: string;
+  poNumber: string;
+  supplierName: string;
+  buyer: string;
+  warehouse: string;
+  createdAt: string;
+  expectedDate: string;
+  receivedDate?: string;
+  status: ReceptionStatus;
+  skuCount: number;
+  unitsExpected: number;
+  unitsReceived: number;
+  qualityOk: boolean;
+  qualityNote: string;
+  items?: ReceptionItem[];
+}
+
+// ----------------------------------------------------------------------------
 //  Margen por canal de venta (marketplace / web / tienda)
 // ----------------------------------------------------------------------------
 
