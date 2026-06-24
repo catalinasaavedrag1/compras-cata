@@ -2,7 +2,9 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "../layouts/AppLayout";
 import { OcDraftProvider } from "../context/OcDraftContext";
 import { ToastProvider } from "../context/ToastContext";
+import { BuyerProvider } from "../context/BuyerContext";
 import { DashboardPage } from "../pages/DashboardPage";
+import { MyPanelPage } from "../pages/MyPanelPage";
 import { ReplenishmentPage } from "../pages/ReplenishmentPage";
 import { ProductsPage } from "../pages/ProductsPage";
 import { ProductDetailPage } from "../pages/ProductDetailPage";
@@ -18,10 +20,12 @@ import { SettingsPage } from "../pages/SettingsPage";
 export default function AppRoutes() {
   return (
     <ToastProvider>
+      <BuyerProvider>
       <OcDraftProvider>
         <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/mi-panel" element={<MyPanelPage />} />
           <Route path="/reposicion" element={<ReplenishmentPage />} />
           <Route path="/campanas-oportunidades" element={<CampaignOpportunitiesPage />} />
           <Route path="/productos" element={<ProductsPage />} />
@@ -37,6 +41,7 @@ export default function AppRoutes() {
           </Route>
         </Routes>
       </OcDraftProvider>
+      </BuyerProvider>
     </ToastProvider>
   );
 }

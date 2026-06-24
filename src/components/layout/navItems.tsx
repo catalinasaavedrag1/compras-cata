@@ -10,6 +10,7 @@ import {
   IconSales,
   IconRules,
   IconCampaign,
+  IconCheck,
 } from "../ui/icons";
 
 export interface NavItem {
@@ -36,6 +37,12 @@ export const navGroups: NavGroup[] = [
         icon: IconDashboard,
         end: true,
         hint: "Resumen del día y qué revisar primero",
+      },
+      {
+        to: "/mi-panel",
+        label: "Mi panel",
+        icon: IconCheck,
+        hint: "Mis tareas, categorías, riesgos de quiebre y proveedores",
       },
     ],
   },

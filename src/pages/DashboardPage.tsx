@@ -20,6 +20,7 @@ import {
   IconChevronRight,
   IconCampaign,
   IconArrowRight,
+  IconCheck,
 } from "../components/ui/icons";
 import { products } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
@@ -145,18 +146,25 @@ export function DashboardPage() {
       <PageHeader
         title="Dashboard de compras"
         description="Tu portada de decisiones del día: qué está crítico, qué revisar primero, cuánta plata implica la compra sugerida y qué proveedores están fallando. Datos de ejemplo al 24/06/2026."
+        action={
+          <Link to="/mi-panel">
+            <Button variant="secondary" icon={<IconCheck className="w-4 h-4" />}>
+              Ir a Mi panel
+            </Button>
+          </Link>
+        }
       />
 
       {/* KPIs principales */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 mb-5">
-        <KpiCard title="SKUs con quiebre" value={formatNumber(stockoutSkus)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Sin stock disponible hoy" />
-        <KpiCard title="En riesgo de quiebre" value={formatNumber(criticalRecs.length + buyNowRecs.length)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Cobertura menor al lead time" />
-        <KpiCard title="Con sobrestock" value={formatNumber(overstockProducts.length)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Inventario sobre el máximo" />
-        <KpiCard title="Compra sugerida del mes" value={formatCurrencyCompact(suggestedTotal)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description={`${formatPercent(budgetPct, 0)} del presupuesto`} />
-        <KpiCard title="OC abiertas" value={formatNumber(openPOs)} tone="neutral" icon={<IconInventory className="w-4 h-4" />} description={`${delayedPOs.length} atrasadas`} />
-        <KpiCard title="Proveedores a revisar" value={formatNumber(lowComplianceSuppliers.length)} tone="bad" icon={<IconSuppliers className="w-4 h-4" />} description="Cumplimiento bajo 70%" />
-        <KpiCard title="Venta últimos 30 días" value={formatCurrencyCompact(salesKpis.salesLast30Days)} tone="good" delta={8.4} icon={<IconSales className="w-4 h-4" />} />
-        <KpiCard title="Inventario valorizado" value={formatCurrencyCompact(inventoryKpis.totalInventoryValue)} tone="neutral" icon={<IconInventory className="w-4 h-4" />} description={`${inventoryKpis.averageInventoryDays} días promedio`} />
+        <KpiCard title="SKUs con quiebre" value={formatNumber(stockoutSkus)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Ver productos sin stock" to="/productos?stock=1" />
+        <KpiCard title="En riesgo de quiebre" value={formatNumber(criticalRecs.length + buyNowRecs.length)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Ver reposición" to="/reposicion" />
+        <KpiCard title="Con sobrestock" value={formatNumber(overstockProducts.length)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Ver inventario" to="/inventario" />
+        <KpiCard title="Compra sugerida del mes" value={formatCurrencyCompact(suggestedTotal)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description={`${formatPercent(budgetPct, 0)} del presupuesto`} to="/reposicion" />
+        <KpiCard title="OC abiertas (sin recibir)" value={formatNumber(openPOs)} tone="neutral" icon={<IconInventory className="w-4 h-4" />} description={`${delayedPOs.length} atrasadas · ver órdenes`} to="/ordenes-compra" />
+        <KpiCard title="Proveedores a revisar" value={formatNumber(lowComplianceSuppliers.length)} tone="bad" icon={<IconSuppliers className="w-4 h-4" />} description="Cumplimiento bajo 70%" to="/proveedores" />
+        <KpiCard title="Venta últimos 30 días" value={formatCurrencyCompact(salesKpis.salesLast30Days)} tone="good" delta={8.4} icon={<IconSales className="w-4 h-4" />} to="/ventas" />
+        <KpiCard title="Inventario valorizado" value={formatCurrencyCompact(inventoryKpis.totalInventoryValue)} tone="neutral" icon={<IconInventory className="w-4 h-4" />} description={`${inventoryKpis.averageInventoryDays} días promedio`} to="/inventario" />
       </div>
 
       {/* Qué revisar primero — lo más importante, arriba */}

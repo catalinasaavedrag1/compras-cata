@@ -279,12 +279,22 @@ export function ReplenishmentPage() {
       align: "right",
       sortable: true,
       sortValue: (r) => r.suggestedQuantity,
-      render: (r) => (
-        <div className="text-sm">
-          <p className="font-semibold text-slate-900">{formatNumber(r.suggestedQuantity)} u.</p>
-          <p className="text-xs text-slate-400">{formatCurrency(r.unitCost)} c/u</p>
-        </div>
-      ),
+      render: (r) => {
+        const coverAfter =
+          r.salesLast30Days > 0
+            ? Math.round((r.availableStock + r.suggestedQuantity) / (r.salesLast30Days / 30))
+            : 0;
+        return (
+          <div className="text-sm">
+            <p className="font-semibold text-slate-900">{formatNumber(r.suggestedQuantity)} u.</p>
+            {r.suggestedQuantity > 0 ? (
+              <p className="text-xs text-emerald-600">para ~{coverAfter} días</p>
+            ) : (
+              <p className="text-xs text-slate-400">{formatCurrency(r.unitCost)} c/u</p>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "amount",
@@ -472,8 +482,9 @@ export function ReplenishmentPage() {
       <div className="space-y-3 mb-4">
         <HelpNote title="Cómo se calcula la cantidad sugerida:">
           se combina el stock disponible, la venta reciente, el lead time del proveedor y los
-          días objetivo de inventario. Solo se recomienda comprar cuando hay riesgo de quiebre
-          o necesidad real. La tabla muestra primero lo más urgente.
+          días objetivo de inventario. La columna <b>"para ~N días"</b> indica cuántos días de venta
+          cubrirá la compra sugerida (ya considerando el tiempo de entrega del proveedor). Solo se
+          recomienda comprar cuando hay riesgo de quiebre o necesidad real; la tabla muestra primero lo más urgente.
           {overstockSavings > 0 && (
             <>
               {" "}Ajustando el sobrestock puedes liberar{" "}

@@ -129,6 +129,29 @@ export function calculatePriority(params: {
   return "low";
 }
 
+/** Suma días a una fecha ISO (aaaa-mm-dd) y devuelve ISO. */
+export function addDaysISO(baseISO: string, days: number): string {
+  const d = new Date(`${baseISO}T00:00:00`);
+  d.setDate(d.getDate() + Math.round(days));
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Fecha estimada de quiebre: hoy + días de cobertura del stock disponible.
+ * Si no hay venta, no hay quiebre previsible (devuelve null).
+ * Si el stock ya es 0 con venta, el quiebre es hoy.
+ */
+export function estimatedStockoutDate(
+  availableStock: number,
+  monthlySales: number,
+  todayISO: string
+): string | null {
+  if (monthlySales <= 0) return null;
+  const days = coverageDays(availableStock, monthlySales);
+  if (days >= 999) return null;
+  return addDaysISO(todayISO, days);
+}
+
 /** Capital inmovilizado estimado por sobrestock (unidades sobre el máximo) */
 export function frozenCapital(
   availableStock: number,

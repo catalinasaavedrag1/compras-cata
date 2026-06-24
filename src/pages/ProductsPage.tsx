@@ -10,8 +10,10 @@ import { HelpNote } from "../components/business/HelpNote";
 import { ExportButton } from "../components/business/ExportButton";
 import { products as allProducts } from "../data/mockProducts";
 import { filterProducts, uniqueValues } from "../utils/filters";
-import { useUrlState } from "../utils/useUrlState";
-import { formatCurrency, formatNumber, formatPercent } from "../utils/formatters";
+import { useUrlState, useUrlToggle } from "../utils/useUrlState";
+import { coverageDays, estimatedStockoutDate } from "../utils/calculations";
+import { TODAY_ISO } from "../utils/constants";
+import { formatCurrency, formatDate, formatNumber, formatPercent } from "../utils/formatters";
 import { IconProducts, IconAlerts, IconSuppliers, IconSales } from "../components/ui/icons";
 import type { Product } from "../types/purchasing";
 
@@ -25,6 +27,7 @@ export function ProductsPage() {
   const [supplier, setSupplier] = useUrlState("prov");
   const [productStatus, setProductStatus] = useUrlState("comercial");
   const [purchaseStatus, setPurchaseStatus] = useUrlState("compra");
+  const [outOfStock, toggleOutOfStock] = useUrlToggle("stock");
   const [toggles, setToggles] = useState({
     lowMargin: false,
     noSupplier: false,
@@ -48,8 +51,11 @@ export function ProductsPage() {
     if (toggles.outdatedCost) {
       result = result.filter((p) => p.costUpdatedAt < "2026-04-01");
     }
+    if (outOfStock) {
+      result = result.filter((p) => p.availableStock <= 0);
+    }
     return result;
-  }, [query, category, subcategory, brand, supplier, productStatus, purchaseStatus, toggles]);
+  }, [query, category, subcategory, brand, supplier, productStatus, purchaseStatus, toggles, outOfStock]);
 
   const clearFilters = () => {
     setQuery("");
@@ -60,6 +66,7 @@ export function ProductsPage() {
     setProductStatus("");
     setPurchaseStatus("");
     setToggles({ lowMargin: false, noSupplier: false, noSales: false, outdatedCost: false });
+    if (outOfStock) toggleOutOfStock();
   };
 
   const lowMarginCount = allProducts.filter((p) => p.margin < 25).length;
@@ -133,6 +140,24 @@ export function ProductsPage() {
       align: "right",
       hideOnMobile: true,
       render: (p) => <span className="text-slate-700">{formatNumber(p.salesLast30Days)}</span>,
+    },
+    {
+      key: "stockout",
+      header: "Quiebre estimado",
+      align: "right",
+      hideOnMobile: true,
+      render: (p) => {
+        if (p.availableStock <= 0 && p.salesLast30Days > 0)
+          return <span className="text-rose-600 font-semibold">En quiebre</span>;
+        const date = estimatedStockoutDate(p.availableStock, p.salesLast30Days, TODAY_ISO);
+        if (!date) return <span className="text-slate-300">—</span>;
+        const cover = coverageDays(p.availableStock, p.salesLast30Days);
+        return (
+          <span className={cover <= p.supplierLeadTimeDays ? "text-rose-600 font-medium" : cover <= p.supplierLeadTimeDays * 2 ? "text-amber-600" : "text-slate-600"}>
+            {formatDate(date)}
+          </span>
+        );
+      },
     },
     {
       key: "rotation",
@@ -237,6 +262,7 @@ export function ProductsPage() {
             },
           ]}
           toggles={[
+            { key: "outOfStock", label: "Sin stock", active: outOfStock, onToggle: toggleOutOfStock },
             { key: "lowMargin", label: "Margen bajo", active: toggles.lowMargin, onToggle: () => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin })) },
             { key: "noSupplier", label: "Sin proveedor", active: toggles.noSupplier, onToggle: () => setToggles((t) => ({ ...t, noSupplier: !t.noSupplier })) },
             { key: "noSales", label: "Sin venta", active: toggles.noSales, onToggle: () => setToggles((t) => ({ ...t, noSales: !t.noSales })) },

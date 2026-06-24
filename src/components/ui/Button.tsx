@@ -8,6 +8,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
   icon?: ReactNode;
+  /** Muestra un spinner y deshabilita el botón mientras true. */
+  loading?: boolean;
+}
+
+function Spinner() {
+  return (
+    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z" />
+    </svg>
+  );
 }
 
 const variants: Record<Variant, string> = {
@@ -29,12 +40,15 @@ export function Button({
   variant = "primary",
   size = "md",
   icon,
+  loading = false,
   className,
   children,
+  disabled,
   ...props
 }: ButtonProps) {
   return (
     <button
+      disabled={disabled || loading}
       className={cn(
         "inline-flex items-center justify-center rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300",
         variants[variant],
@@ -43,7 +57,7 @@ export function Button({
       )}
       {...props}
     >
-      {icon}
+      {loading ? <Spinner /> : icon}
       {children}
     </button>
   );

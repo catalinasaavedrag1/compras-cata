@@ -11,6 +11,7 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Tabs } from "../components/ui/Tabs";
 import { EmptyState } from "../components/ui/EmptyState";
+import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { ExportButton } from "../components/business/ExportButton";
 import { CampaignBuilderModal } from "../components/business/CampaignBuilderModal";
 import { uniqueValues } from "../utils/filters";
@@ -66,6 +67,7 @@ export function CampaignOpportunitiesPage() {
   );
   const [builderOpen, setBuilderOpen] = useState(false);
   const [builderTemplate, setBuilderTemplate] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const [done, setDone] = useState<string[]>([]); // acciones simuladas ya gestionadas
   const [sort, setSort] = useState<SortState>({ key: null, dir: "desc" });
@@ -472,12 +474,8 @@ export function CampaignOpportunitiesPage() {
         <CreatedCampaignsView
           campaigns={createdCampaigns}
           onCreate={() => openBuilder("")}
-          onDelete={deleteCampaign}
-          onAddToOc={(sku) => {
-            const p = all.find((o) => o.sku === sku);
-            navigate(`/productos/${sku}`);
-            void p;
-          }}
+          onDelete={setPendingDelete}
+          onAddToOc={(sku) => navigate(`/productos/${sku}`)}
         />
       ) : (
       <>
@@ -631,6 +629,19 @@ export function CampaignOpportunitiesPage() {
         onClose={() => setBuilderOpen(false)}
         onSave={saveCampaign}
         initialName={builderTemplate}
+      />
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title="Eliminar campaña"
+        message="¿Seguro que quieres eliminar esta campaña? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar campaña"
+        danger
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) deleteCampaign(pendingDelete);
+          setPendingDelete(null);
+        }}
       />
     </div>
   );

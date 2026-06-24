@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { cn } from "../../utils/cn";
-import { IconArrowDown, IconArrowUp } from "../ui/icons";
+import { IconArrowDown, IconArrowUp, IconChevronRight } from "../ui/icons";
 
 type Tone = "neutral" | "good" | "warn" | "bad" | "info";
 
@@ -14,6 +15,8 @@ interface KpiCardProps {
   deltaPositiveIsGood?: boolean;
   tone?: Tone;
   icon?: ReactNode;
+  /** Si se pasa, la card es cliqueable y navega a esa ruta. */
+  to?: string;
 }
 
 const toneAccent: Record<Tone, string> = {
@@ -40,13 +43,14 @@ export function KpiCard({
   deltaPositiveIsGood = true,
   tone = "neutral",
   icon,
+  to,
 }: KpiCardProps) {
   const hasDelta = delta !== undefined && Number.isFinite(delta);
   const up = (delta ?? 0) >= 0;
   const good = up === deltaPositiveIsGood;
 
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-card p-4 flex flex-col gap-2">
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium text-slate-500">{title}</p>
         {icon && (
@@ -80,7 +84,28 @@ export function KpiCard({
           </span>
         )}
       </div>
-      {description && <p className="text-xs text-slate-500 leading-snug">{description}</p>}
-    </div>
+      {description && (
+        <p className="text-xs text-slate-500 leading-snug flex items-center gap-1">
+          {description}
+          {to && <IconChevronRight className="w-3 h-3 text-brand-400 inline" />}
+        </p>
+      )}
+    </>
   );
+
+  const baseClass =
+    "bg-white border border-slate-200 rounded-xl shadow-card p-4 flex flex-col gap-2";
+
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className={cn(baseClass, "transition-colors hover:border-brand-300 hover:bg-brand-50/30")}
+      >
+        {inner}
+      </Link>
+    );
+  }
+
+  return <div className={baseClass}>{inner}</div>;
 }

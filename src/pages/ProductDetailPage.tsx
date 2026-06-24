@@ -9,7 +9,7 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BarList } from "../components/business/BarList";
-import { IconPlus, IconChevronRight } from "../components/ui/icons";
+import { IconPlus } from "../components/ui/icons";
 import { getProductBySku } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
 import { alerts } from "../data/mockAlerts";
@@ -80,13 +80,11 @@ export function ProductDetailPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-3">
-        <Link to="/productos" className="hover:text-brand-600">Productos</Link>
-        <IconChevronRight className="w-3.5 h-3.5" />
-        <span className="text-slate-600">{product.sku}</span>
-      </div>
-
       <PageHeader
+        breadcrumbs={[
+          { label: "Productos", to: "/productos" },
+          { label: product.sku },
+        ]}
         title={product.name}
         description={`${product.category} · ${product.subcategory} · ${product.brand}`}
         action={

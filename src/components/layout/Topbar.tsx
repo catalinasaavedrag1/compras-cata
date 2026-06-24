@@ -4,6 +4,8 @@ import { navItems } from "./navItems";
 import { Input } from "../ui/Input";
 import { IconSearch, IconMenu, IconOrders, IconProducts, IconSuppliers } from "../ui/icons";
 import { useOcDraft } from "../../context/OcDraftContext";
+import { useBuyer, initials } from "../../context/BuyerContext";
+import { TODAY_ISO } from "../../utils/constants";
 import { formatDate, formatNumber } from "../../utils/formatters";
 import { products } from "../../data/mockProducts";
 import { suppliers } from "../../data/mockSuppliers";
@@ -21,8 +23,6 @@ function currentTitle(pathname: string): string {
   return match?.label ?? "Plataforma de Compras";
 }
 
-const TODAY = "2026-06-24";
-
 interface SearchResult {
   type: "product" | "supplier" | "order";
   title: string;
@@ -34,6 +34,7 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { count } = useOcDraft();
+  const { buyer, setBuyer, buyers } = useBuyer();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -183,11 +184,27 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
       </button>
 
       <div className="hidden sm:flex flex-col items-end leading-tight">
-        <span className="text-xs text-slate-400">{formatDate(TODAY)}</span>
-        <span className="text-sm font-medium text-slate-700">Catalina Saavedra</span>
+        <span className="text-xs text-slate-400">{formatDate(TODAY_ISO)}</span>
+        <div className="relative group">
+          <select
+            value={buyer}
+            onChange={(e) => setBuyer(e.target.value)}
+            title="Cambiar de comprador"
+            className="appearance-none bg-transparent text-sm font-medium text-slate-700 cursor-pointer focus:outline-none text-right pr-1 hover:text-brand-700"
+          >
+            {buyers.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-      <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-semibold flex-shrink-0">
-        CS
+      <div
+        className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-semibold flex-shrink-0"
+        title={buyer}
+      >
+        {initials(buyer)}
       </div>
     </header>
   );
