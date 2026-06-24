@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { Tabs } from "../components/ui/Tabs";
 import { RelatedEntitiesPanel } from "../shared/components/RelatedEntitiesPanel";
 import { ActivityTimeline, type ActivityItem } from "../shared/components/ActivityTimeline";
 import { relatedEntitiesForProduct } from "../shared/entities";
+import { channelMarginsForSku, CHANNEL_LABELS, MARGIN_STATUS } from "../data/mockChannelMargin";
 import { KpiCard } from "../components/business/KpiCard";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { RecommendationBadge } from "../components/business/RecommendationBadge";
@@ -14,7 +15,7 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BarList } from "../components/business/BarList";
-import { IconPlus } from "../components/ui/icons";
+import { IconPlus, IconInfo, IconAlerts } from "../components/ui/icons";
 import { getProductBySku } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
 import { alerts } from "../data/mockAlerts";
@@ -35,7 +36,8 @@ export function ProductDetailPage() {
   const { sku } = useParams<{ sku: string }>();
   const navigate = useNavigate();
   const { addItem, hasItem } = useOcDraft();
-  const [tab, setTab] = useState("resumen");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get("tab") ?? "resumen");
 
   const product = sku ? getProductBySku(sku) : undefined;
 
@@ -75,6 +77,11 @@ export function ProductDetailPage() {
 
   // Entidades relacionadas (conexión con otros módulos)
   const related = relatedEntitiesForProduct(product.sku);
+
+  // Margen por canal
+  const channelMargin = channelMarginsForSku(product.sku);
+  const bestChannel = [...channelMargin].sort((a, b) => b.marginPct - a.marginPct)[0];
+  const worstChannel = [...channelMargin].sort((a, b) => a.marginPct - b.marginPct)[0];
 
   // Actividad / auditoría básica del producto
   const activity: ActivityItem[] = [
@@ -155,6 +162,7 @@ export function ProductDetailPage() {
         onChange={setTab}
         tabs={[
           { value: "resumen", label: "Resumen" },
+          { value: "margen", label: "Margen por canal", count: channelMargin.length },
           { value: "relacionados", label: "Relacionados", count: related.length },
           { value: "actividad", label: "Actividad", count: activity.length },
         ]}
@@ -193,14 +201,20 @@ export function ProductDetailPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-xs font-medium text-slate-500 mb-1">Motivo</p>
-                      <p className="text-sm text-slate-700">{rec.reason}</p>
+                  <div className="space-y-2">
+                    <div className="flex gap-2.5 rounded-lg border-l-2 border-slate-300 bg-slate-50 px-3 py-2">
+                      <IconInfo className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-slate-700">
+                        <span className="font-medium text-slate-500">Motivo: </span>
+                        {rec.reason}
+                      </p>
                     </div>
-                    <div className="rounded-lg bg-rose-50 border border-rose-100 p-3">
-                      <p className="text-xs font-medium text-rose-600 mb-1">Riesgo si no se compra</p>
-                      <p className="text-sm text-slate-700">{rec.risk}</p>
+                    <div className="flex gap-2.5 rounded-lg border-l-2 border-rose-400 bg-rose-50 px-3 py-2">
+                      <IconAlerts className="w-4 h-4 text-rose-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-slate-700">
+                        <span className="font-medium text-rose-600">Riesgo si no compras: </span>
+                        {rec.risk}
+                      </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-3 text-center">
@@ -350,6 +364,60 @@ export function ProductDetailPage() {
       </>
       )}
 
+      {tab === "margen" && (
+        <Card>
+          <CardHeader
+            title="Margen por canal"
+            description="Precio y margen del mismo SKU en cada canal, con precio sugerido para alcanzar el objetivo"
+            action={
+              <Link to={`/margen-canal?q=${product.sku}`} className="text-xs font-medium text-brand-600 hover:text-brand-700">
+                Ver comparador
+              </Link>
+            }
+          />
+          <CardBody>
+            {channelMargin.length === 0 ? (
+              <EmptyState title="Sin datos de canal" description="Este producto no tiene margen por canal cargado." />
+            ) : (
+              <>
+                {bestChannel && worstChannel && bestChannel.channel !== worstChannel.channel && (
+                  <div className="mb-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                    Mejor margen en <b>{CHANNEL_LABELS[bestChannel.channel]}</b> ({formatPercent(bestChannel.marginPct)});
+                    el más bajo en <b>{CHANNEL_LABELS[worstChannel.channel]}</b> ({formatPercent(worstChannel.marginPct)}).
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {channelMargin.map((c) => (
+                    <div key={c.channel} className="rounded-xl border border-slate-200 p-3">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-sm font-semibold text-slate-800">{CHANNEL_LABELS[c.channel]}</span>
+                        <Badge tone={MARGIN_STATUS[c.status].tone} dot>{MARGIN_STATUS[c.status].label}</Badge>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <Row label="Precio" value={formatCurrency(c.finalPrice)} />
+                        <Row label="Costo" value={formatCurrency(c.cost)} />
+                        {c.commission > 0 && <Row label="Comisión" value={formatCurrency(c.commission)} />}
+                        {c.discount > 0 && <Row label="Descuento" value={formatCurrency(c.discount)} />}
+                        <Row label="Margen" value={formatPercent(c.marginPct)} strong tone={c.marginPct < 0 ? "bad" : c.status === "low" ? "warn" : "good"} />
+                        <Row label="Objetivo" value={formatPercent(c.targetMarginPct, 0)} />
+                        <Row label="Venta 30d" value={`${formatNumber(c.sales30)} u.`} />
+                      </div>
+                      {(c.status === "low" || c.status === "negative") && (
+                        <div className="mt-2 rounded-lg bg-brand-50 border border-brand-100 px-2.5 py-1.5">
+                          <p className="text-xs text-brand-800">Precio sugerido: <b>{formatCurrency(c.suggestedPrice)}</b></p>
+                        </div>
+                      )}
+                      <p className="text-xs text-slate-500 mt-2 leading-snug">{c.cause}</p>
+                      <p className="text-xs font-medium text-slate-700 mt-1">Acción: {c.action}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
       {tab === "relacionados" && (
         <Card>
           <CardHeader title="Entidades relacionadas" description="Conexiones de este producto con otros módulos" />
@@ -367,6 +435,26 @@ export function ProductDetailPage() {
           </CardBody>
         </Card>
       )}
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  strong,
+  tone,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  tone?: "good" | "warn" | "bad";
+}) {
+  const toneClass = tone === "bad" ? "text-rose-600" : tone === "warn" ? "text-amber-600" : tone === "good" ? "text-emerald-600" : "text-slate-700";
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs text-slate-500">{label}</span>
+      <span className={`${strong ? "font-semibold" : ""} ${toneClass}`}>{value}</span>
     </div>
   );
 }

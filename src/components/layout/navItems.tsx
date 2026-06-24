@@ -108,6 +108,12 @@ export const navGroups: NavGroup[] = [
         hint: "Qué se vende, qué crece y qué cae",
       },
       {
+        to: "/margen-canal",
+        label: "Margen por canal",
+        icon: IconSales,
+        hint: "Precio y margen por marketplace, web y tienda",
+      },
+      {
         to: "/alertas",
         label: "Alertas comerciales",
         icon: IconAlerts,

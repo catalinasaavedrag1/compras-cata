@@ -14,6 +14,7 @@ import { SuppliersPage } from "../pages/SuppliersPage";
 import { PurchaseOrdersPage } from "../pages/PurchaseOrdersPage";
 import { AlertsPage } from "../pages/AlertsPage";
 import { CampaignOpportunitiesPage } from "../pages/CampaignOpportunitiesPage";
+import { ChannelMarginPage } from "../pages/ChannelMarginPage";
 import { InventoryAnalysisPage } from "../pages/InventoryAnalysisPage";
 import { SalesAnalysisPage } from "../pages/SalesAnalysisPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -38,6 +39,7 @@ export default function AppRoutes() {
           <Route path="/alertas" element={<AlertsPage />} />
           <Route path="/inventario" element={<InventoryAnalysisPage />} />
           <Route path="/ventas" element={<SalesAnalysisPage />} />
+          <Route path="/margen-canal" element={<ChannelMarginPage />} />
           <Route path="/reglas" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

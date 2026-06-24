@@ -17,6 +17,10 @@ interface KpiCardProps {
   icon?: ReactNode;
   /** Si se pasa, la card es cliqueable y navega a esa ruta. */
   to?: string;
+  /** Si se pasa, la card es cliqueable y ejecuta esta acción (ej. filtrar). */
+  onClick?: () => void;
+  /** Marca visual de seleccionado (para KPIs que actúan como filtro). */
+  active?: boolean;
 }
 
 const toneAccent: Record<Tone, string> = {
@@ -44,6 +48,8 @@ export function KpiCard({
   tone = "neutral",
   icon,
   to,
+  onClick,
+  active,
 }: KpiCardProps) {
   const hasDelta = delta !== undefined && Number.isFinite(delta);
   const up = (delta ?? 0) >= 0;
@@ -104,6 +110,21 @@ export function KpiCard({
       >
         {inner}
       </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className={cn(
+          baseClass,
+          "text-left transition-colors hover:border-brand-300 hover:bg-brand-50/30",
+          active && "border-brand-400 ring-2 ring-brand-100"
+        )}
+      >
+        {inner}
+      </button>
     );
   }
 

@@ -307,6 +307,36 @@ export interface CreatedCampaign {
   createdAt: string;
 }
 
+// ----------------------------------------------------------------------------
+//  Margen por canal de venta (marketplace / web / tienda)
+// ----------------------------------------------------------------------------
+
+export type MarginChannelKey = "marketplace" | "web" | "store";
+
+export type MarginStatus = "negative" | "low" | "normal" | "over";
+
+export interface ChannelMargin {
+  sku: string;
+  productName: string;
+  category: string;
+  supplierName: string;
+  buyer: string;
+  channel: MarginChannelKey;
+  listPrice: number;
+  finalPrice: number;
+  cost: number;
+  commission: number; // comisión del canal (marketplace)
+  discount: number; // descuento aplicado
+  marginPct: number; // margen actual %
+  targetMarginPct: number; // margen objetivo %
+  sales30: number;
+  stock: number;
+  suggestedPrice: number; // precio para alcanzar el objetivo
+  status: MarginStatus;
+  cause: string; // causa principal del resultado
+  action: string; // acción recomendada
+}
+
 export interface CampaignOpportunity {
   id: string;
   sku: string;

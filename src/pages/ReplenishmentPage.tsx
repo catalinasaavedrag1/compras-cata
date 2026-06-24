@@ -8,7 +8,6 @@ import { FilterBar } from "../components/business/FilterBar";
 import { RecommendationBadge } from "../components/business/RecommendationBadge";
 import { PriorityBadge } from "../components/business/PriorityBadge";
 import { StateLegend } from "../components/business/StateLegend";
-import { HelpNote } from "../components/business/HelpNote";
 import { recommendationUrgency, priorityUrgency } from "../components/business/statusInfo";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
@@ -16,7 +15,7 @@ import { Tabs } from "../components/ui/Tabs";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
-import { IconReplenish, IconAlerts, IconBox, IconPlus, IconClose } from "../components/ui/icons";
+import { IconReplenish, IconAlerts, IconBox, IconPlus, IconClose, IconInfo } from "../components/ui/icons";
 import { recommendations as allRecs } from "../data/mockRecommendations";
 import { suppliers } from "../data/mockSuppliers";
 import { monthlyPurchaseBudget } from "../data/mockRules";
@@ -505,20 +504,19 @@ export function ReplenishmentPage() {
         <KpiCard title="Con margen bajo" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Margen menor a 25%" />
       </div>
 
-      {/* Ayuda + leyenda de estados */}
-      <div className="space-y-3 mb-4">
-        <HelpNote title="Cómo se calcula la cantidad sugerida:">
-          se combina el stock disponible, la venta reciente, el lead time del proveedor y los
-          días objetivo de inventario. La columna <b>"para ~N días"</b> indica cuántos días de venta
-          cubrirá la compra sugerida (ya considerando el tiempo de entrega del proveedor). Solo se
-          recomienda comprar cuando hay riesgo de quiebre o necesidad real; la tabla muestra primero lo más urgente.
-          {overstockSavings > 0 && (
-            <>
-              {" "}Ajustando el sobrestock puedes liberar{" "}
-              <span className="font-semibold">{formatCurrency(overstockSavings)}</span> de capital.
-            </>
-          )}
-        </HelpNote>
+      {/* Ayuda breve + leyenda de estados (colapsable) */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs text-slate-500">
+        <span className="inline-flex items-center gap-1">
+          <IconInfo className="w-3.5 h-3.5 text-slate-400" />
+          La cantidad sugerida cubre lead time + días objetivo. <b className="font-medium text-slate-600">"para ~N días"</b> = cobertura tras comprar.
+        </span>
+        {overstockSavings > 0 && (
+          <span className="text-emerald-700">
+            Ajustar sobrestock libera <b>{formatCurrency(overstockSavings)}</b>.
+          </span>
+        )}
+      </div>
+      <div className="mb-4">
         <StateLegend />
       </div>
 
