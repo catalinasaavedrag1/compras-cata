@@ -20,6 +20,15 @@
   }
 }
 
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 @layer utilities {
   .line-clamp-2 {
     display: -webkit-box;
