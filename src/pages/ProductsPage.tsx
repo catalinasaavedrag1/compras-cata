@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -7,35 +7,30 @@ import { FilterBar } from "../components/business/FilterBar";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
+import { ExportButton } from "../components/business/ExportButton";
 import { products as allProducts } from "../data/mockProducts";
 import { filterProducts, uniqueValues } from "../utils/filters";
+import { useUrlState } from "../utils/useUrlState";
 import { formatCurrency, formatNumber, formatPercent } from "../utils/formatters";
 import { IconProducts, IconAlerts, IconSuppliers, IconSales } from "../components/ui/icons";
 import type { Product } from "../types/purchasing";
 
 export function ProductsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
-  const [subcategory, setSubcategory] = useState("");
-  const [brand, setBrand] = useState("");
-  const [supplier, setSupplier] = useState("");
-  const [productStatus, setProductStatus] = useState("");
-  const [purchaseStatus, setPurchaseStatus] = useState("");
+  const [query, setQuery] = useUrlState("q");
+  const [category, setCategory] = useUrlState("cat");
+  const [subcategory, setSubcategory] = useUrlState("sub");
+  const [brand, setBrand] = useUrlState("marca");
+  const [supplier, setSupplier] = useUrlState("prov");
+  const [productStatus, setProductStatus] = useUrlState("comercial");
+  const [purchaseStatus, setPurchaseStatus] = useUrlState("compra");
   const [toggles, setToggles] = useState({
     lowMargin: false,
     noSupplier: false,
     noSales: false,
     outdatedCost: false,
   });
-
-  // Carga el query desde el buscador global del Topbar
-  useEffect(() => {
-    const q = searchParams.get("q");
-    if (q) setQuery(q);
-  }, [searchParams]);
 
   const filtered = useMemo(() => {
     let result = filterProducts(allProducts, {
@@ -163,6 +158,29 @@ export function ProductsPage() {
       <PageHeader
         title="Productos / SKUs"
         description="Maestro del surtido. Revisa stock, margen, rotación y estado de cada producto. Haz clic en una fila para ver el detalle y la decisión recomendada."
+        action={
+          <ExportButton
+            filename="productos"
+            rows={filtered}
+            columns={[
+              { label: "SKU", value: (p) => p.sku },
+              { label: "Nombre", value: (p) => p.name },
+              { label: "Categoría", value: (p) => p.category },
+              { label: "Subcategoría", value: (p) => p.subcategory },
+              { label: "Marca", value: (p) => p.brand },
+              { label: "Proveedor", value: (p) => p.supplierName },
+              { label: "Costo", value: (p) => p.cost },
+              { label: "Precio", value: (p) => p.price },
+              { label: "Margen %", value: (p) => p.margin },
+              { label: "Stock total", value: (p) => p.totalStock },
+              { label: "Stock disponible", value: (p) => p.availableStock },
+              { label: "Venta 30 días", value: (p) => p.salesLast30Days },
+              { label: "Rotación", value: (p) => p.rotation },
+              { label: "Estado comercial", value: (p) => p.productStatus },
+              { label: "Estado compra", value: (p) => p.purchaseStatus },
+            ]}
+          />
+        }
       />
 
       <HelpNote className="mb-4">

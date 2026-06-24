@@ -269,6 +269,44 @@ export type CampaignOpportunityStatus =
   | "review_supplier"
   | "not_recommended";
 
+// ----------------------------------------------------------------------------
+//  Campañas creadas por el comprador (con productos en descuento y canales)
+// ----------------------------------------------------------------------------
+
+export type PromoChannel =
+  | "web"
+  | "marketplace"
+  | "store"
+  | "omnichannel"
+  | "b2b"
+  | "social"
+  | "email"
+  | "google_ads"
+  | "meta"
+  | "tiktok";
+
+export type CreatedCampaignStatus = "draft" | "scheduled" | "active";
+
+export interface CampaignProductLine {
+  sku: string;
+  productName: string;
+  basePrice: number;
+  discountPct: number;
+  campaignPrice: number;
+  availableStock: number;
+}
+
+export interface CreatedCampaign {
+  id: string;
+  name: string;
+  channels: PromoChannel[];
+  startDate: string;
+  endDate: string;
+  status: CreatedCampaignStatus;
+  products: CampaignProductLine[];
+  createdAt: string;
+}
+
 export interface CampaignOpportunity {
   id: string;
   sku: string;

@@ -149,6 +149,13 @@ export const IconClock = base(
   </>
 );
 
+export const IconDownload = base(
+  <>
+    <path d="M12 3v12M7 10l5 5 5-5" />
+    <path d="M5 21h14" />
+  </>
+);
+
 export const IconCampaign = base(
   <>
     <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z" />

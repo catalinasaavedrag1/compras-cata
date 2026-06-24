@@ -3,6 +3,8 @@ import type {
   CampaignChannel,
   CampaignOpportunityStatus,
   CampaignOpportunityType,
+  PromoChannel,
+  CreatedCampaignStatus,
 } from "../../types/purchasing";
 
 export const CHANNEL_LABELS: Record<CampaignChannel, string> = {
@@ -82,6 +84,33 @@ export const TYPE_TONE: Record<CampaignOpportunityType, BadgeTone> = {
   star_product: "blue",
   review_before_campaign: "amber",
   not_recommended: "neutral",
+};
+
+// Canales promocionales para campañas creadas (incluye plataformas de ads).
+export const PROMO_CHANNEL_LABELS: Record<PromoChannel, string> = {
+  web: "Web",
+  marketplace: "Marketplace",
+  store: "Tienda física",
+  omnichannel: "Omnicanal",
+  b2b: "Venta empresa",
+  social: "Redes sociales",
+  email: "Email marketing",
+  google_ads: "Google Ads",
+  meta: "Meta (Facebook/Instagram)",
+  tiktok: "TikTok Ads",
+};
+
+export const PROMO_CHANNELS = Object.entries(PROMO_CHANNEL_LABELS).map(
+  ([value, label]) => ({ value: value as PromoChannel, label })
+);
+
+export const CREATED_CAMPAIGN_STATUS: Record<
+  CreatedCampaignStatus,
+  { label: string; tone: BadgeTone }
+> = {
+  draft: { label: "Borrador", tone: "neutral" },
+  scheduled: { label: "Programada", tone: "amber" },
+  active: { label: "Activa", tone: "green" },
 };
 
 /** Orden de urgencia para la tabla (menor = más urgente). */

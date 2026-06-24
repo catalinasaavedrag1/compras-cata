@@ -9,6 +9,10 @@ import { HelpNote } from "../components/business/HelpNote";
 import { PriorityGuide, type GuideStep } from "../components/business/PriorityGuide";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { Tabs } from "../components/ui/Tabs";
+import { EmptyState } from "../components/ui/EmptyState";
+import { ExportButton } from "../components/business/ExportButton";
+import { CampaignBuilderModal } from "../components/business/CampaignBuilderModal";
 import { uniqueValues } from "../utils/filters";
 import {
   formatCurrency,
@@ -20,6 +24,8 @@ import {
   formatDelta,
 } from "../utils/formatters";
 import { useOcDraft } from "../context/OcDraftContext";
+import { useToast } from "../context/ToastContext";
+import { useLocalStorage } from "../utils/useLocalStorage";
 import { campaignOpportunities as all } from "../data/mockCampaignOpportunities";
 import {
   CHANNEL_LABELS,
@@ -27,6 +33,8 @@ import {
   CAMPAIGN_STATUS,
   TYPE_TONE,
   STATUS_URGENCY,
+  PROMO_CHANNEL_LABELS,
+  CREATED_CAMPAIGN_STATUS,
 } from "../components/business/campaignLabels";
 import {
   IconReplenish,
@@ -36,8 +44,10 @@ import {
   IconArrowUp,
   IconCheck,
   IconPlus,
+  IconCampaign,
+  IconClose,
 } from "../components/ui/icons";
-import type { CampaignOpportunity } from "../types/purchasing";
+import type { CampaignOpportunity, CreatedCampaign } from "../types/purchasing";
 
 /** Precio de venta estimado a partir del costo y el margen. */
 function estPrice(o: CampaignOpportunity) {
@@ -47,6 +57,15 @@ function estPrice(o: CampaignOpportunity) {
 export function CampaignOpportunitiesPage() {
   const navigate = useNavigate();
   const { addItem, hasItem } = useOcDraft();
+  const toast = useToast();
+
+  const [view, setView] = useState<"oportunidades" | "campanas">("oportunidades");
+  const [createdCampaigns, setCreatedCampaigns] = useLocalStorage<CreatedCampaign[]>(
+    "compras:campaigns",
+    []
+  );
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [builderTemplate, setBuilderTemplate] = useState("");
 
   const [done, setDone] = useState<string[]>([]); // acciones simuladas ya gestionadas
   const [sort, setSort] = useState<SortState>({ key: null, dir: "desc" });
@@ -176,11 +195,30 @@ export function CampaignOpportunitiesPage() {
         quantity: o.suggestedPurchaseQuantity,
         unitCost: o.unitCost,
       });
+      toast.success(`${o.productName} agregado al borrador de OC`);
       return;
     }
     if (o.actionLabel === "Revisar proveedor") return navigate("/proveedores");
     // Resto (potenciar, liquidación, excluir, revisar margen): se marca como gestionado
     setDone((prev) => (prev.includes(o.id) ? prev : [...prev, o.id]));
+    toast.success(`${o.actionLabel}: ${o.productName}`);
+  };
+
+  const saveCampaign = (c: CreatedCampaign) => {
+    setCreatedCampaigns((prev) => [c, ...prev]);
+    setBuilderOpen(false);
+    setView("campanas");
+    toast.success(`Campaña "${c.name}" creada con ${c.products.length} producto${c.products.length === 1 ? "" : "s"}`);
+  };
+
+  const deleteCampaign = (id: string) => {
+    setCreatedCampaigns((prev) => prev.filter((x) => x.id !== id));
+    toast.info("Campaña eliminada");
+  };
+
+  const openBuilder = (template = "") => {
+    setBuilderTemplate(template);
+    setBuilderOpen(true);
   };
 
   const handleSort = (key: string) =>
@@ -374,9 +412,75 @@ export function CampaignOpportunitiesPage() {
     <div>
       <PageHeader
         title="Campañas y oportunidades"
-        description="Analiza productos que irán a campañas comerciales, oportunidades de liquidación, crecimiento acelerado y riesgos de quiebre para anticipar compras y evitar pérdidas de venta."
+        description="Analiza productos que irán a campañas comerciales, oportunidades de liquidación, crecimiento acelerado y riesgos de quiebre, y crea tus propias campañas con productos en descuento."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <ExportButton
+              filename="campanas-oportunidades"
+              rows={filtered}
+              columns={[
+                { label: "SKU", value: (o) => o.sku },
+                { label: "Producto", value: (o) => o.productName },
+                { label: "Categoría", value: (o) => o.category },
+                { label: "Proveedor", value: (o) => o.supplierName },
+                { label: "Oportunidad", value: (o) => OPPORTUNITY_TYPE_LABELS[o.opportunityType] },
+                { label: "Canal", value: (o) => CHANNEL_LABELS[o.channel] },
+                { label: "Campaña", value: (o) => o.campaignName },
+                { label: "Fecha campaña", value: (o) => o.campaignDate },
+                { label: "Stock disponible", value: (o) => o.availableStock },
+                { label: "Venta 30 días", value: (o) => o.salesLast30Days },
+                { label: "Crecimiento %", value: (o) => o.growthRate },
+                { label: "Venta estimada campaña", value: (o) => o.estimatedCampaignSales },
+                { label: "Brecha stock", value: (o) => o.stockGap },
+                { label: "Compra sugerida", value: (o) => o.suggestedPurchaseQuantity },
+                { label: "Margen %", value: (o) => o.margin },
+                { label: "Estado", value: (o) => CAMPAIGN_STATUS[o.status].label },
+              ]}
+            />
+            <Button onClick={() => openBuilder("")} icon={<IconPlus className="w-4 h-4" />}>
+              Crear campaña
+            </Button>
+          </div>
+        }
       />
 
+      {/* Plantillas rápidas de campaña */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="text-xs font-medium text-slate-500">Plantillas rápidas:</span>
+        {["Cyber herramientas", "Especial construcción", "Liquidación stock lento", "Campaña jardín primavera"].map((t) => (
+          <button
+            key={t}
+            onClick={() => openBuilder(t)}
+            className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
+          >
+            <IconPlus className="w-3 h-3" /> {t}
+          </button>
+        ))}
+      </div>
+
+      <Tabs
+        className="mb-5"
+        value={view}
+        onChange={(v) => setView(v as typeof view)}
+        tabs={[
+          { value: "oportunidades", label: "Oportunidades detectadas", count: all.length },
+          { value: "campanas", label: "Mis campañas", count: createdCampaigns.length },
+        ]}
+      />
+
+      {view === "campanas" ? (
+        <CreatedCampaignsView
+          campaigns={createdCampaigns}
+          onCreate={() => openBuilder("")}
+          onDelete={deleteCampaign}
+          onAddToOc={(sku) => {
+            const p = all.find((o) => o.sku === sku);
+            navigate(`/productos/${sku}`);
+            void p;
+          }}
+        />
+      ) : (
+      <>
       <HelpNote className="mb-4">
         Esta vista cruza <b>campaña, canal, stock disponible, venta reciente, crecimiento, margen y
         venta estimada</b> para recomendar si conviene <b>comprar, liquidar, potenciar o excluir</b> cada
@@ -519,6 +623,115 @@ export function CampaignOpportunitiesPage() {
           emptyMessage="No hay oportunidades que coincidan con los filtros."
         />
       </Card>
+      </>
+      )}
+
+      <CampaignBuilderModal
+        open={builderOpen}
+        onClose={() => setBuilderOpen(false)}
+        onSave={saveCampaign}
+        initialName={builderTemplate}
+      />
+    </div>
+  );
+}
+
+/** Vista "Mis campañas": campañas creadas por el comprador. */
+function CreatedCampaignsView({
+  campaigns,
+  onCreate,
+  onDelete,
+  onAddToOc,
+}: {
+  campaigns: CreatedCampaign[];
+  onCreate: () => void;
+  onDelete: (id: string) => void;
+  onAddToOc: (sku: string) => void;
+}) {
+  if (campaigns.length === 0) {
+    return (
+      <Card>
+        <CardBody>
+          <EmptyState
+            icon={<IconCampaign className="w-6 h-6" />}
+            title="Aún no has creado campañas"
+            description="Crea una campaña (ej. Cyber), elige los canales (web, marketplace, Google Ads, Meta…) y sube los productos que estarán con descuento."
+            action={<Button onClick={onCreate} icon={<IconPlus className="w-4 h-4" />}>Crear campaña</Button>}
+          />
+        </CardBody>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <HelpNote variant="tip">
+        Estas son tus campañas. Revisa los productos con <b>stock bajo</b> antes de lanzarlas y agrégalos a
+        una orden de compra para no quebrar durante el evento.
+      </HelpNote>
+      {campaigns.map((c) => {
+        const lowStock = c.products.filter((p) => p.availableStock <= 5).length;
+        const avgDiscount = Math.round(
+          c.products.reduce((a, p) => a + p.discountPct, 0) / Math.max(1, c.products.length)
+        );
+        return (
+          <Card key={c.id}>
+            <CardHeader
+              title={c.name}
+              description={`${formatDate(c.startDate)} → ${formatDate(c.endDate)} · ${c.products.length} producto${c.products.length === 1 ? "" : "s"} · ${avgDiscount}% dcto promedio`}
+              action={
+                <div className="flex items-center gap-2">
+                  <Badge tone={CREATED_CAMPAIGN_STATUS[c.status].tone} dot>
+                    {CREATED_CAMPAIGN_STATUS[c.status].label}
+                  </Badge>
+                  <button
+                    onClick={() => onDelete(c.id)}
+                    className="text-slate-400 hover:text-rose-600"
+                    aria-label="Eliminar campaña"
+                  >
+                    <IconClose className="w-4 h-4" />
+                  </button>
+                </div>
+              }
+            />
+            <CardBody>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {c.channels.map((ch) => (
+                  <Badge key={ch} tone="blue">{PROMO_CHANNEL_LABELS[ch]}</Badge>
+                ))}
+                {lowStock > 0 && (
+                  <Badge tone="red">{lowStock} con stock bajo — revisa compra</Badge>
+                )}
+              </div>
+              <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+                {c.products.map((p) => (
+                  <div key={p.sku} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+                      <p className="text-sm font-medium text-slate-800 truncate">{p.productName}</p>
+                      <p className="text-xs text-slate-500">
+                        Stock {formatNumber(p.availableStock)}
+                        {p.availableStock <= 5 && <span className="text-rose-500 font-medium"> · stock bajo</span>}
+                      </p>
+                    </div>
+                    <Badge tone="amber">-{p.discountPct}%</Badge>
+                    <div className="text-right w-28">
+                      <p className="text-xs text-slate-400 line-through">{formatCurrency(p.basePrice)}</p>
+                      <p className="text-sm font-semibold text-emerald-600">{formatCurrency(p.campaignPrice)}</p>
+                    </div>
+                    <button
+                      onClick={() => onAddToOc(p.sku)}
+                      className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                    >
+                      Ver producto
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+        );
+      })}
     </div>
   );
 }

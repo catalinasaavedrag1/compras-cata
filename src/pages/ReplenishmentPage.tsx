@@ -28,7 +28,10 @@ import {
   formatPercent,
 } from "../utils/formatters";
 import { useOcDraft } from "../context/OcDraftContext";
+import { useToast } from "../context/ToastContext";
 import { useLocalStorage } from "../utils/useLocalStorage";
+import { useUrlState } from "../utils/useUrlState";
+import { ExportButton } from "../components/business/ExportButton";
 import type { PurchaseRecommendation } from "../types/purchasing";
 
 interface RecOverride {
@@ -49,6 +52,7 @@ const emptyToggles = {
 export function ReplenishmentPage() {
   const navigate = useNavigate();
   const { addItem, hasItem } = useOcDraft();
+  const toast = useToast();
 
   // Estado persistente (sobrevive a recargas)
   const [overrides, setOverrides] = useLocalStorage<Record<string, RecOverride>>(
@@ -63,11 +67,11 @@ export function ReplenishmentPage() {
   // Estado de UI
   const [selected, setSelected] = useState<string[]>([]);
   const [sort, setSort] = useState<SortState>({ key: null, dir: "desc" });
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
-  const [supplier, setSupplier] = useState("");
-  const [status, setStatus] = useState("");
-  const [priority, setPriority] = useState("");
+  const [query, setQuery] = useUrlState("q");
+  const [category, setCategory] = useUrlState("cat");
+  const [supplier, setSupplier] = useUrlState("prov");
+  const [status, setStatus] = useUrlState("estado");
+  const [priority, setPriority] = useUrlState("prioridad");
   const [toggles, setToggles] = useState(emptyToggles);
 
   const [editing, setEditing] = useState<PurchaseRecommendation | null>(null);
@@ -132,22 +136,27 @@ export function ReplenishmentPage() {
   const selectedTotal = selectedRecs.reduce((a, r) => a + r.suggestedPurchaseAmount, 0);
 
   const addSelectedToOc = () => {
-    selectedRecs
-      .filter((r) => r.suggestedQuantity > 0 && !hasItem(r.sku))
-      .forEach((r) =>
-        addItem({
-          sku: r.sku,
-          productName: r.productName,
-          supplierName: r.supplierName,
-          quantity: r.suggestedQuantity,
-          unitCost: r.unitCost,
-        })
-      );
+    const toAdd = selectedRecs.filter((r) => r.suggestedQuantity > 0 && !hasItem(r.sku));
+    toAdd.forEach((r) =>
+      addItem({
+        sku: r.sku,
+        productName: r.productName,
+        supplierName: r.supplierName,
+        quantity: r.suggestedQuantity,
+        unitCost: r.unitCost,
+      })
+    );
     setSelected([]);
+    toast.success(
+      toAdd.length > 0
+        ? `${toAdd.length} producto${toAdd.length === 1 ? "" : "s"} agregado${toAdd.length === 1 ? "" : "s"} al borrador de OC`
+        : "Esos productos ya estaban en el borrador de OC"
+    );
   };
 
   const ignoreSelected = () => {
     setIgnoredIds((prev) => Array.from(new Set([...prev, ...selected])));
+    toast.info(`${selected.length} sugerencia${selected.length === 1 ? "" : "s"} ignorada${selected.length === 1 ? "" : "s"}`);
     setSelected([]);
   };
 
@@ -167,10 +176,11 @@ export function ReplenishmentPage() {
         supplierName: editSupplier,
       },
     }));
+    toast.success(`Sugerencia de ${editing.productName} actualizada`);
     setEditing(null);
   };
 
-  const handleAdd = (r: PurchaseRecommendation) =>
+  const handleAdd = (r: PurchaseRecommendation) => {
     addItem({
       sku: r.sku,
       productName: r.productName,
@@ -178,6 +188,8 @@ export function ReplenishmentPage() {
       quantity: r.suggestedQuantity,
       unitCost: r.unitCost,
     });
+    toast.success(`${r.productName} agregado al borrador de OC`);
+  };
 
   const handleSort = (key: string) =>
     setSort((prev) =>
@@ -356,6 +368,7 @@ export function ReplenishmentPage() {
               onClick={(e) => {
                 e.stopPropagation();
                 setIgnoredIds((prev) => Array.from(new Set([...prev, r.id])));
+                toast.info(`Sugerencia de ${r.productName} ignorada`);
               }}
               className="flex-1 text-xs text-slate-500 hover:text-rose-600 border border-slate-200 rounded-md py-1"
             >
@@ -378,9 +391,32 @@ export function ReplenishmentPage() {
         title="Reposición sugerida"
         description="Productos priorizados según stock disponible, venta histórica, lead time del proveedor y riesgo de quiebre. Define qué comprar, cuánto y por qué."
         action={
-          <Button onClick={() => navigate("/ordenes-compra")} icon={<IconReplenish className="w-4 h-4" />}>
-            Ir a órdenes de compra
-          </Button>
+          <div className="flex gap-2">
+            <ExportButton
+              filename="reposicion-sugerida"
+              rows={filtered}
+              columns={[
+                { label: "SKU", value: (r) => r.sku },
+                { label: "Producto", value: (r) => r.productName },
+                { label: "Categoría", value: (r) => r.category },
+                { label: "Marca", value: (r) => r.brand },
+                { label: "Proveedor", value: (r) => r.supplierName },
+                { label: "Stock disponible", value: (r) => r.availableStock },
+                { label: "Venta 30 días", value: (r) => r.salesLast30Days },
+                { label: "Días inventario", value: (r) => r.inventoryDays },
+                { label: "Cantidad sugerida", value: (r) => r.suggestedQuantity },
+                { label: "Costo unitario", value: (r) => r.unitCost },
+                { label: "Compra sugerida $", value: (r) => r.suggestedPurchaseAmount },
+                { label: "Margen %", value: (r) => r.margin },
+                { label: "Prioridad", value: (r) => r.priority },
+                { label: "Estado", value: (r) => r.status },
+                { label: "Motivo", value: (r) => r.reason },
+              ]}
+            />
+            <Button onClick={() => navigate("/ordenes-compra")} icon={<IconReplenish className="w-4 h-4" />}>
+              Ir a órdenes de compra
+            </Button>
+          </div>
         }
       />
 

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "../layouts/AppLayout";
 import { OcDraftProvider } from "../context/OcDraftContext";
+import { ToastProvider } from "../context/ToastContext";
 import { DashboardPage } from "../pages/DashboardPage";
 import { ReplenishmentPage } from "../pages/ReplenishmentPage";
 import { ProductsPage } from "../pages/ProductsPage";
@@ -16,8 +17,9 @@ import { SettingsPage } from "../pages/SettingsPage";
 
 export default function AppRoutes() {
   return (
-    <OcDraftProvider>
-      <Routes>
+    <ToastProvider>
+      <OcDraftProvider>
+        <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/reposicion" element={<ReplenishmentPage />} />
@@ -32,8 +34,9 @@ export default function AppRoutes() {
           <Route path="/ventas" element={<SalesAnalysisPage />} />
           <Route path="/reglas" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </OcDraftProvider>
+          </Route>
+        </Routes>
+      </OcDraftProvider>
+    </ToastProvider>
   );
 }

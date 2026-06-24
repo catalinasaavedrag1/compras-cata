@@ -17,6 +17,7 @@ import { IconPlus, IconReplenish, IconOrders } from "../components/ui/icons";
 import { purchaseOrders as seedPOs } from "../data/mockPurchaseOrders";
 import { recommendations } from "../data/mockRecommendations";
 import { useOcDraft } from "../context/OcDraftContext";
+import { useToast } from "../context/ToastContext";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import {
   formatCurrency,
@@ -37,6 +38,7 @@ const TABS = [
 export function PurchaseOrdersPage() {
   const navigate = useNavigate();
   const { items, count, totalAmount, updateQuantity, removeItem, clear, addItem, hasItem } = useOcDraft();
+  const toast = useToast();
 
   // Persistente: órdenes creadas por el usuario + cambios de estado sobre las semilla
   const [createdOrders, setCreatedOrders] = useLocalStorage<PurchaseOrder[]>(
@@ -98,6 +100,7 @@ export function PurchaseOrdersPage() {
   const markAsSent = (id: string) => {
     setStatusOverrides((prev) => ({ ...prev, [id]: "sent" }));
     setDetail(null);
+    toast.success("Orden de compra marcada como enviada");
   };
 
   // Sugerencias que aún no están en el borrador
@@ -132,6 +135,7 @@ export function PurchaseOrdersPage() {
     clear();
     setDrawerOpen(false);
     setTab("draft");
+    toast.success(`Borrador ${num} creado con ${newOrder.skuCount} producto${newOrder.skuCount === 1 ? "" : "s"}`);
   };
 
   const columns: Column<PurchaseOrder>[] = [
@@ -333,15 +337,16 @@ export function PurchaseOrdersPage() {
                     size="sm"
                     variant="secondary"
                     icon={<IconPlus className="w-3.5 h-3.5" />}
-                    onClick={() =>
+                    onClick={() => {
                       addItem({
                         sku: r.sku,
                         productName: r.productName,
                         supplierName: r.supplierName,
                         quantity: r.suggestedQuantity,
                         unitCost: r.unitCost,
-                      })
-                    }
+                      });
+                      toast.success(`${r.productName} agregado al borrador`);
+                    }}
                   >
                     Agregar
                   </Button>

@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "../components/layout/Sidebar";
 import { Topbar } from "../components/layout/Topbar";
 import { MobileNav } from "../components/layout/MobileNav";
+import { Toaster } from "../components/ui/Toaster";
 
 export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -17,6 +18,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }

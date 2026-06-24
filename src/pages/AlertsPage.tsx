@@ -16,6 +16,7 @@ import { filterAlerts } from "../utils/filters";
 import { formatNumber } from "../utils/formatters";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import { useOcDraft } from "../context/OcDraftContext";
+import { useToast } from "../context/ToastContext";
 import { IconAlerts, IconCheck } from "../components/ui/icons";
 import type { AlertStatus } from "../types/purchasing";
 
@@ -30,6 +31,7 @@ const TABS = [
 export function AlertsPage() {
   const navigate = useNavigate();
   const { addItem, hasItem } = useOcDraft();
+  const toast = useToast();
   const [statusOverrides, setStatusOverrides] = useLocalStorage<Record<string, AlertStatus>>(
     "compras:alert-status",
     {}
@@ -47,8 +49,10 @@ export function AlertsPage() {
     [statusOverrides]
   );
 
-  const setStatus = (id: string, status: AlertStatus) =>
+  const setStatus = (id: string, status: AlertStatus) => {
     setStatusOverrides((prev) => ({ ...prev, [id]: status }));
+    toast.success(status === "resolved" ? "Alerta marcada como resuelta" : "Alerta marcada en revisión");
+  };
 
   const counts = useMemo(
     () => ({
@@ -82,14 +86,16 @@ export function AlertsPage() {
       return {
         label: added ? "Agregado a OC" : "Agregar a OC",
         disabled: added,
-        onClick: () =>
+        onClick: () => {
           addItem({
             sku: rec.sku,
             productName: rec.productName,
             supplierName: rec.supplierName,
             quantity: rec.suggestedQuantity,
             unitCost: rec.unitCost,
-          }),
+          });
+          toast.success(`${rec.productName} agregado al borrador de OC`);
+        },
       };
     }
     if (a.type === "po_delayed")
