@@ -1,0 +1,212 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { PageHeader } from "../components/ui/PageHeader";
+import { KpiCard } from "../components/business/KpiCard";
+import { Card, CardBody, CardHeader } from "../components/ui/Card";
+import { Tabs } from "../components/ui/Tabs";
+import { BarList } from "../components/business/BarList";
+import { HelpNote } from "../components/business/HelpNote";
+import { DataTable, type Column } from "../components/ui/Table";
+import { StatusBadge } from "../components/business/StatusBadge";
+import { Badge } from "../components/ui/Badge";
+import {
+  inventoryKpis,
+  inventoryByCategory,
+  inventoryByWarehouse,
+  inventoryByRotation,
+} from "../data/mockInventory";
+import { products } from "../data/mockProducts";
+import { frozenCapital } from "../utils/calculations";
+import {
+  formatCurrency,
+  formatCurrencyCompact,
+  formatNumber,
+} from "../utils/formatters";
+import { IconInventory, IconBox, IconAlerts } from "../components/ui/icons";
+import type { Product } from "../types/purchasing";
+
+const GROUP_TABS = [
+  { value: "category", label: "Por categoría" },
+  { value: "warehouse", label: "Por tienda/bodega" },
+  { value: "rotation", label: "Por rotación" },
+];
+
+export function InventoryAnalysisPage() {
+  const [group, setGroup] = useState("category");
+
+  const groupData =
+    group === "warehouse"
+      ? inventoryByWarehouse
+      : group === "rotation"
+      ? inventoryByRotation
+      : inventoryByCategory;
+
+  // Productos con más capital inmovilizado (stock disponible * costo)
+  const frozen = [...products]
+    .map((p) => ({ p, frozen: p.availableStock * p.cost }))
+    .sort((a, b) => b.frozen - a.frozen)
+    .slice(0, 6);
+
+  const overstock = products.filter((p) => p.purchaseStatus === "overstock");
+  const noSales90 = products.filter((p) => p.salesLast90Days <= 6);
+  const criticalStock = products.filter((p) => p.availableStock <= 0 && p.salesLast30Days > 0);
+
+  const frozenColumns: Column<Product>[] = [
+    {
+      key: "product",
+      header: "Producto",
+      render: (p) => (
+        <Link to={`/productos/${p.sku}`} className="block hover:text-brand-700">
+          <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+          <p className="font-medium text-slate-800">{p.name}</p>
+        </Link>
+      ),
+    },
+    { key: "stock", header: "Stock disp.", align: "right", render: (p) => formatNumber(p.availableStock) },
+    { key: "sales", header: "Venta mes", align: "right", hideOnMobile: true, render: (p) => formatNumber(p.salesLast30Days) },
+    { key: "days", header: "Días inv.", align: "right", render: (p) => formatNumber(p.inventoryDays) },
+    {
+      key: "capital",
+      header: "Capital inmovilizado",
+      align: "right",
+      render: (p) => <span className="font-semibold text-slate-900">{formatCurrency(p.availableStock * p.cost)}</span>,
+    },
+    {
+      key: "excess",
+      header: "Sobre máximo",
+      align: "right",
+      hideOnMobile: true,
+      render: (p) => {
+        const fc = frozenCapital(p.availableStock, p.maxStock, p.cost);
+        return fc > 0 ? <span className="text-amber-600">{formatCurrency(fc)}</span> : <span className="text-slate-300">—</span>;
+      },
+    },
+    { key: "status", header: "Estado", render: (p) => <StatusBadge kind="purchase" value={p.purchaseStatus} dot={false} /> },
+  ];
+
+  return (
+    <div>
+      <PageHeader
+        title="Análisis de inventario"
+        description="Salud del inventario para compras: cuánto capital está inmovilizado, dónde hay sobrestock o stock muerto y qué productos están en quiebre."
+      />
+
+      <HelpNote className="mb-4">
+        <b>Sobrestock</b>: más inventario del necesario según la velocidad de venta. <b>Stock muerto</b>:
+        productos sin venta en 90 días. Ambos inmovilizan capital que podrías usar en productos que sí
+        rotan. El objetivo de esta vista es liberar esa caja.
+      </HelpNote>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <KpiCard title="Inventario valorizado" value={formatCurrencyCompact(inventoryKpis.totalInventoryValue)} tone="info" icon={<IconInventory className="w-4 h-4" />} />
+        <KpiCard title="Stock disponible" value={formatCurrencyCompact(inventoryKpis.availableStockValue)} tone="good" icon={<IconBox className="w-4 h-4" />} />
+        <KpiCard title="Stock comprometido" value={formatCurrencyCompact(inventoryKpis.committedStockValue)} tone="neutral" icon={<IconBox className="w-4 h-4" />} />
+        <KpiCard title="Stock muerto" value={formatCurrencyCompact(inventoryKpis.deadStockValue)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Sin venta en 90 días" />
+        <KpiCard title="Stock lento" value={formatCurrencyCompact(inventoryKpis.slowStockValue)} tone="warn" icon={<IconBox className="w-4 h-4" />} />
+        <KpiCard title="Sobrestock" value={formatCurrencyCompact(inventoryKpis.overstockValue)} tone="warn" icon={<IconBox className="w-4 h-4" />} />
+        <KpiCard title="SKUs con quiebre" value={formatNumber(inventoryKpis.stockoutSkus)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} />
+        <KpiCard title="Días prom. inventario" value={`${inventoryKpis.averageInventoryDays} días`} tone="neutral" icon={<IconInventory className="w-4 h-4" />} />
+      </div>
+
+      <Card className="mb-5">
+        <CardHeader title="Inventario valorizado" description="Distribución del inventario según el corte seleccionado" />
+        <CardBody>
+          <div className="mb-4">
+            <Tabs tabs={GROUP_TABS} value={group} onChange={setGroup} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <p className="text-xs font-medium text-slate-500 mb-3">Inventario valorizado</p>
+              <BarList
+                items={groupData.map((g) => ({
+                  label: g.label,
+                  value: g.inventoryValue,
+                  display: formatCurrencyCompact(g.inventoryValue),
+                  tone: "blue",
+                }))}
+              />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500 mb-3">Sobrestock (capital a liberar)</p>
+              <BarList
+                items={groupData.map((g) => ({
+                  label: g.label,
+                  value: g.overstockValue,
+                  display: formatCurrencyCompact(g.overstockValue),
+                  tone: "violet",
+                }))}
+              />
+            </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card className="mb-5">
+        <CardHeader title="Productos con más inventario inmovilizado" description="Capital detenido en stock. Prioridad para liberar caja." />
+        <DataTable columns={frozenColumns} data={frozen.map((f) => f.p)} rowKey={(p) => p.sku} />
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ListCard
+          title="Sobrestock"
+          subtitle="Stock sobre el máximo"
+          products={overstock}
+          tone="violet"
+        />
+        <ListCard
+          title="Sin venta en 90 días"
+          subtitle="Candidatos a stock muerto"
+          products={noSales90}
+          tone="amber"
+        />
+        <ListCard
+          title="Stock crítico"
+          subtitle="Quiebre con venta activa"
+          products={criticalStock}
+          tone="red"
+        />
+      </div>
+    </div>
+  );
+}
+
+function ListCard({
+  title,
+  subtitle,
+  products,
+  tone,
+}: {
+  title: string;
+  subtitle: string;
+  products: Product[];
+  tone: "violet" | "amber" | "red";
+}) {
+  return (
+    <Card>
+      <CardHeader title={title} description={subtitle} action={<Badge tone={tone}>{products.length}</Badge>} />
+      <CardBody className="space-y-2">
+        {products.length > 0 ? (
+          products.map((p) => (
+            <Link
+              key={p.sku}
+              to={`/productos/${p.sku}`}
+              className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
+                <p className="text-xs text-slate-500">
+                  Disp. {formatNumber(p.availableStock)} · {formatNumber(p.inventoryDays)} días inv.
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-slate-700 flex-shrink-0">
+                {formatCurrencyCompact(p.availableStock * p.cost)}
+              </span>
+            </Link>
+          ))
+        ) : (
+          <p className="text-sm text-slate-400 py-3 text-center">Sin productos en esta categoría.</p>
+        )}
+      </CardBody>
+    </Card>
+  );
+}

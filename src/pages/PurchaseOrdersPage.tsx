@@ -1,0 +1,421 @@
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Card } from "../components/ui/Card";
+import { DataTable, type Column } from "../components/ui/Table";
+import { StatusBadge } from "../components/business/StatusBadge";
+import { Tabs } from "../components/ui/Tabs";
+import { Button } from "../components/ui/Button";
+import { Drawer } from "../components/ui/Drawer";
+import { Modal } from "../components/ui/Modal";
+import { Input } from "../components/ui/Input";
+import { Badge } from "../components/ui/Badge";
+import { EmptyState } from "../components/ui/EmptyState";
+import { KpiCard } from "../components/business/KpiCard";
+import { HelpNote } from "../components/business/HelpNote";
+import { IconPlus, IconReplenish, IconOrders } from "../components/ui/icons";
+import { purchaseOrders as seedPOs } from "../data/mockPurchaseOrders";
+import { recommendations } from "../data/mockRecommendations";
+import { useOcDraft } from "../context/OcDraftContext";
+import { useLocalStorage } from "../utils/useLocalStorage";
+import {
+  formatCurrency,
+  formatCurrencyCompact,
+  formatDate,
+  formatNumber,
+} from "../utils/formatters";
+import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
+
+const TABS = [
+  { value: "all", label: "Todas" },
+  { value: "draft", label: "Borradores" },
+  { value: "open", label: "En curso" },
+  { value: "delayed", label: "Atrasadas" },
+  { value: "received", label: "Recibidas" },
+];
+
+export function PurchaseOrdersPage() {
+  const navigate = useNavigate();
+  const { items, count, totalAmount, updateQuantity, removeItem, clear, addItem, hasItem } = useOcDraft();
+
+  // Persistente: órdenes creadas por el usuario + cambios de estado sobre las semilla
+  const [createdOrders, setCreatedOrders] = useLocalStorage<PurchaseOrder[]>(
+    "compras:po-created",
+    []
+  );
+  const [statusOverrides, setStatusOverrides] = useLocalStorage<
+    Record<string, PurchaseOrderStatus>
+  >("compras:po-status", {});
+
+  const [tab, setTab] = useState("all");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [detail, setDetail] = useState<PurchaseOrder | null>(null);
+  const [createdNumber, setCreatedNumber] = useState<string | null>(null);
+
+  const orders = useMemo<PurchaseOrder[]>(() => {
+    const seeded = seedPOs.map((o) =>
+      statusOverrides[o.id] ? { ...o, status: statusOverrides[o.id] } : o
+    );
+    const created = createdOrders.map((o) =>
+      statusOverrides[o.id] ? { ...o, status: statusOverrides[o.id] } : o
+    );
+    return [...created, ...seeded];
+  }, [createdOrders, statusOverrides]);
+
+  const counts = useMemo(() => {
+    const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received"];
+    return {
+      all: orders.length,
+      draft: orders.filter((o) => o.status === "draft").length,
+      open: orders.filter((o) => open.includes(o.status)).length,
+      delayed: orders.filter((o) => o.status === "delayed").length,
+      received: orders.filter((o) => o.status === "received").length,
+    };
+  }, [orders]);
+
+  const filtered = useMemo(() => {
+    const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received"];
+    switch (tab) {
+      case "draft":
+        return orders.filter((o) => o.status === "draft");
+      case "open":
+        return orders.filter((o) => open.includes(o.status));
+      case "delayed":
+        return orders.filter((o) => o.status === "delayed");
+      case "received":
+        return orders.filter((o) => o.status === "received");
+      default:
+        return orders;
+    }
+  }, [orders, tab]);
+
+  const totalOpenAmount = orders
+    .filter((o) => !["received", "cancelled"].includes(o.status))
+    .reduce((a, o) => a + o.totalAmount, 0);
+  const delayedCount = orders.filter((o) => o.status === "delayed").length;
+  const draftCount = orders.filter((o) => o.status === "draft").length;
+
+  const markAsSent = (id: string) => {
+    setStatusOverrides((prev) => ({ ...prev, [id]: "sent" }));
+    setDetail(null);
+  };
+
+  // Sugerencias que aún no están en el borrador
+  const pendingSuggestions = recommendations.filter(
+    (r) => r.suggestedQuantity > 0 && !hasItem(r.sku)
+  );
+
+  const createOrder = () => {
+    if (count === 0) return;
+    const num = `OC-2026-${String(143 + createdOrders.length).padStart(4, "0")}`;
+    const newOrder: PurchaseOrder = {
+      id: `PO-${num}`,
+      number: num,
+      supplierName: items[0]?.supplierName || "Varios proveedores",
+      createdAt: "2026-06-24",
+      expectedDate: "2026-07-05",
+      status: "draft",
+      totalAmount,
+      skuCount: count,
+      destinationWarehouse: "Centro de Distribución",
+      buyerName: "Catalina Saavedra",
+      delayedDays: 0,
+      lines: items.map((i) => ({
+        sku: i.sku,
+        productName: i.productName,
+        quantity: i.quantity,
+        unitCost: i.unitCost,
+      })),
+    };
+    setCreatedOrders((prev) => [newOrder, ...prev]);
+    setCreatedNumber(num);
+    clear();
+    setDrawerOpen(false);
+    setTab("draft");
+  };
+
+  const columns: Column<PurchaseOrder>[] = [
+    {
+      key: "number",
+      header: "N° OC",
+      render: (o) => (
+        <div>
+          <p className="font-medium text-slate-800">{o.number}</p>
+          <p className="text-xs text-slate-400">{o.buyerName}</p>
+        </div>
+      ),
+    },
+    { key: "supplier", header: "Proveedor", render: (o) => <span className="text-sm text-slate-700">{o.supplierName}</span> },
+    {
+      key: "dates",
+      header: "Creación / Esperada",
+      hideOnMobile: true,
+      render: (o) => (
+        <div className="text-sm">
+          <p className="text-slate-700">{formatDate(o.createdAt)}</p>
+          <p className="text-xs text-slate-400">espera {formatDate(o.expectedDate)}</p>
+        </div>
+      ),
+    },
+    { key: "skus", header: "SKUs", align: "right", hideOnMobile: true, render: (o) => formatNumber(o.skuCount) },
+    { key: "warehouse", header: "Bodega destino", hideOnMobile: true, render: (o) => <span className="text-sm text-slate-600">{o.destinationWarehouse}</span> },
+    {
+      key: "amount",
+      header: "Monto total",
+      align: "right",
+      render: (o) => <span className="font-semibold text-slate-900">{formatCurrency(o.totalAmount)}</span>,
+    },
+    {
+      key: "delay",
+      header: "Atraso",
+      align: "center",
+      render: (o) => (o.delayedDays > 0 ? <Badge tone="red">{o.delayedDays} d</Badge> : <span className="text-slate-300">—</span>),
+    },
+    { key: "status", header: "Estado", render: (o) => <StatusBadge kind="purchaseOrder" value={o.status} /> },
+    {
+      key: "actions",
+      header: "",
+      render: (o) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setDetail(o);
+          }}
+          className="text-xs font-medium text-brand-600 hover:text-brand-700"
+        >
+          Ver detalle
+        </button>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <PageHeader
+        title="Órdenes de compra"
+        description="Seguimiento de órdenes de compra: borradores, enviadas, atrasadas y recibidas. Crea nuevas OC desde las sugerencias de reposición."
+        action={
+          <Button onClick={() => setDrawerOpen(true)} icon={<IconPlus className="w-4 h-4" />}>
+            Crear OC desde sugerencias
+            {count > 0 && (
+              <span className="ml-1 rounded-full bg-white/20 px-1.5 text-xs">{count}</span>
+            )}
+          </Button>
+        }
+      />
+
+      {createdNumber && (
+        <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-emerald-800">
+            Borrador <span className="font-semibold">{createdNumber}</span> creado correctamente. Puedes revisarlo en la pestaña Borradores.
+          </p>
+          <button onClick={() => setCreatedNumber(null)} className="text-xs font-medium text-emerald-700 hover:text-emerald-900">
+            Cerrar
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <KpiCard title="Monto en curso" value={formatCurrencyCompact(totalOpenAmount)} tone="info" icon={<IconOrders className="w-4 h-4" />} description="OC sin recibir" />
+        <KpiCard title="Atrasadas" value={formatNumber(delayedCount)} tone="bad" icon={<IconReplenish className="w-4 h-4" />} />
+        <KpiCard title="Borradores" value={formatNumber(draftCount)} tone="warn" icon={<IconPlus className="w-4 h-4" />} />
+        <KpiCard title="Total OC" value={formatNumber(orders.length)} tone="neutral" icon={<IconOrders className="w-4 h-4" />} />
+      </div>
+
+      <HelpNote className="mb-4">
+        Una OC pasa por: <b>borrador → enviada → confirmada → recibida</b>. Las <b>atrasadas</b> (rojo)
+        superaron su fecha esperada y pueden provocar quiebre: priorízalas. Crea nuevas OC desde las
+        sugerencias de reposición con el botón de arriba.
+      </HelpNote>
+
+      <div className="mb-3">
+        <Tabs
+          tabs={TABS.map((t) => ({ ...t, count: counts[t.value as keyof typeof counts] }))}
+          value={tab}
+          onChange={setTab}
+        />
+      </div>
+
+      <Card>
+        <DataTable
+          columns={columns}
+          data={filtered}
+          rowKey={(o) => o.id}
+          onRowClick={(o) => setDetail(o)}
+          rowClassName={(o) => (o.status === "delayed" ? "bg-rose-50/40" : undefined)}
+          emptyMessage={
+            tab === "delayed"
+              ? "No hay órdenes de compra atrasadas. Todas están dentro de su fecha esperada de entrega."
+              : tab === "draft"
+              ? "No tienes borradores. Crea uno desde las sugerencias de reposición."
+              : "No hay órdenes de compra en esta vista."
+          }
+        />
+      </Card>
+
+      {/* Drawer crear OC desde sugerencias */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Crear OC desde sugerencias"
+        description="Revisa los productos del borrador, ajusta cantidades y genera la orden."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>
+              Cerrar
+            </Button>
+            <Button onClick={createOrder} disabled={count === 0}>
+              Crear borrador ({formatCurrency(totalAmount)})
+            </Button>
+          </>
+        }
+      >
+        {count === 0 ? (
+          <EmptyState
+            title="El borrador está vacío"
+            description="Agrega productos desde la página de Reposición sugerida o desde las sugerencias de abajo."
+            action={<Button onClick={() => { setDrawerOpen(false); navigate("/reposicion"); }}>Ir a reposición</Button>}
+          />
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+              Productos en el borrador ({count})
+            </p>
+            {items.map((it) => (
+              <div key={it.sku} className="rounded-lg border border-slate-200 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="text-xs font-mono text-slate-400">{it.sku}</span>
+                    <p className="text-sm font-medium text-slate-800">{it.productName}</p>
+                    <p className="text-xs text-slate-500">{it.supplierName}</p>
+                  </div>
+                  <button onClick={() => removeItem(it.sku)} className="text-xs text-rose-500 hover:text-rose-700">
+                    Quitar
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-3 mt-2">
+                  <div className="w-28">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={it.quantity}
+                      onChange={(e) => updateQuantity(it.sku, Number(e.target.value))}
+                    />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {formatCurrency(it.quantity * it.unitCost)}
+                  </span>
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-between items-center rounded-lg bg-slate-50 px-3 py-2.5">
+              <span className="text-sm font-medium text-slate-600">Total estimado</span>
+              <span className="text-base font-semibold text-slate-900">{formatCurrency(totalAmount)}</span>
+            </div>
+          </div>
+        )}
+
+        {pendingSuggestions.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+              Sugerencias para agregar
+            </p>
+            <div className="space-y-2">
+              {pendingSuggestions.slice(0, 6).map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{r.productName}</p>
+                    <p className="text-xs text-slate-500">
+                      {formatNumber(r.suggestedQuantity)} u. · {formatCurrency(r.suggestedPurchaseAmount)}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<IconPlus className="w-3.5 h-3.5" />}
+                    onClick={() =>
+                      addItem({
+                        sku: r.sku,
+                        productName: r.productName,
+                        supplierName: r.supplierName,
+                        quantity: r.suggestedQuantity,
+                        unitCost: r.unitCost,
+                      })
+                    }
+                  >
+                    Agregar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {/* Modal detalle OC */}
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.number ?? ""}
+        description={detail ? `${detail.supplierName} · ${detail.destinationWarehouse}` : ""}
+        footer={
+          detail && (
+            <>
+              <Button variant="secondary" onClick={() => setDetail(null)}>
+                Cerrar
+              </Button>
+              {(detail.status === "draft" || detail.status === "confirmed") && (
+                <Button onClick={() => markAsSent(detail.id)}>Marcar como enviada</Button>
+              )}
+            </>
+          )
+        }
+      >
+        {detail && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <DetailField label="Estado" value={<StatusBadge kind="purchaseOrder" value={detail.status} />} />
+              <DetailField label="Comprador" value={detail.buyerName} />
+              <DetailField label="Creación" value={formatDate(detail.createdAt)} />
+              <DetailField label="Fecha esperada" value={formatDate(detail.expectedDate)} />
+              <DetailField label="Monto total" value={<span className="font-semibold">{formatCurrency(detail.totalAmount)}</span>} />
+              <DetailField label="N° de SKUs" value={formatNumber(detail.skuCount)} />
+            </div>
+            {detail.lines && detail.lines.length > 0 ? (
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Productos</p>
+                <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+                  {detail.lines.map((l) => (
+                    <div key={l.sku} className="flex items-center justify-between gap-2 px-3 py-2">
+                      <div>
+                        <span className="text-xs font-mono text-slate-400">{l.sku}</span>
+                        <p className="text-sm text-slate-700">{l.productName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-slate-800">{formatNumber(l.quantity)} u.</p>
+                        <p className="text-xs text-slate-400">{formatCurrency(l.unitCost)} c/u</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">
+                El detalle de líneas de esta orden no está disponible en la demo.
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs text-slate-500">{label}</p>
+      <div className="text-sm text-slate-800 mt-0.5">{value}</div>
+    </div>
+  );
+}

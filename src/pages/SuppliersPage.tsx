@@ -1,0 +1,185 @@
+import { useMemo, useState } from "react";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Card, CardBody, CardHeader } from "../components/ui/Card";
+import { DataTable, type Column } from "../components/ui/Table";
+import { StatusBadge } from "../components/business/StatusBadge";
+import { KpiCard } from "../components/business/KpiCard";
+import { FilterBar } from "../components/business/FilterBar";
+import { HelpNote } from "../components/business/HelpNote";
+import { Badge } from "../components/ui/Badge";
+import { suppliers } from "../data/mockSuppliers";
+import {
+  formatCurrency,
+  formatCurrencyCompact,
+  formatDate,
+  formatDays,
+  formatNumber,
+  formatPercent,
+} from "../utils/formatters";
+import { IconSuppliers, IconAlerts, IconOrders } from "../components/ui/icons";
+import type { Supplier } from "../types/purchasing";
+
+export function SuppliersPage() {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("");
+
+  const filtered = useMemo(
+    () =>
+      suppliers.filter((s) => {
+        if (query.trim() && !`${s.name} ${s.rut}`.toLowerCase().includes(query.toLowerCase()))
+          return false;
+        if (status && s.status !== status) return false;
+        return true;
+      }),
+    [query, status]
+  );
+
+  const delayed = suppliers.filter((s) => s.status === "delayed").length;
+  const lowCompliance = suppliers.filter((s) => s.deliveryCompliance < 70).length;
+  const totalPending = suppliers.reduce((a, s) => a + s.pendingAmount, 0);
+  const openOCs = suppliers.reduce((a, s) => a + s.openPurchaseOrders, 0);
+
+  const mostDelayed = [...suppliers].sort((a, b) => a.deliveryCompliance - b.deliveryCompliance).slice(0, 4);
+  const biggestBuy = [...suppliers].sort((a, b) => b.purchasedAmountLast90Days - a.purchasedAmountLast90Days).slice(0, 4);
+  const highLeadTime = [...suppliers].sort((a, b) => b.averageLeadTimeDays - a.averageLeadTimeDays).slice(0, 4);
+
+  const columns: Column<Supplier>[] = [
+    {
+      key: "name",
+      header: "Proveedor",
+      render: (s) => (
+        <div>
+          <p className="font-medium text-slate-800">{s.name}</p>
+          <p className="text-xs text-slate-400 font-mono">{s.rut}</p>
+        </div>
+      ),
+    },
+    {
+      key: "categories",
+      header: "Categorías",
+      hideOnMobile: true,
+      render: (s) => (
+        <div className="flex flex-wrap gap-1 max-w-[200px]">
+          {s.categories.map((c) => (
+            <Badge key={c} tone="neutral">{c}</Badge>
+          ))}
+        </div>
+      ),
+    },
+    { key: "skus", header: "SKUs", align: "right", hideOnMobile: true, render: (s) => formatNumber(s.associatedSkus) },
+    { key: "openOc", header: "OC abiertas", align: "right", render: (s) => formatNumber(s.openPurchaseOrders) },
+    {
+      key: "compliance",
+      header: "Cumplimiento",
+      align: "right",
+      render: (s) => (
+        <span className={s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : s.deliveryCompliance < 85 ? "text-amber-600 font-medium" : "text-emerald-600 font-medium"}>
+          {formatPercent(s.deliveryCompliance, 0)}
+        </span>
+      ),
+    },
+    { key: "leadTime", header: "Lead time", align: "right", hideOnMobile: true, render: (s) => formatDays(s.averageLeadTimeDays) },
+    { key: "lastPurchase", header: "Última compra", align: "right", hideOnMobile: true, render: (s) => formatDate(s.lastPurchaseDate) },
+    {
+      key: "buy90",
+      header: "Compra 90 días",
+      align: "right",
+      hideOnMobile: true,
+      render: (s) => formatCurrencyCompact(s.purchasedAmountLast90Days),
+    },
+    {
+      key: "pending",
+      header: "Monto pendiente",
+      align: "right",
+      render: (s) => (
+        <span className={s.pendingAmount > 20000000 ? "text-amber-600 font-medium" : "text-slate-700"}>
+          {formatCurrency(s.pendingAmount)}
+        </span>
+      ),
+    },
+    { key: "status", header: "Estado", render: (s) => <StatusBadge kind="supplier" value={s.status} /> },
+  ];
+
+  return (
+    <div>
+      <PageHeader
+        title="Proveedores"
+        description="Gestión de proveedores con foco en cumplimiento, lead time y monto pendiente. Información para decidir si seguir comprando a cada uno."
+      />
+
+      <HelpNote className="mb-4">
+        El <b>cumplimiento</b> es el % de entregas a tiempo: bajo 70% el proveedor se marca
+        <b> a revisar</b> porque puede provocar quiebres. El <b>lead time</b> es cuántos días demora
+        en entregar; mientras más alto, más stock de seguridad necesitas.
+      </HelpNote>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <KpiCard title="Proveedores atrasados" value={formatNumber(delayed)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} />
+        <KpiCard title="Bajo cumplimiento (<70%)" value={formatNumber(lowCompliance)} tone="warn" icon={<IconSuppliers className="w-4 h-4" />} />
+        <KpiCard title="OC abiertas (total)" value={formatNumber(openOCs)} tone="neutral" icon={<IconOrders className="w-4 h-4" />} />
+        <KpiCard title="Monto pendiente total" value={formatCurrencyCompact(totalPending)} tone="info" icon={<IconSuppliers className="w-4 h-4" />} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <MiniRank title="Peor cumplimiento" items={mostDelayed.map((s) => ({ name: s.name, value: formatPercent(s.deliveryCompliance, 0), tone: "red" as const, sub: `${s.openPurchaseOrders} OC abiertas` }))} />
+        <MiniRank title="Mayor compra (90 días)" items={biggestBuy.map((s) => ({ name: s.name, value: formatCurrencyCompact(s.purchasedAmountLast90Days), tone: "green" as const, sub: `${formatNumber(s.associatedSkus)} SKUs` }))} />
+        <MiniRank title="Lead time más alto" items={highLeadTime.map((s) => ({ name: s.name, value: formatDays(s.averageLeadTimeDays), tone: "amber" as const, sub: `Cumple ${formatPercent(s.deliveryCompliance, 0)}` }))} />
+      </div>
+
+      <div className="mb-4">
+        <FilterBar
+          searchValue={query}
+          onSearchChange={setQuery}
+          searchPlaceholder="Buscar por nombre o RUT"
+          resultCount={filtered.length}
+          onClear={() => { setQuery(""); setStatus(""); }}
+          selects={[
+            {
+              key: "status",
+              placeholder: "Estado",
+              value: status,
+              onChange: setStatus,
+              options: [
+                { value: "active", label: "Activo" },
+                { value: "review", label: "Revisar" },
+                { value: "delayed", label: "Atrasado" },
+                { value: "blocked", label: "Bloqueado" },
+                { value: "inactive", label: "Sin compras" },
+              ],
+            },
+          ]}
+        />
+      </div>
+
+      <Card>
+        <DataTable columns={columns} data={filtered} rowKey={(s) => s.id} />
+      </Card>
+    </div>
+  );
+}
+
+function MiniRank({
+  title,
+  items,
+}: {
+  title: string;
+  items: { name: string; value: string; sub: string; tone: "red" | "green" | "amber" }[];
+}) {
+  const toneText = { red: "text-rose-600", green: "text-emerald-600", amber: "text-amber-600" };
+  return (
+    <Card>
+      <CardHeader title={title} />
+      <CardBody className="space-y-2">
+        {items.map((it) => (
+          <div key={it.name} className="flex items-center justify-between gap-2 py-1 border-b border-slate-50 last:border-0">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-800 truncate">{it.name}</p>
+              <p className="text-xs text-slate-400">{it.sub}</p>
+            </div>
+            <span className={`text-sm font-semibold flex-shrink-0 ${toneText[it.tone]}`}>{it.value}</span>
+          </div>
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
