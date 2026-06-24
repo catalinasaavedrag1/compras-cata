@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { AlertCard } from "../components/business/AlertCard";
 import { FilterBar } from "../components/business/FilterBar";
 import { KpiCard } from "../components/business/KpiCard";
-import { HelpNote } from "../components/business/HelpNote";
 import { Tabs } from "../components/ui/Tabs";
 import { Card, CardBody } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -54,27 +53,32 @@ export function AlertsPage() {
     toast.success(status === "resolved" ? "Alerta marcada como resuelta" : "Alerta marcada en revisión");
   };
 
+  // Filtrado por la barra de filtros (sin la pestaña): controla KPIs y conteos
+  const byFilters = useMemo(
+    () => filterAlerts(alerts, { query, type, severity }),
+    [alerts, query, type, severity]
+  );
+
   const counts = useMemo(
     () => ({
-      active: alerts.filter((a) => a.status === "new" || a.status === "in_review").length,
-      new: alerts.filter((a) => a.status === "new").length,
-      in_review: alerts.filter((a) => a.status === "in_review").length,
-      resolved: alerts.filter((a) => a.status === "resolved").length,
-      ignored: alerts.filter((a) => a.status === "ignored").length,
+      active: byFilters.filter((a) => a.status === "new" || a.status === "in_review").length,
+      new: byFilters.filter((a) => a.status === "new").length,
+      in_review: byFilters.filter((a) => a.status === "in_review").length,
+      resolved: byFilters.filter((a) => a.status === "resolved").length,
+      ignored: byFilters.filter((a) => a.status === "ignored").length,
     }),
-    [alerts]
+    [byFilters]
   );
 
   const filtered = useMemo(() => {
-    let base = filterAlerts(alerts, { query, type, severity });
+    let base = byFilters;
     if (tab === "active") base = base.filter((a) => a.status === "new" || a.status === "in_review");
     else base = base.filter((a) => a.status === tab);
-    // Ordenar por severidad (alta primero)
     const order = { high: 0, medium: 1, low: 2 };
     return [...base].sort((a, b) => order[a.severity] - order[b.severity]);
-  }, [alerts, query, type, severity, tab]);
+  }, [byFilters, tab]);
 
-  const highCount = alerts.filter((a) => a.severity === "high" && (a.status === "new" || a.status === "in_review")).length;
+  const highCount = byFilters.filter((a) => a.severity === "high" && (a.status === "new" || a.status === "in_review")).length;
 
   // Acción sugerida concreta según el tipo de alerta
   const actionForAlert = (a: (typeof filtered)[number]) => {
@@ -114,25 +118,14 @@ export function AlertsPage() {
         description="Problemas que requieren atención del comprador: quiebres, sobrestock, proveedores atrasados, margen bajo y órdenes vencidas. Cada alerta explica el problema y propone una acción."
       />
 
-      <HelpNote className="mb-4">
-        Las alertas están ordenadas por severidad. Empieza por las de severidad <b>alta</b>:
-        son las que impactan la venta hoy. Usa la acción sugerida de cada tarjeta para resolverla
-        sin salir de aquí.
-      </HelpNote>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Alertas activas" value={formatNumber(counts.active)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} />
-        <KpiCard title="Severidad alta" value={formatNumber(highCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} />
-        <KpiCard title="En revisión" value={formatNumber(counts.in_review)} tone="info" icon={<IconAlerts className="w-4 h-4" />} />
-        <KpiCard title="Resueltas" value={formatNumber(counts.resolved)} tone="good" icon={<IconAlerts className="w-4 h-4" />} />
-      </div>
-
+      {/* Filtros arriba: controlan KPIs, conteos y listado */}
       <div className="mb-4">
         <FilterBar
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Buscar por producto, proveedor o SKU"
-          resultCount={filtered.length}
+          resultCount={byFilters.length}
+          summary={`${byFilters.length} alerta${byFilters.length === 1 ? "" : "s"} · ${highCount} alta severidad · ${counts.in_review} en revisión`}
           onClear={() => { setQuery(""); setType(""); setSeverity(""); }}
           selects={[
             {
@@ -155,6 +148,13 @@ export function AlertsPage() {
             },
           ]}
         />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <KpiCard title="Alertas activas" value={formatNumber(counts.active)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} />
+        <KpiCard title="Severidad alta" value={formatNumber(highCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} />
+        <KpiCard title="En revisión" value={formatNumber(counts.in_review)} tone="info" icon={<IconAlerts className="w-4 h-4" />} />
+        <KpiCard title="Resueltas" value={formatNumber(counts.resolved)} tone="good" icon={<IconAlerts className="w-4 h-4" />} />
       </div>
 
       <div className="mb-4">

@@ -34,10 +34,11 @@ export function SuppliersPage() {
     [query, status]
   );
 
-  const delayed = suppliers.filter((s) => s.status === "delayed").length;
-  const lowCompliance = suppliers.filter((s) => s.deliveryCompliance < 70).length;
-  const totalPending = suppliers.reduce((a, s) => a + s.pendingAmount, 0);
-  const openOCs = suppliers.reduce((a, s) => a + s.openPurchaseOrders, 0);
+  // KPIs según el resultado filtrado
+  const delayed = filtered.filter((s) => s.status === "delayed").length;
+  const lowCompliance = filtered.filter((s) => s.deliveryCompliance < 70).length;
+  const totalPending = filtered.reduce((a, s) => a + s.pendingAmount, 0);
+  const openOCs = filtered.reduce((a, s) => a + s.openPurchaseOrders, 0);
 
   const mostDelayed = [...suppliers].sort((a, b) => a.deliveryCompliance - b.deliveryCompliance).slice(0, 4);
   const biggestBuy = [...suppliers].sort((a, b) => b.purchasedAmountLast90Days - a.purchasedAmountLast90Days).slice(0, 4);
@@ -113,25 +114,13 @@ export function SuppliersPage() {
         en entregar; mientras más alto, más stock de seguridad necesitas.
       </HelpNote>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Proveedores atrasados" value={formatNumber(delayed)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} />
-        <KpiCard title="Bajo cumplimiento (<70%)" value={formatNumber(lowCompliance)} tone="warn" icon={<IconSuppliers className="w-4 h-4" />} />
-        <KpiCard title="OC abiertas (total)" value={formatNumber(openOCs)} tone="neutral" icon={<IconOrders className="w-4 h-4" />} />
-        <KpiCard title="Monto pendiente total" value={formatCurrencyCompact(totalPending)} tone="info" icon={<IconSuppliers className="w-4 h-4" />} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-        <MiniRank title="Peor cumplimiento" items={mostDelayed.map((s) => ({ name: s.name, value: formatPercent(s.deliveryCompliance, 0), tone: "red" as const, sub: `${s.openPurchaseOrders} OC abiertas` }))} />
-        <MiniRank title="Mayor compra (90 días)" items={biggestBuy.map((s) => ({ name: s.name, value: formatCurrencyCompact(s.purchasedAmountLast90Days), tone: "green" as const, sub: `${formatNumber(s.associatedSkus)} SKUs` }))} />
-        <MiniRank title="Lead time más alto" items={highLeadTime.map((s) => ({ name: s.name, value: formatDays(s.averageLeadTimeDays), tone: "amber" as const, sub: `Cumple ${formatPercent(s.deliveryCompliance, 0)}` }))} />
-      </div>
-
       <div className="mb-4">
         <FilterBar
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Buscar por nombre o RUT"
           resultCount={filtered.length}
+          summary={`${filtered.length} proveedor${filtered.length === 1 ? "" : "es"} · ${delayed} atrasado${delayed === 1 ? "" : "s"} · ${lowCompliance} por revisar`}
           onClear={() => { setQuery(""); setStatus(""); }}
           selects={[
             {
@@ -149,6 +138,19 @@ export function SuppliersPage() {
             },
           ]}
         />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <KpiCard title="Proveedores atrasados" value={formatNumber(delayed)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} />
+        <KpiCard title="Bajo cumplimiento (<70%)" value={formatNumber(lowCompliance)} tone="warn" icon={<IconSuppliers className="w-4 h-4" />} />
+        <KpiCard title="OC abiertas (total)" value={formatNumber(openOCs)} tone="neutral" icon={<IconOrders className="w-4 h-4" />} />
+        <KpiCard title="Monto pendiente total" value={formatCurrencyCompact(totalPending)} tone="info" icon={<IconSuppliers className="w-4 h-4" />} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <MiniRank title="Peor cumplimiento" items={mostDelayed.map((s) => ({ name: s.name, value: formatPercent(s.deliveryCompliance, 0), tone: "red" as const, sub: `${s.openPurchaseOrders} OC abiertas` }))} />
+        <MiniRank title="Mayor compra (90 días)" items={biggestBuy.map((s) => ({ name: s.name, value: formatCurrencyCompact(s.purchasedAmountLast90Days), tone: "green" as const, sub: `${formatNumber(s.associatedSkus)} SKUs` }))} />
+        <MiniRank title="Lead time más alto" items={highLeadTime.map((s) => ({ name: s.name, value: formatDays(s.averageLeadTimeDays), tone: "amber" as const, sub: `Cumple ${formatPercent(s.deliveryCompliance, 0)}` }))} />
       </div>
 
       <Card>

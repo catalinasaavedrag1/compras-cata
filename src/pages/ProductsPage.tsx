@@ -6,7 +6,6 @@ import { DataTable, type Column } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { KpiCard } from "../components/business/KpiCard";
-import { HelpNote } from "../components/business/HelpNote";
 import { ExportButton } from "../components/business/ExportButton";
 import { products as allProducts } from "../data/mockProducts";
 import { filterProducts, uniqueValues } from "../utils/filters";
@@ -69,9 +68,10 @@ export function ProductsPage() {
     if (outOfStock) toggleOutOfStock();
   };
 
-  const lowMarginCount = allProducts.filter((p) => p.margin < 25).length;
-  const noSupplierCount = allProducts.filter((p) => !p.supplierName).length;
-  const noSalesCount = allProducts.filter((p) => p.salesLast30Days === 0).length;
+  // KPIs según el resultado filtrado (se actualizan con los filtros)
+  const lowMarginCount = filtered.filter((p) => p.margin < 25).length;
+  const noSupplierCount = filtered.filter((p) => !p.supplierName).length;
+  const noSalesCount = filtered.filter((p) => p.salesLast30Days === 0).length;
 
   const columns: Column<Product>[] = [
     {
@@ -208,19 +208,6 @@ export function ProductsPage() {
         }
       />
 
-      <HelpNote className="mb-4">
-        El <b>estado comercial</b> describe el momento del producto (activo, nuevo, temporada, sin
-        venta). El <b>estado de compra</b> dice qué hacer (comprar, no comprar, revisar, sobrestock).
-        Usa los filtros de abajo para encontrar casos a gestionar: margen bajo, sin proveedor o sin venta.
-      </HelpNote>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Total SKUs" value={formatNumber(allProducts.length)} tone="info" icon={<IconProducts className="w-4 h-4" />} />
-        <KpiCard title="Margen bajo (<25%)" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconSales className="w-4 h-4" />} />
-        <KpiCard title="Sin proveedor" value={formatNumber(noSupplierCount)} tone={noSupplierCount ? "bad" : "good"} icon={<IconSuppliers className="w-4 h-4" />} />
-        <KpiCard title="Sin venta (30d)" value={formatNumber(noSalesCount)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} />
-      </div>
-
       <div className="mb-4">
         <FilterBar
           searchValue={query}
@@ -269,6 +256,13 @@ export function ProductsPage() {
             { key: "outdated", label: "Sin costo actualizado", active: toggles.outdatedCost, onToggle: () => setToggles((t) => ({ ...t, outdatedCost: !t.outdatedCost })) },
           ]}
         />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <KpiCard title="SKUs en vista" value={formatNumber(filtered.length)} tone="info" icon={<IconProducts className="w-4 h-4" />} description="Según filtros" />
+        <KpiCard title="Margen bajo (<25%)" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconSales className="w-4 h-4" />} />
+        <KpiCard title="Sin proveedor" value={formatNumber(noSupplierCount)} tone={noSupplierCount ? "bad" : "good"} icon={<IconSuppliers className="w-4 h-4" />} />
+        <KpiCard title="Sin venta (30d)" value={formatNumber(noSalesCount)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} />
       </div>
 
       <Card>
