@@ -211,6 +211,12 @@ export function MyPanelPage() {
     toast.success(`${p.name} agregado al borrador de OC`);
   };
 
+  // Acción recomendada del día (lo más urgente) + resumen compacto
+  const topRisk = riskRows[0];
+  const quiebresHoy = riskRows.filter((r) => r.product.availableStock <= 0).length;
+  const ocPorLlegar = myOpenOrders.length;
+  const criticalActions = quiebresHoy + myDelayedPOs.length + mySuppliersToReview.filter((s) => s.status === "delayed").length;
+
   // Tareas consolidadas del comprador
   const tasks: GuideStep[] = [
     {
@@ -335,14 +341,49 @@ export function MyPanelPage() {
   return (
     <div>
       <PageHeader
-        title={`Mi panel · ${buyer}`}
-        description="Tus tareas como comprador: qué comprar, qué órdenes seguir, qué proveedores revisar y qué inventario gestionar, solo de tus categorías asignadas."
+        title={`Mi jornada de compras · ${buyer}`}
+        description={criticalActions > 0 ? `Hoy tienes ${criticalActions} acción${criticalActions === 1 ? "" : "es"} crítica${criticalActions === 1 ? "" : "s"}.` : "Sin acciones críticas para hoy."}
         action={
           <Button variant="secondary" onClick={() => navigate("/reposicion")} icon={<IconReplenish className="w-4 h-4" />}>
             Ir a reposición
           </Button>
         }
       />
+
+      {/* Resumen compacto del día (chips cliqueables) */}
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 mb-3 pb-0.5">
+        <Chip tone="red" label={`${quiebresHoy} quiebres hoy`} onClick={() => { setHorizon("hoy"); }} />
+        <Chip tone="amber" label={`${riskRows.length} en riesgo`} to="#riesgo" />
+        <Chip tone="blue" label={`${ocPorLlegar} OC sin recibir`} to="#ordenes" />
+        <Chip tone="amber" label={`${mySuppliersToReview.length} proveedores`} to="#proveedores" />
+        <Chip tone="violet" label={`${overstockProducts.length} sobrestock`} to="#sobrestock" />
+      </div>
+
+      {/* Acción recomendada hoy */}
+      {topRisk && (
+        <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-rose-600 mb-1">Acción recomendada hoy</p>
+          <p className="text-lg font-semibold text-slate-900">
+            Comprar {formatNumber(topRisk.suggestedQty)} u. de {topRisk.product.name}
+          </p>
+          <p className="text-sm text-slate-600 mt-0.5">
+            {topRisk.product.availableStock <= 0 ? "Quiebre hoy" : `Quiebre estimado ${formatDate(topRisk.stockoutDate ?? "")}`} · stock {formatNumber(topRisk.product.availableStock)} u. · lead time proveedor {formatDays(topRisk.product.supplierLeadTimeDays)} · cubre ~{formatDays(topRisk.coverageAfter)}
+          </p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <Button
+              size="sm"
+              disabled={hasItem(topRisk.product.sku)}
+              variant={hasItem(topRisk.product.sku) ? "secondary" : "primary"}
+              onClick={() => handleAdd(topRisk.product, topRisk.suggestedQty)}
+              icon={hasItem(topRisk.product.sku) ? <IconCheck className="w-3.5 h-3.5" /> : <IconPlus className="w-3.5 h-3.5" />}
+            >
+              {hasItem(topRisk.product.sku) ? "En OC" : "Crear OC"}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate(`/productos/${topRisk.product.sku}`)}>Revisar SKU</Button>
+            <Button size="sm" variant="ghost" onClick={() => navigate("/reposicion?foco=urgent")}>Ver reposición</Button>
+          </div>
+        </div>
+      )}
 
       {/* Agenda por horizonte: qué revisar hoy / semana / mes / 3 meses */}
       <Card className="mb-4">
@@ -455,6 +496,34 @@ export function MyPanelPage() {
             onRowClick={(r) => navigate(`/productos/${r.product.sku}`)}
             rowClassName={(r) => (r.product.availableStock <= 0 ? "bg-rose-50/40" : undefined)}
             emptyMessage="No tienes productos en riesgo de quiebre. ¡Bien!"
+            mobileCard={(r) => (
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="text-xs font-mono text-slate-400">{r.product.sku}</span>
+                    <p className="font-medium text-slate-800 leading-snug">{r.product.name}</p>
+                    <p className="text-xs text-slate-500">{r.product.category} · {r.product.supplierName || "Sin proveedor"}</p>
+                  </div>
+                  <Badge tone="red" dot>{r.product.availableStock <= 0 ? "Quiebre" : "Riesgo"}</Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                  <div><p className="text-xs text-slate-400">Stock</p><p className={r.product.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(r.product.availableStock)}</p></div>
+                  <div><p className="text-xs text-slate-400">Quiebre</p><p className="text-slate-700">{r.product.availableStock <= 0 ? "hoy" : formatDate(r.stockoutDate ?? "")}</p></div>
+                  <div><p className="text-xs text-slate-400">Comprar</p><p className="font-semibold text-slate-900">{formatNumber(r.suggestedQty)} u.</p></div>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Cubre ~{formatDays(r.coverageAfter)} · lead {formatDays(r.product.supplierLeadTimeDays)}</p>
+                <Button
+                  size="sm"
+                  className="mt-2 w-full"
+                  variant={hasItem(r.product.sku) ? "secondary" : "primary"}
+                  disabled={hasItem(r.product.sku) || r.suggestedQty <= 0}
+                  onClick={(e) => { e.stopPropagation(); handleAdd(r.product, r.suggestedQty); }}
+                  icon={hasItem(r.product.sku) ? <IconCheck className="w-3.5 h-3.5" /> : <IconPlus className="w-3.5 h-3.5" />}
+                >
+                  {hasItem(r.product.sku) ? "En OC" : "Agregar a OC"}
+                </Button>
+              </div>
+            )}
           />
         </Card>
       </div>
@@ -537,4 +606,26 @@ export function MyPanelPage() {
       </div>
     </div>
   );
+}
+
+function Chip({
+  label,
+  tone,
+  to,
+  onClick,
+}: {
+  label: string;
+  tone: "red" | "amber" | "blue" | "violet";
+  to?: string;
+  onClick?: () => void;
+}) {
+  const toneClass = {
+    red: "bg-rose-50 text-rose-700 border-rose-200",
+    amber: "bg-amber-50 text-amber-700 border-amber-200",
+    blue: "bg-brand-50 text-brand-700 border-brand-200",
+    violet: "bg-violet-50 text-violet-700 border-violet-200",
+  }[tone];
+  const cls = `whitespace-nowrap flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${toneClass}`;
+  if (to) return <a href={to} className={cls}>{label}</a>;
+  return <button onClick={onClick} className={cls}>{label}</button>;
 }
