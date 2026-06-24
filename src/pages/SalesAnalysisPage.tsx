@@ -4,7 +4,6 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { BarList } from "../components/business/BarList";
-import { HelpNote } from "../components/business/HelpNote";
 import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -104,21 +103,19 @@ export function SalesAnalysisPage() {
         description="Señales de venta para comprar mejor: qué se vende más, qué crece, qué cae y cuánta venta se pierde por quiebre."
       />
 
-      <HelpNote className="mb-4">
-        Úsala para anticipar la compra: los productos en <b>crecimiento</b> pueden necesitar más stock,
-        los que <b>caen</b> conviene revisarlos antes de reponer, y la <b>venta perdida por quiebre</b>
-        muestra cuánto cuesta no tener stock a tiempo.
-      </HelpNote>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      {/* KPIs de venta (siempre visibles) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <KpiCard title="Venta 30 días" value={formatCurrencyCompact(salesKpis.salesLast30Days)} tone="good" delta={8.4} icon={<IconSales className="w-4 h-4" />} />
         <KpiCard title="Venta 90 días" value={formatCurrencyCompact(salesKpis.salesLast90Days)} tone="good" icon={<IconSales className="w-4 h-4" />} />
-        <KpiCard title="Venta 180 días" value={formatCurrencyCompact(salesKpis.salesLast180Days)} tone="neutral" icon={<IconSales className="w-4 h-4" />} />
+        <KpiCard title="Venta perdida por quiebre" value={formatCurrencyCompact(salesKpis.lostSalesByStockout)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Comprar críticos" to="/reposicion?foco=urgent" />
         <KpiCard title="Margen promedio" value={formatPercent(salesKpis.averageMargin)} tone="good" icon={<IconSales className="w-4 h-4" />} />
-        <KpiCard title="Categoría en alza" value={salesKpis.topGrowthCategory} tone="good" icon={<IconSales className="w-4 h-4" />} description="Mayor crecimiento" />
-        <KpiCard title="Producto más vendido" value={salesKpis.topProduct} tone="info" icon={<IconSales className="w-4 h-4" />} />
-        <KpiCard title="Mayor caída" value={salesKpis.topDropProduct} tone="warn" icon={<IconAlerts className="w-4 h-4" />} />
-        <KpiCard title="Venta perdida por quiebre" value={formatCurrencyCompact(salesKpis.lostSalesByStockout)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Estimada últimos 30 días" />
+      </div>
+
+      {/* KPIs de contexto (solo escritorio; en móvil están en los insights) */}
+      <div className="hidden md:grid md:grid-cols-3 gap-3 mb-5">
+        <KpiCard title="Categoría en alza" value={salesKpis.topGrowthCategory} tone="good" icon={<IconSales className="w-4 h-4" />} description="Ver reposición" to={`/reposicion?cat=${encodeURIComponent(salesKpis.topGrowthCategory)}`} />
+        <KpiCard title="Producto más vendido" value={salesKpis.topProduct} tone="info" icon={<IconSales className="w-4 h-4" />} description="Ver producto" to={`/productos/${topProducts[0].sku}`} />
+        <KpiCard title="Mayor caída" value={salesKpis.topDropProduct} tone="warn" icon={<IconAlerts className="w-4 h-4" />} description="Ver producto" to={`/productos/${decliningProducts[0].sku}`} />
       </div>
 
       {/* Insights accionables: qué hacer con estos datos */}
@@ -195,7 +192,29 @@ export function SalesAnalysisPage() {
 
       <Card className="mb-5">
         <CardHeader title="Productos más vendidos" description="Top productos por venta en 30 días" />
-        <DataTable columns={topColumns} data={topProducts} rowKey={(p) => p.sku} />
+        <DataTable
+          columns={topColumns}
+          data={topProducts}
+          rowKey={(p) => p.sku}
+          mobileCard={(p) => (
+            <Link to={`/productos/${p.sku}`} className="block">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+                  <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
+                  <p className="text-xs text-slate-500">{p.category}</p>
+                </div>
+                <span className={`text-xs font-medium flex-shrink-0 ${p.growth >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  {formatDelta(p.growth)}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-1.5 text-sm">
+                <div><p className="text-xs text-slate-400">Unidades 30d</p><p className="text-slate-700">{formatNumber(p.unitsLast30Days)}</p></div>
+                <div><p className="text-xs text-slate-400">Venta 30d</p><p className="font-medium text-slate-800">{formatCurrency(p.amountLast30Days)}</p></div>
+              </div>
+            </Link>
+          )}
+        />
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
