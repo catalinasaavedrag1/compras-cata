@@ -277,6 +277,32 @@ export function ProductsPage() {
           data={filtered}
           rowKey={(p) => p.sku}
           onRowClick={(p) => navigate(`/productos/${p.sku}`)}
+          mobileCard={(p) => (
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+                  <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
+                  <p className="text-xs text-slate-500">{p.category} · {p.brand}</p>
+                </div>
+                <StatusBadge kind="purchase" value={p.purchaseStatus} dot={false} />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                <div>
+                  <p className="text-xs text-slate-400">Stock disp.</p>
+                  <p className={p.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(p.availableStock)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Venta mes</p>
+                  <p className="text-slate-700">{formatNumber(p.salesLast30Days)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Margen</p>
+                  <p className={p.margin < 25 ? "text-amber-600 font-medium" : "text-slate-700"}>{formatPercent(p.margin)}</p>
+                </div>
+              </div>
+            </div>
+          )}
         />
       </Card>
     </div>

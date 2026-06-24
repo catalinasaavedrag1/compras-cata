@@ -3,6 +3,7 @@ import { AppLayout } from "../layouts/AppLayout";
 import { OcDraftProvider } from "../context/OcDraftContext";
 import { ToastProvider } from "../context/ToastContext";
 import { BuyerProvider } from "../context/BuyerContext";
+import { NotificationProvider } from "../context/NotificationContext";
 import { DashboardPage } from "../pages/DashboardPage";
 import { MyPanelPage } from "../pages/MyPanelPage";
 import { ReplenishmentPage } from "../pages/ReplenishmentPage";
@@ -21,6 +22,7 @@ export default function AppRoutes() {
   return (
     <ToastProvider>
       <BuyerProvider>
+      <NotificationProvider>
       <OcDraftProvider>
         <Routes>
         <Route element={<AppLayout />}>
@@ -41,6 +43,7 @@ export default function AppRoutes() {
           </Route>
         </Routes>
       </OcDraftProvider>
+      </NotificationProvider>
       </BuyerProvider>
     </ToastProvider>
   );

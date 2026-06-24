@@ -1,8 +1,10 @@
-import { NavLink } from "react-router-dom";
+import { useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import { navGroups } from "./navItems";
 import { Brand } from "./Sidebar";
 import { cn } from "../../utils/cn";
-import { IconClose } from "../ui/icons";
+import { Input } from "../ui/Input";
+import { IconClose, IconSearch } from "../ui/icons";
 
 interface MobileNavProps {
   open: boolean;
@@ -10,7 +12,19 @@ interface MobileNavProps {
 }
 
 export function MobileNav({ open, onClose }: MobileNavProps) {
+  const navigate = useNavigate();
+  const [search, setSearch] = useState("");
+
   if (!open) return null;
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (search.trim()) {
+      navigate(`/productos?q=${encodeURIComponent(search.trim())}`);
+      setSearch("");
+      onClose();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
@@ -26,6 +40,14 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
             <IconClose />
           </button>
         </div>
+        <form onSubmit={submitSearch} className="px-3 pt-3">
+          <Input
+            icon={<IconSearch className="w-4 h-4" />}
+            placeholder="Buscar SKU o producto..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </form>
         <nav className="flex-1 px-3 py-3 overflow-y-auto scrollbar-thin">
           {navGroups.map((group) => (
             <div key={group.title} className="mb-3 last:mb-0">

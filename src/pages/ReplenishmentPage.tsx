@@ -12,6 +12,7 @@ import { HelpNote } from "../components/business/HelpNote";
 import { recommendationUrgency, priorityUrgency } from "../components/business/statusInfo";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
+import { Tabs } from "../components/ui/Tabs";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
@@ -67,6 +68,7 @@ export function ReplenishmentPage() {
   // Estado de UI
   const [selected, setSelected] = useState<string[]>([]);
   const [sort, setSort] = useState<SortState>({ key: null, dir: "desc" });
+  const [foco, setFoco] = useUrlState("foco", "all");
   const [query, setQuery] = useUrlState("q");
   const [category, setCategory] = useUrlState("cat");
   const [supplier, setSupplier] = useUrlState("prov");
@@ -90,7 +92,7 @@ export function ReplenishmentPage() {
   );
 
   const filtered = useMemo(() => {
-    const result = filterRecommendations(visible, {
+    let result = filterRecommendations(visible, {
       query,
       category,
       supplier,
@@ -98,6 +100,10 @@ export function ReplenishmentPage() {
       priority,
       ...toggles,
     });
+    // Foco rápido (segmentos): reduce la tabla a lo que el comprador quiere ver
+    if (foco === "urgent") result = result.filter((r) => r.status === "critical" || r.status === "buy_now");
+    else if (foco === "review") result = result.filter((r) => r.status === "review");
+    else if (foco === "overstock") result = result.filter((r) => r.status === "overstock");
     // Orden por defecto: lo más urgente primero (estado, luego prioridad, luego monto)
     return [...result].sort((a, b) => {
       const byStatus = recommendationUrgency[a.status] - recommendationUrgency[b.status];
@@ -106,7 +112,9 @@ export function ReplenishmentPage() {
       if (byPriority !== 0) return byPriority;
       return b.suggestedPurchaseAmount - a.suggestedPurchaseAmount;
     });
-  }, [visible, query, category, supplier, status, priority, toggles]);
+  }, [visible, query, category, supplier, status, priority, toggles, foco]);
+
+  const urgentRecs = visible.filter((r) => r.status === "critical" || r.status === "buy_now");
 
   // Resumen (sobre lo visible, no ignoradas)
   const totalSuggested = visible.reduce((a, r) => a + r.suggestedPurchaseAmount, 0);
@@ -151,6 +159,24 @@ export function ReplenishmentPage() {
       toAdd.length > 0
         ? `${toAdd.length} producto${toAdd.length === 1 ? "" : "s"} agregado${toAdd.length === 1 ? "" : "s"} al borrador de OC`
         : "Esos productos ya estaban en el borrador de OC"
+    );
+  };
+
+  const addAllUrgent = () => {
+    const toAdd = urgentRecs.filter((r) => r.suggestedQuantity > 0 && !hasItem(r.sku));
+    toAdd.forEach((r) =>
+      addItem({
+        sku: r.sku,
+        productName: r.productName,
+        supplierName: r.supplierName,
+        quantity: r.suggestedQuantity,
+        unitCost: r.unitCost,
+      })
+    );
+    toast.success(
+      toAdd.length > 0
+        ? `${toAdd.length} producto${toAdd.length === 1 ? "" : "s"} urgente${toAdd.length === 1 ? "" : "s"} agregado${toAdd.length === 1 ? "" : "s"} a OC`
+        : "Todos los urgentes ya están en el borrador de OC"
     );
   };
 
@@ -205,6 +231,7 @@ export function ReplenishmentPage() {
     setStatus("");
     setPriority("");
     setToggles(emptyToggles);
+    setFoco("all");
   };
 
   const columns: Column<PurchaseRecommendation>[] = [
@@ -495,6 +522,25 @@ export function ReplenishmentPage() {
         <StateLegend />
       </div>
 
+      {/* Foco rápido: segmenta la tabla con un clic */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+        <Tabs
+          value={foco}
+          onChange={setFoco}
+          tabs={[
+            { value: "all", label: "Todos", count: visible.length },
+            { value: "urgent", label: "Comprar ahora", count: urgentRecs.length },
+            { value: "review", label: "Revisar", count: visible.filter((r) => r.status === "review").length },
+            { value: "overstock", label: "Sobrestock", count: overstockCount },
+          ]}
+        />
+        {urgentRecs.length > 0 && (
+          <Button size="sm" onClick={addAllUrgent} icon={<IconPlus className="w-3.5 h-3.5" />}>
+            Agregar {urgentRecs.length} urgentes a OC
+          </Button>
+        )}
+      </div>
+
       <div className="mb-4">
         <FilterBar
           searchValue={query}
@@ -605,6 +651,48 @@ export function ReplenishmentPage() {
             onToggle: toggleRow,
             onToggleAll: toggleAll,
           }}
+          mobileCard={(r) => (
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-xs font-mono text-slate-400">{r.sku}</span>
+                  <p className="font-medium text-slate-800 leading-snug">{r.productName}</p>
+                  <p className="text-xs text-slate-500">{r.category} · {r.supplierName}</p>
+                </div>
+                <RecommendationBadge status={r.status} />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                <div>
+                  <p className="text-xs text-slate-400">Stock disp.</p>
+                  <p className={r.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(r.availableStock)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Sugerido</p>
+                  <p className="font-semibold text-slate-900">{formatNumber(r.suggestedQuantity)} u.</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Compra</p>
+                  <p className="font-semibold text-slate-900">{formatCurrency(r.suggestedPurchaseAmount)}</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5 leading-snug">{r.reason}</p>
+              {r.suggestedQuantity > 0 && (
+                <Button
+                  size="sm"
+                  className="mt-2 w-full"
+                  variant={hasItem(r.sku) ? "secondary" : "primary"}
+                  disabled={hasItem(r.sku)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAdd(r);
+                  }}
+                  icon={<IconPlus className="w-3.5 h-3.5" />}
+                >
+                  {hasItem(r.sku) ? "En OC" : "Agregar a OC"}
+                </Button>
+              )}
+            </div>
+          )}
         />
       </Card>
 

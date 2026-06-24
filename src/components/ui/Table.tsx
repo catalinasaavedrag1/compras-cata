@@ -41,6 +41,9 @@ interface DataTableProps<T> {
   selection?: SelectionConfig;
   sort?: SortState;
   onSortChange?: (key: string) => void;
+  /** Render de tarjeta para móvil. Si se define, en pantallas chicas se
+   *  muestran tarjetas en vez de la tabla (más legible y táctil). */
+  mobileCard?: (row: T) => ReactNode;
 }
 
 const alignClass = {
@@ -60,6 +63,7 @@ export function DataTable<T>({
   selection,
   sort,
   onSortChange,
+  mobileCard,
 }: DataTableProps<T>) {
   const sortedData = useMemo(() => {
     if (!sort?.key) return data;
@@ -89,7 +93,27 @@ export function DataTable<T>({
     visibleKeys.every((k) => selection.selectedKeys.includes(k));
 
   return (
-    <div className="overflow-x-auto scrollbar-thin">
+    <>
+      {/* Móvil: lista de tarjetas (más legible y táctil que una tabla ancha) */}
+      {mobileCard && (
+        <div className="lg:hidden divide-y divide-slate-100">
+          {sortedData.map((row) => (
+            <div
+              key={rowKey(row)}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              className={cn(
+                "p-3.5",
+                onRowClick && "cursor-pointer active:bg-slate-50",
+                rowClassName?.(row)
+              )}
+            >
+              {mobileCard(row)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className={cn("overflow-x-auto scrollbar-thin", mobileCard && "hidden lg:block")}>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr
@@ -161,7 +185,7 @@ export function DataTable<T>({
                 )}
               >
                 {selection && (
-                  <td className="px-3 py-3 w-10" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-3 py-2 w-10" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       className="rounded border-slate-300 text-brand-600 focus:ring-brand-300 cursor-pointer"
@@ -175,7 +199,7 @@ export function DataTable<T>({
                   <td
                     key={col.key}
                     className={cn(
-                      "px-3 py-3 text-slate-700 align-middle",
+                      "px-3 py-2 text-slate-700 align-middle",
                       alignClass[col.align ?? "left"],
                       col.hideOnMobile && "hidden lg:table-cell",
                       col.className
@@ -189,6 +213,7 @@ export function DataTable<T>({
           })}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }

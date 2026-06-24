@@ -1,6 +1,11 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
+import { Tabs } from "../components/ui/Tabs";
+import { RelatedEntitiesPanel } from "../shared/components/RelatedEntitiesPanel";
+import { ActivityTimeline, type ActivityItem } from "../shared/components/ActivityTimeline";
+import { relatedEntitiesForProduct } from "../shared/entities";
 import { KpiCard } from "../components/business/KpiCard";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { RecommendationBadge } from "../components/business/RecommendationBadge";
@@ -30,6 +35,7 @@ export function ProductDetailPage() {
   const { sku } = useParams<{ sku: string }>();
   const navigate = useNavigate();
   const { addItem, hasItem } = useOcDraft();
+  const [tab, setTab] = useState("resumen");
 
   const product = sku ? getProductBySku(sku) : undefined;
 
@@ -66,6 +72,26 @@ export function ProductDetailPage() {
     { date: "2026-03-15", cost: Math.round(product.cost * 0.94), note: "Lista anterior" },
     { date: "2025-12-01", cost: Math.round(product.cost * 0.89), note: "Lista 2025" },
   ];
+
+  // Entidades relacionadas (conexión con otros módulos)
+  const related = relatedEntitiesForProduct(product.sku);
+
+  // Actividad / auditoría básica del producto
+  const activity: ActivityItem[] = [
+    { date: product.costUpdatedAt, title: "Actualización de costo", description: `Costo vigente ${formatCurrency(product.cost)}`, tone: "blue" as const },
+    ...purchaseHistory.map((h) => ({
+      date: h.date,
+      title: `Orden de compra ${h.number}`,
+      description: `${formatNumber(h.qty)} unidades a ${formatCurrency(h.cost)} c/u`,
+      tone: "neutral" as const,
+    })),
+    ...relatedAlerts.map((a) => ({
+      date: a.date,
+      title: "Alerta comercial",
+      description: a.description,
+      tone: "amber" as const,
+    })),
+  ].sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const handleAdd = () => {
     if (!rec) return;
@@ -123,6 +149,19 @@ export function ProductDetailPage() {
         onAdd={handleAdd}
       />
 
+      <Tabs
+        className="mb-5"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: "resumen", label: "Resumen" },
+          { value: "relacionados", label: "Relacionados", count: related.length },
+          { value: "actividad", label: "Actividad", count: activity.length },
+        ]}
+      />
+
+      {tab === "resumen" && (
+      <>
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <KpiCard title="Stock total" value={formatNumber(product.totalStock)} tone="neutral" />
@@ -308,6 +347,26 @@ export function ProductDetailPage() {
           </Card>
         </div>
       </div>
+      </>
+      )}
+
+      {tab === "relacionados" && (
+        <Card>
+          <CardHeader title="Entidades relacionadas" description="Conexiones de este producto con otros módulos" />
+          <CardBody>
+            <RelatedEntitiesPanel entities={related} />
+          </CardBody>
+        </Card>
+      )}
+
+      {tab === "actividad" && (
+        <Card>
+          <CardHeader title="Actividad del producto" description="Auditoría básica de eventos y cambios" />
+          <CardBody>
+            <ActivityTimeline items={activity} />
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }

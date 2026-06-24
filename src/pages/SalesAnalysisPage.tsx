@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { BarList } from "../components/business/BarList";
 import { HelpNote } from "../components/business/HelpNote";
-import { DataTable, type Column } from "../components/ui/Table";
+import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
+import { DataTable, type Column } from "../components/ui/Table";
+import { IconArrowRight } from "../components/ui/icons";
 import {
   salesKpis,
   salesByCategory,
@@ -26,7 +29,48 @@ import { IconSales, IconAlerts } from "../components/ui/icons";
 import type { TopProduct } from "../types/purchasing";
 import type { ProductTrend } from "../data/mockSales";
 
+type Period = "30" | "90" | "180";
+
 export function SalesAnalysisPage() {
+  const [period, setPeriod] = useState<Period>("30");
+  const periodKey = period === "30" ? "last30Days" : period === "90" ? "last90Days" : "last180Days";
+
+  const sortedByGrowth = [...salesByCategory].sort((a, b) => b.growth - a.growth);
+  const topGrow = sortedByGrowth[0];
+  const topDrop = sortedByGrowth[sortedByGrowth.length - 1];
+
+  // Insights accionables: traducen los datos en decisiones de compra
+  const insights = [
+    {
+      tone: "good" as const,
+      title: `${topGrow.category} crece ${formatDelta(topGrow.growth)}`,
+      detail: "Demanda al alza: revisa stock objetivo y adelanta compras para no quebrar.",
+      to: `/reposicion?cat=${encodeURIComponent(topGrow.category)}`,
+      cta: "Ver reposición de la categoría",
+    },
+    {
+      tone: "bad" as const,
+      title: `${topDrop.category} cae ${formatDelta(topDrop.growth)}`,
+      detail: "Venta a la baja: evita sobrecomprar y revisa el inventario de la categoría.",
+      to: `/inventario`,
+      cta: "Revisar inventario",
+    },
+    {
+      tone: "warn" as const,
+      title: `Venta perdida por quiebre: ${formatCurrencyCompact(salesKpis.lostSalesByStockout)}`,
+      detail: "Lo que se dejó de vender por falta de stock. Prioriza los productos críticos.",
+      to: "/reposicion?foco=urgent",
+      cta: "Comprar productos críticos",
+    },
+    {
+      tone: "good" as const,
+      title: `${growingProducts[0].name} +${growingProducts[0].growth}%`,
+      detail: growingProducts[0].note,
+      to: `/productos/${growingProducts[0].sku}`,
+      cta: "Ver producto",
+    },
+  ];
+
   const topColumns: Column<TopProduct>[] = [
     {
       key: "product",
@@ -77,17 +121,58 @@ export function SalesAnalysisPage() {
         <KpiCard title="Venta perdida por quiebre" value={formatCurrencyCompact(salesKpis.lostSalesByStockout)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Estimada últimos 30 días" />
       </div>
 
+      {/* Insights accionables: qué hacer con estos datos */}
+      <Card className="mb-5">
+        <CardHeader title="Qué significa para tus compras" description="Lecturas accionables de la venta, con su siguiente paso" />
+        <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {insights.map((i) => (
+            <Link
+              key={i.title}
+              to={i.to}
+              className="group flex items-start gap-3 rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
+            >
+              <span
+                className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
+                  i.tone === "good" ? "bg-emerald-500" : i.tone === "bad" ? "bg-rose-500" : "bg-amber-500"
+                }`}
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-800">{i.title}</span>
+                <span className="block text-xs text-slate-500 mt-0.5 leading-snug">{i.detail}</span>
+                <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-600 group-hover:text-brand-700">
+                  {i.cta} <IconArrowRight className="w-3.5 h-3.5" />
+                </span>
+              </span>
+            </Link>
+          ))}
+        </CardBody>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
         <Card>
-          <CardHeader title="Venta por categoría" description="Últimos 30 días" />
+          <CardHeader
+            title="Venta por categoría"
+            description="Dónde se concentra la venta en el período"
+            action={
+              <Tabs
+                value={period}
+                onChange={(v) => setPeriod(v as Period)}
+                tabs={[
+                  { value: "30", label: "30 días" },
+                  { value: "90", label: "90 días" },
+                  { value: "180", label: "180 días" },
+                ]}
+              />
+            }
+          />
           <CardBody>
             <BarList
               items={[...salesByCategory]
-                .sort((a, b) => b.last30Days - a.last30Days)
+                .sort((a, b) => b[periodKey] - a[periodKey])
                 .map((c) => ({
                   label: c.category,
-                  value: c.last30Days,
-                  display: formatCurrencyCompact(c.last30Days),
+                  value: c[periodKey],
+                  display: formatCurrencyCompact(c[periodKey]),
                   tone: "blue",
                 }))}
             />

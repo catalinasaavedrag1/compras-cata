@@ -5,6 +5,7 @@ import { Input } from "../ui/Input";
 import { IconSearch, IconMenu, IconOrders, IconProducts, IconSuppliers } from "../ui/icons";
 import { useOcDraft } from "../../context/OcDraftContext";
 import { useBuyer, initials } from "../../context/BuyerContext";
+import { NotificationCenter } from "./NotificationCenter";
 import { TODAY_ISO } from "../../utils/constants";
 import { formatDate, formatNumber } from "../../utils/formatters";
 import { products } from "../../data/mockProducts";
@@ -168,6 +169,8 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
       </div>
 
       <div className="flex-1" />
+
+      <NotificationCenter />
 
       <button
         onClick={() => navigate("/ordenes-compra")}
