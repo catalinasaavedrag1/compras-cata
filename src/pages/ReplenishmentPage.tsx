@@ -497,11 +497,11 @@ export function ReplenishmentPage() {
 
       {/* Cards resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-        <KpiCard title="Compra sugerida total" value={formatCurrencyCompact(totalSuggested)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Reposición vigente" />
-        <KpiCard title="SKUs críticos" value={formatNumber(criticalCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Comprar de inmediato" />
-        <KpiCard title="Para comprar ahora" value={formatNumber(buyNowCount)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Stock bajo vs lead time" />
-        <KpiCard title="Con sobrestock" value={formatNumber(overstockCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="No conviene comprar" />
-        <KpiCard title="Con margen bajo" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Margen menor a 25%" />
+        <KpiCard title="Compra sugerida total" value={formatCurrencyCompact(totalSuggested)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Ver urgentes" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
+        <KpiCard title="SKUs críticos" value={formatNumber(criticalCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Comprar de inmediato" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
+        <KpiCard title="Para comprar ahora" value={formatNumber(buyNowCount)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Stock bajo vs lead time" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
+        <KpiCard title="Con sobrestock" value={formatNumber(overstockCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="No conviene comprar" active={foco === "overstock"} onClick={() => setFoco("overstock")} />
+        <KpiCard title="Con margen bajo" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Margen menor a 25%" active={toggles.lowMargin} onClick={() => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin }))} />
       </div>
 
       {/* Ayuda breve + leyenda de estados (colapsable) */}

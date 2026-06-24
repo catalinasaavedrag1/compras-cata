@@ -4,6 +4,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { DataTable, type Column } from "../components/ui/Table";
+import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -32,8 +33,10 @@ import {
   coverageDays,
   estimatedStockoutDate,
   calculateSuggestedPurchase,
+  addDaysISO,
 } from "../utils/calculations";
 import { TODAY_ISO } from "../utils/constants";
+import { useState } from "react";
 import {
   formatCurrencyCompact,
   formatDate,
@@ -115,6 +118,87 @@ export function MyPanelPage() {
   );
 
   const noSupplierProducts = myProducts.filter((p) => !p.supplierName);
+
+  // ---- Agenda por horizonte de tiempo ----
+  const [horizon, setHorizon] = useState<"hoy" | "semana" | "mes" | "trimestre">("hoy");
+  const daysTo = (iso: string) =>
+    Math.round((new Date(`${iso}T00:00:00`).getTime() - new Date(`${TODAY_ISO}T00:00:00`).getTime()) / 86400000);
+
+  interface AgendaItem {
+    id: string;
+    dueDate: string;
+    days: number;
+    kind: string;
+    title: string;
+    detail: string;
+    to: string;
+    tone: "red" | "amber" | "violet" | "blue";
+  }
+
+  const agenda: AgendaItem[] = [];
+  riskRows.forEach((r) => {
+    const due = r.product.availableStock <= 0 ? TODAY_ISO : r.stockoutDate ?? TODAY_ISO;
+    agenda.push({
+      id: `q-${r.product.sku}`,
+      dueDate: due,
+      days: Math.max(daysTo(due), r.product.availableStock <= 0 ? -1 : daysTo(due)),
+      kind: "Quiebre",
+      title: r.product.name,
+      detail: `Riesgo de quiebre · comprar ${formatNumber(r.suggestedQty)} u.`,
+      to: `/productos/${r.product.sku}`,
+      tone: "red",
+    });
+  });
+  myOpenOrders.forEach((o) => {
+    agenda.push({
+      id: `oc-${o.id}`,
+      dueDate: o.expectedDate,
+      days: daysTo(o.expectedDate),
+      kind: "OC",
+      title: o.number,
+      detail: `${o.supplierName} · ${o.delayedDays > 0 ? `atrasada ${o.delayedDays} d` : "por recibir"}`,
+      to: "/ordenes-compra",
+      tone: o.delayedDays > 0 ? "red" : "amber",
+    });
+  });
+  mySuppliersToReview.forEach((s) => {
+    const add = s.status === "delayed" ? 0 : s.status === "review" ? 14 : 30;
+    const due = addDaysISO(TODAY_ISO, add);
+    agenda.push({
+      id: `prov-${s.id}`,
+      dueDate: due,
+      days: daysTo(due),
+      kind: "Proveedor",
+      title: s.name,
+      detail: `Revisar proveedor · cumple ${s.deliveryCompliance}%`,
+      to: "/proveedores",
+      tone: "amber",
+    });
+  });
+  overstockProducts.forEach((p) => {
+    const due = addDaysISO(TODAY_ISO, 30);
+    agenda.push({
+      id: `over-${p.sku}`,
+      dueDate: due,
+      days: daysTo(due),
+      kind: "Sobrestock",
+      title: p.name,
+      detail: `Sobrestock · ${formatCurrencyCompact(p.availableStock * p.cost)} inmovilizado`,
+      to: `/productos/${p.sku}`,
+      tone: "violet",
+    });
+  });
+
+  const horizonMax = { hoy: 0, semana: 7, mes: 30, trimestre: 90 };
+  const agendaCounts = {
+    hoy: agenda.filter((a) => a.days <= 0).length,
+    semana: agenda.filter((a) => a.days <= 7).length,
+    mes: agenda.filter((a) => a.days <= 30).length,
+    trimestre: agenda.filter((a) => a.days <= 90).length,
+  };
+  const agendaItems = agenda
+    .filter((a) => a.days <= horizonMax[horizon])
+    .sort((a, b) => a.days - b.days);
 
   const handleAdd = (p: Product, qty: number) => {
     addItem({
@@ -259,6 +343,58 @@ export function MyPanelPage() {
           </Button>
         }
       />
+
+      {/* Agenda por horizonte: qué revisar hoy / semana / mes / 3 meses */}
+      <Card className="mb-4">
+        <CardHeader title="Qué tengo que ver" description="Tus pendientes ordenados por cuándo vencen. Empieza por hoy." />
+        <div className="px-4 pt-1">
+          <Tabs
+            value={horizon}
+            onChange={(v) => setHorizon(v as typeof horizon)}
+            tabs={[
+              { value: "hoy", label: "Hoy / vencido", count: agendaCounts.hoy },
+              { value: "semana", label: "Esta semana", count: agendaCounts.semana },
+              { value: "mes", label: "Este mes", count: agendaCounts.mes },
+              { value: "trimestre", label: "Próx. 3 meses", count: agendaCounts.trimestre },
+            ]}
+          />
+        </div>
+        <CardBody>
+          {agendaItems.length === 0 ? (
+            <EmptyState
+              icon={<IconCheck className="w-6 h-6" />}
+              title="Nada pendiente en este plazo"
+              description="No tienes tareas para este horizonte. Revisa un plazo más amplio."
+            />
+          ) : (
+            <div className="space-y-1.5">
+              {agendaItems.map((a) => {
+                const toneClass = a.tone === "red" ? "bg-rose-500" : a.tone === "amber" ? "bg-amber-500" : a.tone === "violet" ? "bg-violet-500" : "bg-brand-500";
+                const when = a.days < 0 ? `vencido ${Math.abs(a.days)}d` : a.days === 0 ? "hoy" : `en ${a.days}d`;
+                return (
+                  <Link
+                    key={a.id}
+                    to={a.to}
+                    className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                  >
+                    <span className={`w-1.5 h-8 rounded-full flex-shrink-0 ${toneClass}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Badge tone="neutral">{a.kind}</Badge>
+                        <span className="text-sm font-medium text-slate-800 truncate">{a.title}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 truncate">{a.detail}</p>
+                    </div>
+                    <span className={`text-xs font-medium flex-shrink-0 ${a.days <= 0 ? "text-rose-600" : "text-slate-500"}`}>
+                      {when}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       {/* Mis categorías asignadas */}
       <Card className="mb-4">

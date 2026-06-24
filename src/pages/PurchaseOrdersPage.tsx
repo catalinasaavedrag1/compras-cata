@@ -220,10 +220,10 @@ export function PurchaseOrdersPage() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Monto en curso" value={formatCurrencyCompact(totalOpenAmount)} tone="info" icon={<IconOrders className="w-4 h-4" />} description="OC sin recibir" />
-        <KpiCard title="Atrasadas" value={formatNumber(delayedCount)} tone="bad" icon={<IconReplenish className="w-4 h-4" />} />
-        <KpiCard title="Borradores" value={formatNumber(draftCount)} tone="warn" icon={<IconPlus className="w-4 h-4" />} />
-        <KpiCard title="Total OC" value={formatNumber(orders.length)} tone="neutral" icon={<IconOrders className="w-4 h-4" />} />
+        <KpiCard title="Monto en curso" value={formatCurrencyCompact(totalOpenAmount)} tone="info" icon={<IconOrders className="w-4 h-4" />} description="Ver en curso" active={tab === "open"} onClick={() => setTab("open")} />
+        <KpiCard title="Atrasadas" value={formatNumber(delayedCount)} tone="bad" icon={<IconReplenish className="w-4 h-4" />} description="Ver atrasadas" active={tab === "delayed"} onClick={() => setTab("delayed")} />
+        <KpiCard title="Borradores" value={formatNumber(draftCount)} tone="warn" icon={<IconPlus className="w-4 h-4" />} description="Ver borradores" active={tab === "draft"} onClick={() => setTab("draft")} />
+        <KpiCard title="Total OC" value={formatNumber(orders.length)} tone="neutral" icon={<IconOrders className="w-4 h-4" />} description="Ver todas" active={tab === "all"} onClick={() => setTab("all")} />
       </div>
 
       <HelpNote className="mb-4">
