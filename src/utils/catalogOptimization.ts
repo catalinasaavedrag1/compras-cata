@@ -1,26 +1,36 @@
 import type { Product } from "../types/purchasing";
-import { formatNumber, formatDays } from "./formatters";
+import { formatNumber } from "./formatters";
 
 // ============================================================================
-//  Optimización de catálogo: detección de productos redundantes.
+//  Optimización de catálogo: detección de productos redundantes por exceso de
+//  variedad dentro de un mismo tipo de producto (subcategoría).
 //
-//  Idea de negocio: dentro de una misma categoría → subcategoría suele haber
-//  varios SKUs que compiten por la misma demanda. Cuando hay 2+, el de mejor
-//  venta/rotación es el "líder a conservar" y los que lo duplican con bajo
-//  desempeño son candidatos a liquidar o descontinuar. Racionalizar el surtido
-//  libera capital inmovilizado y simplifica la operación.
+//  Idea de negocio: para un mismo tipo de producto (p. ej. "alargador 5 m")
+//  basta con UNA opción por gama de precio — económica, media y premium. Cada
+//  gama sirve a un cliente distinto, así que conviene conservar la mejor de
+//  cada una. Tener VARIAS opciones en la misma gama es redundante: duplican el
+//  mismo segmento sin aportar diferenciación, inmovilizan capital y complican
+//  la operación (el caso de "10 martillos" o "10 alargadores iguales").
 // ============================================================================
 
 export type RedundancyAction = "liquidate" | "discontinue" | "review";
 export type RedundancySeverity = "high" | "medium";
+export type PriceTier = "low" | "mid" | "high";
+
+export const TIER_LABEL: Record<PriceTier, string> = {
+  low: "económica",
+  mid: "media",
+  high: "premium",
+};
 
 export interface RedundantCandidate {
   product: Product;
+  /** SKU/nombre del referente que ya cubre esa gama (a conservar). */
   leaderSku: string;
   leaderName: string;
-  /** Venta del candidato como fracción (0-1) de la del líder. */
+  segment: PriceTier;
+  /** Venta del candidato como fracción (0-1) de la del referente. */
   salesShareVsLeader: number;
-  /** Motivo por el que se considera redundante, en lenguaje de negocio. */
   reason: string;
   /** Capital inmovilizado en este SKU (costo × stock total). */
   tiedCapital: number;
@@ -28,24 +38,36 @@ export interface RedundantCandidate {
   severity: RedundancySeverity;
 }
 
+export interface KeeperProduct {
+  product: Product;
+  segment: PriceTier;
+  /** El mejor de su gama, pero marcado "no comprar"/descontinuado: conviene
+   *  reactivarlo en vez de dejar uno peor. (Caso de surtido invertido.) */
+  reactivate: boolean;
+}
+
 export interface RedundancyGroup {
   category: string;
   subcategory: string;
-  /** SKU con mejor desempeño del grupo (a conservar). */
-  leader: Product;
-  /** Todos los SKUs del grupo, ordenados por desempeño. */
-  members: Product[];
+  /** Surtido sugerido: el mejor SKU de cada gama presente. */
+  keepers: KeeperProduct[];
   candidates: RedundantCandidate[];
+  /** Todos los SKUs del grupo. */
+  members: Product[];
   /** Capital liberable sumando los candidatos del grupo. */
   freeableCapital: number;
 }
 
 export interface CatalogAnalysis {
   groups: RedundancyGroup[];
-  /** N.º de subcategorías con al menos un SKU redundante. */
+  /** N.º de tipos de producto (subcategorías) con exceso de variedad. */
   saturatedSubcategories: number;
   /** N.º total de SKUs redundantes. */
   candidateCount: number;
+  /** SKUs que bastarían en los grupos con exceso (suma de "keepers"). */
+  curatedCount: number;
+  /** Referentes (mejores de su gama) marcados "no comprar" a reactivar. */
+  reactivateCount: number;
   /** Capital inmovilizado total que podría liberarse. */
   freeableCapital: number;
   /** Total de SKUs analizados en el ámbito. */
@@ -54,43 +76,52 @@ export interface CatalogAnalysis {
   redundantShare: number;
 }
 
-/** Desempeño comparable de un SKU: venta reciente, con rotación como desempate. */
-function performance(p: Product): number {
-  return p.salesLast30Days * 1000 + p.rotation;
+/**
+ * Ordena de mejor a peor desempeño: primero venta reciente, luego rotación y
+ * por último margen (más rentable). Así el referente de cada gama es el que
+ * realmente conviene conservar, no el que esté activo por inercia.
+ */
+function better(a: Product, b: Product): number {
+  return (
+    b.salesLast30Days - a.salesLast30Days ||
+    b.rotation - a.rotation ||
+    b.margin - a.margin
+  );
 }
 
-function buildReason(p: Product, leader: Product, share: number): string {
-  if (p.productStatus === "discontinued") return `Descontinuado; duplica a “${leader.name}”`;
-  if (p.productStatus === "no_sales") return `Sin ventas; duplica a “${leader.name}”`;
+/** El mejor de su gama, pero marcado "no comprar" o descontinuado. */
+function needsReactivation(p: Product): boolean {
+  return p.purchaseStatus === "do_not_buy" || p.productStatus === "discontinued";
+}
+
+/** Gama de precio del SKU dentro del rango de precios de su tipo de producto. */
+function tierOf(price: number, min: number, max: number): PriceTier {
+  if (max <= min) return "mid"; // todos al mismo precio → misma gama
+  const t = (price - min) / (max - min);
+  if (t < 1 / 3) return "low";
+  if (t > 2 / 3) return "high";
+  return "mid";
+}
+
+function buildReason(p: Product, keeper: Product, segment: PriceTier, share: number): string {
+  const gama = TIER_LABEL[segment];
+  if (p.productStatus === "discontinued") return `Descontinuado; duplica la gama ${gama} (“${keeper.name}”)`;
+  if (p.productStatus === "no_sales") return `Sin ventas; duplica la gama ${gama} (“${keeper.name}”)`;
   const pct = Math.round(share * 100);
-  const parts = [`Vende ${formatNumber(p.salesLast30Days)}/mes (${pct}% del líder)`];
-  if (p.inventoryDays >= 90) parts.push(`${formatDays(p.inventoryDays)} de inventario`);
-  if (p.purchaseStatus === "overstock") parts.push("en sobrestock");
-  return parts.join(" · ");
+  return `Gama ${gama} ya cubierta por “${keeper.name}” · vende ${formatNumber(p.salesLast30Days)}/mes (${pct}% del referente)`;
 }
 
 function classify(p: Product): { action: RedundancyAction; severity: RedundancySeverity } {
   const dead = p.productStatus === "no_sales" || p.productStatus === "discontinued";
-  let action: RedundancyAction;
-  if (dead || p.totalStock === 0) action = "discontinue";
-  else action = "liquidate";
+  const action: RedundancyAction = dead || p.totalStock === 0 ? "discontinue" : "liquidate";
   const severity: RedundancySeverity = dead || p.inventoryDays >= 120 ? "high" : "medium";
   return { action, severity };
 }
 
-/**
- * Un SKU no-líder es redundante si claramente sub-rinde frente al líder de su
- * subcategoría, o si su estado lo señala (sin ventas, descontinuado, sobrestock).
- */
-function isRedundant(p: Product, leader: Product, share: number): boolean {
-  if (p.productStatus === "no_sales" || p.productStatus === "discontinued") return true;
-  if (p.purchaseStatus === "overstock" || p.purchaseStatus === "do_not_buy") return true;
-  if (share < 0.4) return true;
-  if (leader.rotation > 0 && p.rotation < leader.rotation * 0.5) return true;
-  return false;
-}
+const TIER_ORDER: PriceTier[] = ["low", "mid", "high"];
 
 export function analyzeCatalog(products: Product[]): CatalogAnalysis {
+  // Agrupar por tipo de producto: categoría → subcategoría.
   const byKey = new Map<string, Product[]>();
   for (const p of products) {
     const key = `${p.category}|||${p.subcategory}`;
@@ -102,39 +133,58 @@ export function analyzeCatalog(products: Product[]): CatalogAnalysis {
   const groups: RedundancyGroup[] = [];
   for (const members of byKey.values()) {
     if (members.length < 2) continue;
-    const sorted = [...members].sort((a, b) => performance(b) - performance(a));
-    const leader = sorted[0];
 
+    const prices = members.map((p) => p.price);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+
+    // Repartir en gamas y, dentro de cada gama, conservar el de mejor desempeño.
+    const buckets = new Map<PriceTier, Product[]>();
+    for (const p of members) {
+      const tier = tierOf(p.price, min, max);
+      const b = buckets.get(tier);
+      if (b) b.push(p);
+      else buckets.set(tier, [p]);
+    }
+
+    const keepers: KeeperProduct[] = [];
     const candidates: RedundantCandidate[] = [];
-    for (const p of sorted.slice(1)) {
-      const share =
-        leader.salesLast30Days > 0
-          ? p.salesLast30Days / leader.salesLast30Days
-          : p.salesLast30Days > 0
-            ? 1
-            : 0;
-      if (!isRedundant(p, leader, share)) continue;
-      const { action, severity } = classify(p);
-      candidates.push({
-        product: p,
-        leaderSku: leader.sku,
-        leaderName: leader.name,
-        salesShareVsLeader: share,
-        reason: buildReason(p, leader, share),
-        tiedCapital: Math.round(p.cost * p.totalStock),
-        action,
-        severity,
-      });
+    for (const tier of TIER_ORDER) {
+      const bucket = buckets.get(tier);
+      if (!bucket || bucket.length === 0) continue;
+      const sorted = [...bucket].sort(better);
+      const keeper = sorted[0];
+      keepers.push({ product: keeper, segment: tier, reactivate: needsReactivation(keeper) });
+      for (const p of sorted.slice(1)) {
+        const share =
+          keeper.salesLast30Days > 0
+            ? p.salesLast30Days / keeper.salesLast30Days
+            : p.salesLast30Days > 0
+              ? 1
+              : 0;
+        const { action, severity } = classify(p);
+        candidates.push({
+          product: p,
+          leaderSku: keeper.sku,
+          leaderName: keeper.name,
+          segment: tier,
+          salesShareVsLeader: share,
+          reason: buildReason(p, keeper, tier, share),
+          tiedCapital: Math.round(p.cost * p.totalStock),
+          action,
+          severity,
+        });
+      }
     }
     if (candidates.length === 0) continue;
 
     const freeableCapital = candidates.reduce((s, c) => s + c.tiedCapital, 0);
     groups.push({
-      category: leader.category,
-      subcategory: leader.subcategory,
-      leader,
-      members: sorted,
+      category: members[0].category,
+      subcategory: members[0].subcategory,
+      keepers,
       candidates,
+      members,
       freeableCapital,
     });
   }
@@ -143,12 +193,16 @@ export function analyzeCatalog(products: Product[]): CatalogAnalysis {
   groups.sort((a, b) => b.freeableCapital - a.freeableCapital);
 
   const candidateCount = groups.reduce((n, g) => n + g.candidates.length, 0);
+  const curatedCount = groups.reduce((n, g) => n + g.keepers.length, 0);
+  const reactivateCount = groups.reduce((n, g) => n + g.keepers.filter((k) => k.reactivate).length, 0);
   const freeableCapital = groups.reduce((s, g) => s + g.freeableCapital, 0);
   const totalSkus = products.length;
   return {
     groups,
     saturatedSubcategories: groups.length,
     candidateCount,
+    curatedCount,
+    reactivateCount,
     freeableCapital,
     totalSkus,
     redundantShare: totalSkus > 0 ? candidateCount / totalSkus : 0,

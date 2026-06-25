@@ -9,6 +9,7 @@ import type {
 import {
   analyzeCatalog,
   ACTION_LABEL,
+  TIER_LABEL,
   type RedundancyAction,
   type RedundantCandidate,
 } from "../../utils/catalogOptimization";
@@ -64,7 +65,7 @@ const exportColumns: CsvColumn<ExportRow>[] = [
   { label: "Capital inmovilizado", value: (r) => r.candidate.tiedCapital },
 ];
 
-/** Una subcategoría con uno o más SKUs redundantes. */
+/** Un tipo de producto (subcategoría) con exceso de variedad. */
 function GroupCard({ group }: { group: ReturnType<typeof analyzeCatalog>["groups"][number] }) {
   return (
     <Card>
@@ -73,7 +74,7 @@ function GroupCard({ group }: { group: ReturnType<typeof analyzeCatalog>["groups
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800 truncate">{group.subcategory}</p>
             <p className="text-xs text-slate-500">
-              {group.category} · {group.members.length} SKUs
+              {group.category} · {group.members.length} SKUs · bastan {group.keepers.length}
             </p>
           </div>
           <span className="flex-shrink-0 text-right">
@@ -84,24 +85,32 @@ function GroupCard({ group }: { group: ReturnType<typeof analyzeCatalog>["groups
           </span>
         </div>
 
-        {/* Líder a conservar */}
-        <Link
-          to={`/productos/${group.leader.sku}`}
-          className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 hover:border-emerald-300"
-        >
-          <div className="min-w-0">
-            <span className="text-xs font-mono text-slate-400">{group.leader.sku}</span>
-            <p className="text-sm font-medium text-slate-800 truncate">{group.leader.name}</p>
-            <p className="text-xs text-slate-500">
-              vende {formatNumber(group.leader.salesLast30Days)}/mes · rotación {formatNumber(group.leader.rotation)}×
-            </p>
-          </div>
-          <Badge tone="green" dot>
-            Conservar
-          </Badge>
-        </Link>
+        {/* Surtido sugerido: uno por gama */}
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Conservar (uno por gama)</p>
+        {group.keepers.map((k) => (
+          <Link
+            key={k.product.sku}
+            to={`/productos/${k.product.sku}`}
+            className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 hover:border-emerald-300"
+          >
+            <div className="min-w-0">
+              <span className="text-xs font-mono text-slate-400">{k.product.sku}</span>
+              <p className="text-sm font-medium text-slate-800 truncate">{k.product.name}</p>
+              <p className="text-xs text-slate-500">
+                gama {TIER_LABEL[k.segment]} · vende {formatNumber(k.product.salesLast30Days)}/mes · rota {formatNumber(k.product.rotation)}× · margen {formatPercent(k.product.margin, 0)}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <Badge tone="green" dot>
+                Conservar
+              </Badge>
+              {k.reactivate && <Badge tone="amber">Reactivar compra</Badge>}
+            </div>
+          </Link>
+        ))}
 
-        {/* Candidatos redundantes */}
+        {/* Redundantes: sobran en su gama */}
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 pt-0.5">Sobran</p>
         {group.candidates.map((c) => (
           <Link
             key={c.product.sku}
@@ -214,10 +223,8 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
       )}
 
       <HelpNote variant="tip" title="Cómo leerlo:">
-        Dentro de cada subcategoría, el SKU con mejor venta y rotación se marca como{" "}
-        <strong>Conservar</strong>. Los que lo duplican con bajo desempeño se sugiere{" "}
-        <strong>Liquidar</strong> (tienen stock que recuperar) o <strong>Descontinuar</strong>{" "}
-        (sin ventas o sin stock). Optimizar libera capital y simplifica el surtido.
+        Basta una opción por <strong>gama</strong> (económica, media, premium): se conserva la mejor de
+        cada una; las demás <strong>sobran</strong>.
       </HelpNote>
 
       {/* Acciones: exportar la lista y lanzar una campaña de liquidación. */}

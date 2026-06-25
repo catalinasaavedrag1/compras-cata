@@ -54,8 +54,9 @@ Documento que resume el rediseño de experiencia (UX) orientado a que un comprad
 
 ## Catálogo optimizado (productos redundantes)
 
-- Vista **Catálogo optimizado** (`/catalogo-optimizado`) para racionalizar el surtido: detecta **SKUs redundantes** agrupando por categoría → subcategoría. Dentro de cada subcategoría, el SKU con mejor venta y rotación se marca como **Conservar** y los que lo duplican con bajo desempeño se sugiere **Liquidar** (tienen stock que recuperar) o **Descontinuar** (sin ventas o sin stock).
-- Resumen con **capital inmovilizado liberable** y % del surtido redundante; grupos ordenados por mayor capital a liberar. Filtro por categoría en la URL (compartible).
+- Vista **Catálogo optimizado** (`/catalogo-optimizado`) para racionalizar el surtido por **exceso de variedad**: dentro de un mismo tipo de producto (categoría → subcategoría) basta con una opción por **gama de precio** (económica/media/premium). Se conserva la mejor de cada gama por venta, rotación y margen; las demás de la misma gama **sobran** y se sugiere **Liquidar** (con stock) o **Descontinuar** (sin ventas/stock).
+- Caso de **surtido invertido**: si el mejor de su gama está marcado *no comprar*/descontinuado mientras se mantiene uno peor, se marca **Reactivar compra**.
+- Resumen con **capital inmovilizado liberable** y % del surtido redundante; grupos ordenados por mayor capital a liberar. Filtro por categoría en la URL. Acciones: **exportar CSV** y **crear campaña de liquidación** (precarga los redundantes con stock).
 - La misma vista está disponible como pestaña **"Optimizar surtido"** en el detalle de cada categoría.
 - Lógica pura en `utils/catalogOptimization.ts`; UI reutilizable en `components/business/CatalogRedundancy.tsx`.
 
