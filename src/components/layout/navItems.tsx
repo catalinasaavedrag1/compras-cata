@@ -11,6 +11,7 @@ import {
   IconRules,
   IconCampaign,
   IconCheck,
+  IconBulb,
 } from "../ui/icons";
 
 export interface NavItem {
@@ -101,6 +102,12 @@ export const navGroups: NavGroup[] = [
         label: "Proveedores",
         icon: IconSuppliers,
         hint: "Cumplimiento, lead time y proveedores a revisar",
+      },
+      {
+        to: "/catalogo-optimizado",
+        label: "Catálogo optimizado",
+        icon: IconBulb,
+        hint: "Productos redundantes por subcategoría para racionalizar el surtido",
       },
     ],
   },

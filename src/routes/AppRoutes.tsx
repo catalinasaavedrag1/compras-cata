@@ -10,6 +10,7 @@ import { ReplenishmentPage } from "../pages/ReplenishmentPage";
 import { ProductsPage } from "../pages/ProductsPage";
 import { ProductDetailPage } from "../pages/ProductDetailPage";
 import { CategoriesPage } from "../pages/CategoriesPage";
+import { CatalogOptimizationPage } from "../pages/CatalogOptimizationPage";
 import { SuppliersPage } from "../pages/SuppliersPage";
 import { PurchaseOrdersPage } from "../pages/PurchaseOrdersPage";
 import { AlertsPage } from "../pages/AlertsPage";
@@ -38,6 +39,7 @@ export default function AppRoutes() {
           <Route path="/productos/:sku" element={<ProductDetailPage />} />
           <Route path="/categorias" element={<CategoriesPage />} />
           <Route path="/categorias/:id" element={<CategoryDetailPage />} />
+          <Route path="/catalogo-optimizado" element={<CatalogOptimizationPage />} />
           <Route path="/proveedores" element={<SuppliersPage />} />
           <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
           <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />

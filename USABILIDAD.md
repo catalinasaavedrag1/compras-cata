@@ -52,6 +52,13 @@ Documento que resume el rediseño de experiencia (UX) orientado a que un comprad
 - Mensajes de validación que explican qué corregir.
 - **Empty states con acción sugerida** (ej. "Aún no has creado campañas → Crear campaña"; "No hay alertas activas → Ir a reposición").
 
+## Catálogo optimizado (productos redundantes)
+
+- Vista **Catálogo optimizado** (`/catalogo-optimizado`) para racionalizar el surtido: detecta **SKUs redundantes** agrupando por categoría → subcategoría. Dentro de cada subcategoría, el SKU con mejor venta y rotación se marca como **Conservar** y los que lo duplican con bajo desempeño se sugiere **Liquidar** (tienen stock que recuperar) o **Descontinuar** (sin ventas o sin stock).
+- Resumen con **capital inmovilizado liberable** y % del surtido redundante; grupos ordenados por mayor capital a liberar. Filtro por categoría en la URL (compartible).
+- La misma vista está disponible como pestaña **"Optimizar surtido"** en el detalle de cada categoría.
+- Lógica pura en `utils/catalogOptimization.ts`; UI reutilizable en `components/business/CatalogRedundancy.tsx`.
+
 ## Guía al usuario
 
 - Bloque **"Qué revisar primero" / "Todas mis tareas"** (`PriorityGuide`) ordenado por urgencia, con conteo en vivo; lo resuelto se marca en verde.
