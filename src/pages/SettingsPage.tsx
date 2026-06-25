@@ -7,6 +7,7 @@ import { Button } from "../components/ui/Button";
 import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { Drawer } from "../components/ui/Drawer";
 import { Input } from "../components/ui/Input";
+import { Tabs } from "../components/ui/Tabs";
 import { KpiCard } from "../components/business/KpiCard";
 import { useToast } from "../context/ToastContext";
 import { purchaseRules as seedRules, specialRules } from "../data/mockRules";
@@ -42,18 +43,35 @@ function healthOf(r: PurchaseRule): RuleHealth {
   return "ok";
 }
 
-const isGlobal = (r: PurchaseRule) => r.scope.toLowerCase().startsWith("global");
-const affectedCount = (scope: string) =>
-  scope.toLowerCase().startsWith("global") ? products.length : products.filter((p) => p.category === scope).length;
-const affectedPurchase = (scope: string) =>
-  recommendations
-    .filter((r) => scope.toLowerCase().startsWith("global") || r.category === scope)
-    .reduce((a, r) => a + r.suggestedPurchaseAmount, 0);
+const isGlobal = (r: PurchaseRule) => r.scopeType === "global";
+
+const SCOPE_TYPE: Record<PurchaseRule["scopeType"], { label: string; tone: BadgeTone }> = {
+  global: { label: "Regla base", tone: "slate" },
+  category: { label: "Categoría", tone: "blue" },
+  supplier: { label: "Proveedor", tone: "violet" },
+  brand: { label: "Marca", tone: "amber" },
+  channel: { label: "Canal", tone: "green" },
+};
+
+function affectedProductsOf(r: PurchaseRule) {
+  switch (r.scopeType) {
+    case "supplier": return products.filter((p) => p.supplierName === r.scopeValue);
+    case "brand": return products.filter((p) => p.brand === r.scopeValue);
+    case "category": return products.filter((p) => p.category === r.scopeValue);
+    default: return products; // global y canal aplican a todo el surtido
+  }
+}
+const affectedCount = (r: PurchaseRule) => affectedProductsOf(r).length;
+const affectedPurchase = (r: PurchaseRule) => {
+  const skus = new Set(affectedProductsOf(r).map((p) => p.sku));
+  return recommendations.filter((rec) => skus.has(rec.sku)).reduce((a, rec) => a + rec.suggestedPurchaseAmount, 0);
+};
 
 export function SettingsPage() {
   const toast = useToast();
   const [rules, setRules] = useState<PurchaseRule[]>(seedRules);
   const [onlyAlerts, setOnlyAlerts] = useState(false);
+  const [scopeFilter, setScopeFilter] = useState<string>("all");
   const [editing, setEditing] = useState<PurchaseRule | null>(null);
 
   const global = rules.find(isGlobal);
@@ -63,8 +81,11 @@ export function SettingsPage() {
   const leadProm = Math.round(rules.reduce((a, r) => a + r.leadTimeDays, 0) / rules.length);
   const diasProm = Math.round(rules.reduce((a, r) => a + r.targetInventoryDays, 0) / rules.length);
 
-  const visible = onlyAlerts ? withHealth.filter((x) => x.health !== "ok") : withHealth;
+  const visible = withHealth
+    .filter((x) => (scopeFilter === "all" ? true : x.r.scopeType === scopeFilter))
+    .filter((x) => (onlyAlerts ? x.health !== "ok" : true));
   const alerts = withHealth.filter((x) => x.health !== "ok");
+  const scopeCount = (t: string) => (t === "all" ? rules.length : rules.filter((r) => r.scopeType === t).length);
 
   const vsGlobal = (r: PurchaseRule) => {
     if (!global || isGlobal(r)) return null;
@@ -81,7 +102,7 @@ export function SettingsPage() {
         <div className="min-w-[150px]">
           <p className="font-medium text-slate-800">{r.scope}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <Badge tone={isGlobal(r) ? "slate" : "blue"}>{isGlobal(r) ? "Regla base" : "Personalizada"}</Badge>
+            <Badge tone={SCOPE_TYPE[r.scopeType].tone}>{SCOPE_TYPE[r.scopeType].label}</Badge>
             {vsGlobal(r) && <span className="text-xs text-amber-600">{vsGlobal(r)}</span>}
           </div>
         </div>
@@ -97,8 +118,8 @@ export function SettingsPage() {
       align: "right",
       render: ({ r }) => (
         <div className="text-sm">
-          <p className="text-slate-700">{affectedCount(r.scope)} SKU</p>
-          <p className="text-xs text-slate-400">{formatCurrencyCompact(affectedPurchase(r.scope))}</p>
+          <p className="text-slate-700">{affectedCount(r)} SKU</p>
+          <p className="text-xs text-slate-400">{formatCurrencyCompact(affectedPurchase(r))}</p>
         </div>
       ),
     },
@@ -111,7 +132,7 @@ export function SettingsPage() {
     <div>
       <PageHeader
         title="Reglas de compra"
-        description="Cómo se calcula la compra sugerida por categoría. Detecta reglas mal configuradas y ajusta con impacto visible."
+        description="Define cómo se calcula la compra sugerida por categoría, proveedor, marca o canal."
       />
 
       {/* Resumen KPI */}
@@ -141,11 +162,26 @@ export function SettingsPage() {
         </Card>
       )}
 
+      {/* Filtro por tipo de ámbito */}
+      <Tabs
+        className="mb-4"
+        value={scopeFilter}
+        onChange={setScopeFilter}
+        tabs={[
+          { value: "all", label: "Todas", count: scopeCount("all") },
+          { value: "category", label: "Categoría", count: scopeCount("category") },
+          { value: "supplier", label: "Proveedor", count: scopeCount("supplier") },
+          { value: "brand", label: "Marca", count: scopeCount("brand") },
+          { value: "channel", label: "Canal", count: scopeCount("channel") },
+          { value: "global", label: "Global", count: scopeCount("global") },
+        ]}
+      />
+
       {/* 2 columnas en escritorio: tabla + ayuda/excepciones siempre visibles */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader title="Reglas por categoría" description="Toca una regla para editar con impacto" />
+            <CardHeader title="Reglas" description="Precedencia: proveedor › marca › categoría › global" />
             <DataTable
               columns={columns}
               data={visible}
@@ -158,7 +194,7 @@ export function SettingsPage() {
                     <div className="min-w-0">
                       <p className="font-medium text-slate-800">{r.scope}</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <Badge tone={isGlobal(r) ? "slate" : "blue"}>{isGlobal(r) ? "Regla base" : "Personalizada"}</Badge>
+                        <Badge tone={SCOPE_TYPE[r.scopeType].tone}>{SCOPE_TYPE[r.scopeType].label}</Badge>
                         {vsGlobal(r) && <span className="text-xs text-amber-600">{vsGlobal(r)}</span>}
                       </div>
                     </div>
@@ -169,7 +205,7 @@ export function SettingsPage() {
                     <div><p className="text-xs text-slate-400">Mín/Máx</p><p className="text-slate-700">{formatNumber(r.minStock)}/{formatNumber(r.maxStock)}</p></div>
                     <div><p className="text-xs text-slate-400">Lead</p><p className="text-slate-700">{formatDays(r.leadTimeDays)}</p></div>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">{affectedCount(r.scope)} SKU · {formatCurrencyCompact(affectedPurchase(r.scope))} compra sugerida</p>
+                  <p className="text-xs text-slate-500 mt-1">{affectedCount(r)} SKU · {formatCurrencyCompact(affectedPurchase(r))} compra sugerida</p>
                   <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar regla</Button>
                 </div>
               )}
@@ -233,7 +269,7 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
   if (draft.targetInventoryDays > 0 && draft.targetInventoryDays <= 20) warnings.push("Días objetivo bajos: riesgo de quiebre.");
   if (draft.leadTimeDays >= 15) warnings.push("Lead time alto: comprar con más anticipación.");
 
-  const affected = affectedCount(draft.scope);
+  const affected = affectedCount(draft);
   const deltaPct = rule.targetInventoryDays > 0 ? Math.round((draft.targetInventoryDays / rule.targetInventoryDays - 1) * 100) : 0;
 
   return (

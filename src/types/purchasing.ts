@@ -226,9 +226,13 @@ export interface InventoryByGroup {
   overstockValue: number;
 }
 
+export type RuleScopeType = "global" | "category" | "supplier" | "brand" | "channel";
+
 export interface PurchaseRule {
   id: string;
-  scope: string; // categoría o "Global"
+  scope: string; // etiqueta legible del ámbito
+  scopeType: RuleScopeType;
+  scopeValue?: string; // valor concreto (nombre de categoría/proveedor/marca/canal)
   targetInventoryDays: number;
   minStock: number;
   maxStock: number;
