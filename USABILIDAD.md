@@ -26,6 +26,7 @@ Documento que resume el rediseño de experiencia (UX) orientado a que un comprad
 
 - **Sidebar agrupado** por propósito: Inicio (Dashboard, Mi panel) · Gestión de compra (Reposición, Campañas, Órdenes, Proveedores) · Catálogo (Productos, Categorías) · Análisis (Inventario, Ventas, Alertas) · Configuración (Reglas).
 - Cada ítem tiene icono y tooltip; el agrupamiento se replica en móvil.
+- **Sidebar colapsable** (estado recordado en `localStorage`): en modo colapsado queda fijo —no se expande solo al pasar el mouse, evitando que tape el contenido por accidente— y cada icono muestra un **tooltip instantáneo** (etiqueta + descripción) a la derecha, sin el retardo del `title` nativo. Atajo de teclado **`[`** para colapsar/expandir sin usar el mouse.
 - **Topbar** con buscador global, **selector de comprador** (cambia el contexto de "Mi panel"), fecha y avatar con iniciales.
 - `Breadcrumbs` donde corresponde.
 
