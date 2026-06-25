@@ -97,6 +97,33 @@ export function coverageDays(
 }
 
 /**
+ * Frase en lenguaje natural que explica la situación de stock sin tecnicismos:
+ * "Vendiste 30 en 30 días · te queda para 3 días".
+ * Pensada para que cualquiera entienda de un vistazo por qué hay que comprar.
+ */
+export function coverageSentence(
+  availableStock: number,
+  salesLast30Days: number
+): string {
+  if (salesLast30Days <= 0) {
+    return availableStock > 0
+      ? "No vendiste nada en 30 días · stock parado"
+      : "Sin venta y sin stock";
+  }
+  const days = coverageDays(availableStock, salesLast30Days);
+  if (availableStock <= 0) {
+    return `Vendiste ${Math.round(salesLast30Days)} en 30 días · te quedaste sin stock`;
+  }
+  const daysLabel =
+    days >= 999
+      ? "+999 días"
+      : days < 1
+        ? "menos de 1 día"
+        : `${Math.round(days)} ${Math.round(days) === 1 ? "día" : "días"}`;
+  return `Vendiste ${Math.round(salesLast30Days)} en 30 días · te queda para ${daysLabel}`;
+}
+
+/**
  * Determina el estado de recomendación según cobertura, lead time y rotación.
  */
 export function calculateRecommendationStatus(params: {

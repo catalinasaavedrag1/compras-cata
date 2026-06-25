@@ -39,6 +39,7 @@ import {
   formatNumber,
   formatPercent,
 } from "../utils/formatters";
+import { coverageSentence } from "../utils/calculations";
 
 export function DashboardPage() {
   const activeSkus = products.filter((p) => p.productStatus !== "discontinued").length;
@@ -251,6 +252,7 @@ export function DashboardPage() {
                     <PriorityBadge priority={r.priority} />
                   </div>
                   <p className="text-sm font-medium text-slate-800 truncate mt-0.5">{r.productName}</p>
+                  <p className="text-xs text-rose-600 leading-snug mt-0.5">{coverageSentence(r.availableStock, r.salesLast30Days)}</p>
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs text-slate-500">Comprar {formatNumber(r.suggestedQuantity)} u.</span>
                     <span className="text-xs font-semibold text-slate-700">{formatCurrency(r.suggestedPurchaseAmount)}</span>

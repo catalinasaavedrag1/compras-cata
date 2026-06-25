@@ -30,6 +30,7 @@ import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
 import {
   coverageDays,
+  coverageSentence,
   estimatedStockoutDate,
   calculateSuggestedPurchase,
   addDaysISO,
@@ -269,6 +270,9 @@ export function MyPanelPage() {
           <span className="text-xs font-mono text-slate-400">{p.sku}</span>
           <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
           <p className="text-xs text-slate-500">{p.category} · {p.supplierName || "Sin proveedor"}</p>
+          <p className="text-xs mt-0.5 leading-snug text-rose-600">
+            {coverageSentence(p.availableStock, p.salesLast30Days)}
+          </p>
         </div>
       ),
     },
@@ -500,6 +504,9 @@ export function MyPanelPage() {
                     <span className="text-xs font-mono text-slate-400">{r.product.sku}</span>
                     <p className="font-medium text-slate-800 leading-snug">{r.product.name}</p>
                     <p className="text-xs text-slate-500">{r.product.category} · {r.product.supplierName || "Sin proveedor"}</p>
+                    <p className="text-xs mt-0.5 leading-snug text-rose-600 font-medium">
+                      {coverageSentence(r.product.availableStock, r.product.salesLast30Days)}
+                    </p>
                   </div>
                   <Badge tone="red" dot>{r.product.availableStock <= 0 ? "Quiebre" : "Riesgo"}</Badge>
                 </div>

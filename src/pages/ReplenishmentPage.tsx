@@ -20,7 +20,8 @@ import { recommendations as allRecs } from "../data/mockRecommendations";
 import { suppliers } from "../data/mockSuppliers";
 import { monthlyPurchaseBudget } from "../data/mockRules";
 import { filterRecommendations, uniqueValues } from "../utils/filters";
-import { coverageDays } from "../utils/calculations";
+import { coverageDays, coverageSentence } from "../utils/calculations";
+import { cn } from "../utils/cn";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -249,6 +250,9 @@ export function ReplenishmentPage() {
           </div>
           <p className="font-medium text-slate-800 leading-snug">{r.productName}</p>
           <p className="text-xs text-slate-500">{r.category}</p>
+          <p className={cn("text-xs mt-0.5 leading-snug", coverageToneText(r))}>
+            {coverageSentence(r.availableStock, r.salesLast30Days)}
+          </p>
         </div>
       ),
     },
@@ -675,7 +679,10 @@ export function ReplenishmentPage() {
                   <p className="font-semibold text-slate-900">{formatCurrency(r.suggestedPurchaseAmount)}</p>
                 </div>
               </div>
-              <p className="text-xs text-slate-500 mt-1.5 leading-snug">{r.reason}</p>
+              <p className={cn("text-xs mt-1.5 leading-snug font-medium", coverageToneText(r))}>
+                {coverageSentence(r.availableStock, r.salesLast30Days)}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5 leading-snug">{r.reason}</p>
               {r.suggestedQuantity > 0 && (
                 <Button
                   size="sm"
@@ -745,6 +752,16 @@ export function ReplenishmentPage() {
       </Modal>
     </div>
   );
+}
+
+/** Color de la frase de cobertura según urgencia frente al lead time. */
+function coverageToneText(rec: PurchaseRecommendation): string {
+  if (rec.salesLast30Days <= 0) return "text-slate-400";
+  const cover = coverageDays(rec.availableStock, rec.salesLast30Days);
+  const lead = rec.supplierLeadTimeDays;
+  if (rec.availableStock <= 0 || cover <= lead) return "text-rose-600";
+  if (cover <= lead * 2) return "text-amber-600";
+  return "text-emerald-600";
 }
 
 /** Celda de cobertura en días con barra y color según el lead time. */
