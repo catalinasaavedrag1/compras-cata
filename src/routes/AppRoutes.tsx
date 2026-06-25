@@ -4,7 +4,9 @@ import { OcDraftProvider } from "../context/OcDraftContext";
 import { ToastProvider } from "../context/ToastContext";
 import { BuyerProvider } from "../context/BuyerContext";
 import { NotificationProvider } from "../context/NotificationContext";
+import { SignalsProvider } from "../context/SignalsContext";
 import { DashboardPage } from "../pages/DashboardPage";
+import { SalesSignalsPage } from "../pages/SalesSignalsPage";
 import { MyPanelPage } from "../pages/MyPanelPage";
 import { ReplenishmentPage } from "../pages/ReplenishmentPage";
 import { ProductsPage } from "../pages/ProductsPage";
@@ -28,6 +30,7 @@ export default function AppRoutes() {
       <BuyerProvider>
       <NotificationProvider>
       <OcDraftProvider>
+      <SignalsProvider>
         <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
@@ -43,6 +46,7 @@ export default function AppRoutes() {
           <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
           <Route path="/recepciones" element={<ReceptionsPage />} />
           <Route path="/alertas" element={<AlertsPage />} />
+          <Route path="/senales-ventas" element={<SalesSignalsPage />} />
           <Route path="/inventario" element={<InventoryAnalysisPage />} />
           <Route path="/ventas" element={<SalesAnalysisPage />} />
           <Route path="/margen-canal" element={<ChannelMarginPage />} />
@@ -50,6 +54,7 @@ export default function AppRoutes() {
           <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
+      </SignalsProvider>
       </OcDraftProvider>
       </NotificationProvider>
       </BuyerProvider>

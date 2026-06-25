@@ -1,7 +1,8 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useLocalStorage } from "../utils/useLocalStorage";
-import { alertService, purchaseOrderService } from "../services";
+import { alertService, purchaseOrderService, signalService } from "../services";
 import { ALERT_TYPE_LABELS } from "../components/business/alertLabels";
+import { SIGNAL_TYPE } from "../components/business/signalLabels";
 
 // ============================================================================
 //  Centro de notificaciones. Cada notificación apunta a un registro/módulo
@@ -46,6 +47,20 @@ function buildNotifications(readIds: string[]): AppNotification[] {
       moduleKey: "alertas",
       route: a.relatedSku ? `/productos/${a.relatedSku}` : "/alertas",
       read: read.has(`alr-${a.id}`),
+    });
+  }
+
+  for (const s of signalService.list()) {
+    if (s.status === "resolved" || s.status === "rejected") continue;
+    out.push({
+      id: `sig-${s.id}`,
+      title: `Señal de ventas · ${SIGNAL_TYPE[s.type].short}`,
+      message: `${s.productName} — ${s.store} · ${s.reportedBy}`,
+      tone: s.priority === "high" ? "danger" : s.priority === "medium" ? "warning" : "info",
+      date: s.date.slice(0, 10),
+      moduleKey: "senales",
+      route: "/senales-ventas",
+      read: read.has(`sig-${s.id}`),
     });
   }
 

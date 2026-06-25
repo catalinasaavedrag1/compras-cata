@@ -177,3 +177,29 @@ export const IconCampaign = base(
     <path d="M14 8a4 4 0 0 1 0 8M17 5a8 8 0 0 1 0 14" />
   </>
 );
+
+// Señales del terreno (antena / broadcast): lo que ventas detecta y reporta.
+export const IconSignal = base(
+  <>
+    <circle cx="12" cy="9" r="2" />
+    <path d="M7.8 4.8a7 7 0 0 0 0 8.4M16.2 4.8a7 7 0 0 1 0 8.4" />
+    <path d="M5 2.5a11 11 0 0 0 0 13M19 2.5a11 11 0 0 1 0 13" />
+    <path d="M12 11v9" />
+  </>
+);
+
+// Conversación / mensajes (chat interno comprador ↔ vendedor).
+export const IconChat = base(
+  <>
+    <path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z" />
+  </>
+);
+
+// Convertir en tarea de compra / carrito.
+export const IconCart = base(
+  <>
+    <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
+    <path d="M2 3h2l2.4 12.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L21 7H5.2" />
+  </>
+);

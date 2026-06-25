@@ -11,6 +11,7 @@ import {
   IconRules,
   IconCampaign,
   IconCheck,
+  IconSignal,
 } from "../ui/icons";
 
 export interface NavItem {
@@ -49,6 +50,12 @@ export const navGroups: NavGroup[] = [
         label: "Alertas",
         icon: IconAlerts,
         hint: "Problemas que requieren atención del comprador",
+      },
+      {
+        to: "/senales-ventas",
+        label: "Señales de ventas",
+        icon: IconSignal,
+        hint: "Lo que ventas detecta en el terreno: quiebres, demanda y oportunidades",
       },
     ],
   },
