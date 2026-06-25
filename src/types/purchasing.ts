@@ -235,6 +235,8 @@ export interface PurchaseRule {
   minMargin: number; // %
   leadTimeDays: number;
   notes: string;
+  updatedAt?: string; // última modificación (ISO)
+  updatedBy?: string;
 }
 
 // ============================================================================

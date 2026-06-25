@@ -7,24 +7,31 @@ import { Button } from "../components/ui/Button";
 import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { Drawer } from "../components/ui/Drawer";
 import { Input } from "../components/ui/Input";
-import { Tabs } from "../components/ui/Tabs";
 import { KpiCard } from "../components/business/KpiCard";
 import { useToast } from "../context/ToastContext";
 import { purchaseRules as seedRules, specialRules } from "../data/mockRules";
 import { products } from "../data/mockProducts";
-import { formatDays, formatNumber, formatPercent } from "../utils/formatters";
+import { recommendations } from "../data/mockRecommendations";
+import { formatCurrencyCompact, formatDate, formatDays, formatNumber, formatPercent } from "../utils/formatters";
 import { IconRules, IconAlerts, IconArrowRight } from "../components/ui/icons";
 import type { PurchaseRule } from "../types/purchasing";
 
-type RuleHealth = "ok" | "review" | "incoherent" | "high_lead" | "overstock_risk" | "stockout_risk";
+type RuleHealth = "ok" | "incoherent" | "high_lead" | "overstock_risk" | "stockout_risk";
 
 const HEALTH: Record<RuleHealth, { label: string; tone: BadgeTone }> = {
   ok: { label: "Correcta", tone: "green" },
-  review: { label: "Requiere revisión", tone: "amber" },
   incoherent: { label: "Incoherente", tone: "red" },
   high_lead: { label: "Lead time alto", tone: "amber" },
   overstock_risk: { label: "Riesgo sobrestock", tone: "violet" },
   stockout_risk: { label: "Riesgo de quiebre", tone: "red" },
+};
+
+const reasonFor: Record<RuleHealth, string> = {
+  ok: "Parámetros dentro de rango.",
+  incoherent: "Stock máximo menor que el mínimo. Corregir.",
+  high_lead: "Lead time alto: conviene comprar con más anticipación.",
+  overstock_risk: "Días objetivo altos: posible sobrestock (sobre todo si es estacional).",
+  stockout_risk: "Días objetivo bajos: riesgo de quiebre.",
 };
 
 function healthOf(r: PurchaseRule): RuleHealth {
@@ -36,46 +43,47 @@ function healthOf(r: PurchaseRule): RuleHealth {
 }
 
 const isGlobal = (r: PurchaseRule) => r.scope.toLowerCase().startsWith("global");
-
-function affectedCount(scope: string): number {
-  if (scope.toLowerCase().startsWith("global")) return products.length;
-  return products.filter((p) => p.category === scope).length;
-}
-
-const reasonFor: Record<RuleHealth, string> = {
-  ok: "Parámetros dentro de rango.",
-  review: "Revisar parámetros.",
-  incoherent: "Stock máximo menor que el mínimo. Corregir.",
-  high_lead: "Lead time alto: conviene comprar con más anticipación.",
-  overstock_risk: "Días objetivo altos: posible sobrestock, sobre todo si es estacional.",
-  stockout_risk: "Días objetivo bajos: riesgo de quiebre.",
-};
+const affectedCount = (scope: string) =>
+  scope.toLowerCase().startsWith("global") ? products.length : products.filter((p) => p.category === scope).length;
+const affectedPurchase = (scope: string) =>
+  recommendations
+    .filter((r) => scope.toLowerCase().startsWith("global") || r.category === scope)
+    .reduce((a, r) => a + r.suggestedPurchaseAmount, 0);
 
 export function SettingsPage() {
   const toast = useToast();
   const [rules, setRules] = useState<PurchaseRule[]>(seedRules);
-  const [tab, setTab] = useState("categorias");
   const [onlyAlerts, setOnlyAlerts] = useState(false);
   const [editing, setEditing] = useState<PurchaseRule | null>(null);
 
+  const global = rules.find(isGlobal);
   const withHealth = useMemo(() => rules.map((r) => ({ r, health: healthOf(r) })), [rules]);
   const propias = rules.filter((r) => !isGlobal(r)).length;
-  const globales = rules.filter(isGlobal).length;
   const conAlerta = withHealth.filter((x) => x.health !== "ok").length;
   const leadProm = Math.round(rules.reduce((a, r) => a + r.leadTimeDays, 0) / rules.length);
   const diasProm = Math.round(rules.reduce((a, r) => a + r.targetInventoryDays, 0) / rules.length);
 
   const visible = onlyAlerts ? withHealth.filter((x) => x.health !== "ok") : withHealth;
-  const alerts = withHealth.filter((x) => x.health !== "ok" && x.health !== "review");
+  const alerts = withHealth.filter((x) => x.health !== "ok");
+
+  const vsGlobal = (r: PurchaseRule) => {
+    if (!global || isGlobal(r)) return null;
+    const d = r.targetInventoryDays - global.targetInventoryDays;
+    if (d === 0) return null;
+    return `${d > 0 ? "+" : ""}${d} d vs global`;
+  };
 
   const columns: Column<{ r: PurchaseRule; health: RuleHealth }>[] = [
     {
       key: "scope",
       header: "Ámbito",
       render: ({ r }) => (
-        <div className="min-w-[160px]">
+        <div className="min-w-[150px]">
           <p className="font-medium text-slate-800">{r.scope}</p>
-          <Badge tone={isGlobal(r) ? "slate" : "blue"}>{isGlobal(r) ? "Regla base" : "Personalizada"}</Badge>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <Badge tone={isGlobal(r) ? "slate" : "blue"}>{isGlobal(r) ? "Regla base" : "Personalizada"}</Badge>
+            {vsGlobal(r) && <span className="text-xs text-amber-600">{vsGlobal(r)}</span>}
+          </div>
         </div>
       ),
     },
@@ -83,28 +91,32 @@ export function SettingsPage() {
     { key: "stock", header: "Stock mín/máx", align: "right", hideOnMobile: true, render: ({ r }) => `${formatNumber(r.minStock)} / ${formatNumber(r.maxStock)}` },
     { key: "margin", header: "Margen mín.", align: "right", hideOnMobile: true, render: ({ r }) => formatPercent(r.minMargin, 0) },
     { key: "lead", header: "Lead time", align: "right", hideOnMobile: true, render: ({ r }) => formatDays(r.leadTimeDays) },
-    { key: "impact", header: "Impacto", align: "right", hideOnMobile: true, render: ({ r }) => `${affectedCount(r.scope)} SKU` },
-    { key: "health", header: "Estado", render: ({ health }) => <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge> },
     {
-      key: "action",
-      header: "",
+      key: "impact",
+      header: "Impacto",
+      align: "right",
       render: ({ r }) => (
-        <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar</Button>
+        <div className="text-sm">
+          <p className="text-slate-700">{affectedCount(r.scope)} SKU</p>
+          <p className="text-xs text-slate-400">{formatCurrencyCompact(affectedPurchase(r.scope))}</p>
+        </div>
       ),
     },
+    { key: "updated", header: "Modificada", align: "right", hideOnMobile: true, render: ({ r }) => <span className="text-xs text-slate-500">{r.updatedAt ? formatDate(r.updatedAt) : "—"}</span> },
+    { key: "health", header: "Estado", render: ({ health }) => <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge> },
+    { key: "action", header: "", render: ({ r }) => <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar</Button> },
   ];
 
   return (
     <div>
       <PageHeader
         title="Reglas de compra"
-        description="Cómo se calcula la compra sugerida por categoría. Revisa, detecta reglas mal configuradas y ajusta con impacto visible."
+        description="Cómo se calcula la compra sugerida por categoría. Detecta reglas mal configuradas y ajusta con impacto visible."
       />
 
-      {/* Resumen KPI cliqueable */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <KpiCard title="Con regla propia" value={formatNumber(propias)} tone="info" icon={<IconRules className="w-4 h-4" />} />
-        <KpiCard title="Usan regla global" value={formatNumber(globales)} tone="neutral" icon={<IconRules className="w-4 h-4" />} />
+      {/* Resumen KPI */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <KpiCard title="Con regla propia" value={formatNumber(propias)} tone="info" icon={<IconRules className="w-4 h-4" />} description={`+ 1 regla global`} />
         <KpiCard title="Requieren revisión" value={formatNumber(conAlerta)} tone={conAlerta ? "bad" : "good"} icon={<IconAlerts className="w-4 h-4" />} description="Filtrar" active={onlyAlerts} onClick={() => setOnlyAlerts((v) => !v)} />
         <KpiCard title="Días objetivo prom." value={formatDays(diasProm)} tone="neutral" icon={<IconRules className="w-4 h-4" />} />
         <KpiCard title="Lead time prom." value={formatDays(leadProm)} tone="neutral" icon={<IconRules className="w-4 h-4" />} />
@@ -114,97 +126,89 @@ export function SettingsPage() {
       {alerts.length > 0 && (
         <Card className="mb-4">
           <CardHeader title="Qué reglas revisar" description="Configuraciones que pueden afectar la compra sugerida" />
-          <CardBody className="space-y-2">
+          <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {alerts.map(({ r, health }) => (
-              <button key={r.id} onClick={() => setEditing(r)} className="flex w-full items-center gap-3 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-left hover:border-brand-300">
+              <button key={r.id} onClick={() => setEditing(r)} className="flex items-center gap-3 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-left hover:border-brand-300">
                 <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium text-slate-800">{r.scope}</span>
                   <span className="block text-xs text-slate-500">{reasonFor[health]}</span>
                 </span>
-                <span className="text-xs font-medium text-brand-600 inline-flex items-center gap-1 flex-shrink-0">Editar <IconArrowRight className="w-3.5 h-3.5" /></span>
+                <IconArrowRight className="w-4 h-4 text-brand-500 flex-shrink-0" />
               </button>
             ))}
           </CardBody>
         </Card>
       )}
 
-      <Tabs
-        className="mb-4"
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { value: "categorias", label: "Reglas por categoría", count: rules.length },
-          { value: "excepciones", label: "Excepciones", count: specialRules.length },
-          { value: "formula", label: "Cómo se calcula" },
-        ]}
-      />
-
-      {tab === "categorias" && (
-        <Card>
-          <DataTable
-            columns={columns}
-            data={visible}
-            rowKey={({ r }) => r.id}
-            onRowClick={({ r }) => setEditing(r)}
-            emptyMessage="No hay reglas con alerta."
-            mobileCard={({ r, health }) => (
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-800">{r.scope}</p>
-                    <Badge tone={isGlobal(r) ? "slate" : "blue"}>{isGlobal(r) ? "Regla base" : "Personalizada"}</Badge>
+      {/* 2 columnas en escritorio: tabla + ayuda/excepciones siempre visibles */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader title="Reglas por categoría" description="Toca una regla para editar con impacto" />
+            <DataTable
+              columns={columns}
+              data={visible}
+              rowKey={({ r }) => r.id}
+              onRowClick={({ r }) => setEditing(r)}
+              emptyMessage="No hay reglas con alerta."
+              mobileCard={({ r, health }) => (
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-800">{r.scope}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <Badge tone={isGlobal(r) ? "slate" : "blue"}>{isGlobal(r) ? "Regla base" : "Personalizada"}</Badge>
+                        {vsGlobal(r) && <span className="text-xs text-amber-600">{vsGlobal(r)}</span>}
+                      </div>
+                    </div>
+                    <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge>
                   </div>
-                  <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge>
+                  <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                    <div><p className="text-xs text-slate-400">Días obj.</p><p className="text-slate-700">{formatDays(r.targetInventoryDays)}</p></div>
+                    <div><p className="text-xs text-slate-400">Mín/Máx</p><p className="text-slate-700">{formatNumber(r.minStock)}/{formatNumber(r.maxStock)}</p></div>
+                    <div><p className="text-xs text-slate-400">Lead</p><p className="text-slate-700">{formatDays(r.leadTimeDays)}</p></div>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">{affectedCount(r.scope)} SKU · {formatCurrencyCompact(affectedPurchase(r.scope))} compra sugerida</p>
+                  <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar regla</Button>
                 </div>
-                <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                  <div><p className="text-xs text-slate-400">Días obj.</p><p className="text-slate-700">{formatDays(r.targetInventoryDays)}</p></div>
-                  <div><p className="text-xs text-slate-400">Mín/Máx</p><p className="text-slate-700">{formatNumber(r.minStock)}/{formatNumber(r.maxStock)}</p></div>
-                  <div><p className="text-xs text-slate-400">Lead</p><p className="text-slate-700">{formatDays(r.leadTimeDays)}</p></div>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">{affectedCount(r.scope)} SKU afectados</p>
-                <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar regla</Button>
-              </div>
-            )}
-          />
-        </Card>
-      )}
+              )}
+            />
+          </Card>
+        </div>
 
-      {tab === "excepciones" && (
-        <Card>
-          <CardHeader title="Excepciones y reglas especiales" description="Casos particulares del surtido" />
-          <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {specialRules.map((s) => (
-              <div key={s.title} className="rounded-lg border border-slate-200 p-3">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <Badge tone="blue" dot>{s.title}</Badge>
-                  <Badge tone="green">Activa</Badge>
-                </div>
-                <p className="text-sm text-slate-600">{s.description}</p>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader title="Cómo se calcula" />
+            <CardBody>
+              <div className="rounded-lg bg-slate-50 p-3 mb-2">
+                <p className="text-sm text-slate-700 font-mono leading-snug">Cantidad = venta diaria × (lead time + días objetivo) − stock disponible</p>
               </div>
-            ))}
-          </CardBody>
-        </Card>
-      )}
-
-      {tab === "formula" && (
-        <Card>
-          <CardHeader title="Cómo se calcula la compra sugerida" />
-          <CardBody>
-            <div className="rounded-lg bg-slate-50 p-3 mb-3">
-              <p className="text-sm text-slate-700 font-mono">Cantidad = (venta diaria × (lead time + días objetivo)) − stock disponible</p>
-              <p className="text-xs text-slate-500 mt-1">Acotada por stock mínimo y máximo de la categoría.</p>
-            </div>
-            <p className="text-sm text-slate-600">Luego se ajusta por: margen mínimo, temporada, sobrestock, baja rotación y proveedores atrasados. Solo se recomienda comprar si hay riesgo de quiebre o necesidad real.</p>
-          </CardBody>
-        </Card>
-      )}
+              <p className="text-xs text-slate-500">Acotada por stock mín/máx. Se ajusta por margen, temporada, sobrestock, baja rotación y proveedor atrasado. Solo se sugiere comprar si hay riesgo de quiebre o necesidad real.</p>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Excepciones y reglas especiales" />
+            <CardBody className="space-y-2">
+              {specialRules.map((s) => (
+                <div key={s.title} className="rounded-lg border border-slate-200 p-2.5">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <Badge tone="blue" dot>{s.title}</Badge>
+                    <Badge tone="green">Activa</Badge>
+                  </div>
+                  <p className="text-xs text-slate-600">{s.description}</p>
+                </div>
+              ))}
+            </CardBody>
+          </Card>
+        </div>
+      </div>
 
       <RuleEditDrawer
         rule={editing}
         onClose={() => setEditing(null)}
         onSave={(updated) => {
-          setRules((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+          setRules((prev) => prev.map((x) => (x.id === updated.id ? { ...updated, updatedAt: "2026-06-24", updatedBy: "Catalina Saavedra" } : x)));
           setEditing(null);
           toast.success(`Regla de ${updated.scope} actualizada`);
         }}
@@ -215,9 +219,7 @@ export function SettingsPage() {
 
 function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; onClose: () => void; onSave: (r: PurchaseRule) => void }) {
   const [draft, setDraft] = useState<PurchaseRule | null>(null);
-  // Sincroniza el borrador cuando cambia la regla
   if (rule && (!draft || draft.id !== rule.id)) setDraft({ ...rule });
-
   if (!rule || !draft) return null;
 
   const set = (k: keyof PurchaseRule, v: number) => setDraft({ ...draft, [k]: v });
@@ -231,7 +233,6 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
   if (draft.targetInventoryDays > 0 && draft.targetInventoryDays <= 20) warnings.push("Días objetivo bajos: riesgo de quiebre.");
   if (draft.leadTimeDays >= 15) warnings.push("Lead time alto: comprar con más anticipación.");
 
-  // Impacto estimado (mock): cambio en días objetivo ≈ cambio en compra sugerida
   const affected = affectedCount(draft.scope);
   const deltaPct = rule.targetInventoryDays > 0 ? Math.round((draft.targetInventoryDays / rule.targetInventoryDays - 1) * 100) : 0;
 
@@ -240,7 +241,7 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
       open={!!rule}
       onClose={onClose}
       title={`Editar regla · ${rule.scope}`}
-      description="Ajusta los parámetros. Verás el impacto antes de guardar."
+      description={rule.updatedAt ? `Última modificación: ${formatDate(rule.updatedAt)} · ${rule.updatedBy ?? ""}` : "Ajusta los parámetros y ve el impacto."}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
@@ -268,7 +269,6 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
           </div>
         )}
 
-        {/* Simulador de impacto */}
         <div className="rounded-lg border border-slate-200 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Impacto estimado</p>
           <div className="space-y-1 text-sm">
@@ -279,7 +279,7 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
         </div>
 
         <div className="flex items-center justify-between">
-          <Link to={`/productos?cat=${encodeURIComponent(isGlobal(draft) ? "" : draft.scope)}`} className="text-xs font-medium text-brand-600 hover:text-brand-700" onClick={onClose}>
+          <Link to={isGlobal(draft) ? "/productos" : `/productos?cat=${encodeURIComponent(draft.scope)}`} className="text-xs font-medium text-brand-600 hover:text-brand-700" onClick={onClose}>
             Ver productos afectados
           </Link>
           <button onClick={() => setDraft({ ...seedRules.find((s) => s.id === rule.id)! })} className="text-xs text-slate-500 hover:text-slate-700">Restaurar valores</button>
