@@ -58,7 +58,8 @@ Documento que resume el rediseño de experiencia (UX) orientado a que un comprad
 - Caso de **surtido invertido**: si el mejor de su gama está marcado *no comprar*/descontinuado mientras se mantiene uno peor, se marca **Reactivar compra**.
 - Resumen con **capital inmovilizado liberable** y % del surtido redundante; grupos ordenados por mayor capital a liberar. Filtro por categoría en la URL. Acciones: **exportar CSV** y **crear campaña de liquidación** (precarga los redundantes con stock).
 - La misma vista está disponible como pestaña **"Optimizar surtido"** en el detalle de cada categoría.
-- Lógica pura en `utils/catalogOptimization.ts`; UI reutilizable en `components/business/CatalogRedundancy.tsx`.
+- **Conectada con otras vistas**: filtros por acción (Todos/Liquidar/Descontinuar/Reactivar); chip de estado en el **detalle de producto** ("Redundante · …" / "Reactivar compra") que enlaza a la vista; chip de **capital liberable** en el Dashboard; y crea **campañas** que aparecen en "Mis campañas".
+- Lógica pura en `utils/catalogOptimization.ts` (incl. `skuOptimizationStatus`); UI reutilizable en `components/business/CatalogRedundancy.tsx`.
 
 ## Guía al usuario
 

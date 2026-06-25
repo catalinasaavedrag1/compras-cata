@@ -23,6 +23,7 @@ import {
   IconCheck,
 } from "../components/ui/icons";
 import { products } from "../data/mockProducts";
+import { analyzeCatalog } from "../utils/catalogOptimization";
 import { recommendations } from "../data/mockRecommendations";
 import { alerts } from "../data/mockAlerts";
 import { categories } from "../data/mockCategories";
@@ -127,6 +128,9 @@ export function DashboardPage() {
 
   const salesByCat = [...categories].sort((a, b) => b.salesLast30Days - a.salesLast30Days).slice(0, 6);
 
+  // Surtido redundante (catálogo optimizado)
+  const catalogOpt = analyzeCatalog(products);
+
   // Campañas y oportunidades
   const upcomingCampaigns = new Set(campaignOpportunities.map((o) => o.campaignName)).size;
   const campaignStockoutRisk = campaignOpportunities.filter((o) => o.status === "stockout_risk").length;
@@ -171,6 +175,9 @@ export function DashboardPage() {
         <DashChip to="/ventas" label={`${formatCurrencyCompact(salesKpis.salesLast30Days)} venta 30d`} />
         <DashChip to="/inventario" label={`${formatCurrencyCompact(inventoryKpis.totalInventoryValue)} inventario`} />
         <DashChip to="/ventas" label={`${formatCurrencyCompact(salesKpis.lostSalesByStockout)} venta perdida`} />
+        {catalogOpt.candidateCount > 0 && (
+          <DashChip to="/catalogo-optimizado" label={`${formatCurrencyCompact(catalogOpt.freeableCapital)} liberable en surtido`} />
+        )}
       </div>
 
       {/* Qué revisar primero — lo más importante, arriba */}

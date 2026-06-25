@@ -214,3 +214,40 @@ export const ACTION_LABEL: Record<RedundancyAction, string> = {
   discontinue: "Descontinuar",
   review: "Revisar",
 };
+
+// ----------------------------------------------------------------------------
+//  Estado de optimización de un SKU concreto, para conectar con otras vistas
+//  (detalle de producto, dashboard, etc.).
+// ----------------------------------------------------------------------------
+
+export interface SkuOptimizationStatus {
+  kind: "redundant" | "reactivate" | "none";
+  category?: string;
+  subcategory?: string;
+  segment?: PriceTier;
+  action?: RedundancyAction;
+  /** Referente que ya cubre la gama (en el caso redundante). */
+  leaderName?: string;
+}
+
+export function skuOptimizationStatus(sku: string, products: Product[]): SkuOptimizationStatus {
+  const { groups } = analyzeCatalog(products);
+  for (const g of groups) {
+    const cand = g.candidates.find((c) => c.product.sku === sku);
+    if (cand) {
+      return {
+        kind: "redundant",
+        category: g.category,
+        subcategory: g.subcategory,
+        segment: cand.segment,
+        action: cand.action,
+        leaderName: cand.leaderName,
+      };
+    }
+    const keep = g.keepers.find((k) => k.reactivate && k.product.sku === sku);
+    if (keep) {
+      return { kind: "reactivate", category: g.category, subcategory: g.subcategory, segment: keep.segment };
+    }
+  }
+  return { kind: "none" };
+}

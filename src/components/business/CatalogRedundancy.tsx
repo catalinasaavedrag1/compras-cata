@@ -23,6 +23,7 @@ import { ExportButton } from "./ExportButton";
 import { CampaignBuilderModal } from "./CampaignBuilderModal";
 import { useLocalStorage } from "../../utils/useLocalStorage";
 import { useToast } from "../../context/ToastContext";
+import { cn } from "../../utils/cn";
 import type { CsvColumn } from "../../utils/exportCsv";
 import { formatCurrencyCompact, formatNumber, formatPercent } from "../../utils/formatters";
 import { IconCategories, IconProducts, IconInventory, IconCheck, IconCampaign } from "../ui/icons";
@@ -65,8 +66,24 @@ const exportColumns: CsvColumn<ExportRow>[] = [
   { label: "Capital inmovilizado", value: (r) => r.candidate.tiedCapital },
 ];
 
+type RedundancyFilter = "all" | RedundancyAction | "reactivate";
+
 /** Un tipo de producto (subcategoría) con exceso de variedad. */
-function GroupCard({ group }: { group: ReturnType<typeof analyzeCatalog>["groups"][number] }) {
+function GroupCard({
+  group,
+  filter,
+}: {
+  group: ReturnType<typeof analyzeCatalog>["groups"][number];
+  filter: RedundancyFilter;
+}) {
+  const keepers = filter === "reactivate" ? group.keepers.filter((k) => k.reactivate) : group.keepers;
+  const candidates =
+    filter === "all"
+      ? group.candidates
+      : filter === "reactivate"
+        ? []
+        : group.candidates.filter((c) => c.action === filter);
+
   return (
     <Card>
       <CardBody className="space-y-2.5">
@@ -86,48 +103,56 @@ function GroupCard({ group }: { group: ReturnType<typeof analyzeCatalog>["groups
         </div>
 
         {/* Surtido sugerido: uno por gama */}
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Conservar (uno por gama)</p>
-        {group.keepers.map((k) => (
-          <Link
-            key={k.product.sku}
-            to={`/productos/${k.product.sku}`}
-            className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 hover:border-emerald-300"
-          >
-            <div className="min-w-0">
-              <span className="text-xs font-mono text-slate-400">{k.product.sku}</span>
-              <p className="text-sm font-medium text-slate-800 truncate">{k.product.name}</p>
-              <p className="text-xs text-slate-500">
-                gama {TIER_LABEL[k.segment]} · vende {formatNumber(k.product.salesLast30Days)}/mes · rota {formatNumber(k.product.rotation)}× · margen {formatPercent(k.product.margin, 0)}
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              <Badge tone="green" dot>
-                Conservar
-              </Badge>
-              {k.reactivate && <Badge tone="amber">Reactivar compra</Badge>}
-            </div>
-          </Link>
-        ))}
+        {keepers.length > 0 && (
+          <>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Conservar (uno por gama)</p>
+            {keepers.map((k) => (
+              <Link
+                key={k.product.sku}
+                to={`/productos/${k.product.sku}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 hover:border-emerald-300"
+              >
+                <div className="min-w-0">
+                  <span className="text-xs font-mono text-slate-400">{k.product.sku}</span>
+                  <p className="text-sm font-medium text-slate-800 truncate">{k.product.name}</p>
+                  <p className="text-xs text-slate-500">
+                    gama {TIER_LABEL[k.segment]} · vende {formatNumber(k.product.salesLast30Days)}/mes · rota {formatNumber(k.product.rotation)}× · margen {formatPercent(k.product.margin, 0)}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <Badge tone="green" dot>
+                    Conservar
+                  </Badge>
+                  {k.reactivate && <Badge tone="amber">Reactivar compra</Badge>}
+                </div>
+              </Link>
+            ))}
+          </>
+        )}
 
         {/* Redundantes: sobran en su gama */}
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 pt-0.5">Sobran</p>
-        {group.candidates.map((c) => (
-          <Link
-            key={c.product.sku}
-            to={`/productos/${c.product.sku}`}
-            className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-          >
-            <div className="min-w-0">
-              <span className="text-xs font-mono text-slate-400">{c.product.sku}</span>
-              <p className="text-sm font-medium text-slate-800 truncate">{c.product.name}</p>
-              <p className="text-xs text-slate-500 line-clamp-2">{c.reason}</p>
-            </div>
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              <Badge tone={actionTone[c.action]}>{ACTION_LABEL[c.action]}</Badge>
-              <span className="text-xs text-slate-500">{formatCurrencyCompact(c.tiedCapital)}</span>
-            </div>
-          </Link>
-        ))}
+        {candidates.length > 0 && (
+          <>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 pt-0.5">Sobran</p>
+            {candidates.map((c) => (
+              <Link
+                key={c.product.sku}
+                to={`/productos/${c.product.sku}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+              >
+                <div className="min-w-0">
+                  <span className="text-xs font-mono text-slate-400">{c.product.sku}</span>
+                  <p className="text-sm font-medium text-slate-800 truncate">{c.product.name}</p>
+                  <p className="text-xs text-slate-500 line-clamp-2">{c.reason}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <Badge tone={actionTone[c.action]}>{ACTION_LABEL[c.action]}</Badge>
+                  <span className="text-xs text-slate-500">{formatCurrencyCompact(c.tiedCapital)}</span>
+                </div>
+              </Link>
+            ))}
+          </>
+        )}
       </CardBody>
     </Card>
   );
@@ -144,6 +169,7 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
   const toast = useToast();
   const [, setCampaigns] = useLocalStorage<CreatedCampaign[]>("compras:campaigns", []);
   const [campaignOpen, setCampaignOpen] = useState(false);
+  const [filter, setFilter] = useState<RedundancyFilter>("all");
 
   const analysis = analyzeCatalog(products);
 
@@ -161,6 +187,22 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
   }
 
   const allCandidates = analysis.groups.flatMap((g) => g.candidates);
+  const liquidateCount = allCandidates.filter((c) => c.action === "liquidate").length;
+  const discontinueCount = allCandidates.filter((c) => c.action === "discontinue").length;
+
+  const allFilterOptions: { key: RedundancyFilter; label: string; count: number }[] = [
+    { key: "all", label: "Todos", count: analysis.candidateCount },
+    { key: "liquidate", label: "Liquidar", count: liquidateCount },
+    { key: "discontinue", label: "Descontinuar", count: discontinueCount },
+    { key: "reactivate", label: "Reactivar compra", count: analysis.reactivateCount },
+  ];
+  const filterOptions = allFilterOptions.filter((o) => o.key === "all" || o.count > 0);
+
+  const visibleGroups = analysis.groups.filter((g) => {
+    if (filter === "all") return true;
+    if (filter === "reactivate") return g.keepers.some((k) => k.reactivate);
+    return g.candidates.some((c) => c.action === filter);
+  });
 
   const exportRows: ExportRow[] = analysis.groups.flatMap((g) =>
     g.candidates.map((candidate) => ({ candidate, category: g.category, subcategory: g.subcategory }))
@@ -227,11 +269,24 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
         cada una; las demás <strong>sobran</strong>.
       </HelpNote>
 
-      {/* Acciones: exportar la lista y lanzar una campaña de liquidación. */}
+      {/* Filtros por acción + acciones (exportar / campaña de liquidación). */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">
-          {formatNumber(analysis.candidateCount)} SKUs redundantes en {formatNumber(analysis.saturatedSubcategories)} subcategorías
-        </p>
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+          {filterOptions.map((o) => (
+            <button
+              key={o.key}
+              onClick={() => setFilter(o.key)}
+              className={cn(
+                "whitespace-nowrap flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+                filter === o.key
+                  ? "border-brand-300 bg-brand-50 text-brand-700"
+                  : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+              )}
+            >
+              {o.label} ({formatNumber(o.count)})
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2">
           <ExportButton filename="catalogo-redundantes" rows={exportRows} columns={exportColumns} />
           {liquidationLines.length > 0 && (
@@ -247,8 +302,8 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {analysis.groups.map((g) => (
-          <GroupCard key={`${g.category}-${g.subcategory}`} group={g} />
+        {visibleGroups.map((g) => (
+          <GroupCard key={`${g.category}-${g.subcategory}`} group={g} filter={filter} />
         ))}
       </div>
 

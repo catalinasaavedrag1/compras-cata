@@ -16,7 +16,8 @@ import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BarList } from "../components/business/BarList";
 import { IconPlus, IconInfo, IconAlerts } from "../components/ui/icons";
-import { getProductBySku } from "../data/mockProducts";
+import { getProductBySku, products } from "../data/mockProducts";
+import { skuOptimizationStatus, ACTION_LABEL, TIER_LABEL } from "../utils/catalogOptimization";
 import { recommendations } from "../data/mockRecommendations";
 import { alerts } from "../data/mockAlerts";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
@@ -77,6 +78,12 @@ export function ProductDetailPage() {
 
   // Entidades relacionadas (conexión con otros módulos)
   const related = relatedEntitiesForProduct(product.sku);
+
+  // Estado en el catálogo optimizado (surtido redundante / a reactivar)
+  const optStatus = skuOptimizationStatus(product.sku, products);
+  const optLink = optStatus.category
+    ? `/catalogo-optimizado?cat=${encodeURIComponent(optStatus.category)}`
+    : "/catalogo-optimizado";
 
   // Margen por canal
   const channelMargin = channelMarginsForSku(product.sku);
@@ -145,6 +152,16 @@ export function ProductDetailPage() {
           </Link>
         ) : (
           <Badge tone="red">Sin proveedor asignado</Badge>
+        )}
+        {optStatus.kind === "redundant" && (
+          <Link to={optLink} title={`Gama ${TIER_LABEL[optStatus.segment!]} ya cubierta por “${optStatus.leaderName}”`}>
+            <Badge tone="amber" dot>Redundante · {ACTION_LABEL[optStatus.action!]}</Badge>
+          </Link>
+        )}
+        {optStatus.kind === "reactivate" && (
+          <Link to={optLink} title="Es el mejor de su gama pero está en “no comprar”">
+            <Badge tone="amber" dot>Reactivar compra</Badge>
+          </Link>
         )}
       </div>
 
