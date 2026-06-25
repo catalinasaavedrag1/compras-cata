@@ -47,23 +47,23 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: "Gestión de compra",
+    title: "Comprar",
     items: [
       {
         to: "/reposicion",
-        label: "Reposición sugerida",
+        label: "Reposición",
         icon: IconReplenish,
         hint: "Qué comprar, cuánto y por qué",
       },
       {
         to: "/campanas-oportunidades",
-        label: "Campañas y oportunidades",
+        label: "Campañas",
         icon: IconCampaign,
         hint: "Anticipar compras para campañas, liquidaciones y crecimiento",
       },
       {
         to: "/ordenes-compra",
-        label: "Órdenes de compra",
+        label: "Órdenes",
         icon: IconOrders,
         hint: "Seguimiento de OC y creación desde sugerencias",
       },
@@ -86,7 +86,7 @@ export const navGroups: NavGroup[] = [
     items: [
       {
         to: "/productos",
-        label: "Productos / SKUs",
+        label: "Productos",
         icon: IconProducts,
         hint: "Maestro de productos del surtido",
       },
@@ -103,13 +103,13 @@ export const navGroups: NavGroup[] = [
     items: [
       {
         to: "/inventario",
-        label: "Análisis de inventario",
+        label: "Inventario",
         icon: IconInventory,
         hint: "Capital inmovilizado, sobrestock y quiebres",
       },
       {
         to: "/ventas",
-        label: "Análisis de ventas",
+        label: "Ventas",
         icon: IconSales,
         hint: "Qué se vende, qué crece y qué cae",
       },
@@ -121,7 +121,7 @@ export const navGroups: NavGroup[] = [
       },
       {
         to: "/alertas",
-        label: "Alertas comerciales",
+        label: "Alertas",
         icon: IconAlerts,
         hint: "Problemas que requieren atención del comprador",
       },
@@ -132,7 +132,7 @@ export const navGroups: NavGroup[] = [
     items: [
       {
         to: "/reglas",
-        label: "Reglas de compra",
+        label: "Reglas",
         icon: IconRules,
         hint: "Parámetros del cálculo de compra sugerida",
       },
