@@ -6,7 +6,6 @@ import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { DataTable, type Column, type SortState } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 import { HelpNote } from "../components/business/HelpNote";
-import { PriorityGuide, type GuideStep } from "../components/business/PriorityGuide";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Tabs } from "../components/ui/Tabs";
@@ -41,19 +40,12 @@ import {
   IconReplenish,
   IconAlerts,
   IconBox,
-  IconSales,
-  IconArrowUp,
   IconCheck,
   IconPlus,
   IconCampaign,
   IconClose,
 } from "../components/ui/icons";
 import type { CampaignOpportunity, CreatedCampaign } from "../types/purchasing";
-
-/** Precio de venta estimado a partir del costo y el margen. */
-function estPrice(o: CampaignOpportunity) {
-  return o.margin < 100 ? o.unitCost / (1 - o.margin / 100) : o.unitCost;
-}
 
 export function CampaignOpportunitiesPage() {
   const navigate = useNavigate();
@@ -108,60 +100,9 @@ export function CampaignOpportunitiesPage() {
 
   // KPIs
   const stockoutRisk = all.filter((o) => o.status === "stockout_risk").length;
+  const buyBefore = all.filter((o) => o.status === "buy_before_campaign").length;
   const toLiquidateList = all.filter((o) => o.status === "liquidate");
-  const acceleratedList = all.filter((o) => o.opportunityType === "accelerated_growth");
-  const estSalesTotal = all.reduce((a, o) => a + o.estimatedCampaignSales * estPrice(o), 0);
   const suggestedBuyTotal = all.reduce((a, o) => a + o.suggestedPurchaseQuantity * o.unitCost, 0);
-  const stockGapUnits = all
-    .filter((o) => o.status === "stockout_risk" || o.status === "buy_before_campaign")
-    .reduce((a, o) => a + Math.max(0, o.stockGap), 0);
-  const highMarginOpps = all.filter(
-    (o) => (o.status === "ready_for_campaign" || o.status === "boost") && o.margin >= 35
-  );
-
-  // "Qué revisar primero"
-  const guideSteps: GuideStep[] = [
-    {
-      title: "Campaña cercana con stock insuficiente",
-      detail: "Productos con campaña próxima que pueden quebrar antes del evento.",
-      count: all.filter((o) => (o.status === "stockout_risk" || o.status === "buy_before_campaign") && o.daysToCampaign <= 12).length,
-      countLabel: `${all.filter((o) => (o.status === "stockout_risk" || o.status === "buy_before_campaign") && o.daysToCampaign <= 12).length} productos`,
-      to: "#tabla",
-      tone: "red",
-    },
-    {
-      title: "Crecimiento acelerado y bajo inventario",
-      detail: "Demanda creciendo fuerte que necesita más stock objetivo.",
-      count: acceleratedList.length,
-      countLabel: `${acceleratedList.length} productos`,
-      to: "#tabla",
-      tone: "amber",
-    },
-    {
-      title: "Sobrestock que podría liquidarse",
-      detail: "Inventario inmovilizado para empujar por web, marketplace o B2B.",
-      count: toLiquidateList.length,
-      countLabel: `${toLiquidateList.length} productos`,
-      to: "#tabla",
-      tone: "violet",
-    },
-    {
-      title: "Alto margen para potenciar",
-      detail: "Productos rentables con stock suficiente, listos para impulsar.",
-      count: highMarginOpps.length,
-      countLabel: `${highMarginOpps.length} productos`,
-      to: "#tabla",
-      tone: "blue",
-    },
-    {
-      title: "No recomendados para campaña",
-      detail: "Riesgo operativo: sin stock, sin proveedor o margen muy bajo.",
-      count: all.filter((o) => o.status === "not_recommended" || o.status === "review_margin" || o.status === "review_supplier").length,
-      countLabel: `${all.filter((o) => o.status === "not_recommended" || o.status === "review_margin" || o.status === "review_supplier").length} productos`,
-      to: "#tabla",
-      tone: "neutral",
-    },
-  ];
 
   // Campañas próximas (agrupadas)
   const upcoming = useMemo(() => {
@@ -479,111 +420,38 @@ export function CampaignOpportunitiesPage() {
         />
       ) : (
       <>
-      <HelpNote className="mb-4">
-        Esta vista cruza <b>campaña, canal, stock disponible, venta reciente, crecimiento, margen y
-        venta estimada</b> para recomendar si conviene <b>comprar, liquidar, potenciar o excluir</b> cada
-        producto. Sirve para anticiparse: compra antes de la campaña lo que falte y empuja lo que sobra.
-      </HelpNote>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <KpiCard title="Productos en campaña" value={formatNumber(all.length)} tone="info" icon={<IconSales className="w-4 h-4" />} />
-        <KpiCard title="Riesgo de quiebre" value={formatNumber(stockoutRisk)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Campaña sin stock suficiente" />
-        <KpiCard title="Sugeridos para liquidar" value={formatNumber(toLiquidateList.length)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Sobrestock a empujar" />
-        <KpiCard title="Crecimiento acelerado" value={formatNumber(acceleratedList.length)} tone="good" icon={<IconArrowUp className="w-4 h-4" />} description="Demanda subiendo fuerte" />
-        <KpiCard title="Venta estimada campañas" value={formatCurrencyCompact(estSalesTotal)} tone="good" icon={<IconSales className="w-4 h-4" />} />
-        <KpiCard title="Compra sugerida campañas" value={formatCurrencyCompact(suggestedBuyTotal)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Para abastecer eventos" />
-        <KpiCard title="Stock en riesgo" value={`${formatNumber(stockGapUnits)} u.`} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Brecha total antes de campañas" />
-        <KpiCard title="Oportunidades buen margen" value={formatNumber(highMarginOpps.length)} tone="good" icon={<IconArrowUp className="w-4 h-4" />} description="Listas para potenciar" />
+      {/* Campañas próximas (chips compactos) */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-3 pb-0.5">
+        <span className="text-xs font-medium text-slate-500 flex-shrink-0">Próximas:</span>
+        {upcoming.map((c) => (
+          <span key={c.name} className="whitespace-nowrap flex-shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-600">
+            {c.name} · {c.count} SKU · <span className={c.days <= 7 ? "text-rose-600 font-medium" : "text-amber-600"}>en {formatDays(c.days)}</span>
+          </span>
+        ))}
       </div>
 
-      {/* Qué revisar primero */}
-      <Card className="mb-5">
-        <CardHeader title="Qué revisar primero" description="Acciones ordenadas por urgencia para anticipar las campañas." />
-        <PriorityGuide steps={guideSteps} />
-      </Card>
-
-      {/* Bloques especiales */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-        <Card>
-          <CardHeader title="Campañas próximas" description="Eventos ordenados por cercanía y productos asociados" />
-          <CardBody className="space-y-2">
-            {upcoming.map((c) => (
-              <div key={c.name} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{c.name}</p>
-                  <p className="text-xs text-slate-500">{Array.from(c.channels).join(", ")}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge tone="neutral">{c.count} SKUs</Badge>
-                  <Badge tone={c.days <= 7 ? "red" : "amber"}>en {formatDays(c.days)}</Badge>
-                </div>
-              </div>
-            ))}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader title="Riesgos de campaña" description="Tienen campaña pero el stock no alcanza" />
-          <CardBody className="space-y-2">
-            {all
-              .filter((o) => o.status === "stockout_risk" || o.status === "buy_before_campaign")
-              .sort((a, b) => a.daysToCampaign - b.daysToCampaign)
-              .slice(0, 5)
-              .map((o) => (
-                <div key={o.id} className="rounded-lg border border-rose-100 bg-rose-50/50 p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-slate-800 truncate">{o.productName}</p>
-                    <Badge tone="red">en {formatDays(o.daysToCampaign)}</Badge>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    {o.campaignName} · stock {formatNumber(o.availableStock)} u., faltan{" "}
-                    <span className="font-semibold">{formatNumber(o.stockGap)} u.</span>
-                  </p>
-                </div>
-              ))}
-          </CardBody>
-        </Card>
+      {/* KPIs compactos (escritorio), cliqueables → filtran */}
+      <div className="hidden md:grid md:grid-cols-4 gap-3 mb-4">
+        <KpiCard title="Riesgo de quiebre" value={formatNumber(stockoutRisk)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Campaña sin stock" active={status === "stockout_risk"} onClick={() => setStatus(status === "stockout_risk" ? "" : "stockout_risk")} />
+        <KpiCard title="Comprar antes" value={formatNumber(buyBefore)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Abastecer evento" active={status === "buy_before_campaign"} onClick={() => setStatus(status === "buy_before_campaign" ? "" : "buy_before_campaign")} />
+        <KpiCard title="Sugeridos para liquidar" value={formatNumber(toLiquidateList.length)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Sobrestock" active={status === "liquidate"} onClick={() => setStatus(status === "liquidate" ? "" : "liquidate")} />
+        <KpiCard title="Compra sugerida campañas" value={formatCurrencyCompact(suggestedBuyTotal)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Total a comprar" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-        <BlockList
-          title="Crecimiento acelerado"
-          subtitle="Demanda subiendo fuerte"
-          items={acceleratedList.map((o) => ({
-            sku: o.sku,
-            name: o.productName,
-            value: formatDelta(o.growthRate),
-            tone: "green" as const,
-            note: `Stock ${formatNumber(o.availableStock)} u. · estima ${formatNumber(o.estimatedCampaignSales)} u. en campaña`,
-          }))}
-          onClick={(sku) => navigate(`/productos/${sku}`)}
-        />
-        <BlockList
-          title="Para liquidar"
-          subtitle="Sobrestock o baja rotación"
-          items={toLiquidateList.map((o) => ({
-            sku: o.sku,
-            name: o.productName,
-            value: `${formatNumber(o.availableStock)} u.`,
-            tone: "violet" as const,
-            note: `Vendió ${formatNumber(o.salesLast30Days)} u. en 30 días · ${o.recommendation}`,
-          }))}
-          onClick={(sku) => navigate(`/productos/${sku}`)}
-        />
-        <BlockList
-          title="Oportunidades de alto margen"
-          subtitle="Rentables y con stock para potenciar"
-          items={highMarginOpps.map((o) => ({
-            sku: o.sku,
-            name: o.productName,
-            value: formatPercent(o.margin),
-            tone: "blue" as const,
-            note: `${CHANNEL_LABELS[o.channel]} · ${o.campaignName}`,
-          }))}
-          onClick={(sku) => navigate(`/productos/${sku}`)}
-        />
-      </div>
+      {/* Foco por estado (reduce el listado con un clic) */}
+      <Tabs
+        className="mb-4"
+        value={status || "all"}
+        onChange={(v) => setStatus(v === "all" ? "" : v)}
+        tabs={[
+          { value: "all", label: "Todos", count: all.length },
+          { value: "buy_before_campaign", label: "Comprar antes", count: buyBefore },
+          { value: "stockout_risk", label: "Riesgo de quiebre", count: stockoutRisk },
+          { value: "liquidate", label: "Liquidar", count: toLiquidateList.length },
+          { value: "boost", label: "Potenciar", count: all.filter((o) => o.status === "boost").length },
+          { value: "not_recommended", label: "No recomendado", count: all.filter((o) => o.status === "not_recommended").length },
+        ]}
+      />
 
       {/* Tabla principal */}
       <div id="tabla" className="mb-4">
@@ -619,6 +487,24 @@ export function CampaignOpportunitiesPage() {
           onSortChange={handleSort}
           rowClassName={(o) => (o.status === "stockout_risk" ? "bg-rose-50/40" : undefined)}
           emptyMessage="No hay oportunidades que coincidan con los filtros."
+          mobileCard={(o) => (
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-xs font-mono text-slate-400">{o.sku}</span>
+                  <p className="font-medium text-slate-800 leading-snug">{o.productName}</p>
+                  <p className="text-xs text-slate-500">{CHANNEL_LABELS[o.channel]} · {o.campaignName} · en {formatDays(o.daysToCampaign)}</p>
+                </div>
+                <Badge tone={CAMPAIGN_STATUS[o.status].tone} dot>{CAMPAIGN_STATUS[o.status].label}</Badge>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                <div><p className="text-xs text-slate-400">Stock</p><p className={o.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(o.availableStock)}</p></div>
+                <div><p className="text-xs text-slate-400">Brecha</p><p className={o.stockGap > 0 ? "text-rose-600" : "text-emerald-600"}>{o.stockGap > 0 ? `-${formatNumber(o.stockGap)}` : "OK"}</p></div>
+                <div><p className="text-xs text-slate-400">Sugerido</p><p className="font-semibold text-slate-900">{o.suggestedPurchaseQuantity > 0 ? `${formatNumber(o.suggestedPurchaseQuantity)} u.` : "—"}</p></div>
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5">{o.recommendation}</p>
+            </div>
+          )}
         />
       </Card>
       </>
@@ -747,40 +633,3 @@ function CreatedCampaignsView({
   );
 }
 
-function BlockList({
-  title,
-  subtitle,
-  items,
-  onClick,
-}: {
-  title: string;
-  subtitle: string;
-  items: { sku: string; name: string; value: string; note: string; tone: "green" | "violet" | "blue" }[];
-  onClick: (sku: string) => void;
-}) {
-  const toneText = { green: "text-emerald-600", violet: "text-violet-600", blue: "text-brand-600" };
-  return (
-    <Card>
-      <CardHeader title={title} description={subtitle} />
-      <CardBody className="space-y-2">
-        {items.length > 0 ? (
-          items.map((it) => (
-            <button
-              key={it.sku}
-              onClick={() => onClick(it.sku)}
-              className="w-full text-left rounded-lg border border-slate-200 px-2.5 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-slate-800 truncate">{it.name}</p>
-                <span className={`text-sm font-semibold flex-shrink-0 ${toneText[it.tone]}`}>{it.value}</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5 leading-snug">{it.note}</p>
-            </button>
-          ))
-        ) : (
-          <p className="text-sm text-slate-400 py-3 text-center">Sin productos en esta categoría.</p>
-        )}
-      </CardBody>
-    </Card>
-  );
-}
