@@ -16,6 +16,9 @@ import { ALERT_TYPE_LABELS } from "../components/business/alertLabels";
 import { filterAlerts } from "../utils/filters";
 import { formatNumber, formatDate } from "../utils/formatters";
 import { cn } from "../utils/cn";
+import { TODAY_ISO } from "../utils/constants";
+import type { AlertType } from "../types/purchasing";
+import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
@@ -202,15 +205,23 @@ export function AlertsPage() {
         </Card>
       ) : (
         <div className="grid lg:grid-cols-[minmax(320px,380px)_1fr] gap-4">
-          {/* Lista (inbox) */}
-          <div className="space-y-1.5 lg:max-h-[72vh] lg:overflow-y-auto no-scrollbar lg:pr-1">
-            {filtered.map((a) => (
-              <AlertRow
-                key={a.id}
-                alert={a}
-                selected={selected?.id === a.id}
-                onClick={() => { setSelectedId(a.id); setMobileDetail(true); }}
-              />
+          {/* Lista (inbox) agrupada por tiempo */}
+          <div className="space-y-3 lg:max-h-[72vh] lg:overflow-y-auto no-scrollbar lg:pr-1">
+            {groupByTime(filtered).map((bucket) => (
+              <div key={bucket.key}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-1 mb-1.5">{bucket.label}</p>
+                <div className="space-y-1.5">
+                  {bucket.items.map((a) => (
+                    <AlertRow
+                      key={a.id}
+                      alert={a}
+                      selected={selected?.id === a.id}
+                      action={actionForAlert(a)}
+                      onClick={() => { setSelectedId(a.id); setMobileDetail(true); }}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
           {/* Detalle (escritorio) */}
@@ -242,29 +253,85 @@ export function AlertsPage() {
   );
 }
 
-function AlertRow({ alert, selected, onClick }: { alert: (typeof seedAlerts)[number]; selected: boolean; onClick: () => void }) {
-  const dot = alert.severity === "high" ? "bg-rose-500" : alert.severity === "medium" ? "bg-amber-500" : "bg-slate-300";
+const TYPE_GROUP: Record<AlertType, { label: string; tone: BadgeTone }> = {
+  stockout: { label: "Stock", tone: "red" },
+  stockout_risk: { label: "Stock", tone: "amber" },
+  overstock: { label: "Stock", tone: "violet" },
+  dead_stock: { label: "Stock", tone: "violet" },
+  no_sales: { label: "Stock", tone: "neutral" },
+  po_delayed: { label: "OC", tone: "red" },
+  supplier_delay: { label: "Proveedor", tone: "amber" },
+  no_supplier: { label: "Proveedor", tone: "red" },
+  unexpected_demand: { label: "Demanda", tone: "blue" },
+  high_suggested_purchase: { label: "Demanda", tone: "blue" },
+  low_margin: { label: "Margen", tone: "amber" },
+  cost_increase: { label: "Margen", tone: "amber" },
+  outdated_cost: { label: "Margen", tone: "neutral" },
+};
+
+/** Agrupa alertas por antigüedad (Hoy / Ayer / Esta semana / Anteriores). */
+function groupByTime(items: (typeof seedAlerts)[number][]) {
+  const today = new Date(`${TODAY_ISO}T00:00:00`).getTime();
+  const daysAgo = (iso: string) => Math.round((today - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
+  const buckets: { key: string; label: string; items: (typeof seedAlerts)[number][] }[] = [
+    { key: "hoy", label: "Hoy", items: [] },
+    { key: "ayer", label: "Ayer", items: [] },
+    { key: "semana", label: "Esta semana", items: [] },
+    { key: "antes", label: "Anteriores", items: [] },
+  ];
+  for (const a of items) {
+    const d = daysAgo(a.date);
+    if (d <= 0) buckets[0].items.push(a);
+    else if (d === 1) buckets[1].items.push(a);
+    else if (d <= 7) buckets[2].items.push(a);
+    else buckets[3].items.push(a);
+  }
+  return buckets.filter((b) => b.items.length > 0);
+}
+
+function AlertRow({
+  alert,
+  selected,
+  onClick,
+  action,
+}: {
+  alert: (typeof seedAlerts)[number];
+  selected: boolean;
+  onClick: () => void;
+  action?: { label: string; onClick: () => void; disabled?: boolean };
+}) {
+  const unread = alert.status === "new";
+  const type = TYPE_GROUP[alert.type];
   return (
-    <button
+    <div
       onClick={onClick}
       className={cn(
-        "w-full text-left rounded-lg border px-3 py-2.5 flex items-start gap-2.5 transition-colors",
+        "w-full cursor-pointer rounded-lg border px-3 py-2.5 transition-colors",
         selected ? "border-brand-300 bg-brand-50/60" : "border-slate-200 bg-white hover:bg-slate-50"
       )}
     >
-      <span className={cn("mt-1.5 w-2 h-2 rounded-full flex-shrink-0", dot)} />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium text-slate-800 truncate">{alert.relatedEntity}</span>
-          <span className="text-xs text-slate-400 flex-shrink-0">{formatDate(alert.date)}</span>
-        </span>
-        <span className="block text-xs text-slate-500 truncate">{ALERT_TYPE_LABELS[alert.type]} · {alert.description}</span>
-        <span className="flex items-center gap-1.5 mt-1">
-          <StatusBadge kind="alert" value={alert.status} dot={false} />
-          {(alert.status === "new" || alert.status === "in_review") && <SeverityBadge severity={alert.severity} />}
-        </span>
-      </span>
-    </button>
+      <div className="flex items-center gap-1.5 mb-1">
+        <SeverityBadge severity={alert.severity} />
+        <Badge tone={type.tone}>{type.label}</Badge>
+        {unread && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" title="No leída" />}
+        <div className="flex-1" />
+        <span className="text-xs text-slate-400 flex-shrink-0">{formatDate(alert.date)}</span>
+      </div>
+      <p className={cn("text-sm truncate", unread ? "font-semibold text-slate-900" : "font-medium text-slate-700")}>{alert.relatedEntity}</p>
+      <p className="text-xs text-slate-500 line-clamp-2">{alert.description}</p>
+      <div className="flex items-center gap-2 mt-1.5">
+        <StatusBadge kind="alert" value={alert.status} dot={false} />
+        {action && (
+          <button
+            onClick={(e) => { e.stopPropagation(); action.onClick(); }}
+            disabled={action.disabled}
+            className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:text-slate-400"
+          >
+            {action.label}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
