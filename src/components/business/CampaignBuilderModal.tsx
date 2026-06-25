@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
@@ -20,6 +20,10 @@ interface Props {
   onSave: (campaign: CreatedCampaign) => void;
   /** Plantilla opcional para precargar el nombre (ej. "Cyber"). */
   initialName?: string;
+  /** Productos precargados (ej. liquidación de SKUs redundantes). */
+  initialLines?: CampaignProductLine[];
+  /** Canales precargados. Por defecto ["web"]. */
+  initialChannels?: PromoChannel[];
 }
 
 const todayISO = "2026-06-24";
@@ -37,12 +41,19 @@ function lineFor(sku: string, discountPct: number): CampaignProductLine | null {
   };
 }
 
-export function CampaignBuilderModal({ open, onClose, onSave, initialName = "" }: Props) {
+export function CampaignBuilderModal({
+  open,
+  onClose,
+  onSave,
+  initialName = "",
+  initialLines,
+  initialChannels,
+}: Props) {
   const [name, setName] = useState(initialName);
   const [startDate, setStartDate] = useState(todayISO);
   const [endDate, setEndDate] = useState("2026-07-04");
-  const [channels, setChannels] = useState<PromoChannel[]>(["web"]);
-  const [lines, setLines] = useState<CampaignProductLine[]>([]);
+  const [channels, setChannels] = useState<PromoChannel[]>(initialChannels ?? ["web"]);
+  const [lines, setLines] = useState<CampaignProductLine[]>(initialLines ?? []);
   const [picker, setPicker] = useState("");
   const [error, setError] = useState("");
 
@@ -50,11 +61,18 @@ export function CampaignBuilderModal({ open, onClose, onSave, initialName = "" }
     setName(initialName);
     setStartDate(todayISO);
     setEndDate("2026-07-04");
-    setChannels(["web"]);
-    setLines([]);
+    setChannels(initialChannels ?? ["web"]);
+    setLines(initialLines ?? []);
     setPicker("");
     setError("");
   };
+
+  // Al abrir, parte desde los valores iniciales actuales (permite precargar
+  // productos/canales según el contexto, p. ej. una campaña de liquidación).
+  useEffect(() => {
+    if (open) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const close = () => {
     reset();

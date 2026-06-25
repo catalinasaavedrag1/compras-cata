@@ -39,7 +39,7 @@ export function CatalogOptimizationPage() {
         }
       />
 
-      <CatalogRedundancy products={scoped} />
+      <CatalogRedundancy products={scoped} scopeLabel={cat || undefined} />
     </div>
   );
 }

@@ -100,7 +100,7 @@ export function CategoryDetailPage() {
         </Card>
       )}
 
-      {tab === "optimizar" && <CatalogRedundancy products={catProducts} />}
+      {tab === "optimizar" && <CatalogRedundancy products={catProducts} scopeLabel={category.name} />}
 
       {tab === "reposicion" && (
         <Card>
