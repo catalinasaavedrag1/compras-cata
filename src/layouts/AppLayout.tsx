@@ -14,7 +14,7 @@ export function AppLayout() {
       <Sidebar />
       <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="flex-1 min-w-0 flex flex-col">
-        <Topbar onOpenMenu={() => setMenuOpen(true)} />
+        <Topbar />
         <main className="flex-1 px-4 lg:px-6 py-4 pb-24 lg:pb-4 max-w-[1600px] w-full mx-auto">
           <Outlet />
         </main>
