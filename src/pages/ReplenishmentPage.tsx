@@ -427,7 +427,7 @@ export function ReplenishmentPage() {
     <div>
       <PageHeader
         title="Reposición sugerida"
-        description="Productos priorizados según stock disponible, venta histórica, lead time del proveedor y riesgo de quiebre. Define qué comprar, cuánto y por qué."
+        description="Qué comprar, cuánto y por qué — priorizado por riesgo de quiebre."
         action={
           <div className="flex gap-2">
             <ExportButton

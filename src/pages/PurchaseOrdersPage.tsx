@@ -197,7 +197,7 @@ export function PurchaseOrdersPage() {
     <div>
       <PageHeader
         title="Órdenes de compra"
-        description="Seguimiento de órdenes de compra: borradores, enviadas, atrasadas y recibidas. Crea nuevas OC desde las sugerencias de reposición."
+        description="Seguimiento de OC y creación desde sugerencias."
         action={
           <Button onClick={() => setDrawerOpen(true)} icon={<IconPlus className="w-4 h-4" />}>
             Crear OC desde sugerencias

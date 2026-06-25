@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -20,6 +21,7 @@ import { IconSuppliers, IconAlerts, IconOrders } from "../components/ui/icons";
 import type { Supplier } from "../types/purchasing";
 
 export function SuppliersPage() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
 
@@ -154,7 +156,28 @@ export function SuppliersPage() {
       </div>
 
       <Card>
-        <DataTable columns={columns} data={filtered} rowKey={(s) => s.id} />
+        <DataTable
+          columns={columns}
+          data={filtered}
+          rowKey={(s) => s.id}
+          onRowClick={(s) => navigate(`/proveedores/${s.id}`)}
+          mobileCard={(s) => (
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-800">{s.name}</p>
+                  <p className="text-xs text-slate-400 font-mono">{s.rut}</p>
+                </div>
+                <StatusBadge kind="supplier" value={s.status} dot={false} />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                <div><p className="text-xs text-slate-400">Cumple</p><p className={s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatPercent(s.deliveryCompliance, 0)}</p></div>
+                <div><p className="text-xs text-slate-400">Lead time</p><p className="text-slate-700">{formatDays(s.averageLeadTimeDays)}</p></div>
+                <div><p className="text-xs text-slate-400">OC abiertas</p><p className="text-slate-700">{formatNumber(s.openPurchaseOrders)}</p></div>
+              </div>
+            </div>
+          )}
+        />
       </Card>
     </div>
   );

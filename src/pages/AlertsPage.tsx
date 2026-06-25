@@ -115,7 +115,7 @@ export function AlertsPage() {
     <div>
       <PageHeader
         title="Alertas comerciales"
-        description="Problemas que requieren atención del comprador: quiebres, sobrestock, proveedores atrasados, margen bajo y órdenes vencidas. Cada alerta explica el problema y propone una acción."
+        description="Problemas que requieren tu atención, con acción sugerida."
       />
 
       {/* Filtros arriba: controlan KPIs, conteos y listado */}

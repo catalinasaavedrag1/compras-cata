@@ -6,7 +6,9 @@ import { DataTable, type Column } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { KpiCard } from "../components/business/KpiCard";
-import { ExportButton } from "../components/business/ExportButton";
+import { MoreActions } from "../components/ui/MoreActions";
+import { exportToCsv } from "../utils/exportCsv";
+import { useToast } from "../context/ToastContext";
 import { products as allProducts } from "../data/mockProducts";
 import { filterProducts, uniqueValues } from "../utils/filters";
 import { useUrlState, useUrlToggle } from "../utils/useUrlState";
@@ -16,8 +18,23 @@ import { formatCurrency, formatDate, formatNumber, formatPercent } from "../util
 import { IconProducts, IconAlerts, IconSuppliers, IconSales } from "../components/ui/icons";
 import type { Product } from "../types/purchasing";
 
+const PRODUCT_CSV_COLUMNS = [
+  { label: "SKU", value: (p: Product) => p.sku },
+  { label: "Nombre", value: (p: Product) => p.name },
+  { label: "Categoría", value: (p: Product) => p.category },
+  { label: "Marca", value: (p: Product) => p.brand },
+  { label: "Proveedor", value: (p: Product) => p.supplierName },
+  { label: "Costo", value: (p: Product) => p.cost },
+  { label: "Precio", value: (p: Product) => p.price },
+  { label: "Margen %", value: (p: Product) => p.margin },
+  { label: "Stock disponible", value: (p: Product) => p.availableStock },
+  { label: "Venta 30 días", value: (p: Product) => p.salesLast30Days },
+  { label: "Estado compra", value: (p: Product) => p.purchaseStatus },
+];
+
 export function ProductsPage() {
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [query, setQuery] = useUrlState("q");
   const [category, setCategory] = useUrlState("cat");
@@ -182,27 +199,17 @@ export function ProductsPage() {
     <div>
       <PageHeader
         title="Productos / SKUs"
-        description="Maestro del surtido. Revisa stock, margen, rotación y estado de cada producto. Haz clic en una fila para ver el detalle y la decisión recomendada."
+        description="Revisa stock, margen, rotación y estado del surtido."
         action={
-          <ExportButton
-            filename="productos"
-            rows={filtered}
-            columns={[
-              { label: "SKU", value: (p) => p.sku },
-              { label: "Nombre", value: (p) => p.name },
-              { label: "Categoría", value: (p) => p.category },
-              { label: "Subcategoría", value: (p) => p.subcategory },
-              { label: "Marca", value: (p) => p.brand },
-              { label: "Proveedor", value: (p) => p.supplierName },
-              { label: "Costo", value: (p) => p.cost },
-              { label: "Precio", value: (p) => p.price },
-              { label: "Margen %", value: (p) => p.margin },
-              { label: "Stock total", value: (p) => p.totalStock },
-              { label: "Stock disponible", value: (p) => p.availableStock },
-              { label: "Venta 30 días", value: (p) => p.salesLast30Days },
-              { label: "Rotación", value: (p) => p.rotation },
-              { label: "Estado comercial", value: (p) => p.productStatus },
-              { label: "Estado compra", value: (p) => p.purchaseStatus },
+          <MoreActions
+            actions={[
+              {
+                label: "Exportar a CSV",
+                onClick: () => {
+                  exportToCsv("productos", filtered, PRODUCT_CSV_COLUMNS);
+                  toast.success(`Se exportaron ${filtered.length} productos a productos.csv`);
+                },
+              },
             ]}
           />
         }
@@ -212,8 +219,9 @@ export function ProductsPage() {
         <FilterBar
           searchValue={query}
           onSearchChange={setQuery}
-          searchPlaceholder="Buscar por SKU o nombre"
+          searchPlaceholder="Buscar SKU, producto o marca"
           resultCount={filtered.length}
+          summary={`${filtered.length} productos · ${filtered.filter((p) => p.availableStock <= 0).length} sin stock · ${lowMarginCount} margen bajo · ${noSupplierCount} sin proveedor`}
           onClear={clearFilters}
           selects={[
             { key: "cat", placeholder: "Categoría", value: category, onChange: setCategory, options: uniqueValues(allProducts, (p) => p.category).map((c) => ({ value: c, label: c })) },

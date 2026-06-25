@@ -127,7 +127,7 @@ export function ReceptionsPage() {
     <div>
       <PageHeader
         title="Recepciones"
-        description="Qué mercadería viene en camino, qué llegó y cómo llegó (completa, parcial o con problemas de calidad). Vista del comprador, sin detalle logístico."
+        description="Qué viene en camino, qué llegó y cómo llegó."
       />
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">

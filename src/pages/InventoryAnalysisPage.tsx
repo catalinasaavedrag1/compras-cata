@@ -88,7 +88,7 @@ export function InventoryAnalysisPage() {
     <div>
       <PageHeader
         title="Análisis de inventario"
-        description="Salud del inventario para compras: cuánto capital está inmovilizado, dónde hay sobrestock o stock muerto y qué productos están en quiebre."
+        description="Capital inmovilizado, sobrestock, stock muerto y quiebres."
       />
 
       <HelpNote className="mb-4">

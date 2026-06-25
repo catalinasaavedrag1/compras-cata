@@ -102,7 +102,7 @@ export function CategoriesPage() {
     <div>
       <PageHeader
         title="Categorías"
-        description="Salud comercial por categoría: venta, margen, inventario, quiebres y rotación. Identifica dónde concentrar la gestión de compra."
+        description="Salud comercial por categoría: venta, margen, quiebres y rotación."
       />
 
       <HelpNote className="mb-4">
