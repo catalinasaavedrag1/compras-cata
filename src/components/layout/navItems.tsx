@@ -44,6 +44,12 @@ export const navGroups: NavGroup[] = [
         icon: IconCheck,
         hint: "Mis tareas, categorías, riesgos de quiebre y proveedores",
       },
+      {
+        to: "/alertas",
+        label: "Alertas",
+        icon: IconAlerts,
+        hint: "Problemas que requieren atención del comprador",
+      },
     ],
   },
   {
@@ -73,12 +79,6 @@ export const navGroups: NavGroup[] = [
         icon: IconInventory,
         hint: "Qué viene en camino, qué llegó y cómo llegó",
       },
-      {
-        to: "/proveedores",
-        label: "Proveedores",
-        icon: IconSuppliers,
-        hint: "Cumplimiento, lead time y proveedores a revisar",
-      },
     ],
   },
   {
@@ -95,6 +95,12 @@ export const navGroups: NavGroup[] = [
         label: "Categorías",
         icon: IconCategories,
         hint: "Salud comercial por categoría",
+      },
+      {
+        to: "/proveedores",
+        label: "Proveedores",
+        icon: IconSuppliers,
+        hint: "Cumplimiento, lead time y proveedores a revisar",
       },
     ],
   },
@@ -118,12 +124,6 @@ export const navGroups: NavGroup[] = [
         label: "Margen por canal",
         icon: IconSales,
         hint: "Precio y margen por marketplace, web y tienda",
-      },
-      {
-        to: "/alertas",
-        label: "Alertas",
-        icon: IconAlerts,
-        hint: "Problemas que requieren atención del comprador",
       },
     ],
   },
