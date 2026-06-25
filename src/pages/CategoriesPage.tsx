@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -15,6 +16,7 @@ import {
 import type { Category } from "../types/purchasing";
 
 export function CategoriesPage() {
+  const navigate = useNavigate();
   const sortedBySales = [...categories].sort((a, b) => b.salesLast30Days - a.salesLast30Days);
   const sortedByCritical = [...categories].sort(
     (a, b) => b.stockoutSkus + b.riskSkus - (a.stockoutSkus + a.riskSkus)
@@ -156,7 +158,29 @@ export function CategoriesPage() {
 
       <Card>
         <CardHeader title="Detalle por categoría" description="Todas las categorías del surtido" />
-        <DataTable columns={columns} data={categories} rowKey={(c) => c.id} />
+        <DataTable
+          columns={columns}
+          data={categories}
+          rowKey={(c) => c.id}
+          onRowClick={(c) => navigate(`/categorias/${c.id}`)}
+          mobileCard={(c) => (
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-800">{c.name}</p>
+                  <p className="text-xs text-slate-500">{c.buyer}</p>
+                </div>
+                <StatusBadge kind="category" value={c.status} dot={false} />
+              </div>
+              <div className="flex items-center gap-1.5 mt-2">
+                {c.stockoutSkus > 0 && <Badge tone="red">{c.stockoutSkus} quiebre</Badge>}
+                {c.riskSkus > 0 && <Badge tone="amber">{c.riskSkus} riesgo</Badge>}
+                {c.overstockSkus > 0 && <Badge tone="violet">{c.overstockSkus} sobre</Badge>}
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5">{formatCurrencyCompact(c.salesLast30Days)} venta · compra sug. {formatCurrencyCompact(c.suggestedPurchase)}</p>
+            </div>
+          )}
+        />
       </Card>
     </div>
   );

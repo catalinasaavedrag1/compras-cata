@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { navGroups } from "./navItems";
 import { cn } from "../../utils/cn";
@@ -5,15 +6,25 @@ import { useLocalStorage } from "../../utils/useLocalStorage";
 import { IconChevronRight } from "../ui/icons";
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useLocalStorage<boolean>("compras:sidebar-collapsed", false);
+  const [pinnedCollapsed, setPinnedCollapsed] = useLocalStorage<boolean>("compras:sidebar-collapsed", false);
+  const [hovering, setHovering] = useState(false);
+
+  // Colapsado salvo que el mouse esté encima (hover-to-expand)
+  const collapsed = pinnedCollapsed && !hovering;
 
   return (
-    <aside
-      className={cn(
-        "hidden lg:flex lg:flex-col flex-shrink-0 border-r border-slate-200 bg-white h-screen sticky top-0 transition-[width] duration-200",
-        collapsed ? "w-16" : "w-64"
-      )}
-    >
+    <>
+      {/* Espaciador: reserva el ancho colapsado para que el hover no empuje el contenido */}
+      <div className={cn("hidden lg:block flex-shrink-0", pinnedCollapsed ? "w-16" : "w-64")} aria-hidden />
+      <aside
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+        className={cn(
+          "hidden lg:flex lg:flex-col border-r border-slate-200 bg-white h-screen fixed top-0 left-0 z-40 transition-[width] duration-200",
+          collapsed ? "w-16" : "w-64",
+          pinnedCollapsed && !collapsed ? "shadow-xl" : ""
+        )}
+      >
       {/* Marca + botón colapsar */}
       <div className={cn("flex items-center h-16 border-b border-slate-100 flex-shrink-0", collapsed ? "justify-center px-0" : "px-3")}>
         {!collapsed && (
@@ -27,7 +38,7 @@ export function Sidebar() {
         )}
         {collapsed && <BrandLogo />}
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => setPinnedCollapsed(!pinnedCollapsed)}
           className={cn(
             "text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg p-1.5",
             collapsed && "absolute top-4 -right-3 bg-white border border-slate-200 shadow-sm"
@@ -82,7 +93,8 @@ export function Sidebar() {
           </div>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }
 
