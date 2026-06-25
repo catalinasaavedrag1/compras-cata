@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { cn } from "../../utils/cn";
 import type { CommercialAlert } from "../../types/purchasing";
 import { formatDate } from "../../utils/formatters";
@@ -12,6 +13,8 @@ interface AlertCardProps {
   compact?: boolean;
   /** Acción sugerida principal (ej. "Agregar a OC", "Ver producto"). */
   primaryAction?: { label: string; onClick: () => void; disabled?: boolean };
+  /** Si se pasa, la entidad afectada es un enlace al registro relacionado. */
+  entityTo?: string;
 }
 
 const severityBar = {
@@ -26,6 +29,7 @@ export function AlertCard({
   onResolve,
   compact,
   primaryAction,
+  entityTo,
 }: AlertCardProps) {
   return (
     <div className="relative bg-white border border-slate-200 rounded-xl shadow-card overflow-hidden">
@@ -49,9 +53,13 @@ export function AlertCard({
           </div>
         </div>
 
-        <p className="mt-2 text-sm font-semibold text-slate-800">
-          {alert.relatedEntity}
-        </p>
+        {entityTo ? (
+          <Link to={entityTo} className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:text-brand-800 hover:underline">
+            {alert.relatedEntity}
+          </Link>
+        ) : (
+          <p className="mt-2 text-sm font-semibold text-slate-800">{alert.relatedEntity}</p>
+        )}
         <p className="mt-1 text-sm text-slate-600 leading-snug">{alert.description}</p>
 
         {!compact && (
