@@ -15,19 +15,26 @@ import {
 
 export type ToastTone = "success" | "info" | "warning" | "error";
 
+/** Acción opcional del toast (ej. "Ver borrador OC" → navega al detalle). */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: number;
   tone: ToastTone;
   message: string;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
   toasts: Toast[];
-  show: (message: string, tone?: ToastTone) => void;
-  success: (message: string) => void;
-  info: (message: string) => void;
-  warning: (message: string) => void;
-  error: (message: string) => void;
+  show: (message: string, tone?: ToastTone, action?: ToastAction) => void;
+  success: (message: string, action?: ToastAction) => void;
+  info: (message: string, action?: ToastAction) => void;
+  warning: (message: string, action?: ToastAction) => void;
+  error: (message: string, action?: ToastAction) => void;
   dismiss: (id: number) => void;
 }
 
@@ -42,10 +49,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const show = useCallback(
-    (message: string, tone: ToastTone = "success") => {
+    (message: string, tone: ToastTone = "success", action?: ToastAction) => {
       const id = ++counter.current;
-      setToasts((prev) => [...prev, { id, tone, message }]);
-      setTimeout(() => dismiss(id), 3500);
+      setToasts((prev) => [...prev, { id, tone, message, action }]);
+      setTimeout(() => dismiss(id), action ? 6000 : 3500);
     },
     [dismiss]
   );
@@ -54,10 +61,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     () => ({
       toasts,
       show,
-      success: (m) => show(m, "success"),
-      info: (m) => show(m, "info"),
-      warning: (m) => show(m, "warning"),
-      error: (m) => show(m, "error"),
+      success: (m, action) => show(m, "success", action),
+      info: (m, action) => show(m, "info", action),
+      warning: (m, action) => show(m, "warning", action),
+      error: (m, action) => show(m, "error", action),
       dismiss,
     }),
     [toasts, show, dismiss]

@@ -138,7 +138,7 @@ export function CampaignOpportunitiesPage() {
         quantity: o.suggestedPurchaseQuantity,
         unitCost: o.unitCost,
       });
-      toast.success(`${o.productName} agregado al borrador de OC`);
+      toast.success(`${o.productName} agregado al borrador de OC`, { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") });
       return;
     }
     if (o.actionLabel === "Revisar proveedor") return navigate("/proveedores");

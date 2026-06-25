@@ -157,7 +157,8 @@ export function ReplenishmentPage() {
     toast.success(
       toAdd.length > 0
         ? `${toAdd.length} producto${toAdd.length === 1 ? "" : "s"} agregado${toAdd.length === 1 ? "" : "s"} al borrador de OC`
-        : "Esos productos ya estaban en el borrador de OC"
+        : "Esos productos ya estaban en el borrador de OC",
+      toAdd.length > 0 ? { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") } : undefined
     );
   };
 
@@ -175,7 +176,8 @@ export function ReplenishmentPage() {
     toast.success(
       toAdd.length > 0
         ? `${toAdd.length} producto${toAdd.length === 1 ? "" : "s"} urgente${toAdd.length === 1 ? "" : "s"} agregado${toAdd.length === 1 ? "" : "s"} a OC`
-        : "Todos los urgentes ya están en el borrador de OC"
+        : "Todos los urgentes ya están en el borrador de OC",
+      { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") }
     );
   };
 
@@ -213,7 +215,7 @@ export function ReplenishmentPage() {
       quantity: r.suggestedQuantity,
       unitCost: r.unitCost,
     });
-    toast.success(`${r.productName} agregado al borrador de OC`);
+    toast.success(`${r.productName} agregado al borrador de OC`, { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") });
   };
 
   const handleSort = (key: string) =>

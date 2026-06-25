@@ -207,7 +207,7 @@ export function MyPanelPage() {
       quantity: qty,
       unitCost: p.cost,
     });
-    toast.success(`${p.name} agregado al borrador de OC`);
+    toast.success(`${p.name} agregado al borrador de OC`, { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") });
   };
 
   // Acción recomendada del día (lo más urgente) + resumen compacto

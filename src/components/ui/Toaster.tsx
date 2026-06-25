@@ -22,7 +22,20 @@ export function Toaster() {
         >
           <span className={cn("absolute left-0 top-0 bottom-0 w-1", toneStyles[t.tone].bar)} />
           <span className="mt-0.5 flex-shrink-0 pl-1">{toneStyles[t.tone].icon}</span>
-          <p className="flex-1 text-sm text-slate-700 leading-snug">{t.message}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-700 leading-snug">{t.message}</p>
+            {t.action && (
+              <button
+                onClick={() => {
+                  t.action!.onClick();
+                  dismiss(t.id);
+                }}
+                className="mt-1 text-sm font-medium text-brand-600 hover:text-brand-700"
+              >
+                {t.action.label} →
+              </button>
+            )}
+          </div>
           <button
             onClick={() => dismiss(t.id)}
             className="text-slate-400 hover:text-slate-600 flex-shrink-0"

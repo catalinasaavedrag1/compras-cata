@@ -98,7 +98,7 @@ export function AlertsPage() {
             quantity: rec.suggestedQuantity,
             unitCost: rec.unitCost,
           });
-          toast.success(`${rec.productName} agregado al borrador de OC`);
+          toast.success(`${rec.productName} agregado al borrador de OC`, { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") });
         },
       };
     }
