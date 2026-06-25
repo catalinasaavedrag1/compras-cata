@@ -19,7 +19,11 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
-      <MobileBottomNav onMore={() => setMenuOpen(true)} />
+      <MobileBottomNav
+        menuOpen={menuOpen}
+        onToggleMenu={() => setMenuOpen((v) => !v)}
+        onNavigate={() => setMenuOpen(false)}
+      />
       <Toaster />
     </div>
   );
