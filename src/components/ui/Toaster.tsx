@@ -13,7 +13,7 @@ export function Toaster() {
   const { toasts, dismiss } = useToast();
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]">
+    <div className="fixed z-[60] flex flex-col gap-2 left-3 right-3 bottom-20 sm:left-auto sm:right-4 sm:bottom-4 sm:w-80">
       {toasts.map((t) => (
         <div
           key={t.id}

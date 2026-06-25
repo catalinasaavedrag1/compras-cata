@@ -48,7 +48,7 @@ export function NotificationCenter() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1.5 w-96 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
+        <div className="fixed sm:absolute left-2 right-2 sm:left-auto sm:right-0 top-16 sm:top-auto sm:mt-1.5 sm:w-96 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
             <p className="text-sm font-semibold text-slate-800">
               Notificaciones {unreadCount > 0 && <span className="text-slate-400 font-normal">({unreadCount} sin leer)</span>}
