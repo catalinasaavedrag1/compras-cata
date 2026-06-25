@@ -5,7 +5,6 @@ import { KpiCard } from "../components/business/KpiCard";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { Tabs } from "../components/ui/Tabs";
 import { BarList } from "../components/business/BarList";
-import { HelpNote } from "../components/business/HelpNote";
 import { DataTable, type Column } from "../components/ui/Table";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { Badge } from "../components/ui/Badge";
