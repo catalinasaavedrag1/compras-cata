@@ -8,7 +8,6 @@ import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
-import { HelpNote } from "../components/business/HelpNote";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { PriorityGuide, type GuideStep } from "../components/business/PriorityGuide";
 import {
@@ -477,17 +476,15 @@ export function MyPanelPage() {
         <PriorityGuide steps={tasks} />
       </Card>
 
+      {/* Bloque inferior en 2 columnas (escritorio aprovecha el ancho) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="lg:col-span-2 space-y-5">
       {/* Riesgo de quiebre */}
-      <div id="riesgo" className="mb-5">
+      <div id="riesgo">
         <div className="flex items-center justify-between mb-2.5">
           <h3 className="text-sm font-semibold text-slate-800">Mis productos en riesgo de quiebre</h3>
           <Link to="/reposicion" className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver reposición</Link>
         </div>
-        <HelpNote className="mb-3">
-          La <b>fecha de quiebre</b> estima cuándo te quedas sin stock según la venta reciente. La{" "}
-          <b>compra sugerida</b> indica cuántas unidades comprar y para cuántos días de cobertura, considerando
-          el lead time del proveedor.
-        </HelpNote>
         <Card>
           <DataTable
             columns={riskColumns}
@@ -528,9 +525,8 @@ export function MyPanelPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-        {/* OC sin recibir */}
-        <div id="ordenes">
+      {/* OC sin recibir */}
+      <div id="ordenes">
           <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Órdenes de compra sin recibir</h3>
           <Card>
             <CardBody className="space-y-2">
@@ -555,10 +551,12 @@ export function MyPanelPage() {
             </CardBody>
           </Card>
         </div>
+      </div>{/* fin columna izquierda */}
 
+      <div className="space-y-5">
         {/* Proveedores por revisar */}
         <div id="proveedores">
-          <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Proveedores por revisar este mes</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Proveedores por revisar</h3>
           <Card>
             <CardBody className="space-y-2">
               {mySuppliersToReview.length === 0 ? (
@@ -579,7 +577,6 @@ export function MyPanelPage() {
             </CardBody>
           </Card>
         </div>
-      </div>
 
       {/* Sobrestock */}
       <div id="sobrestock">
@@ -604,6 +601,8 @@ export function MyPanelPage() {
           </CardBody>
         </Card>
       </div>
+      </div>{/* fin columna derecha */}
+      </div>{/* fin grid 2 columnas */}
     </div>
   );
 }

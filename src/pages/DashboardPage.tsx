@@ -155,16 +155,21 @@ export function DashboardPage() {
         }
       />
 
-      {/* KPIs principales */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 mb-5">
-        <KpiCard title="SKUs con quiebre" value={formatNumber(stockoutSkus)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Ver productos sin stock" to="/productos?stock=1" />
+      {/* 4 KPIs hero de decisión (cliqueables) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <KpiCard title="SKUs con quiebre" value={formatNumber(stockoutSkus)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Ver sin stock" to="/productos?stock=1" />
         <KpiCard title="En riesgo de quiebre" value={formatNumber(criticalRecs.length + buyNowRecs.length)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Ver reposición" to="/reposicion" />
-        <KpiCard title="Con sobrestock" value={formatNumber(overstockProducts.length)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Ver inventario" to="/inventario" />
         <KpiCard title="Compra sugerida del mes" value={formatCurrencyCompact(suggestedTotal)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description={`${formatPercent(budgetPct, 0)} del presupuesto`} to="/reposicion" />
-        <KpiCard title="OC abiertas (sin recibir)" value={formatNumber(openPOs)} tone="neutral" icon={<IconInventory className="w-4 h-4" />} description={`${delayedPOs.length} atrasadas · ver órdenes`} to="/ordenes-compra" />
-        <KpiCard title="Proveedores a revisar" value={formatNumber(lowComplianceSuppliers.length)} tone="bad" icon={<IconSuppliers className="w-4 h-4" />} description="Cumplimiento bajo 70%" to="/proveedores" />
-        <KpiCard title="Venta últimos 30 días" value={formatCurrencyCompact(salesKpis.salesLast30Days)} tone="good" delta={8.4} icon={<IconSales className="w-4 h-4" />} to="/ventas" />
-        <KpiCard title="Inventario valorizado" value={formatCurrencyCompact(inventoryKpis.totalInventoryValue)} tone="neutral" icon={<IconInventory className="w-4 h-4" />} description={`${inventoryKpis.averageInventoryDays} días promedio`} to="/inventario" />
+        <KpiCard title="OC abiertas (sin recibir)" value={formatNumber(openPOs)} tone="neutral" icon={<IconInventory className="w-4 h-4" />} description={`${delayedPOs.length} atrasadas`} to="/ordenes-compra" />
+      </div>
+
+      {/* Indicadores secundarios en chips compactos (cliqueables) */}
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 mb-4 pb-0.5">
+        <DashChip to="/inventario" label={`${overstockProducts.length} con sobrestock`} />
+        <DashChip to="/proveedores" label={`${lowComplianceSuppliers.length} proveedores a revisar`} />
+        <DashChip to="/ventas" label={`${formatCurrencyCompact(salesKpis.salesLast30Days)} venta 30d`} />
+        <DashChip to="/inventario" label={`${formatCurrencyCompact(inventoryKpis.totalInventoryValue)} inventario`} />
+        <DashChip to="/ventas" label={`${formatCurrencyCompact(salesKpis.lostSalesByStockout)} venta perdida`} />
       </div>
 
       {/* Qué revisar primero — lo más importante, arriba */}
@@ -388,6 +393,17 @@ export function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function DashChip({ to, label }: { to: string; label: string }) {
+  return (
+    <Link
+      to={to}
+      className="whitespace-nowrap flex-shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50/40"
+    >
+      {label}
+    </Link>
   );
 }
 
