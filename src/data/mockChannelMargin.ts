@@ -108,6 +108,10 @@ const SELECTED = [
   "HER-001", "HER-002", "HER-003", "CON-001", "MAD-001",
   "ELE-001", "ELE-002", "GAS-002", "FER-003", "PIN-001",
   "PIN-002", "JAR-003", "SEG-001", "ELE-003",
+  // Nuevos SKUs del catálogo ampliado
+  "CON-003", "MAD-003", "FER-005", "FER-006", "GAS-006",
+  "HER-004", "HER-005", "HER-006", "PIN-003", "PIN-004",
+  "ELE-005", "ELE-006", "JAR-006", "SEG-002", "AGR-002",
 ];
 
 const TARGET_BY_CATEGORY: Record<string, number> = {
@@ -120,6 +124,7 @@ const TARGET_BY_CATEGORY: Record<string, number> = {
   Jardín: 30,
   "Seguridad industrial": 30,
   Maderas: 25,
+  Agrícola: 27,
 };
 
 export const channelMargins: ChannelMargin[] = SELECTED.flatMap((sku) => {

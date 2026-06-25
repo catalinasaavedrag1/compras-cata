@@ -212,4 +212,115 @@ export const alerts: CommercialAlert[] = [
     responsible: "Andrea Muñoz",
     status: "in_review",
   },
+  {
+    id: "ALR-016",
+    type: "stockout",
+    severity: "high",
+    relatedEntity: "Llave de paso PVC 1/2\"",
+    relatedSku: "GAS-005",
+    description:
+      "GAS-005 con stock disponible 0 y venta de 150/mes. Quiebre activo en las 3 ubicaciones.",
+    recommendation:
+      "Comprar 280 unidades a FerrePro Chile (lead time 12 días). Venta perdida ~$343.500/mes.",
+    date: "2026-06-24",
+    responsible: "Juan Pérez",
+    status: "new",
+  },
+  {
+    id: "ALR-017",
+    type: "stockout_risk",
+    severity: "high",
+    relatedEntity: "Fierro estriado 8 mm x 6 m",
+    relatedSku: "CON-003",
+    description:
+      "CON-003 con disponible 12 y venta de 620/mes. Cobertura menor a 1 día.",
+    recommendation:
+      "Comprar 580 unidades a Proveedor Andes. Producto estructural de altísima rotación.",
+    date: "2026-06-24",
+    responsible: "Catalina Saavedra",
+    status: "new",
+  },
+  {
+    id: "ALR-018",
+    type: "supplier_delay",
+    severity: "high",
+    relatedEntity: "Industrial del Sur",
+    description:
+      "Industrial del Sur con cumplimiento 62% y lead time real de 18 días. Afecta a HER-005 en riesgo de quiebre.",
+    recommendation:
+      "Evaluar proveedor alternativo para SKUs críticos de Herramientas eléctricas.",
+    date: "2026-06-23",
+    responsible: "Felipe Rojas",
+    status: "in_review",
+  },
+  {
+    id: "ALR-019",
+    type: "stockout_risk",
+    severity: "medium",
+    relatedEntity: "Huincha de medir 5 m",
+    relatedSku: "FER-006",
+    description:
+      "FER-006 con cobertura de 5 días y lead time de 12. Se agota antes de la reposición.",
+    recommendation:
+      "Comprar 160 unidades a FerrePro Chile. Alta rotación y margen sobre 44%.",
+    date: "2026-06-23",
+    responsible: "Juan Pérez",
+    status: "new",
+  },
+  {
+    id: "ALR-020",
+    type: "overstock",
+    severity: "medium",
+    relatedEntity: "Látex interior blanco 1 gal",
+    relatedSku: "PIN-003",
+    description:
+      "PIN-003 con cobertura de 133 días, muy sobre el máximo (160 u.). Capital inmovilizado ~$356.000.",
+    recommendation:
+      "Pausar compra y evaluar campaña o liquidación para mover el exceso.",
+    date: "2026-06-22",
+    responsible: "María González",
+    status: "new",
+  },
+  {
+    id: "ALR-021",
+    type: "dead_stock",
+    severity: "medium",
+    relatedEntity: "Casco de seguridad ABS",
+    relatedSku: "SEG-002",
+    description:
+      "SEG-002 con rotación 1,6 al año y cobertura de 250 días. Stock prácticamente detenido.",
+    recommendation:
+      "Evaluar descontinuar o liquidar. No se sugiere compra.",
+    date: "2026-06-20",
+    responsible: "Felipe Rojas",
+    status: "new",
+  },
+  {
+    id: "ALR-022",
+    type: "low_margin",
+    severity: "medium",
+    relatedEntity: "Fierro estriado 8 mm x 6 m",
+    relatedSku: "CON-003",
+    description:
+      "CON-003 con margen de 26,4%, bajo el objetivo de 28% de la categoría Construcción.",
+    recommendation:
+      "Renegociar costo con Proveedor Andes o revisar precio de venta.",
+    date: "2026-06-19",
+    responsible: "Catalina Saavedra",
+    status: "in_review",
+  },
+  {
+    id: "ALR-023",
+    type: "outdated_cost",
+    severity: "low",
+    relatedEntity: "Tornillo autoperforante 8x1/2 caja 100u",
+    relatedSku: "FER-004",
+    description:
+      "El costo de FER-004 no se actualiza desde el 15/02/2026 (más de 4 meses).",
+    recommendation:
+      "Solicitar lista de precios vigente a FerrePro Chile y actualizar el costo.",
+    date: "2026-06-18",
+    responsible: "Juan Pérez",
+    status: "new",
+  },
 ];
