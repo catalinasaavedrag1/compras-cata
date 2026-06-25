@@ -164,7 +164,7 @@ export function DashboardPage() {
       </div>
 
       {/* Indicadores secundarios en chips compactos (cliqueables) */}
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 mb-4 pb-0.5">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-4 pb-0.5">
         <DashChip to="/inventario" label={`${overstockProducts.length} con sobrestock`} />
         <DashChip to="/proveedores" label={`${lowComplianceSuppliers.length} proveedores a revisar`} />
         <DashChip to="/ventas" label={`${formatCurrencyCompact(salesKpis.salesLast30Days)} venta 30d`} />

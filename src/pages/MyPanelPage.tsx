@@ -350,7 +350,7 @@ export function MyPanelPage() {
       />
 
       {/* Resumen compacto del día (chips cliqueables) */}
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 mb-3 pb-0.5">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-3 pb-0.5">
         <Chip tone="red" label={`${quiebresHoy} quiebres hoy`} onClick={() => { setHorizon("hoy"); }} />
         <Chip tone="amber" label={`${riskRows.length} en riesgo`} to="#riesgo" />
         <Chip tone="blue" label={`${ocPorLlegar} OC sin recibir`} to="#ordenes" />

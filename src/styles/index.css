@@ -30,6 +30,14 @@
 }
 
 @layer utilities {
+  /* Oculta la barra de scroll manteniendo el desplazamiento (chips/tabs horizontales) */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;

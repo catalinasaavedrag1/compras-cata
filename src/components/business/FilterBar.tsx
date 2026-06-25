@@ -152,7 +152,7 @@ export function FilterBar({
         />
 
         {/* Chips rápidos en una línea con scroll horizontal */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 pb-0.5">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5">
           {toggles.map((t) => (
             <Chip key={t.key} active={t.active} onClick={t.onToggle} nowrap>{t.label}</Chip>
           ))}
@@ -174,7 +174,7 @@ export function FilterBar({
 
         {/* Chips de filtros activos (removibles) */}
         {(activeSelects.length > 0 || activeToggles.length > 0) && (
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 pb-0.5">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5">
             {activeSelects.map((s) => (
               <ActiveChip key={s.key} onRemove={() => s.onChange("")}>
                 {s.placeholder}: {optionLabel(s)}
