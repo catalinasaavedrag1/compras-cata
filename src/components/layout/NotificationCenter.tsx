@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications, type NotifTone } from "../../context/NotificationContext";
-import { IconBell } from "../ui/icons";
+import { IconBell, IconArrowRight } from "../ui/icons";
 import { formatDate } from "../../utils/formatters";
 import { cn } from "../../utils/cn";
 
@@ -48,22 +48,36 @@ export function NotificationCenter() {
       </button>
 
       {open && (
-        <div className="fixed sm:absolute left-2 right-2 sm:left-auto sm:right-0 top-16 sm:top-auto sm:mt-1.5 sm:w-96 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
-            <p className="text-sm font-semibold text-slate-800">
+        <div
+          className={cn(
+            // Móvil: pantalla completa (estilo Mercado Libre).
+            "fixed inset-0 z-50 flex flex-col bg-white",
+            // Escritorio: dropdown anclado al icono.
+            "sm:absolute sm:inset-auto sm:right-0 sm:top-auto sm:mt-1.5 sm:block sm:h-auto sm:w-96 sm:rounded-xl sm:border sm:border-slate-200 sm:shadow-lg sm:overflow-hidden"
+          )}
+        >
+          <div className="flex items-center gap-1.5 px-4 h-14 sm:h-auto sm:py-2.5 border-b border-slate-100 flex-shrink-0">
+            <button
+              onClick={() => setOpen(false)}
+              className="sm:hidden -ml-2 p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"
+              aria-label="Volver"
+            >
+              <IconArrowRight className="w-5 h-5 rotate-180" />
+            </button>
+            <p className="flex-1 min-w-0 text-sm font-semibold text-slate-800">
               Notificaciones {unreadCount > 0 && <span className="text-slate-400 font-normal">({unreadCount} sin leer)</span>}
             </p>
             {unreadCount > 0 && (
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={markAllRead}
-                className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                className="flex-shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
               >
                 Marcar todas leídas
               </button>
             )}
           </div>
-          <div className="max-h-[70vh] overflow-y-auto scrollbar-thin">
+          <div className="flex-1 overflow-y-auto scrollbar-thin sm:flex-none sm:max-h-[70vh] pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
             {notifications.length === 0 ? (
               <p className="px-4 py-6 text-sm text-slate-500 text-center">
                 No tienes notificaciones. Todo en orden.
