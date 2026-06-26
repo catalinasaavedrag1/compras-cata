@@ -48,7 +48,8 @@ export const compradorGroups: NavGroup[] = [
     title: "Comprar",
     items: [
       { to: "/reposicion", label: "Reposición", icon: IconReplenish, hint: "Qué comprar, cuánto y por qué" },
-      { to: "/campanas-oportunidades", label: "Campañas", icon: IconCampaign, hint: "Anticipar compras para campañas, liquidaciones y crecimiento" },
+      { to: "/campanas", label: "Campañas", icon: IconCampaign, hint: "Productos en descuento, presupuesto por canal y espacios publicitarios" },
+      { to: "/campanas-oportunidades", label: "Oportunidades", icon: IconBulb, hint: "Anticipar compras para campañas, liquidaciones y crecimiento" },
       { to: "/ordenes-compra", label: "Órdenes", icon: IconOrders, hint: "Seguimiento de OC y creación desde sugerencias" },
       { to: "/recepciones", label: "Recepciones", icon: IconInventory, hint: "Qué viene en camino, qué llegó y cómo llegó" },
     ],
