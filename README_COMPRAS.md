@@ -39,11 +39,28 @@ npm install
 ## 4. Cómo ejecutar
 
 ```bash
-npm run dev      # servidor de desarrollo (http://localhost:5173)
+npm run dev      # solo frontend en modo demo (datos mock, http://localhost:5173)
 npm run build    # build de producción (tsc + vite)
 npm run preview  # previsualizar el build
 npm run typecheck
 ```
+
+### Con backend real (frontend + API conectados)
+
+```bash
+npm run seed       # genera server/db.json desde los datos mock (una vez)
+npm run dev:full   # levanta API (http://localhost:4100) + frontend juntos
+```
+
+Y para que el frontend consuma la API, copia `.env.example` a `.env.local` y define:
+
+```
+VITE_API_URL=http://localhost:4100/api
+```
+
+Con eso el indicador del Topbar pasa a **"API conectada"** y los módulos leen/escriben contra el backend. Sin `VITE_API_URL` (p. ej. en GitHub Pages) la app sigue en **modo demo** con los datos mock, sin romperse.
+
+**Backend** (`server/`): Express + almacén JSON (`server/db.json`, persistente) sembrado desde los mismos datos mock del front. Expone una API REST por colección: `GET /api/:collection`, `GET /api/:collection/:id`, `POST`, `PATCH`, `DELETE`, más `GET /api/health`. Scripts: `npm run server` (solo API), `npm run seed` (re-sembrar).
 
 ## 5. Estructura de carpetas
 

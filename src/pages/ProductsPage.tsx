@@ -9,7 +9,8 @@ import { KpiCard } from "../components/business/KpiCard";
 import { MoreActions } from "../components/ui/MoreActions";
 import { exportToCsv } from "../utils/exportCsv";
 import { useToast } from "../context/ToastContext";
-import { products as allProducts } from "../data/mockProducts";
+import { products as mockProducts } from "../data/mockProducts";
+import { useCollection } from "../context/DataContext";
 import { filterProducts, uniqueValues } from "../utils/filters";
 import { useUrlState, useUrlToggle } from "../utils/useUrlState";
 import { coverageDays, estimatedStockoutDate } from "../utils/calculations";
@@ -35,6 +36,7 @@ const PRODUCT_CSV_COLUMNS = [
 export function ProductsPage() {
   const navigate = useNavigate();
   const toast = useToast();
+  const allProducts = useCollection<Product>("products", mockProducts);
 
   const [query, setQuery] = useUrlState("q");
   const [category, setCategory] = useUrlState("cat");

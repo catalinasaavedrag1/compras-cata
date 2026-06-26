@@ -11,3 +11,6 @@ yarn-error.log*
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Backend runtime store
+server/db.json

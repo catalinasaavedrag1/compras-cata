@@ -14,7 +14,9 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
 import { IconPlus, IconReplenish, IconOrders } from "../components/ui/icons";
-import { purchaseOrders as seedPOs } from "../data/mockPurchaseOrders";
+import { purchaseOrders as mockPOs } from "../data/mockPurchaseOrders";
+import { useCollection } from "../context/DataContext";
+import { apiCreate, backendEnabled } from "../services/apiClient";
 import { recommendations } from "../data/mockRecommendations";
 import { getProductBySku } from "../data/mockProducts";
 import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
@@ -46,6 +48,7 @@ export function PurchaseOrdersPage() {
   const { items, count, totalAmount, updateQuantity, removeItem, clear, addItem, hasItem } = useOcDraft();
   const toast = useToast();
   const { addApproval, addDecision, approvals, approvalState } = usePurchaseFlow();
+  const seedPOs = useCollection<PurchaseOrder>("purchase-orders", mockPOs);
 
   // Persistente: órdenes creadas por el usuario + cambios de estado sobre las semilla
   const [createdOrders, setCreatedOrders] = useLocalStorage<PurchaseOrder[]>(
@@ -80,7 +83,7 @@ export function PurchaseOrdersPage() {
     };
     return [...createdOrders.map(apply), ...seedPOs.map(apply)];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createdOrders, statusOverrides, approvals, approvalState]);
+  }, [createdOrders, statusOverrides, approvals, approvalState, seedPOs]);
 
   const counts = useMemo(() => {
     const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received", "with_difference"];
@@ -209,6 +212,8 @@ export function PurchaseOrdersPage() {
       lines: items.map((i) => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, unitCost: i.unitCost })),
     };
     setCreatedOrders((prev) => [newOrder, ...prev]);
+    // Persistir en el backend si está conectado (best-effort, no bloquea la UI)
+    if (backendEnabled) apiCreate("purchase-orders", newOrder).catch(() => {});
 
     setCreatedNumber(num);
     clear();

@@ -8,6 +8,7 @@ import { useBuyer, initials } from "../../context/BuyerContext";
 import { useRole } from "../../context/RoleContext";
 import { cn } from "../../utils/cn";
 import { NotificationCenter } from "./NotificationCenter";
+import { BackendStatus } from "./BackendStatus";
 import { TODAY_ISO } from "../../utils/constants";
 import { formatDate, formatNumber } from "../../utils/formatters";
 import { products } from "../../data/mockProducts";
@@ -166,6 +167,8 @@ export function Topbar() {
       </div>
 
       <div className="flex-1" />
+
+      <BackendStatus />
 
       {/* Cambio de rol: Comprador / Líder */}
       <div className="hidden sm:flex bg-slate-100 rounded-lg p-0.5">

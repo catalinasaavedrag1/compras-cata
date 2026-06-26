@@ -8,7 +8,8 @@ import { KpiCard } from "../components/business/KpiCard";
 import { FilterBar } from "../components/business/FilterBar";
 import { HelpNote } from "../components/business/HelpNote";
 import { Badge } from "../components/ui/Badge";
-import { suppliers } from "../data/mockSuppliers";
+import { suppliers as mockSuppliers } from "../data/mockSuppliers";
+import { useCollection } from "../context/DataContext";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -25,6 +26,7 @@ import type { Supplier } from "../types/purchasing";
 
 export function SuppliersPage() {
   const navigate = useNavigate();
+  const suppliers = useCollection<Supplier>("suppliers", mockSuppliers);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
 
