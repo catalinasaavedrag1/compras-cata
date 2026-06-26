@@ -42,6 +42,7 @@ const WorkloadPage = lazy(() => named(import("../pages/WorkloadPage"), "Workload
 const LostOpportunitiesPage = lazy(() => named(import("../pages/LostOpportunitiesPage"), "LostOpportunitiesPage"));
 const PurchaseQualityPage = lazy(() => named(import("../pages/PurchaseQualityPage"), "PurchaseQualityPage"));
 const DecisionsPage = lazy(() => named(import("../pages/DecisionsPage"), "DecisionsPage"));
+const ApprovalsPage = lazy(() => named(import("../pages/ApprovalsPage"), "ApprovalsPage"));
 
 function PageLoader() {
   return (
@@ -86,6 +87,7 @@ export default function AppRoutes() {
           <Route path="/recepciones" element={<ReceptionsPage />} />
           <Route path="/oportunidades-perdidas" element={<LostOpportunitiesPage />} />
           <Route path="/decisiones" element={<DecisionsPage />} />
+          <Route path="/aprobaciones" element={<ApprovalsPage />} />
           <Route path="/alertas" element={<AlertsPage />} />
           <Route path="/senales-ventas" element={<SalesSignalsPage />} />
           <Route path="/inventario" element={<InventoryAnalysisPage />} />

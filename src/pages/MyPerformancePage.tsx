@@ -25,6 +25,7 @@ import { SEASON, challenges } from "../data/mockChallenges";
 import { competitionFeed } from "../data/mockCompetitionFeed";
 import { defaultRewards, type Reward } from "../data/mockRewards";
 import { useLocalStorage } from "../utils/useLocalStorage";
+import { buyerAttribution } from "../utils/buyerAttribution";
 
 const RANK_PHRASE: Record<string, string> = {
   margen: "margen bruto",
@@ -169,6 +170,36 @@ export function MyPerformancePage() {
           <p className="text-[11px] text-indigo-200 mt-0.5">{season.from.name} → {season.to.name}</p>
         </div>
       </div>
+
+      {/* Causa de los quiebres: evaluación justa */}
+      {(() => {
+        const attr = buyerAttribution(me);
+        return (
+          <Card className="mb-4">
+            <CardBody>
+              <p className="text-sm font-semibold text-slate-800 mb-1">Causa de tus quiebres</p>
+              <p className="text-xs text-slate-400 mb-3">No todo quiebre es culpa del comprador. Se separa la causa para una evaluación justa.</p>
+              <div className="flex h-2.5 rounded-full overflow-hidden mb-3 bg-slate-100">
+                {attr.slices.map((s) => s.count > 0 && (
+                  <div key={s.key} className={s.tone === "red" ? "bg-rose-400" : s.tone === "amber" ? "bg-amber-400" : "bg-brand-400"} style={{ width: `${s.pct}%` }} title={`${s.label}: ${s.count}`} />
+                ))}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-3">
+                {attr.slices.map((s) => (
+                  <div key={s.key} className="rounded-lg border border-slate-100 px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-700">{s.label}</span>
+                      <Badge tone={s.tone}>{s.count} · {s.pct}%</Badge>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{s.desc}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">{attr.fairNote}{attr.scoreAdjust > 0 && <> <b>Score ajustado por causa: +{attr.scoreAdjust} pts.</b></>}</p>
+            </CardBody>
+          </Card>
+        );
+      })()}
 
       {/* Cómo subir mi score + reconocimientos */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mb-4">

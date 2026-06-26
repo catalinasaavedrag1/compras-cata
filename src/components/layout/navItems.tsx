@@ -52,6 +52,7 @@ export const compradorGroups: NavGroup[] = [
       { to: "/campanas-oportunidades", label: "Oportunidades", icon: IconBulb, hint: "Anticipar compras para campañas, liquidaciones y crecimiento" },
       { to: "/oportunidades-perdidas", label: "Oportunidades perdidas", icon: IconBulb, hint: "Productos que vendían, quedaron sin stock y no se volvieron a comprar" },
       { to: "/ordenes-compra", label: "Órdenes", icon: IconOrders, hint: "Seguimiento de OC y creación desde sugerencias" },
+      { to: "/aprobaciones", label: "Aprobaciones", icon: IconCheck, hint: "Compras fuera de criterio que requieren aprobación y justificación" },
       { to: "/calidad-compra", label: "Calidad de compra", icon: IconCheck, hint: "¿Se compró corto, saludable o de más? Días comprados vs objetivo" },
       { to: "/recepciones", label: "Recepciones", icon: IconInventory, hint: "Qué viene en camino, qué llegó y cómo llegó" },
       { to: "/decisiones", label: "Historial de decisiones", icon: IconBulb, hint: "Auditoría: sugerido vs comprado, resultado y aprendizaje" },
@@ -105,6 +106,8 @@ export const liderGroups: NavGroup[] = [
     title: "Gestión",
     items: [
       { to: "/equipo/carga", label: "Carga & reasignación", icon: IconRules, hint: "Equilibrar la carga del equipo" },
+      { to: "/aprobaciones", label: "Aprobaciones", icon: IconCheck, hint: "Aprobar o rechazar compras fuera de criterio" },
+      { to: "/decisiones", label: "Historial de decisiones", icon: IconBulb, hint: "Auditoría: sugerido vs comprado, resultado y aprendizaje" },
     ],
   },
 ];
