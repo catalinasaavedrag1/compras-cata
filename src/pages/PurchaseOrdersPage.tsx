@@ -16,8 +16,14 @@ import { HelpNote } from "../components/business/HelpNote";
 import { IconPlus, IconReplenish, IconOrders } from "../components/ui/icons";
 import { purchaseOrders as seedPOs } from "../data/mockPurchaseOrders";
 import { recommendations } from "../data/mockRecommendations";
+import { getProductBySku } from "../data/mockProducts";
+import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
+import { usePurchaseFlow } from "../context/PurchaseFlowContext";
+import { coverageDays } from "../utils/calculations";
+import { TODAY_ISO } from "../utils/constants";
+import type { ApprovalCriterion } from "../data/mockApprovals";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import {
   formatCurrency,
@@ -39,6 +45,7 @@ export function PurchaseOrdersPage() {
   const navigate = useNavigate();
   const { items, count, totalAmount, updateQuantity, removeItem, clear, addItem, hasItem } = useOcDraft();
   const toast = useToast();
+  const { addApproval, addDecision } = usePurchaseFlow();
 
   // Persistente: órdenes creadas por el usuario + cambios de estado sobre las semilla
   const [createdOrders, setCreatedOrders] = useLocalStorage<PurchaseOrder[]>(
@@ -131,11 +138,81 @@ export function PurchaseOrdersPage() {
       })),
     };
     setCreatedOrders((prev) => [newOrder, ...prev]);
+
+    // Cerrar el ciclo: por cada línea, registrar decisión y, si se desvía del
+    // sugerido o se sale de criterio, generar una solicitud de aprobación.
+    let approvalsCreated = 0;
+    items.forEach((i, idx) => {
+      const rec = recommendations.find((r) => r.sku === i.sku);
+      const p = getProductBySku(i.sku);
+      const suggested = rec?.suggestedQuantity ?? i.quantity;
+      const diff = i.quantity - suggested;
+      const diffPct = suggested > 0 ? Math.abs(diff / suggested) : i.quantity > 0 ? 1 : 0;
+
+      const rule = p ? resolveRuleForProduct(p, purchaseRules) : null;
+      const objetivo = rule?.targetInventoryDays ?? 45;
+      const coverAfter = p && p.salesLast30Days > 0 ? coverageDays(p.availableStock + i.quantity, p.salesLast30Days) : 0;
+      const margin = p ? p.margin : 100;
+      const minMargin = rule?.minMargin ?? 0;
+      const lineAmount = i.quantity * i.unitCost;
+
+      const criteria: ApprovalCriterion[] = [];
+      if (suggested === 0 || diffPct > 0.2) criteria.push("desvio_sugerido");
+      if (lineAmount >= 5000000) criteria.push("monto_alto");
+      if (coverAfter > objetivo * 1.3) criteria.push("cobertura_excesiva");
+      if (margin < minMargin) criteria.push("margen_bajo");
+
+      const decId = `DEC-${num}-${idx}`;
+      addDecision({
+        id: decId,
+        date: TODAY_ISO,
+        sku: i.sku,
+        productName: i.productName,
+        supplierName: i.supplierName,
+        buyerName: newOrder.buyerName,
+        approvedBy: criteria.length > 0 ? "Pendiente" : "—",
+        suggestedQty: suggested,
+        purchasedQty: i.quantity,
+        unitCost: i.unitCost,
+        reason: criteria.length > 0 ? `Desvío vs sugerido en ${num}` : `Compra alineada al sugerido (${num})`,
+        resultDays: 0,
+        outcome: "pendiente",
+        resultText: `Compra recién creada en ${num}. Resultado en medición.`,
+        learning: "—",
+      });
+
+      if (criteria.length > 0) {
+        approvalsCreated++;
+        addApproval({
+          id: `APR-${num}-${idx}`,
+          date: TODAY_ISO,
+          sku: i.sku,
+          productName: i.productName,
+          supplierName: i.supplierName,
+          buyerName: newOrder.buyerName,
+          suggestedQty: suggested,
+          requestedQty: i.quantity,
+          unitCost: i.unitCost,
+          amount: lineAmount,
+          coberturaResultante: Math.round(coverAfter),
+          coberturaObjetivo: objetivo,
+          margin: Math.round(margin),
+          minMargin,
+          criteria,
+          justification: "Pendiente de justificar por el comprador",
+        });
+      }
+    });
+
     setCreatedNumber(num);
     clear();
     setDrawerOpen(false);
     setTab("draft");
-    toast.success(`Borrador ${num} creado con ${newOrder.skuCount} producto${newOrder.skuCount === 1 ? "" : "s"}`);
+    toast.success(
+      `Borrador ${num} creado con ${newOrder.skuCount} producto${newOrder.skuCount === 1 ? "" : "s"}` +
+        (approvalsCreated > 0 ? ` · ${approvalsCreated} requiere${approvalsCreated === 1 ? "" : "n"} aprobación` : ""),
+      approvalsCreated > 0 ? { label: "Ver aprobaciones", onClick: () => navigate("/aprobaciones") } : undefined
+    );
   };
 
   const columns: Column<PurchaseOrder>[] = [

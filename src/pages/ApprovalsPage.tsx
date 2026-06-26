@@ -7,22 +7,22 @@ import { HelpNote } from "../components/business/HelpNote";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
-import { useLocalStorage } from "../utils/useLocalStorage";
 import { useToast } from "../context/ToastContext";
-import { approvalRequests, CRITERION_LABEL } from "../data/mockApprovals";
+import { usePurchaseFlow, type ApprovalState } from "../context/PurchaseFlowContext";
+import { CRITERION_LABEL } from "../data/mockApprovals";
 import { IconCheck, IconAlerts, IconOrders } from "../components/ui/icons";
 import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/formatters";
 
-type Decision = "pendiente" | "aprobada" | "rechazada";
+type Decision = ApprovalState;
 
 export function ApprovalsPage() {
   const toast = useToast();
-  const [decisions, setDecisions] = useLocalStorage<Record<string, Decision>>("compras:approvals", {});
+  const { approvals: approvalRequests, approvalState, setApprovalState } = usePurchaseFlow();
   const [filter, setFilter] = useState<Decision | "todas">("pendiente");
 
-  const stateOf = (id: string): Decision => decisions[id] ?? "pendiente";
+  const stateOf = (id: string): Decision => approvalState[id] ?? "pendiente";
   const decide = (id: string, d: Decision, name: string) => {
-    setDecisions((prev) => ({ ...prev, [id]: d }));
+    setApprovalState(id, d);
     toast[d === "aprobada" ? "success" : "warning"](`${name}: ${d === "aprobada" ? "aprobada" : "rechazada"}`);
   };
 

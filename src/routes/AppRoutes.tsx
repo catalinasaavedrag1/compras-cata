@@ -7,6 +7,7 @@ import { BuyerProvider } from "../context/BuyerContext";
 import { RoleProvider } from "../context/RoleContext";
 import { NotificationProvider } from "../context/NotificationContext";
 import { SignalsProvider } from "../context/SignalsContext";
+import { PurchaseFlowProvider } from "../context/PurchaseFlowContext";
 
 // Carga diferida por ruta: cada página viaja en su propio chunk.
 const named = <T extends Record<string, unknown>, K extends keyof T>(p: Promise<T>, key: K) =>
@@ -59,6 +60,7 @@ export default function AppRoutes() {
       <BuyerProvider>
       <NotificationProvider>
       <OcDraftProvider>
+      <PurchaseFlowProvider>
       <SignalsProvider>
         <Routes>
         <Route element={<AppLayout />}>
@@ -99,6 +101,7 @@ export default function AppRoutes() {
           </Route>
         </Routes>
       </SignalsProvider>
+      </PurchaseFlowProvider>
       </OcDraftProvider>
       </NotificationProvider>
       </BuyerProvider>

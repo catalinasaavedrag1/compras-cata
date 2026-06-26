@@ -7,12 +7,13 @@ import { FilterBar } from "../components/business/FilterBar";
 import { HelpNote } from "../components/business/HelpNote";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
-import { purchaseDecisions, OUTCOME_META, type DecisionOutcome } from "../data/mockDecisions";
+import { OUTCOME_META, type DecisionOutcome } from "../data/mockDecisions";
+import { usePurchaseFlow } from "../context/PurchaseFlowContext";
 import { IconBulb, IconCheck, IconAlerts } from "../components/ui/icons";
 import { formatNumber } from "../utils/formatters";
 
 export function DecisionsPage() {
-  const all = purchaseDecisions;
+  const { decisions: all } = usePurchaseFlow();
   const [query, setQuery] = useState("");
   const [outcome, setOutcome] = useState("");
 

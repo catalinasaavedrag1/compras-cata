@@ -45,7 +45,7 @@ import {
 import { TODAY_ISO } from "../utils/constants";
 import { seasonalFactor } from "../utils/seasonality";
 import { lostOpportunities } from "../utils/lostOpportunities";
-import { approvalRequests } from "../data/mockApprovals";
+import { usePurchaseFlow } from "../context/PurchaseFlowContext";
 import { useState } from "react";
 import {
   formatCurrencyCompact,
@@ -66,6 +66,7 @@ interface RiskRow {
 export function MyPanelPage() {
   const navigate = useNavigate();
   const { buyer, myCategories } = useBuyer();
+  const { approvals } = usePurchaseFlow();
   const { signals } = useSignals();
 
   // Señales de ventas que me tocan: asignadas a mí, o de mis categorías sin asignar.
@@ -97,7 +98,7 @@ export function MyPanelPage() {
   // Oportunidades no capturadas y aprobaciones del comprador
   const myLostOpps = useMemo(() => lostOpportunities().filter((o) => myCategories.includes(o.category)), [myCategories]);
   const myLostRevenue = myLostOpps.reduce((a, o) => a + o.ventaPerdida, 0);
-  const myApprovals = approvalRequests.filter((a) => a.buyerName === buyer);
+  const myApprovals = approvals.filter((a) => a.buyerName === buyer);
 
   // Riesgo de quiebre: sin stock con venta, o cobertura corta vs lead time
   const riskRows = useMemo<RiskRow[]>(() => {

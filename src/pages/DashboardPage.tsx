@@ -37,7 +37,7 @@ import { monthlyPurchaseBudget } from "../data/mockRules";
 import { campaignOpportunities } from "../data/mockCampaignOpportunities";
 import { lostOpportunities } from "../utils/lostOpportunities";
 import { purchaseQualityLines } from "../utils/purchaseQuality";
-import { approvalRequests } from "../data/mockApprovals";
+import { usePurchaseFlow } from "../context/PurchaseFlowContext";
 import { signals as salesSignals } from "../data/mockSignals";
 import { STOCKOUT_TYPES } from "../components/business/signalLabels";
 import {
@@ -50,6 +50,7 @@ import {
 import { coverageSentence } from "../utils/calculations";
 
 export function DashboardPage() {
+  const { pendingApprovalsCount } = usePurchaseFlow();
   const activeSkus = products.filter((p) => p.productStatus !== "discontinued").length;
   const stockoutSkus = products.filter((p) => p.availableStock <= 0).length;
   const criticalRecs = recommendations.filter((r) => r.status === "critical");
@@ -66,7 +67,7 @@ export function DashboardPage() {
   // Módulos nuevos: oportunidades no capturadas, aprobaciones, calidad de compra
   const lostOpps = lostOpportunities();
   const lostRevenue = lostOpps.reduce((a, o) => a + o.ventaPerdida, 0);
-  const pendingApprovals = approvalRequests.length; // mock: todas inician pendientes
+  const pendingApprovals = pendingApprovalsCount;
   const shortPurchases = purchaseQualityLines().filter((l) => l.klass === "corta").length;
 
   // "Qué revisar primero" — pasos con conteo en vivo, ordenados por urgencia
