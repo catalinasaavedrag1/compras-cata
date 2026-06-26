@@ -27,6 +27,7 @@ import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import { campaignOpportunities as all } from "../data/mockCampaignOpportunities";
+import { getSupplierByName } from "../data/mockSuppliers";
 import {
   CHANNEL_LABELS,
   OPPORTUNITY_TYPE_LABELS,
@@ -128,6 +129,54 @@ export function CampaignOpportunitiesPage() {
     }
     return Array.from(map.values()).sort((a, b) => a.days - b.days);
   }, []);
+
+  // Consolidación de compras de campaña por proveedor (una OC por proveedor),
+  // con alerta de lead time crítico (no alcanza a llegar antes de la campaña).
+  const bySupplier = useMemo(() => {
+    const map = new Map<
+      string,
+      { supplier: string; items: CampaignOpportunity[]; units: number; amount: number; minDays: number; leadTime: number }
+    >();
+    for (const o of all) {
+      if (o.suggestedPurchaseQuantity <= 0) continue;
+      const e = map.get(o.supplierName);
+      if (e) {
+        e.items.push(o);
+        e.units += o.suggestedPurchaseQuantity;
+        e.amount += o.suggestedPurchaseQuantity * o.unitCost;
+        e.minDays = Math.min(e.minDays, o.daysToCampaign);
+      } else {
+        map.set(o.supplierName, {
+          supplier: o.supplierName,
+          items: [o],
+          units: o.suggestedPurchaseQuantity,
+          amount: o.suggestedPurchaseQuantity * o.unitCost,
+          minDays: o.daysToCampaign,
+          leadTime: getSupplierByName(o.supplierName)?.averageLeadTimeDays ?? 0,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      const ar = a.leadTime >= a.minDays ? 0 : 1;
+      const br = b.leadTime >= b.minDays ? 0 : 1;
+      return ar - br || a.minDays - b.minDays;
+    });
+  }, []);
+  const ocCount = bySupplier.length;
+  const criticalLeadCount = bySupplier.filter((s) => s.leadTime >= s.minDays).length;
+
+  const createSupplierOc = (group: (typeof bySupplier)[number]) => {
+    let added = 0;
+    for (const o of group.items) {
+      if (hasItem(o.sku)) continue;
+      addItem({ sku: o.sku, productName: o.productName, supplierName: o.supplierName, quantity: o.suggestedPurchaseQuantity, unitCost: o.unitCost });
+      added++;
+    }
+    toast.success(
+      added > 0 ? `${added} producto${added === 1 ? "" : "s"} de ${group.supplier} agregado${added === 1 ? "" : "s"} al borrador de OC` : `Ya estaban en el borrador`,
+      { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") }
+    );
+  };
 
   const handleAction = (o: CampaignOpportunity) => {
     if (o.suggestedPurchaseQuantity > 0 && o.actionLabel === "Agregar a OC") {
@@ -437,6 +486,35 @@ export function CampaignOpportunitiesPage() {
         <KpiCard title="Sugeridos para liquidar" value={formatNumber(toLiquidateList.length)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Sobrestock" active={status === "liquidate"} onClick={() => setStatus(status === "liquidate" ? "" : "liquidate")} />
         <KpiCard title="Compra sugerida campañas" value={formatCurrencyCompact(suggestedBuyTotal)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Total a comprar" />
       </div>
+
+      {/* Consolidación de OC por proveedor para las campañas */}
+      {bySupplier.length > 0 && (
+        <Card className="mb-4">
+          <CardHeader
+            title={`OC a generar por proveedor (${ocCount})`}
+            description={`Consolida las compras de campaña en una OC por proveedor.${criticalLeadCount > 0 ? ` ${criticalLeadCount} con lead time crítico: no alcanza a llegar antes de la campaña.` : ""}`}
+          />
+          <CardBody className="space-y-2">
+            {bySupplier.map((g) => {
+              const critical = g.leadTime >= g.minDays;
+              return (
+                <div key={g.supplier} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-800 truncate">{g.supplier}</span>
+                      <Badge tone={critical ? "red" : "green"}>{critical ? `Lead ${formatDays(g.leadTime)} ≥ ${formatDays(g.minDays)} a campaña` : `Lead ${formatDays(g.leadTime)} OK`}</Badge>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{g.items.length} SKU · {formatNumber(g.units)} u. · {formatCurrencyCompact(g.amount)} · campaña en {formatDays(g.minDays)}</p>
+                  </div>
+                  <Button size="sm" variant={critical ? "primary" : "secondary"} icon={<IconPlus className="w-4 h-4" />} onClick={() => createSupplierOc(g)}>
+                    Crear OC
+                  </Button>
+                </div>
+              );
+            })}
+          </CardBody>
+        </Card>
+      )}
 
       {/* Foco por estado (reduce el listado con un clic) */}
       <Tabs
