@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AppLayout } from "../layouts/AppLayout";
 import { OcDraftProvider } from "../context/OcDraftContext";
 import { ToastProvider } from "../context/ToastContext";
@@ -6,33 +7,46 @@ import { BuyerProvider } from "../context/BuyerContext";
 import { RoleProvider } from "../context/RoleContext";
 import { NotificationProvider } from "../context/NotificationContext";
 import { SignalsProvider } from "../context/SignalsContext";
-import { DashboardPage } from "../pages/DashboardPage";
-import { SalesSignalsPage } from "../pages/SalesSignalsPage";
-import { MyPanelPage } from "../pages/MyPanelPage";
-import { ReplenishmentPage } from "../pages/ReplenishmentPage";
-import { ProductsPage } from "../pages/ProductsPage";
-import { ProductDetailPage } from "../pages/ProductDetailPage";
-import { CategoriesPage } from "../pages/CategoriesPage";
-import { CatalogOptimizationPage } from "../pages/CatalogOptimizationPage";
-import { SuppliersPage } from "../pages/SuppliersPage";
-import { PurchaseOrdersPage } from "../pages/PurchaseOrdersPage";
-import { AlertsPage } from "../pages/AlertsPage";
-import { CampaignOpportunitiesPage } from "../pages/CampaignOpportunitiesPage";
-import { CampaignsPage } from "../pages/CampaignsPage";
-import { ChannelMarginPage } from "../pages/ChannelMarginPage";
-import { ReceptionsPage } from "../pages/ReceptionsPage";
-import { SupplierDetailPage } from "../pages/SupplierDetailPage";
-import { CategoryDetailPage } from "../pages/CategoryDetailPage";
-import { InventoryAnalysisPage } from "../pages/InventoryAnalysisPage";
-import { SalesAnalysisPage } from "../pages/SalesAnalysisPage";
-import { SettingsPage } from "../pages/SettingsPage";
-import { MyPerformancePage } from "../pages/MyPerformancePage";
-import { TeamDashboardPage } from "../pages/TeamDashboardPage";
-import { TeamAlertsPage } from "../pages/TeamAlertsPage";
-import { BuyersPage } from "../pages/BuyersPage";
-import { RankingPage } from "../pages/RankingPage";
-import { GoalsPage } from "../pages/GoalsPage";
-import { WorkloadPage } from "../pages/WorkloadPage";
+
+// Carga diferida por ruta: cada página viaja en su propio chunk.
+const named = <T extends Record<string, unknown>, K extends keyof T>(p: Promise<T>, key: K) =>
+  p.then((m) => ({ default: m[key] as unknown as React.ComponentType }));
+
+const DashboardPage = lazy(() => named(import("../pages/DashboardPage"), "DashboardPage"));
+const SalesSignalsPage = lazy(() => named(import("../pages/SalesSignalsPage"), "SalesSignalsPage"));
+const MyPanelPage = lazy(() => named(import("../pages/MyPanelPage"), "MyPanelPage"));
+const ReplenishmentPage = lazy(() => named(import("../pages/ReplenishmentPage"), "ReplenishmentPage"));
+const ProductsPage = lazy(() => named(import("../pages/ProductsPage"), "ProductsPage"));
+const ProductDetailPage = lazy(() => named(import("../pages/ProductDetailPage"), "ProductDetailPage"));
+const CategoriesPage = lazy(() => named(import("../pages/CategoriesPage"), "CategoriesPage"));
+const CatalogOptimizationPage = lazy(() => named(import("../pages/CatalogOptimizationPage"), "CatalogOptimizationPage"));
+const SuppliersPage = lazy(() => named(import("../pages/SuppliersPage"), "SuppliersPage"));
+const PurchaseOrdersPage = lazy(() => named(import("../pages/PurchaseOrdersPage"), "PurchaseOrdersPage"));
+const AlertsPage = lazy(() => named(import("../pages/AlertsPage"), "AlertsPage"));
+const CampaignOpportunitiesPage = lazy(() => named(import("../pages/CampaignOpportunitiesPage"), "CampaignOpportunitiesPage"));
+const CampaignsPage = lazy(() => named(import("../pages/CampaignsPage"), "CampaignsPage"));
+const ChannelMarginPage = lazy(() => named(import("../pages/ChannelMarginPage"), "ChannelMarginPage"));
+const ReceptionsPage = lazy(() => named(import("../pages/ReceptionsPage"), "ReceptionsPage"));
+const SupplierDetailPage = lazy(() => named(import("../pages/SupplierDetailPage"), "SupplierDetailPage"));
+const CategoryDetailPage = lazy(() => named(import("../pages/CategoryDetailPage"), "CategoryDetailPage"));
+const InventoryAnalysisPage = lazy(() => named(import("../pages/InventoryAnalysisPage"), "InventoryAnalysisPage"));
+const SalesAnalysisPage = lazy(() => named(import("../pages/SalesAnalysisPage"), "SalesAnalysisPage"));
+const SettingsPage = lazy(() => named(import("../pages/SettingsPage"), "SettingsPage"));
+const MyPerformancePage = lazy(() => named(import("../pages/MyPerformancePage"), "MyPerformancePage"));
+const TeamDashboardPage = lazy(() => named(import("../pages/TeamDashboardPage"), "TeamDashboardPage"));
+const TeamAlertsPage = lazy(() => named(import("../pages/TeamAlertsPage"), "TeamAlertsPage"));
+const BuyersPage = lazy(() => named(import("../pages/BuyersPage"), "BuyersPage"));
+const RankingPage = lazy(() => named(import("../pages/RankingPage"), "RankingPage"));
+const GoalsPage = lazy(() => named(import("../pages/GoalsPage"), "GoalsPage"));
+const WorkloadPage = lazy(() => named(import("../pages/WorkloadPage"), "WorkloadPage"));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center py-24 text-sm text-slate-400">
+      Cargando…
+    </div>
+  );
+}
 
 export default function AppRoutes() {
   return (
@@ -44,6 +58,7 @@ export default function AppRoutes() {
       <SignalsProvider>
         <Routes>
         <Route element={<AppLayout />}>
+          <Route element={<Suspense fallback={<PageLoader />}><Outlet /></Suspense>}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/mi-panel" element={<MyPanelPage />} />
           <Route path="/mi-desempeno" element={<MyPerformancePage />} />
@@ -72,6 +87,7 @@ export default function AppRoutes() {
           <Route path="/margen-canal" element={<ChannelMarginPage />} />
           <Route path="/reglas" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
           </Route>
         </Routes>
       </SignalsProvider>
