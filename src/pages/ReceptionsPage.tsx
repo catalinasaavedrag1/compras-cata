@@ -9,6 +9,7 @@ import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Select } from "../components/ui/Select";
+import { Input } from "../components/ui/Input";
 import { Drawer } from "../components/ui/Drawer";
 import { DataTable, type Column } from "../components/ui/Table";
 import { useUrlState } from "../utils/useUrlState";
@@ -50,7 +51,12 @@ export function ReceptionsPage() {
   const [tab, setTab] = useUrlState("tab", "arriving");
   const [query, setQuery] = useUrlState("q");
   const [supplier, setSupplier] = useUrlState("prov");
+  const [from, setFrom] = useUrlState("desde");
+  const [to, setTo] = useUrlState("hasta");
   const [detail, setDetail] = useState<Reception | null>(null);
+
+  // Fecha de referencia para medir por período: la de recepción si llegó, si no la esperada.
+  const refDate = (r: Reception) => r.receivedDate ?? r.expectedDate;
 
   const scoped = useMemo(() => {
     if (scope === "todos") return receptions;
@@ -63,9 +69,11 @@ export function ReceptionsPage() {
       scoped.filter((r) => {
         if (query.trim() && !`${r.poNumber} ${r.supplierName} ${r.buyer}`.toLowerCase().includes(query.toLowerCase())) return false;
         if (supplier && r.supplierName !== supplier) return false;
+        if (from && refDate(r) < from) return false;
+        if (to && refDate(r) > to) return false;
         return true;
       }),
-    [scoped, query, supplier]
+    [scoped, query, supplier, from, to]
   );
 
   const undeliveredLines = useMemo<MissingLine[]>(
@@ -208,6 +216,15 @@ export function ReceptionsPage() {
             ]}
           />
         </div>
+        <div className="sm:w-40">
+          <Input label="Desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div className="sm:w-40">
+          <Input label="Hasta" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        {(from || to) && (
+          <button onClick={() => { setFrom(""); setTo(""); }} className="text-xs font-medium text-brand-600 hover:text-brand-700 sm:self-end sm:pb-2.5">Limpiar fechas</button>
+        )}
         <span className="text-xs text-slate-500 sm:self-end sm:pb-2">Alcance: <b className="text-slate-700">{scopeLabel}</b></span>
       </div>
 
@@ -218,7 +235,7 @@ export function ReceptionsPage() {
           searchPlaceholder="Buscar OC, proveedor o comprador"
           resultCount={tab === "undelivered" ? undeliveredLines.length : filtered.length}
           summary={`${counts.undelivered} SKUs sin despachar · ${counts.arriving} por llegar · ${counts.delayed} atrasadas`}
-          onClear={() => { setQuery(""); setSupplier(""); }}
+          onClear={() => { setQuery(""); setSupplier(""); setFrom(""); setTo(""); }}
           selects={[
             { key: "prov", placeholder: "Proveedor", value: supplier, onChange: setSupplier, options: uniqueValues(receptions, (r) => r.supplierName).map((s) => ({ value: s, label: s })) },
           ]}
