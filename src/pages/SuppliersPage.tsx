@@ -18,6 +18,7 @@ import {
   formatPercent,
 } from "../utils/formatters";
 import { IconSuppliers, IconAlerts, IconOrders } from "../components/ui/icons";
+import { supplierFulfillment } from "../utils/supplierPerf";
 import type { Supplier } from "../types/purchasing";
 
 export function SuppliersPage() {
@@ -81,6 +82,21 @@ export function SuppliersPage() {
         </span>
       ),
     },
+    {
+      key: "fill",
+      header: "Despacho",
+      align: "right",
+      render: (s) => {
+        const f = supplierFulfillment(s.name);
+        const tone = f.tone === "red" ? "text-rose-600 font-semibold" : f.tone === "amber" ? "text-amber-600 font-medium" : "text-emerald-600 font-medium";
+        return (
+          <div className="text-sm min-w-[96px]">
+            <span className={tone}>{f.arrivedOrders > 0 ? `${f.fillRate}%` : "—"}</span>
+            {f.undeliveredSkus > 0 && <p className="text-[11px] text-rose-500">{f.undeliveredSkus} SKU sin despachar</p>}
+          </div>
+        );
+      },
+    },
     { key: "leadTime", header: "Lead time", align: "right", hideOnMobile: true, render: (s) => formatDays(s.averageLeadTimeDays) },
     { key: "lastPurchase", header: "Última compra", align: "right", hideOnMobile: true, render: (s) => formatDate(s.lastPurchaseDate) },
     {
@@ -111,9 +127,9 @@ export function SuppliersPage() {
       />
 
       <HelpNote className="mb-4">
-        El <b>cumplimiento</b> es el % de entregas a tiempo: bajo 70% el proveedor se marca
-        <b> a revisar</b> porque puede provocar quiebres. El <b>lead time</b> es cuántos días demora
-        en entregar; mientras más alto, más stock de seguridad necesitas.
+El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuánto de lo pedido
+        realmente envió (según recepciones): un proveedor puede entregar a tiempo pero dejar SKUs sin
+        despachar. Ambos bajos = riesgo de quiebre y proveedor a revisar.
       </HelpNote>
 
       <div className="mb-4">
