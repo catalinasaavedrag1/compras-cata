@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { navGroups } from "./navItems";
+import { navGroupsFor } from "./navItems";
 import { Brand } from "./Sidebar";
 import { cn } from "../../utils/cn";
 import { Input } from "../ui/Input";
+import { useRole } from "../../context/RoleContext";
 import { IconClose, IconSearch } from "../ui/icons";
 
 interface MobileNavProps {
@@ -14,6 +15,8 @@ interface MobileNavProps {
 export function MobileNav({ open, onClose }: MobileNavProps) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const { role } = useRole();
+  const navGroups = navGroupsFor(role);
 
   if (!open) return null;
 

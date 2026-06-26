@@ -3,6 +3,7 @@ import { AppLayout } from "../layouts/AppLayout";
 import { OcDraftProvider } from "../context/OcDraftContext";
 import { ToastProvider } from "../context/ToastContext";
 import { BuyerProvider } from "../context/BuyerContext";
+import { RoleProvider } from "../context/RoleContext";
 import { NotificationProvider } from "../context/NotificationContext";
 import { DashboardPage } from "../pages/DashboardPage";
 import { MyPanelPage } from "../pages/MyPanelPage";
@@ -21,10 +22,18 @@ import { CategoryDetailPage } from "../pages/CategoryDetailPage";
 import { InventoryAnalysisPage } from "../pages/InventoryAnalysisPage";
 import { SalesAnalysisPage } from "../pages/SalesAnalysisPage";
 import { SettingsPage } from "../pages/SettingsPage";
+import { MyPerformancePage } from "../pages/MyPerformancePage";
+import { TeamDashboardPage } from "../pages/TeamDashboardPage";
+import { TeamAlertsPage } from "../pages/TeamAlertsPage";
+import { BuyersPage } from "../pages/BuyersPage";
+import { RankingPage } from "../pages/RankingPage";
+import { GoalsPage } from "../pages/GoalsPage";
+import { WorkloadPage } from "../pages/WorkloadPage";
 
 export default function AppRoutes() {
   return (
     <ToastProvider>
+      <RoleProvider>
       <BuyerProvider>
       <NotificationProvider>
       <OcDraftProvider>
@@ -32,6 +41,13 @@ export default function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/mi-panel" element={<MyPanelPage />} />
+          <Route path="/mi-desempeno" element={<MyPerformancePage />} />
+          <Route path="/equipo" element={<TeamDashboardPage />} />
+          <Route path="/equipo/alertas" element={<TeamAlertsPage />} />
+          <Route path="/equipo/compradores" element={<BuyersPage />} />
+          <Route path="/equipo/ranking" element={<RankingPage />} />
+          <Route path="/equipo/metas" element={<GoalsPage />} />
+          <Route path="/equipo/carga" element={<WorkloadPage />} />
           <Route path="/reposicion" element={<ReplenishmentPage />} />
           <Route path="/campanas-oportunidades" element={<CampaignOpportunitiesPage />} />
           <Route path="/productos" element={<ProductsPage />} />
@@ -53,6 +69,7 @@ export default function AppRoutes() {
       </OcDraftProvider>
       </NotificationProvider>
       </BuyerProvider>
+      </RoleProvider>
     </ToastProvider>
   );
 }

@@ -5,6 +5,8 @@ import { Input } from "../ui/Input";
 import { IconSearch, IconMenu, IconOrders, IconProducts, IconSuppliers } from "../ui/icons";
 import { useOcDraft } from "../../context/OcDraftContext";
 import { useBuyer, initials } from "../../context/BuyerContext";
+import { useRole } from "../../context/RoleContext";
+import { cn } from "../../utils/cn";
 import { NotificationCenter } from "./NotificationCenter";
 import { TODAY_ISO } from "../../utils/constants";
 import { formatDate, formatNumber } from "../../utils/formatters";
@@ -36,6 +38,13 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
   const navigate = useNavigate();
   const { count } = useOcDraft();
   const { buyer, setBuyer, buyers } = useBuyer();
+  const { role, setRole, persona } = useRole();
+
+  const switchRole = (r: "comprador" | "lider") => {
+    if (r === role) return;
+    setRole(r);
+    navigate(r === "lider" ? "/equipo" : "/");
+  };
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +179,26 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
 
       <div className="flex-1" />
 
+      {/* Cambio de rol: Comprador / Líder */}
+      <div className="hidden sm:flex bg-slate-100 rounded-lg p-0.5">
+        {(["comprador", "lider"] as const).map((r) => (
+          <button
+            key={r}
+            onClick={() => switchRole(r)}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+              role === r
+                ? r === "lider"
+                  ? "bg-white text-violet-700 shadow-sm"
+                  : "bg-white text-brand-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            )}
+          >
+            {r === "lider" ? "Líder" : "Comprador"}
+          </button>
+        ))}
+      </div>
+
       <NotificationCenter />
 
       <button
@@ -188,26 +217,33 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
 
       <div className="hidden sm:flex flex-col items-end leading-tight">
         <span className="text-xs text-slate-400">{formatDate(TODAY_ISO)}</span>
-        <div className="relative group">
-          <select
-            value={buyer}
-            onChange={(e) => setBuyer(e.target.value)}
-            title="Cambiar de comprador"
-            className="appearance-none bg-transparent text-sm font-medium text-slate-700 cursor-pointer focus:outline-none text-right pr-1 hover:text-brand-700"
-          >
-            {buyers.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </div>
+        {role === "lider" ? (
+          <span className="text-sm font-medium text-slate-700">{persona.name}</span>
+        ) : (
+          <div className="relative group">
+            <select
+              value={buyer}
+              onChange={(e) => setBuyer(e.target.value)}
+              title="Cambiar de comprador"
+              className="appearance-none bg-transparent text-sm font-medium text-slate-700 cursor-pointer focus:outline-none text-right pr-1 hover:text-brand-700"
+            >
+              {buyers.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       <div
-        className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-semibold flex-shrink-0"
-        title={buyer}
+        className={cn(
+          "w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0",
+          role === "lider" ? "bg-violet-100 text-violet-700" : "bg-brand-100 text-brand-700"
+        )}
+        title={role === "lider" ? persona.name : buyer}
       >
-        {initials(buyer)}
+        {role === "lider" ? persona.initials : initials(buyer)}
       </div>
     </header>
   );

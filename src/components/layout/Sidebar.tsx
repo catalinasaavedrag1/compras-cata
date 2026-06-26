@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { navGroups } from "./navItems";
+import { navGroupsFor } from "./navItems";
 import { cn } from "../../utils/cn";
 import { useLocalStorage } from "../../utils/useLocalStorage";
+import { useRole } from "../../context/RoleContext";
 import { IconChevronRight } from "../ui/icons";
 
 export function Sidebar() {
   const [pinnedCollapsed, setPinnedCollapsed] = useLocalStorage<boolean>("compras:sidebar-collapsed", false);
   const [hovering, setHovering] = useState(false);
+  const { role } = useRole();
+  const navGroups = navGroupsFor(role);
 
   // Colapsado salvo que el mouse esté encima (hover-to-expand)
   const collapsed = pinnedCollapsed && !hovering;
