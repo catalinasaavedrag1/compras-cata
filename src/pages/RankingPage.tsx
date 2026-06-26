@@ -15,7 +15,12 @@ import {
   stockoutRate,
   RANKING_DEFS,
   badgesOf,
+  daysToClose,
+  seasonStatus,
+  SEASON_MOVE_CFG,
 } from "../utils/teamScore";
+import { ChallengeList } from "../components/business/ChallengeList";
+import { SEASON, PREV_SEASON_NAME, challenges } from "../data/mockChallenges";
 import { IconInfo, IconSales, IconAlerts } from "../components/ui/icons";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -40,6 +45,24 @@ export function RankingPage() {
         <span className="text-xs text-brand-900 leading-snug">
           <b className="font-semibold">Score</b> = 30% cumplimiento de venta · 20% margen · 20% reducción de quiebres · 15% rotación · 10% cumplimiento de OC · 5% gestión de sobrestock. Hay rankings por dimensión para que cada quien pueda destacar en lo suyo.
         </span>
+      </div>
+
+      {/* Temporada en curso */}
+      <div className="rounded-2xl p-5 mb-5 text-white flex flex-wrap items-center gap-5" style={{ background: "linear-gradient(135deg,#1f2a5a,#3b2f7a)" }}>
+        <div className="flex-1 min-w-[200px]">
+          <p className="text-xs text-indigo-200 font-medium">🏆 {SEASON.name}</p>
+          <p className="text-2xl font-bold mt-0.5">Cierra en {daysToClose(SEASON.to)} días</p>
+          <p className="text-xs text-indigo-200 mt-1">Al cierre se confirman ascensos y descensos de liga. Los 3 primeros reciben reconocimiento del mes.</p>
+        </div>
+        <div className="flex gap-2">
+          {sorted.slice(0, 3).map((b, i) => (
+            <div key={b.id} className="bg-white/10 rounded-xl px-3 py-2 text-center min-w-[78px]">
+              <p className="text-lg">{MEDALS[i]}</p>
+              <p className="text-xs font-semibold truncate max-w-[70px]">{b.name.split(" ")[0]}</p>
+              <p className="text-[11px] text-indigo-200">{b.score} pts</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* KPIs del equipo */}
@@ -118,6 +141,33 @@ export function RankingPage() {
           </button>
         ))}
       </div>
+
+      {/* Movimientos de liga */}
+      <p className="text-sm font-semibold text-slate-700 mb-2.5 mt-6">Movimientos de liga <span className="font-normal text-slate-400">vs {PREV_SEASON_NAME}</span></p>
+      <Card className="mb-6">
+        <CardBody className="space-y-2.5">
+          {[...buyers].sort((a, b) => b.score - a.score).map((b) => {
+            const st = seasonStatus(b);
+            const cfg = SEASON_MOVE_CFG[st.move];
+            return (
+              <button key={b.id} onClick={() => setSel(b)} className="flex items-center gap-3 w-full text-left rounded-lg px-2 py-1.5 hover:bg-slate-50">
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${BUYER_TONE_AV[b.tone]}`}>{b.initials}</span>
+                <span className="flex-1 min-w-0 text-sm font-medium text-slate-700 truncate">{b.name}</span>
+                <span className="flex items-center gap-2 text-xs text-slate-500">
+                  <Badge tone={st.from.tone}>{st.from.name}</Badge>
+                  <span className="text-slate-300">→</span>
+                  <Badge tone={st.to.tone}>{st.to.name}</Badge>
+                </span>
+                <Badge tone={cfg.tone} className="w-24 justify-center">{cfg.arrow} {cfg.label}</Badge>
+              </button>
+            );
+          })}
+        </CardBody>
+      </Card>
+
+      {/* Retos de la semana */}
+      <p className="text-sm font-semibold text-slate-700 mb-2.5">Retos de la semana</p>
+      <ChallengeList items={challenges} />
 
       <BuyerDetailDrawer buyer={sel} onClose={() => setSel(null)} />
     </div>

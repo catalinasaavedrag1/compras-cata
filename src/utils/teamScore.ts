@@ -1,5 +1,6 @@
 import type { BadgeTone } from "../components/ui/Badge";
 import type { Workload, Buyer } from "../types/team";
+import { TODAY_ISO } from "./constants";
 
 // ============================================================================
 //  Helpers de score, tendencia y carga del equipo de compras.
@@ -182,6 +183,31 @@ export function badgesOf(buyers: Buyer[]): Badge[] {
   ];
   return defs;
 }
+
+// ----------------------------------------------------------------------------
+//  Temporada: días para el cierre y movimiento de liga (ascenso/descenso)
+// ----------------------------------------------------------------------------
+export function daysToClose(toISO: string): number {
+  const end = new Date(`${toISO}T00:00:00`).getTime();
+  const today = new Date(`${TODAY_ISO}T00:00:00`).getTime();
+  return Math.max(0, Math.round((end - today) / 86400000));
+}
+
+export type SeasonMove = "ascenso" | "descenso" | "mantiene";
+
+export function seasonStatus(b: Buyer): { move: SeasonMove; from: League; to: League; delta: number } {
+  const to = leagueOf(b.score).league;
+  const from = leagueOf(b.prevSeasonScore).league;
+  const delta = LEAGUES.indexOf(to) - LEAGUES.indexOf(from);
+  const move: SeasonMove = delta > 0 ? "ascenso" : delta < 0 ? "descenso" : "mantiene";
+  return { move, from, to, delta };
+}
+
+export const SEASON_MOVE_CFG: Record<SeasonMove, { label: string; tone: BadgeTone; arrow: string }> = {
+  ascenso: { label: "Ascenso", tone: "green", arrow: "▲" },
+  descenso: { label: "Descenso", tone: "red", arrow: "▼" },
+  mantiene: { label: "Mantiene", tone: "slate", arrow: "=" },
+};
 
 /** Consejos por dimensión del score para "cómo subir mi score". */
 export const SCORE_ADVICE: Record<string, string> = {

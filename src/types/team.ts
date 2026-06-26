@@ -32,6 +32,7 @@ export interface Buyer {
   tone: "green" | "blue" | "violet" | "amber" | "red" | "slate";
   score: number; // 0-100
   trend: number; // variación de pts vs semana anterior
+  prevSeasonScore: number; // score de cierre de la temporada anterior
   workload: Workload;
   workloadPct: number;
   categories: string[];

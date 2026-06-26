@@ -14,7 +14,12 @@ import {
   RANKING_DEFS,
   badgesOf,
   SCORE_ADVICE,
+  daysToClose,
+  seasonStatus,
+  SEASON_MOVE_CFG,
 } from "../utils/teamScore";
+import { ChallengeList } from "../components/business/ChallengeList";
+import { SEASON, challenges } from "../data/mockChallenges";
 
 const RANK_PHRASE: Record<string, string> = {
   margen: "margen bruto",
@@ -58,6 +63,15 @@ export function MyPerformancePage() {
     .slice(0, 3);
 
   const myBadges = badgesOf(buyers).filter((b) => b.winner.id === me.id);
+
+  const season = seasonStatus(me);
+  const seasonCfg = SEASON_MOVE_CFG[season.move];
+  const myChallenges = challenges.filter(
+    (c) =>
+      c.kind === "team" ||
+      (c.kind === "duel" && (c.aId === me.id || c.bId === me.id)) ||
+      (c.kind === "streak" && c.buyerId === me.id)
+  );
 
   const deg = me.score * 3.6;
 
@@ -130,6 +144,20 @@ export function MyPerformancePage() {
         </div>
       </div>
 
+      {/* Tu temporada */}
+      <div className="rounded-2xl p-5 mb-4 text-white flex flex-wrap items-center gap-5" style={{ background: "linear-gradient(135deg,#1f2a5a,#3b2f7a)" }}>
+        <div className="flex-1 min-w-[200px]">
+          <p className="text-xs text-indigo-200 font-medium">🏆 {SEASON.name}</p>
+          <p className="text-2xl font-bold mt-0.5">Cierra en {daysToClose(SEASON.to)} días</p>
+          <p className="text-xs text-indigo-200 mt-1">Estás en nivel <b className="text-white">{league.name}</b>. {next ? `Te faltan ${ptsToNext} pts para ${next.name}.` : "Estás en la cima."}</p>
+        </div>
+        <div className="bg-white/10 rounded-xl px-4 py-3 text-center">
+          <p className="text-[11px] text-indigo-200">Si cerrara hoy</p>
+          <p className="text-sm font-bold mt-0.5">{seasonCfg.arrow} {seasonCfg.label}</p>
+          <p className="text-[11px] text-indigo-200 mt-0.5">{season.from.name} → {season.to.name}</p>
+        </div>
+      </div>
+
       {/* Cómo subir mi score + reconocimientos */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mb-4">
         <Card>
@@ -171,6 +199,10 @@ export function MyPerformancePage() {
           </CardBody>
         </Card>
       </div>
+
+      {/* Tus retos de la semana */}
+      <p className="text-sm font-semibold text-slate-700 mb-2.5">Tus retos de la semana</p>
+      <div className="mb-4"><ChallengeList items={myChallenges} meId={me.id} /></div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
         <Card>
