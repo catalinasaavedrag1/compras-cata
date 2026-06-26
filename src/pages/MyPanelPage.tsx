@@ -10,6 +10,7 @@ import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { PriorityGuide, type GuideStep } from "../components/business/PriorityGuide";
+import { CollapsibleSection } from "../components/ui/CollapsibleSection";
 import {
   IconAlerts,
   IconBox,
@@ -514,9 +515,13 @@ export function MyPanelPage() {
       )}
 
       {/* Mis categorías asignadas */}
-      <Card className="mb-4">
-        <CardHeader title="Mis categorías asignadas" description={`${myCats.length} categoría${myCats.length === 1 ? "" : "s"} bajo tu gestión`} />
-        <CardBody>
+      <CollapsibleSection
+        id="panel-categorias"
+        className="mb-4"
+        title="Mis categorías asignadas"
+        description={`${myCats.length} categoría${myCats.length === 1 ? "" : "s"} bajo tu gestión`}
+        hint={`${myCats.reduce((a, c) => a + c.stockoutSkus, 0)} quiebres en tus categorías`}
+      >
           {myCats.length === 0 ? (
             <p className="text-sm text-slate-500">No tienes categorías asignadas. Cambia de comprador en la barra superior.</p>
           ) : (
@@ -524,7 +529,7 @@ export function MyPanelPage() {
               {myCats.map((c) => (
                 <Link
                   key={c.id}
-                  to="/categorias"
+                  to={`/categorias/${c.id}`}
                   className="group flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
                 >
                   <span className="text-sm font-medium text-slate-800">{c.name}</span>
@@ -536,21 +541,21 @@ export function MyPanelPage() {
               ))}
             </div>
           )}
-        </CardBody>
-      </Card>
+      </CollapsibleSection>
 
       {/* Señales de ventas para mí */}
-      <Card className="mb-4">
-        <CardHeader
-          title="Señales de ventas para mí"
-          description="Lo que ventas reportó en tus categorías y aún espera tu decisión"
-          action={
-            <Link to="/senales-ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
-              Ver todas
-            </Link>
-          }
-        />
-        <CardBody>
+      <CollapsibleSection
+        id="panel-senales"
+        className="mb-4"
+        title="Señales de ventas para mí"
+        description="Lo que ventas reportó en tus categorías y aún espera tu decisión"
+        hint={`${mySignals.length} pendiente${mySignals.length === 1 ? "" : "s"}`}
+        action={
+          <Link to="/senales-ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
+            Ver todas
+          </Link>
+        }
+      >
           {mySignals.length === 0 ? (
             <p className="text-sm text-slate-500">
               No tienes señales de ventas pendientes. Todo al día por aquí.
@@ -577,8 +582,7 @@ export function MyPanelPage() {
               ))}
             </div>
           )}
-        </CardBody>
-      </Card>
+      </CollapsibleSection>
 
       {/* KPIs de tareas (cliqueables) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
