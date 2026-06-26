@@ -45,7 +45,7 @@ export function PurchaseOrdersPage() {
   const navigate = useNavigate();
   const { items, count, totalAmount, updateQuantity, removeItem, clear, addItem, hasItem } = useOcDraft();
   const toast = useToast();
-  const { addApproval, addDecision } = usePurchaseFlow();
+  const { addApproval, addDecision, approvals, approvalState } = usePurchaseFlow();
 
   // Persistente: órdenes creadas por el usuario + cambios de estado sobre las semilla
   const [createdOrders, setCreatedOrders] = useLocalStorage<PurchaseOrder[]>(
@@ -61,15 +61,26 @@ export function PurchaseOrdersPage() {
   const [detail, setDetail] = useState<PurchaseOrder | null>(null);
   const [createdNumber, setCreatedNumber] = useState<string | null>(null);
 
+  // Estado derivado de aprobación: una OC "por aprobar" pasa a "aprobada" cuando
+  // todas sus líneas con solicitud quedan aprobadas (mismo número en el id APR-).
+  const approvalDerivedStatus = (o: PurchaseOrder): PurchaseOrderStatus => {
+    if (o.status !== "pending_approval") return o.status;
+    const linked = approvals.filter((a) => a.id.startsWith(`APR-${o.number}-`));
+    if (linked.length === 0) return o.status;
+    const states = linked.map((a) => approvalState[a.id] ?? "pendiente");
+    if (states.every((s) => s === "aprobada")) return "approved";
+    return "pending_approval";
+  };
+
   const orders = useMemo<PurchaseOrder[]>(() => {
-    const seeded = seedPOs.map((o) =>
-      statusOverrides[o.id] ? { ...o, status: statusOverrides[o.id] } : o
-    );
-    const created = createdOrders.map((o) =>
-      statusOverrides[o.id] ? { ...o, status: statusOverrides[o.id] } : o
-    );
-    return [...created, ...seeded];
-  }, [createdOrders, statusOverrides]);
+    const apply = (o: PurchaseOrder) => {
+      if (statusOverrides[o.id]) return { ...o, status: statusOverrides[o.id] };
+      const derived = approvalDerivedStatus(o);
+      return derived !== o.status ? { ...o, status: derived } : o;
+    };
+    return [...createdOrders.map(apply), ...seedPOs.map(apply)];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdOrders, statusOverrides, approvals, approvalState]);
 
   const counts = useMemo(() => {
     const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received"];
@@ -118,29 +129,9 @@ export function PurchaseOrdersPage() {
   const createOrder = () => {
     if (count === 0) return;
     const num = `OC-2026-${String(143 + createdOrders.length).padStart(4, "0")}`;
-    const newOrder: PurchaseOrder = {
-      id: `PO-${num}`,
-      number: num,
-      supplierName: items[0]?.supplierName || "Varios proveedores",
-      createdAt: "2026-06-24",
-      expectedDate: "2026-07-05",
-      status: "draft",
-      totalAmount,
-      skuCount: count,
-      destinationWarehouse: "Centro de Distribución",
-      buyerName: "Catalina Saavedra",
-      delayedDays: 0,
-      lines: items.map((i) => ({
-        sku: i.sku,
-        productName: i.productName,
-        quantity: i.quantity,
-        unitCost: i.unitCost,
-      })),
-    };
-    setCreatedOrders((prev) => [newOrder, ...prev]);
+    const buyerName = "Catalina Saavedra";
 
-    // Cerrar el ciclo: por cada línea, registrar decisión y, si se desvía del
-    // sugerido o se sale de criterio, generar una solicitud de aprobación.
+    // Cerrar el ciclo: por cada línea, evaluar desvío vs sugerido y criterio.
     let approvalsCreated = 0;
     items.forEach((i, idx) => {
       const rec = recommendations.find((r) => r.sku === i.sku);
@@ -162,14 +153,13 @@ export function PurchaseOrdersPage() {
       if (coverAfter > objetivo * 1.3) criteria.push("cobertura_excesiva");
       if (margin < minMargin) criteria.push("margen_bajo");
 
-      const decId = `DEC-${num}-${idx}`;
       addDecision({
-        id: decId,
+        id: `DEC-${num}-${idx}`,
         date: TODAY_ISO,
         sku: i.sku,
         productName: i.productName,
         supplierName: i.supplierName,
-        buyerName: newOrder.buyerName,
+        buyerName,
         approvedBy: criteria.length > 0 ? "Pendiente" : "—",
         suggestedQty: suggested,
         purchasedQty: i.quantity,
@@ -189,7 +179,7 @@ export function PurchaseOrdersPage() {
           sku: i.sku,
           productName: i.productName,
           supplierName: i.supplierName,
-          buyerName: newOrder.buyerName,
+          buyerName,
           suggestedQty: suggested,
           requestedQty: i.quantity,
           unitCost: i.unitCost,
@@ -203,6 +193,22 @@ export function PurchaseOrdersPage() {
         });
       }
     });
+
+    const newOrder: PurchaseOrder = {
+      id: `PO-${num}`,
+      number: num,
+      supplierName: items[0]?.supplierName || "Varios proveedores",
+      createdAt: TODAY_ISO,
+      expectedDate: "2026-07-05",
+      status: approvalsCreated > 0 ? "pending_approval" : "draft",
+      totalAmount,
+      skuCount: count,
+      destinationWarehouse: "Centro de Distribución",
+      buyerName,
+      delayedDays: 0,
+      lines: items.map((i) => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, unitCost: i.unitCost })),
+    };
+    setCreatedOrders((prev) => [newOrder, ...prev]);
 
     setCreatedNumber(num);
     clear();
@@ -446,7 +452,10 @@ export function PurchaseOrdersPage() {
               <Button variant="secondary" onClick={() => setDetail(null)}>
                 Cerrar
               </Button>
-              {(detail.status === "draft" || detail.status === "confirmed") && (
+              {detail.status === "pending_approval" && (
+                <Button variant="primary" onClick={() => navigate("/aprobaciones")}>Ver aprobaciones</Button>
+              )}
+              {(detail.status === "draft" || detail.status === "approved" || detail.status === "confirmed") && (
                 <Button onClick={() => markAsSent(detail.id)}>Marcar como enviada</Button>
               )}
             </>
@@ -455,6 +464,11 @@ export function PurchaseOrdersPage() {
       >
         {detail && (
           <div className="space-y-4">
+            {detail.status === "pending_approval" && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                ⏳ Esta orden tiene líneas fuera de criterio y <b>requiere aprobación</b> antes de enviarse al proveedor. Apruébalas en Aprobaciones.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <DetailField label="Estado" value={<StatusBadge kind="purchaseOrder" value={detail.status} />} />
               <DetailField label="Comprador" value={detail.buyerName} />

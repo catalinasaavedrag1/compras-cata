@@ -39,7 +39,29 @@ export function PurchaseFlowProvider({ children }: { children: ReactNode }) {
       pendingApprovalsCount: approvals.filter((a) => stateOf(a.id) === "pendiente").length,
       addApproval: (a) => setCreatedApprovals((prev) => [a, ...prev]),
       addDecision: (d) => setCreatedDecisions((prev) => [d, ...prev]),
-      setApprovalState: (id, state) => setApprovalStateMap((prev) => ({ ...prev, [id]: state })),
+      setApprovalState: (id, state) => {
+        setApprovalStateMap((prev) => ({ ...prev, [id]: state }));
+        // Si la aprobación nació de una OC, actualiza su decisión vinculada
+        // (mismo sufijo: APR-<num>-<idx> ↔ DEC-<num>-<idx>).
+        if (id.startsWith("APR-") && state !== "pendiente") {
+          const decId = id.replace(/^APR-/, "DEC-");
+          setCreatedDecisions((prev) =>
+            prev.map((d) =>
+              d.id === decId
+                ? {
+                    ...d,
+                    approvedBy: state === "aprobada" ? "Líder de compras" : "—",
+                    reason: state === "aprobada" ? `${d.reason} · aprobada` : `${d.reason} · rechazada`,
+                    resultText:
+                      state === "aprobada"
+                        ? "Desvío aprobado por el líder. Compra autorizada; resultado en medición."
+                        : "Desvío rechazado: ajustar la compra al sugerido.",
+                  }
+                : d
+            )
+          );
+        }
+      },
     };
   }, [createdApprovals, createdDecisions, approvalState, setCreatedApprovals, setCreatedDecisions, setApprovalStateMap]);
 

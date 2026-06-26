@@ -41,6 +41,8 @@ const purchase: Record<PurchaseStatus, Config> = {
 
 const purchaseOrder: Record<PurchaseOrderStatus, Config> = {
   draft: { label: "Borrador", tone: "neutral" },
+  pending_approval: { label: "Por aprobar", tone: "amber" },
+  approved: { label: "Aprobada", tone: "green" },
   sent: { label: "Enviada", tone: "blue" },
   confirmed: { label: "Confirmada", tone: "blue" },
   partially_received: { label: "Parcial", tone: "amber" },

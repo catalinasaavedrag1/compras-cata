@@ -29,6 +29,8 @@ export type Priority = "high" | "medium" | "low";
 
 export type PurchaseOrderStatus =
   | "draft"
+  | "pending_approval"
+  | "approved"
   | "sent"
   | "confirmed"
   | "partially_received"
