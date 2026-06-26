@@ -49,6 +49,23 @@ export interface SeasonTopProduct {
   action: string;
 }
 
+export interface YoyMonth {
+  monthIdx: number;
+  label: string;
+  values: Record<number, number | null>;
+}
+
+export interface SkuSeason {
+  sku: string;
+  name: string;
+  type: string;
+  tone: "violet" | "blue" | "slate" | "amber";
+  peakMonth: string;
+  inSeasonPct: number;
+  seasonMonths: string[];
+  insight: string;
+}
+
 export interface SupplierSeasonality {
   series: MonthPoint[];
   ventaActual: number;
@@ -66,6 +83,28 @@ export interface SupplierSeasonality {
   preSeason: { month: string; days: number } | null;
   recommendation: string;
   topProducts: SeasonTopProduct[];
+  years: number[];
+  yoyByMonth: YoyMonth[];
+  skuSeasonality: SkuSeason[];
+}
+
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+// Perfil estacional por SKU: parte del perfil de su categoría con amplitud y
+// desfase deterministas según el SKU, para que no todos se vean idénticos.
+function skuProfile(sku: string, category: string): number[] {
+  const base = profileFor(category);
+  const h = hashStr(sku);
+  const amp = 0.7 + (h % 6) * 0.16; // 0.7 .. 1.5
+  const shift = (h % 3) - 1; // -1, 0, 1
+  return base.map((_, i) => {
+    const v = base[(i - shift + 12) % 12];
+    return 1 + (v - 1) * amp;
+  });
 }
 
 const CURRENT_YEAR = 2026;
@@ -158,6 +197,51 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
       return { sku: p.sku, name: p.name, sales: p.salesLast30Days * p.price, margin: p.margin, type, action };
     });
 
+  // Comparación año contra año (mismo mes en cada año disponible)
+  const years = [...new Set(series.map((p) => Number(p.ym.slice(0, 4))))].sort((a, b) => a - b);
+  const salesAt = (yy: number, mIdx: number) =>
+    series.find((p) => p.ym === `${yy}-${String(mIdx + 1).padStart(2, "0")}`)?.sales ?? null;
+  const yoyByMonth: YoyMonth[] = Array.from({ length: 12 }, (_, mIdx) => ({
+    monthIdx: mIdx,
+    label: MABBR[mIdx],
+    values: Object.fromEntries(years.map((yy) => [yy, salesAt(yy, mIdx)])),
+  }));
+
+  // Estacionalidad por SKU (clasificación, peak, % en temporada, insight)
+  const skuSeasonality: SkuSeason[] = [...prods]
+    .sort((a, b) => b.salesLast30Days * b.price - a.salesLast30Days * a.price)
+    .slice(0, 10)
+    .map((p) => {
+      const prof = skuProfile(p.sku, p.category);
+      const avg = prof.reduce((a, b) => a + b, 0) / 12;
+      const peakIdx = prof.indexOf(Math.max(...prof));
+      const ratioP = Math.max(...prof) / avg;
+      const seasonIdx = prof.map((v, i) => ({ v, i })).filter((x) => x.v >= avg * 1.12);
+      const total = prof.reduce((a, b) => a + b, 0);
+      const inSeasonPct = Math.round((seasonIdx.reduce((a, x) => a + x.v, 0) / total) * 100);
+      const seasonMonths = seasonIdx.map((x) => MABBR[x.i]);
+      const concentrated = seasonMonths.length > 0 && seasonMonths.length <= 2 && inSeasonPct >= 32;
+      let type: string, tone: SkuSeason["tone"], insight: string;
+      if (concentrated) {
+        type = "Campañero";
+        tone = "amber";
+        insight = `Concentra ${inSeasonPct}% de su venta en ${seasonMonths.join(" y ")}. Compra para la campaña y evita stock muerto después.`;
+      } else if (ratioP >= 1.3) {
+        type = "Estacional fuerte";
+        tone = "violet";
+        insight = `Vende ${inSeasonPct}% en temporada (peak ${MABBR[peakIdx]}). Refuerza stock antes del peak y asegura despacho.`;
+      } else if (ratioP >= 1.12) {
+        type = "Estacional suave";
+        tone = "blue";
+        insight = `Sube en ${seasonMonths.join(", ") || MABBR[peakIdx]} (${inSeasonPct}% en temporada). Ajusta compra al alza antes del peak.`;
+      } else {
+        type = "Permanente";
+        tone = "slate";
+        insight = `Venta pareja todo el año (peak leve en ${MABBR[peakIdx]}). Mantén stock base permanente y negocia volumen anual.`;
+      }
+      return { sku: p.sku, name: p.name, type, tone, peakMonth: MABBR[peakIdx], inSeasonPct, seasonMonths, insight };
+    });
+
   const peakStr = peakMonths.length ? peakMonths.join(", ") : "todo el año";
   const recommendation = risky
     ? `Temporada alta en ${peakStr}: la venta sube pero el cumplimiento cae justo en el peak (fill ${fill}%, ${quiebres12} quiebres/12m). Negocia ${preSeason ? preSeason.days + " días antes" : "con anticipación"}: stock reservado para los top SKUs, fill mínimo 95% y despacho parcial semanal.`
@@ -165,5 +249,5 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
       ? `Venta estable todo el año. Conviene mantener stock base permanente y negociar volumen anual con despacho continuo en lugar de grandes compras puntuales.`
       : `Temporada marcada en ${peakStr}. Compra anticipada y asegura stock antes del peak; en postemporada, liquida lentos con apoyo del proveedor.`;
 
-  return { series, ventaActual, ventaPrev, varPct, marginAvg, quiebres12, lost12, fill, leadTime, sobrestock, score, classification, peakMonths, preSeason, recommendation, topProducts };
+  return { series, ventaActual, ventaPrev, varPct, marginAvg, quiebres12, lost12, fill, leadTime, sobrestock, score, classification, peakMonths, preSeason, recommendation, topProducts, years, yoyByMonth, skuSeasonality };
 }

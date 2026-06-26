@@ -576,6 +576,80 @@ function SeasonView({ supplier }: { supplier: Supplier }) {
         </Card>
       </div>
 
+      {/* Comparación año contra año */}
+      <Card>
+        <CardHeader title="Comparación año contra año" description="Mismo mes en cada año: detecta si la temporada crece o se adelanta" />
+        <CardBody className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse min-w-[560px]">
+            <thead>
+              <tr className="text-xs text-slate-400">
+                <th className="text-left font-medium py-1.5 pr-2">Mes</th>
+                {s.years.map((y) => (
+                  <th key={y} className="text-right font-medium py-1.5 px-2">{y}</th>
+                ))}
+                <th className="text-right font-medium py-1.5 pl-2">Var. último año</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.yoyByMonth.map((row) => {
+                const last = s.years[s.years.length - 1];
+                const prev = s.years[s.years.length - 2];
+                const vNow = row.values[last];
+                const vPrev = prev != null ? row.values[prev] : null;
+                const varPct = vNow != null && vPrev != null && vPrev > 0 ? (vNow / vPrev - 1) * 100 : null;
+                const isPeak = s.peakMonths.includes(row.label);
+                return (
+                  <tr key={row.monthIdx} className={`border-t border-slate-50 ${isPeak ? "bg-brand-50/40" : ""}`}>
+                    <td className="py-1.5 pr-2 text-slate-700">
+                      {row.label}{isPeak && <span className="ml-1 text-[10px] text-brand-500 font-semibold">peak</span>}
+                    </td>
+                    {s.years.map((y) => (
+                      <td key={y} className="text-right py-1.5 px-2 text-slate-600 tabular-nums">
+                        {row.values[y] != null ? formatCurrencyCompact(row.values[y]!) : <span className="text-slate-300">—</span>}
+                      </td>
+                    ))}
+                    <td className="text-right py-1.5 pl-2 tabular-nums">
+                      {varPct != null ? (
+                        <span className={varPct >= 0 ? "text-emerald-600 font-medium" : "text-rose-600 font-medium"}>
+                          {varPct >= 0 ? "+" : ""}{formatPercent(varPct, 0)}
+                        </span>
+                      ) : <span className="text-slate-300">—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="text-[11px] text-slate-400 mt-2">Filas resaltadas = meses de temporada alta. La última columna compara el año en curso con el anterior.</p>
+        </CardBody>
+      </Card>
+
+      {/* Estacionalidad por SKU */}
+      <Card>
+        <CardHeader title="Estacionalidad por producto" description="Cómo se comporta cada SKU: campañero, estacional o permanente" />
+        <CardBody className="space-y-1.5">
+          {s.skuSeasonality.length === 0 ? (
+            <p className="text-sm text-slate-400">Sin productos para clasificar.</p>
+          ) : (
+            s.skuSeasonality.map((p) => (
+              <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-start gap-3 rounded-lg border border-slate-100 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                <span className="flex-1 min-w-0">
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-800 truncate">{p.name}</span>
+                    <Badge tone={p.tone}>{p.type}</Badge>
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">{p.insight}</span>
+                </span>
+                <span className="text-right flex-shrink-0">
+                  <span className="block text-sm font-semibold text-slate-700">{p.peakMonth}</span>
+                  <span className="block text-[11px] text-slate-400">{p.inSeasonPct}% en temporada</span>
+                </span>
+              </Link>
+            ))
+          )}
+        </CardBody>
+      </Card>
+
       {/* Pre / Temporada / Post */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {[
