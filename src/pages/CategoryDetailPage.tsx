@@ -9,6 +9,8 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { RecommendationBadge } from "../components/business/RecommendationBadge";
 import { AlertCard } from "../components/business/AlertCard";
+import { CatalogRedundancy } from "../components/business/CatalogRedundancy";
+import { analyzeCatalog } from "../utils/catalogOptimization";
 import { categories } from "../data/mockCategories";
 import { products } from "../data/mockProducts";
 import { suppliers } from "../data/mockSuppliers";
@@ -46,6 +48,7 @@ export function CategoryDetailPage() {
   const catRecs = recommendations.filter((r) => r.category === category.name);
   const catSkus = new Set(catProducts.map((p) => p.sku));
   const catAlerts = alerts.filter((a) => a.relatedEntity === category.name || (a.relatedSku && catSkus.has(a.relatedSku)));
+  const redundantCount = analyzeCatalog(catProducts).candidateCount;
 
   return (
     <div>
@@ -69,6 +72,7 @@ export function CategoryDetailPage() {
         onChange={setTab}
         tabs={[
           { value: "productos", label: "Productos", count: catProducts.length },
+          { value: "optimizar", label: "Optimizar surtido", count: redundantCount },
           { value: "reposicion", label: "Reposición", count: catRecs.length },
           { value: "proveedores", label: "Proveedores", count: catSuppliers.length },
           { value: "alertas", label: "Alertas", count: catAlerts.length },
@@ -95,6 +99,8 @@ export function CategoryDetailPage() {
           </CardBody>
         </Card>
       )}
+
+      {tab === "optimizar" && <CatalogRedundancy products={catProducts} scopeLabel={category.name} />}
 
       {tab === "reposicion" && (
         <Card>

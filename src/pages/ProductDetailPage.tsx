@@ -15,10 +15,18 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BarList } from "../components/business/BarList";
-import { IconPlus, IconInfo, IconAlerts } from "../components/ui/icons";
-import { getProductBySku } from "../data/mockProducts";
+import { IconPlus, IconInfo, IconAlerts, IconSignal } from "../components/ui/icons";
+import { getProductBySku, products } from "../data/mockProducts";
+import { skuOptimizationStatus, ACTION_LABEL, TIER_LABEL } from "../utils/catalogOptimization";
 import { recommendations } from "../data/mockRecommendations";
 import { alerts } from "../data/mockAlerts";
+import { signalService } from "../services";
+import {
+  SIGNAL_TYPE,
+  SIGNAL_STATUS,
+  SIGNAL_PRIORITY,
+  SIGNAL_CHANNEL,
+} from "../components/business/signalLabels";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { useOcDraft } from "../context/OcDraftContext";
 import { coverageDays } from "../utils/calculations";
@@ -55,6 +63,7 @@ export function ProductDetailPage() {
 
   const rec = recommendations.find((r) => r.sku === product.sku);
   const relatedAlerts = alerts.filter((a) => a.relatedSku === product.sku);
+  const productSignals = signalService.bySku(product.sku);
   const relatedPOs = purchaseOrders.filter((o) =>
     o.lines?.some((l) => l.sku === product.sku)
   );
@@ -77,6 +86,12 @@ export function ProductDetailPage() {
 
   // Entidades relacionadas (conexión con otros módulos)
   const related = relatedEntitiesForProduct(product.sku);
+
+  // Estado en el catálogo optimizado (surtido redundante / a reactivar)
+  const optStatus = skuOptimizationStatus(product.sku, products);
+  const optLink = optStatus.category
+    ? `/catalogo-optimizado?cat=${encodeURIComponent(optStatus.category)}`
+    : "/catalogo-optimizado";
 
   // Margen por canal
   const channelMargin = channelMarginsForSku(product.sku);
@@ -146,6 +161,16 @@ export function ProductDetailPage() {
         ) : (
           <Badge tone="red">Sin proveedor asignado</Badge>
         )}
+        {optStatus.kind === "redundant" && (
+          <Link to={optLink} title={`Gama ${TIER_LABEL[optStatus.segment!]} ya cubierta por “${optStatus.leaderName}”`}>
+            <Badge tone="amber" dot>Redundante · {ACTION_LABEL[optStatus.action!]}</Badge>
+          </Link>
+        )}
+        {optStatus.kind === "reactivate" && (
+          <Link to={optLink} title="Es el mejor de su gama pero está en “no comprar”">
+            <Badge tone="amber" dot>Reactivar compra</Badge>
+          </Link>
+        )}
       </div>
 
       {/* Decisión recomendada — lo primero que debe ver el comprador */}
@@ -163,6 +188,7 @@ export function ProductDetailPage() {
         tabs={[
           { value: "resumen", label: "Resumen" },
           { value: "margen", label: "Margen por canal", count: channelMargin.length },
+          { value: "senales", label: "Señales de ventas", count: productSignals.length },
           { value: "relacionados", label: "Relacionados", count: related.length },
           { value: "actividad", label: "Actividad", count: activity.length },
         ]}
@@ -413,6 +439,50 @@ export function ProductDetailPage() {
                   ))}
                 </div>
               </>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {tab === "senales" && (
+        <Card>
+          <CardHeader
+            title="Señales de ventas de este producto"
+            description="Lo que el equipo de ventas ha reportado desde el terreno sobre este SKU"
+            action={
+              <Link to="/senales-ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
+                Ir a Señales de Ventas
+              </Link>
+            }
+          />
+          <CardBody>
+            {productSignals.length === 0 ? (
+              <EmptyState
+                icon={<IconSignal className="w-6 h-6" />}
+                title="Sin señales de ventas"
+                description="El equipo de ventas no ha reportado nada sobre este producto."
+              />
+            ) : (
+              <div className="space-y-2">
+                {productSignals.map((s) => (
+                  <Link
+                    key={s.id}
+                    to="/senales-ventas"
+                    className="block rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
+                  >
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                      <Badge tone={SIGNAL_PRIORITY[s.priority].tone}>{SIGNAL_PRIORITY[s.priority].label}</Badge>
+                      <Badge tone={SIGNAL_TYPE[s.type].tone}>{SIGNAL_TYPE[s.type].short}</Badge>
+                      <div className="flex-1" />
+                      <Badge tone={SIGNAL_STATUS[s.status].tone} dot>{SIGNAL_STATUS[s.status].label}</Badge>
+                    </div>
+                    <p className="text-sm text-slate-700">{s.comment}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {s.reportedBy} · {SIGNAL_CHANNEL[s.channel]} · {s.store}
+                    </p>
+                  </Link>
+                ))}
+              </div>
             )}
           </CardBody>
         </Card>

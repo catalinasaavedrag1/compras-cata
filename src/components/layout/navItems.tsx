@@ -12,6 +12,7 @@ import {
   IconCampaign,
   IconCheck,
   IconBulb,
+  IconSignal,
 } from "../ui/icons";
 import type { Role } from "../../context/RoleContext";
 
@@ -40,6 +41,7 @@ export const compradorGroups: NavGroup[] = [
       { to: "/mi-panel", label: "Mi panel", icon: IconCheck, hint: "Mis tareas, categorías, riesgos de quiebre y proveedores" },
       { to: "/mi-desempeno", label: "Mi desempeño", icon: IconBulb, hint: "Tu score, metas y posición frente al equipo" },
       { to: "/alertas", label: "Alertas", icon: IconAlerts, hint: "Problemas que requieren atención del comprador" },
+      { to: "/senales-ventas", label: "Señales de ventas", icon: IconSignal, hint: "Lo que ventas detecta en el terreno: quiebres, demanda y oportunidades" },
     ],
   },
   {
@@ -57,6 +59,7 @@ export const compradorGroups: NavGroup[] = [
       { to: "/productos", label: "Productos", icon: IconProducts, hint: "Maestro de productos del surtido" },
       { to: "/categorias", label: "Categorías", icon: IconCategories, hint: "Salud comercial por categoría" },
       { to: "/proveedores", label: "Proveedores", icon: IconSuppliers, hint: "Cumplimiento, lead time y proveedores a revisar" },
+      { to: "/catalogo-optimizado", label: "Catálogo optimizado", icon: IconBulb, hint: "Productos redundantes por subcategoría para racionalizar el surtido" },
     ],
   },
   {

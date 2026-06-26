@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { navGroupsFor } from "./navItems";
 import { cn } from "../../utils/cn";
@@ -6,26 +6,54 @@ import { useLocalStorage } from "../../utils/useLocalStorage";
 import { useRole } from "../../context/RoleContext";
 import { IconChevronRight } from "../ui/icons";
 
+/** Datos del tooltip flotante que se muestra en modo colapsado. */
+interface HoverTip {
+  label: string;
+  hint: string;
+  top: number;
+}
+
 export function Sidebar() {
-  const [pinnedCollapsed, setPinnedCollapsed] = useLocalStorage<boolean>("compras:sidebar-collapsed", false);
-  const [hovering, setHovering] = useState(false);
+  const [collapsed, setCollapsed] = useLocalStorage<boolean>("compras:sidebar-collapsed", false);
+  const [tip, setTip] = useState<HoverTip | null>(null);
   const { role } = useRole();
   const navGroups = navGroupsFor(role);
 
-  // Colapsado salvo que el mouse esté encima (hover-to-expand)
-  const collapsed = pinnedCollapsed && !hovering;
+  // Atajo de teclado: "[" colapsa/expande sin usar el mouse.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (e.key === "[") {
+        e.preventDefault();
+        setCollapsed((c) => !c);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setCollapsed]);
+
+  // Al colapsar desaparece cualquier tooltip que quedara visible.
+  useEffect(() => {
+    if (!collapsed) setTip(null);
+  }, [collapsed]);
+
+  const showTip = (e: React.MouseEvent, label: string, hint: string) => {
+    if (!collapsed) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ label, hint, top: r.top + r.height / 2 });
+  };
 
   return (
     <>
-      {/* Espaciador: reserva el ancho colapsado para que el hover no empuje el contenido */}
-      <div className={cn("hidden lg:block flex-shrink-0", pinnedCollapsed ? "w-16" : "w-64")} aria-hidden />
+      {/* Espaciador: reserva el ancho del sidebar fijo para que no tape el contenido. */}
+      <div className={cn("hidden lg:block flex-shrink-0 transition-[width] duration-200", collapsed ? "w-16" : "w-64")} aria-hidden />
       <aside
-        onMouseEnter={() => setHovering(true)}
-        onMouseLeave={() => setHovering(false)}
+        onMouseLeave={() => setTip(null)}
         className={cn(
           "hidden lg:flex lg:flex-col border-r border-slate-200 bg-white h-screen fixed top-0 left-0 z-40 transition-[width] duration-200",
-          collapsed ? "w-16" : "w-64",
-          pinnedCollapsed && !collapsed ? "shadow-xl" : ""
+          collapsed ? "w-16" : "w-64"
         )}
       >
       {/* Marca + botón colapsar */}
@@ -41,12 +69,12 @@ export function Sidebar() {
         )}
         {collapsed && <BrandLogo />}
         <button
-          onClick={() => setPinnedCollapsed(!pinnedCollapsed)}
+          onClick={() => setCollapsed(!collapsed)}
           className={cn(
             "text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg p-1.5",
             collapsed && "absolute top-4 -right-3 bg-white border border-slate-200 shadow-sm"
           )}
-          title={collapsed ? "Expandir menú" : "Colapsar menú"}
+          title={`${collapsed ? "Expandir" : "Colapsar"} menú  ( [ )`}
           aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
         >
           <IconChevronRight className={cn("w-4 h-4 transition-transform", !collapsed && "rotate-180")} />
@@ -66,7 +94,9 @@ export function Sidebar() {
                   key={item.to}
                   to={item.to}
                   end={item.end}
-                  title={item.label}
+                  title={collapsed ? undefined : item.hint}
+                  onMouseEnter={(e) => showTip(e, item.label, item.hint)}
+                  onMouseLeave={() => setTip(null)}
                   className={({ isActive }) =>
                     cn(
                       "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
@@ -97,6 +127,20 @@ export function Sidebar() {
         </div>
       )}
       </aside>
+
+      {/* Tooltip instantáneo del modo colapsado: aparece a la derecha del icono,
+          con position fixed para no ser recortado por el scroll del nav. */}
+      {collapsed && tip && (
+        <div
+          role="tooltip"
+          style={{ top: tip.top, left: "4.25rem" }}
+          className="hidden lg:block fixed z-50 -translate-y-1/2 pointer-events-none rounded-lg bg-slate-800 px-3 py-2 shadow-lg max-w-[15rem]"
+        >
+          <p className="text-xs font-semibold text-white leading-tight">{tip.label}</p>
+          <p className="text-[11px] text-slate-300 leading-snug mt-0.5">{tip.hint}</p>
+          <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-800" />
+        </div>
+      )}
     </>
   );
 }

@@ -30,9 +30,8 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 lg:hidden">
-      <div className="absolute inset-0 bg-slate-900/40" onClick={onClose} />
-      <div className="relative w-72 max-w-[80%] h-full bg-white flex flex-col shadow-xl">
+    <div className="fixed inset-0 z-40 lg:hidden">
+      <div className="relative w-full h-full bg-white flex flex-col">
         <div className="flex items-center justify-between border-b border-slate-100 pr-3">
           <Brand />
           <button
@@ -51,7 +50,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </form>
-        <nav className="flex-1 px-3 py-3 overflow-y-auto scrollbar-thin">
+        <nav className="flex-1 px-3 py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] overflow-y-auto scrollbar-thin">
           {navGroups.map((group) => (
             <div key={group.title} className="mb-3 last:mb-0">
               <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">

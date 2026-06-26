@@ -21,8 +21,11 @@ import {
   IconCampaign,
   IconArrowRight,
   IconCheck,
+  IconSignal,
+  IconChat,
 } from "../components/ui/icons";
 import { products } from "../data/mockProducts";
+import { analyzeCatalog } from "../utils/catalogOptimization";
 import { recommendations } from "../data/mockRecommendations";
 import { alerts } from "../data/mockAlerts";
 import { categories } from "../data/mockCategories";
@@ -32,6 +35,8 @@ import { salesKpis } from "../data/mockSales";
 import { inventoryKpis } from "../data/mockInventory";
 import { monthlyPurchaseBudget } from "../data/mockRules";
 import { campaignOpportunities } from "../data/mockCampaignOpportunities";
+import { signals as salesSignals } from "../data/mockSignals";
+import { STOCKOUT_TYPES } from "../components/business/signalLabels";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -127,6 +132,9 @@ export function DashboardPage() {
 
   const salesByCat = [...categories].sort((a, b) => b.salesLast30Days - a.salesLast30Days).slice(0, 6);
 
+  // Surtido redundante (catálogo optimizado)
+  const catalogOpt = analyzeCatalog(products);
+
   // Campañas y oportunidades
   const upcomingCampaigns = new Set(campaignOpportunities.map((o) => o.campaignName)).size;
   const campaignStockoutRisk = campaignOpportunities.filter((o) => o.status === "stockout_risk").length;
@@ -141,6 +149,30 @@ export function DashboardPage() {
     }, [])
     .sort((a, b) => a.days - b.days)
     .slice(0, 3);
+
+  // Señales de Ventas — lo que el terreno está reportando
+  const activeSignals = salesSignals.filter(
+    (s) => s.status !== "resolved" && s.status !== "rejected"
+  );
+  const newSignals = salesSignals.filter((s) => s.status === "new").length;
+  const stockoutSignals = activeSignals.filter((s) =>
+    STOCKOUT_TYPES.includes(s.type)
+  ).length;
+  const pendingSignals = activeSignals.filter(
+    (s) => s.status === "new" || s.status === "in_review"
+  ).length;
+  const signalLostSale = activeSignals.reduce(
+    (acc, s) => acc + (s.estimatedLostSale ?? 0),
+    0
+  );
+  const topSignalProducts = Object.entries(
+    activeSignals.reduce<Record<string, number>>((acc, s) => {
+      acc[s.productName] = (acc[s.productName] ?? 0) + 1;
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
 
   return (
     <div>
@@ -171,6 +203,9 @@ export function DashboardPage() {
         <DashChip to="/ventas" label={`${formatCurrencyCompact(salesKpis.salesLast30Days)} venta 30d`} />
         <DashChip to="/inventario" label={`${formatCurrencyCompact(inventoryKpis.totalInventoryValue)} inventario`} />
         <DashChip to="/ventas" label={`${formatCurrencyCompact(salesKpis.lostSalesByStockout)} venta perdida`} />
+        {catalogOpt.candidateCount > 0 && (
+          <DashChip to="/catalogo-optimizado" label={`${formatCurrencyCompact(catalogOpt.freeableCapital)} liberable en surtido`} />
+        )}
       </div>
 
       {/* Qué revisar primero — lo más importante, arriba */}
@@ -185,6 +220,41 @@ export function DashboardPage() {
           }
         />
         <PriorityGuide steps={guideSteps} />
+      </Card>
+
+      {/* Señales de Ventas — colaboración con el equipo de ventas */}
+      <Card className="mb-5">
+        <CardHeader
+          title="Señales de Ventas"
+          description="Lo que el equipo de ventas detecta en el terreno antes que nadie: quiebres, demanda y oportunidades."
+          action={
+            <Link to="/senales-ventas">
+              <Button size="sm" variant="secondary" icon={<IconArrowRight className="w-4 h-4" />}>
+                Ver señales de ventas
+              </Button>
+            </Link>
+          }
+        />
+        <CardBody>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <MiniIndicator icon={<IconSignal className="w-4 h-4" />} label="Señales nuevas" value={formatNumber(newSignals)} tone="info" />
+            <MiniIndicator icon={<IconAlerts className="w-4 h-4" />} label="Quiebres reportados" value={formatNumber(stockoutSignals)} tone="bad" />
+            <MiniIndicator icon={<IconChat className="w-4 h-4" />} label="Por revisar" value={formatNumber(pendingSignals)} tone="warn" />
+            <MiniIndicator icon={<IconSales className="w-4 h-4" />} label="Venta perdida estimada" value={formatCurrencyCompact(signalLostSale)} tone="bad" />
+          </div>
+          {topSignalProducts.length > 0 && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-medium text-slate-500 mr-1">Más reportados:</span>
+              {topSignalProducts.map(([name, count]) => (
+                <Link key={name} to="/senales-ventas">
+                  <Badge tone="blue" dot>
+                    {name} · {count}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardBody>
       </Card>
 
       {/* Campañas y oportunidades */}

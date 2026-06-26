@@ -12,6 +12,7 @@ import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { recommendations } from "../data/mockRecommendations";
 import { alerts } from "../data/mockAlerts";
 import { campaignOpportunities } from "../data/mockCampaignOpportunities";
+import { signals } from "../data/mockSignals";
 
 export const productService = {
   list: () => getMock(products),
@@ -47,4 +48,9 @@ export const alertService = {
 export const campaignOpportunityService = {
   list: () => getMock(campaignOpportunities),
   bySku: (sku: string) => campaignOpportunities.filter((o) => o.sku === sku),
+};
+
+export const signalService = {
+  list: () => getMock(signals),
+  bySku: (sku: string) => signals.filter((s) => s.sku === sku),
 };

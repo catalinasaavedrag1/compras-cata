@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "./navItems";
 import { Input } from "../ui/Input";
-import { IconSearch, IconMenu, IconOrders, IconProducts, IconSuppliers } from "../ui/icons";
+import { IconSearch, IconOrders, IconProducts, IconSuppliers } from "../ui/icons";
 import { useOcDraft } from "../../context/OcDraftContext";
 import { useBuyer, initials } from "../../context/BuyerContext";
 import { useRole } from "../../context/RoleContext";
@@ -13,10 +13,6 @@ import { formatDate, formatNumber } from "../../utils/formatters";
 import { products } from "../../data/mockProducts";
 import { suppliers } from "../../data/mockSuppliers";
 import { purchaseOrders } from "../../data/mockPurchaseOrders";
-
-interface TopbarProps {
-  onOpenMenu: () => void;
-}
 
 function currentTitle(pathname: string): string {
   if (pathname.startsWith("/productos/")) return "Detalle de producto";
@@ -33,7 +29,7 @@ interface SearchResult {
   to: string;
 }
 
-export function Topbar({ onOpenMenu }: TopbarProps) {
+export function Topbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { count } = useOcDraft();
@@ -105,14 +101,6 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-slate-200 bg-white/90 backdrop-blur flex items-center gap-3 px-4 lg:px-6">
-      <button
-        onClick={onOpenMenu}
-        className="lg:hidden text-slate-500 hover:text-slate-700 p-1.5 -ml-1 rounded-lg hover:bg-slate-100"
-        aria-label="Abrir menú"
-      >
-        <IconMenu />
-      </button>
-
       <h2 className="text-sm font-semibold text-slate-700 lg:hidden">
         {currentTitle(location.pathname)}
       </h2>
