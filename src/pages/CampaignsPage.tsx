@@ -397,9 +397,9 @@ export function CampaignsPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-1 border-t border-slate-100 pt-2.5 text-xs text-slate-500">
-                    <span>📍 {s.position}</span>
-                    <span>🖼 {s.size}</span>
-                    <span>🗓 {rangeText(camp.from, camp.to)}</span>
+                    <span className="flex items-center gap-1.5"><Svg path="M12 21s-7-4.4-7-10a7 7 0 0 1 14 0c0 5.6-7 10-7 10z" className="w-3.5 h-3.5 text-slate-400" /> {s.position}</span>
+                    <span className="flex items-center gap-1.5"><Svg path="M3 3h18v18H3zM3 9h18M9 21V9" className="w-3.5 h-3.5 text-slate-400" /> {s.size}</span>
+                    <span className="flex items-center gap-1.5"><Svg path="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM16 2v4M8 2v4M3 10h18" className="w-3.5 h-3.5 text-slate-400" /> {rangeText(camp.from, camp.to)}</span>
                   </div>
                   {s.assigned.length > 0 ? (
                     <div className="flex flex-col gap-1">
