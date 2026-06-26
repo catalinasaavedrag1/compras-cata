@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
+import { CollapsibleSection } from "../components/ui/CollapsibleSection";
 import { AlertCard } from "../components/business/AlertCard";
 import { BarList } from "../components/business/BarList";
 import { Badge } from "../components/ui/Badge";
@@ -249,19 +250,19 @@ export function DashboardPage() {
       </Card>
 
       {/* Señales de Ventas — colaboración con el equipo de ventas */}
-      <Card className="mb-5">
-        <CardHeader
-          title="Señales de Ventas"
-          description="Lo que el equipo de ventas detecta en el terreno antes que nadie: quiebres, demanda y oportunidades."
-          action={
-            <Link to="/senales-ventas">
-              <Button size="sm" variant="secondary" icon={<IconArrowRight className="w-4 h-4" />}>
-                Ver señales de ventas
-              </Button>
-            </Link>
-          }
-        />
-        <CardBody>
+      <CollapsibleSection
+        id="dash-senales"
+        className="mb-3"
+        title="Señales de Ventas"
+        description="Lo que ventas detecta en terreno: quiebres, demanda y oportunidades."
+        hint={`${newSignals} nuevas · ${stockoutSignals} quiebres`}
+        action={
+          <Link to="/senales-ventas">
+            <Button size="sm" variant="secondary" icon={<IconArrowRight className="w-4 h-4" />}>Ver</Button>
+          </Link>
+        }
+      >
+        <div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <MiniIndicator icon={<IconSignal className="w-4 h-4" />} label="Señales nuevas" value={formatNumber(newSignals)} tone="info" />
             <MiniIndicator icon={<IconAlerts className="w-4 h-4" />} label="Quiebres reportados" value={formatNumber(stockoutSignals)} tone="bad" />
@@ -280,23 +281,23 @@ export function DashboardPage() {
               ))}
             </div>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      </CollapsibleSection>
 
       {/* Campañas y oportunidades */}
-      <Card className="mb-5">
-        <CardHeader
-          title="Campañas y oportunidades"
-          description="Anticipa compras para campañas comerciales, liquidaciones y crecimiento."
-          action={
-            <Link to="/campanas-oportunidades">
-              <Button size="sm" variant="secondary" icon={<IconArrowRight className="w-4 h-4" />}>
-                Ver campañas y oportunidades
-              </Button>
-            </Link>
-          }
-        />
-        <CardBody>
+      <CollapsibleSection
+        id="dash-campanas"
+        className="mb-3"
+        title="Campañas y oportunidades"
+        description="Anticipa compras para campañas, liquidaciones y crecimiento."
+        hint={`${upcomingCampaigns} próximas · ${campaignStockoutRisk} en riesgo`}
+        action={
+          <Link to="/campanas-oportunidades">
+            <Button size="sm" variant="secondary" icon={<IconArrowRight className="w-4 h-4" />}>Ver</Button>
+          </Link>
+        }
+      >
+        <div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <MiniIndicator icon={<IconCampaign className="w-4 h-4" />} label="Campañas próximas" value={formatNumber(upcomingCampaigns)} tone="info" />
             <MiniIndicator icon={<IconAlerts className="w-4 h-4" />} label="Riesgo de quiebre por campaña" value={formatNumber(campaignStockoutRisk)} tone="bad" />
@@ -311,31 +312,29 @@ export function DashboardPage() {
               </Badge>
             ))}
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </CollapsibleSection>
 
       {/* Disciplina de compra: oportunidades, aprobaciones, calidad y decisiones */}
-      <Card className="mb-5">
-        <CardHeader
-          title="Disciplina de compra"
-          description="Que no se pierda venta por no comprar, ni se compre fuera de criterio. Aprende de las decisiones."
-          action={
-            <Link to="/oportunidades-perdidas">
-              <Button size="sm" variant="secondary" icon={<IconArrowRight className="w-4 h-4" />}>
-                Ver oportunidades
-              </Button>
-            </Link>
-          }
-        />
-        <CardBody>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Link to="/oportunidades-perdidas"><MiniIndicator icon={<IconSales className="w-4 h-4" />} label="Venta no capturada" value={`${formatCurrencyCompact(lostRevenue)}/mes`} tone="bad" /></Link>
-            <Link to="/aprobaciones"><MiniIndicator icon={<IconCheck className="w-4 h-4" />} label="Aprobaciones pendientes" value={formatNumber(pendingApprovals)} tone="warn" /></Link>
-            <Link to="/calidad-compra"><MiniIndicator icon={<IconAlerts className="w-4 h-4" />} label="Compras cortas" value={formatNumber(shortPurchases)} tone="bad" /></Link>
-            <Link to="/decisiones"><MiniIndicator icon={<IconReplenish className="w-4 h-4" />} label="Oportunidades detectadas" value={formatNumber(lostOpps.length)} tone="warn" /></Link>
-          </div>
-        </CardBody>
-      </Card>
+      <CollapsibleSection
+        id="dash-disciplina"
+        className="mb-5"
+        title="Disciplina de compra"
+        description="Que no se pierda venta por no comprar ni se compre fuera de criterio."
+        hint={`${formatCurrencyCompact(lostRevenue)}/mes sin capturar · ${pendingApprovals} por aprobar`}
+        action={
+          <Link to="/oportunidades-perdidas">
+            <Button size="sm" variant="secondary" icon={<IconArrowRight className="w-4 h-4" />}>Ver</Button>
+          </Link>
+        }
+      >
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Link to="/oportunidades-perdidas"><MiniIndicator icon={<IconSales className="w-4 h-4" />} label="Venta no capturada" value={`${formatCurrencyCompact(lostRevenue)}/mes`} tone="bad" /></Link>
+          <Link to="/aprobaciones"><MiniIndicator icon={<IconCheck className="w-4 h-4" />} label="Aprobaciones pendientes" value={formatNumber(pendingApprovals)} tone="warn" /></Link>
+          <Link to="/calidad-compra"><MiniIndicator icon={<IconAlerts className="w-4 h-4" />} label="Compras cortas" value={formatNumber(shortPurchases)} tone="bad" /></Link>
+          <Link to="/decisiones"><MiniIndicator icon={<IconReplenish className="w-4 h-4" />} label="Oportunidades detectadas" value={formatNumber(lostOpps.length)} tone="warn" /></Link>
+        </div>
+      </CollapsibleSection>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-5">
         {/* Acciones urgentes / alertas críticas */}
@@ -383,11 +382,18 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+      <CollapsibleSection
+        id="dash-cat-prov"
+        className="mb-3"
+        title="Categorías y proveedores a vigilar"
+        description="Categorías con quiebres/riesgo y proveedores que pueden frenar la reposición."
+        hint={`${criticalCategories.length} categorías · ${worstSuppliers.length} proveedores`}
+      >
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Categorías críticas */}
-        <Card>
-          <CardHeader title="Categorías que necesitan atención" description="Ordenadas por SKUs con quiebre y en riesgo" />
-          <CardBody className="space-y-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Categorías que necesitan atención</p>
+          <div className="space-y-2">
             {criticalCategories.map((c) => (
               <Link key={c.id} to={`/categorias/${c.id}`} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 rounded-lg px-1 -mx-1">
                 <div className="min-w-0">
@@ -401,13 +407,13 @@ export function DashboardPage() {
                 </div>
               </Link>
             ))}
-          </CardBody>
-        </Card>
+          </div>
+        </div>
 
         {/* Proveedores con problemas */}
-        <Card>
-          <CardHeader title="Proveedores con problemas" description="Bajo cumplimiento de entrega. Pueden frenar la reposición." />
-          <CardBody className="space-y-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Proveedores con problemas</p>
+          <div className="space-y-2">
             {worstSuppliers.map((s) => (
               <Link key={s.id} to={`/proveedores/${s.id}`} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 rounded-lg px-1 -mx-1">
                 <div className="min-w-0">
@@ -422,19 +428,26 @@ export function DashboardPage() {
                 </div>
               </Link>
             ))}
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       </div>
+      </CollapsibleSection>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+      <CollapsibleSection
+        id="dash-inv-oc"
+        className="mb-5"
+        title="Inventario y órdenes a vigilar"
+        description="Sobrestock que inmoviliza capital y OC abiertas o atrasadas."
+        hint={`${overstockProducts.length} con sobrestock · ${expiringPOs.length} OC`}
+      >
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Sobrestock relevante */}
-        <Card>
-          <CardHeader
-            title="Sobrestock relevante"
-            description="Productos que inmovilizan más capital. No conviene comprar."
-            action={<Link to="/inventario" className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver inventario</Link>}
-          />
-          <CardBody className="space-y-2">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sobrestock relevante</p>
+            <Link to="/inventario" className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver inventario</Link>
+          </div>
+          <div className="space-y-2">
             {topOverstock.map((p) => (
               <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0 hover:text-brand-700">
                 <div className="min-w-0">
@@ -446,17 +459,16 @@ export function DashboardPage() {
                 </span>
               </Link>
             ))}
-          </CardBody>
-        </Card>
+          </div>
+        </div>
 
         {/* OC a vigilar */}
-        <Card>
-          <CardHeader
-            title="Órdenes de compra a vigilar"
-            description="Atrasadas o próximas a su fecha esperada"
-            action={<Link to="/ordenes-compra" className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver todas</Link>}
-          />
-          <CardBody className="space-y-2">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Órdenes de compra a vigilar</p>
+            <Link to="/ordenes-compra" className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver todas</Link>
+          </div>
+          <div className="space-y-2">
             {expiringPOs.map((o) => (
               <div key={o.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0">
                 <div className="min-w-0">
@@ -469,11 +481,18 @@ export function DashboardPage() {
                 </div>
               </div>
             ))}
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       </div>
+      </CollapsibleSection>
 
       {/* Resumen venta por categoría + extras */}
+      <CollapsibleSection
+        id="dash-analisis"
+        className="mb-4"
+        title="Análisis de ventas y catálogo"
+        description="Venta por categoría, indicadores de surtido y capital inmovilizado."
+      >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader title="Venta por categoría (30 días)" description="Dónde se concentra la venta del mes" />
@@ -513,6 +532,7 @@ export function DashboardPage() {
           </Card>
         </div>
       </div>
+      </CollapsibleSection>
     </div>
   );
 }
