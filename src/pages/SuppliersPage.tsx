@@ -19,6 +19,8 @@ import {
 } from "../utils/formatters";
 import { IconSuppliers, IconAlerts, IconOrders } from "../components/ui/icons";
 import { supplierFulfillment } from "../utils/supplierPerf";
+import { supplierSeasonality } from "../utils/seasonality";
+import { Link } from "react-router-dom";
 import type { Supplier } from "../types/purchasing";
 
 export function SuppliersPage() {
@@ -46,6 +48,16 @@ export function SuppliersPage() {
   const mostDelayed = [...suppliers].sort((a, b) => a.deliveryCompliance - b.deliveryCompliance).slice(0, 4);
   const biggestBuy = [...suppliers].sort((a, b) => b.purchasedAmountLast90Days - a.purchasedAmountLast90Days).slice(0, 4);
   const highLeadTime = [...suppliers].sort((a, b) => b.averageLeadTimeDays - a.averageLeadTimeDays).slice(0, 4);
+
+  // Proveedores que entran en temporada alta pronto (negociar antes)
+  const entranTemporada = suppliers
+    .filter((s) => s.status !== "inactive")
+    .map((s) => ({ s, seas: supplierSeasonality(s.name) }))
+    .filter((x) => x.seas.preSeason !== null)
+    .sort((a, b) => {
+      const ra = (a.seas.classification.risky ? 0 : 1) - (b.seas.classification.risky ? 0 : 1);
+      return ra !== 0 ? ra : a.seas.preSeason!.days - b.seas.preSeason!.days;
+    });
 
   const columns: Column<Supplier>[] = [
     {
@@ -170,6 +182,23 @@ El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuán
         <MiniRank title="Mayor compra (90 días)" items={biggestBuy.map((s) => ({ name: s.name, value: formatCurrencyCompact(s.purchasedAmountLast90Days), tone: "green" as const, sub: `${formatNumber(s.associatedSkus)} SKUs` }))} />
         <MiniRank title="Lead time más alto" items={highLeadTime.map((s) => ({ name: s.name, value: formatDays(s.averageLeadTimeDays), tone: "amber" as const, sub: `Cumple ${formatPercent(s.deliveryCompliance, 0)}` }))} />
       </div>
+
+      {entranTemporada.length > 0 && (
+        <Card className="mb-5">
+          <CardHeader title="Entran en temporada (próximos 90 días)" description="Negocia antes del peak: stock reservado, fill mínimo y despacho anticipado" />
+          <CardBody className="space-y-2">
+            {entranTemporada.map(({ s, seas }) => (
+              <Link key={s.id} to={`/proveedores/${s.id}?tab=temporadas`} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
+                  <span className="block text-xs text-slate-400">Peak {seas.preSeason!.month} en ~{seas.preSeason!.days} días · fill {seas.fill}% · lead {formatDays(s.averageLeadTimeDays)}</span>
+                </span>
+                <Badge tone={seas.classification.risky ? "red" : "amber"}>{seas.classification.risky ? "Riesgo de quiebre" : "Preparar compra"}</Badge>
+              </Link>
+            ))}
+          </CardBody>
+        </Card>
+      )}
 
       <Card>
         <DataTable
