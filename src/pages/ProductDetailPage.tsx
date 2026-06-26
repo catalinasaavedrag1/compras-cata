@@ -17,6 +17,10 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { BarList } from "../components/business/BarList";
 import { IconPlus, IconInfo, IconAlerts, IconSignal } from "../components/ui/icons";
 import { getProductBySku, products } from "../data/mockProducts";
+import { suppliers, getSupplierByName } from "../data/mockSuppliers";
+import { supplierFulfillment } from "../utils/supplierPerf";
+import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
+import { receptions } from "../data/mockReceptions";
 import { skuOptimizationStatus, ACTION_LABEL, TIER_LABEL } from "../utils/catalogOptimization";
 import { recommendations } from "../data/mockRecommendations";
 import { alerts } from "../data/mockAlerts";
@@ -34,6 +38,7 @@ import { IconCheck } from "../components/ui/icons";
 import type { Product, PurchaseRecommendation } from "../types/purchasing";
 import {
   formatCurrency,
+  formatCurrencyCompact,
   formatDate,
   formatDays,
   formatNumber,
@@ -187,6 +192,7 @@ export function ProductDetailPage() {
         onChange={setTab}
         tabs={[
           { value: "resumen", label: "Resumen" },
+          { value: "negociacion", label: "Negociación" },
           { value: "margen", label: "Margen por canal", count: channelMargin.length },
           { value: "senales", label: "Señales de ventas", count: productSignals.length },
           { value: "relacionados", label: "Relacionados", count: related.length },
@@ -390,6 +396,8 @@ export function ProductDetailPage() {
       </>
       )}
 
+      {tab === "negociacion" && <NegotiationPanel product={product} rec={rec} />}
+
       {tab === "margen" && (
         <Card>
           <CardHeader
@@ -534,6 +542,187 @@ function MiniStat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg bg-slate-50 py-2">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="text-base font-semibold text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function NStat({ label, value, tone, sub }: { label: string; value: string; tone?: "good" | "warn" | "bad"; sub?: string }) {
+  const c = tone === "bad" ? "text-rose-700" : tone === "warn" ? "text-amber-700" : tone === "good" ? "text-emerald-700" : "text-slate-800";
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className={`text-lg font-semibold ${c}`}>{value}</p>
+      {sub && <p className="text-[11px] text-slate-400 leading-tight">{sub}</p>}
+    </div>
+  );
+}
+
+/**
+ * Panel de negociación: reúne lo que el comprador necesita para llegar a la
+ * reunión con argumentos — venta, margen, inventario, proveedor, alternativas,
+ * objetivos sugeridos y la próxima decisión.
+ */
+function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRecommendation }) {
+  const sales30 = product.salesLast30Days;
+  const sales90 = product.salesLast90Days;
+  const tendencia = sales90 > 0 ? (sales30 / (sales90 / 3) - 1) * 100 : 0;
+  const ranking = [...products].sort((a, b) => b.salesLast30Days - a.salesLast30Days).findIndex((p) => p.sku === product.sku) + 1;
+
+  const rule = resolveRuleForProduct(product, purchaseRules);
+  const objetivo = rule.minMargin;
+  const brecha = objetivo - product.margin;
+  const costoObjetivo = Math.round(product.price * (1 - objetivo / 100));
+  const bajaCosto = product.cost > costoObjetivo ? ((product.cost - costoObjetivo) / product.cost) * 100 : 0;
+
+  const enTransito = receptions
+    .filter((r) => ["in_transit", "scheduled"].includes(r.status))
+    .flatMap((r) => r.items ?? [])
+    .filter((it) => it.sku === product.sku)
+    .reduce((a, it) => a + Math.max(0, it.expected - it.received), 0);
+  const enQuiebre = product.availableStock <= 0 && sales30 > 0;
+  const ventaPerdida = enQuiebre ? sales30 * product.price : 0;
+
+  const master = product.supplierName ? getSupplierByName(product.supplierName) : undefined;
+  const perf = product.supplierName ? supplierFulfillment(product.supplierName) : null;
+  const compraAnual = master ? master.purchasedAmountLast90Days * 4 : 0;
+
+  const alternativas = suppliers.filter((s) => s.name !== product.supplierName && s.status !== "inactive" && s.categories.includes(product.category));
+
+  // Objetivos de negociación sugeridos
+  const objetivos: string[] = [];
+  if (brecha > 0 && bajaCosto > 0) objetivos.push(`Bajar el costo ~${formatPercent(bajaCosto, 0)} (a ${formatCurrency(costoObjetivo)}) para alcanzar el margen objetivo de ${formatPercent(objetivo, 0)}`);
+  if (perf && perf.fillRate < 95) objetivos.push(`Mejorar el fill rate de ${perf.fillRate}% a 95% (despacho completo)`);
+  if (master && master.deliveryCompliance < 90) objetivos.push(`Subir cumplimiento de entrega de ${formatPercent(master.deliveryCompliance, 0)} a 95%`);
+  if (master && master.averageLeadTimeDays >= 12) objetivos.push(`Reducir lead time (${formatDays(master.averageLeadTimeDays)}) o acordar despacho semanal`);
+  if (enQuiebre) objetivos.push("Stock de seguridad o despacho parcial para frenar la venta perdida");
+  if (sales30 >= 50) objetivos.push("Bonificación por volumen o rebate por crecimiento");
+  objetivos.push("Plazo de pago 60 días o descuento por pronto pago");
+
+  // Próxima decisión sugerida
+  const decisiones: { label: string; on: boolean }[] = [
+    { label: "Comprar", on: !!rec && rec.suggestedQuantity > 0 && rec.status !== "overstock" },
+    { label: "Renegociar costo", on: brecha > 0 },
+    { label: "Liquidar", on: product.purchaseStatus === "overstock" },
+    { label: "Cambiar proveedor", on: (perf?.fillRate ?? 100) < 80 || (master?.deliveryCompliance ?? 100) < 70 },
+    { label: "Pedir campaña", on: tendencia > 15 },
+    { label: "Mantener", on: true },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-900">
+        <b>Panel de negociación.</b> Todo lo que necesitas para llegar a la reunión con argumentos: cuánto vende, cuánto rinde, qué stock hay, qué tan confiable es el proveedor y qué alternativas tienes.
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Venta */}
+        <Card>
+          <CardHeader title="Venta y demanda" />
+          <CardBody>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <NStat label="Venta 30 días" value={`${formatNumber(sales30)} u.`} />
+              <NStat label="Venta 90 días" value={`${formatNumber(sales90)} u.`} />
+              <NStat label="Tendencia" value={`${tendencia >= 0 ? "+" : ""}${formatPercent(tendencia, 0)}`} tone={tendencia >= 0 ? "good" : "bad"} sub="30d vs prom. 90d" />
+              <NStat label="Ranking" value={`#${ranking}`} sub={`de ${products.length} SKUs`} />
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Margen */}
+        <Card>
+          <CardHeader title="Margen y precio" />
+          <CardBody>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <NStat label="Precio venta" value={formatCurrency(product.price)} />
+              <NStat label="Costo actual" value={formatCurrency(product.cost)} />
+              <NStat label="Margen actual" value={formatPercent(product.margin, 0)} tone={product.margin < objetivo ? "warn" : "good"} />
+              <NStat label="Margen objetivo" value={formatPercent(objetivo, 0)} sub={brecha > 0 ? `faltan ${formatPercent(brecha, 0)}` : "cumplido"} />
+            </div>
+            {brecha > 0 && (
+              <p className="text-xs text-slate-500 mt-2.5">Para llegar al objetivo, el costo debería bajar ~<b className="text-slate-700">{formatPercent(bajaCosto, 0)}</b> (a {formatCurrency(costoObjetivo)}).</p>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* Inventario */}
+        <Card>
+          <CardHeader title="Inventario" />
+          <CardBody>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <NStat label="Disponible" value={formatNumber(product.availableStock)} tone={product.availableStock <= 0 ? "bad" : undefined} sub={`${formatNumber(product.committedStock)} comprometido`} />
+              <NStat label="Días inventario" value={formatNumber(product.inventoryDays)} tone={product.inventoryDays < 7 ? "bad" : product.inventoryDays > 120 ? "warn" : "good"} />
+              <NStat label="En tránsito" value={formatNumber(enTransito)} sub="OC por llegar" />
+              <NStat label={enQuiebre ? "Venta perdida" : "Estado"} value={enQuiebre ? formatCurrencyCompact(ventaPerdida) : product.purchaseStatus === "overstock" ? "Sobrestock" : "OK"} tone={enQuiebre ? "bad" : product.purchaseStatus === "overstock" ? "warn" : "good"} sub={enQuiebre ? "por quiebre / mes" : undefined} />
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Proveedor */}
+        <Card>
+          <CardHeader title={`Proveedor — ${product.supplierName || "sin asignar"}`} />
+          <CardBody>
+            {master ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <NStat label="Lead time" value={formatDays(master.averageLeadTimeDays)} tone={master.averageLeadTimeDays >= 15 ? "warn" : undefined} />
+                <NStat label="Cumplimiento" value={formatPercent(master.deliveryCompliance, 0)} tone={master.deliveryCompliance < 70 ? "bad" : master.deliveryCompliance < 85 ? "warn" : "good"} sub="a tiempo" />
+                <NStat label="Fill rate" value={perf ? `${perf.fillRate}%` : "—"} tone={perf && perf.fillRate < 90 ? "bad" : "good"} sub="despacho completo" />
+                <NStat label="Compra anual" value={formatCurrencyCompact(compraAnual)} sub="estimada" />
+              </div>
+            ) : (
+              <p className="text-sm text-rose-600">Sin proveedor asignado: no se puede negociar ni reponer.</p>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Alternativas + Objetivos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader title="Proveedores alternativos" description="Tu poder de negociación: no dependes de uno solo" />
+          <CardBody>
+            {alternativas.length === 0 ? (
+              <p className="text-sm text-slate-400">No hay proveedores alternativos para esta categoría.</p>
+            ) : (
+              <div className="space-y-2">
+                {alternativas.map((s) => {
+                  const f = supplierFulfillment(s.name);
+                  return (
+                    <Link key={s.id} to={`/proveedores/${s.id}`} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
+                        <span className="block text-xs text-slate-400">lead {formatDays(s.averageLeadTimeDays)} · cumple {formatPercent(s.deliveryCompliance, 0)} · fill {f.arrivedOrders > 0 ? `${f.fillRate}%` : "s/d"}</span>
+                      </span>
+                      <Badge tone={s.deliveryCompliance >= 85 ? "green" : s.deliveryCompliance >= 70 ? "amber" : "red"}>{s.deliveryCompliance >= 85 ? "Buena opción" : "Revisar"}</Badge>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Objetivos de la negociación" description="Lleva pedidos concretos, no solo 'descuento'" />
+          <CardBody>
+            <ul className="space-y-2">
+              {objetivos.map((o, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                  <span className="text-brand-500 mt-0.5">▸</span>
+                  <span>{o}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-slate-500 mb-2">Próxima decisión</p>
+              <div className="flex flex-wrap gap-2">
+                {decisiones.filter((d) => d.on).map((d) => (
+                  <span key={d.label} className="inline-flex items-center rounded-full bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200 px-3 py-1 text-xs font-medium">{d.label}</span>
+                ))}
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
     </div>
   );
 }
