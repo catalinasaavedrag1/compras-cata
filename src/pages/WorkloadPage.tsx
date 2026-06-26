@@ -6,10 +6,14 @@ import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { BUYER_TONE_AV } from "../components/business/BuyerDetailDrawer";
 import { buyers } from "../data/mockBuyers";
+import { suppliers } from "../data/mockSuppliers";
 import type { Buyer } from "../types/team";
 import { WORKLOAD_CFG, workloadBarColor, byWorkloadDesc } from "../utils/teamScore";
 import { useToast } from "../context/ToastContext";
+import { useSignals } from "../context/SignalsContext";
 import { formatNumber } from "../utils/formatters";
+
+type ReassignKind = "categoría" | "proveedor" | "solicitud";
 
 const LEVELS = [
   { label: "Baja", color: "#3366f2" },
@@ -18,15 +22,28 @@ const LEVELS = [
   { label: "Crítica", color: "#f43f5e" },
 ];
 
-interface ReassignState { category: string; from: Buyer; }
+interface ReassignState { kind: ReassignKind; label: string; from: Buyer; }
 interface OffboardState { buyer: Buyer; mode: string; }
 
 export function WorkloadPage() {
   const toast = useToast();
+  const { signals } = useSignals();
   const [reassign, setReassign] = useState<ReassignState | null>(null);
   const [offboard, setOffboard] = useState<OffboardState | null>(null);
 
   const board = [...buyers].sort(byWorkloadDesc);
+
+  // Elementos granulares reasignables por comprador
+  const suppliersOf = (b: Buyer) =>
+    suppliers
+      .filter((s) => s.status !== "inactive" && s.categories.some((c) => b.categories.includes(c)))
+      .map((s) => s.name)
+      .slice(0, 6);
+  const requestsOf = (b: Buyer) =>
+    signals
+      .filter((s) => s.assignedBuyer === b.name && s.status !== "resolved" && s.status !== "rejected")
+      .map((s) => s.productName)
+      .slice(0, 6);
 
   return (
     <div>
@@ -77,17 +94,11 @@ export function WorkloadPage() {
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Mover una categoría a otro comprador</p>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {b.categories.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setReassign({ category: c, from: b })}
-                      className="inline-flex items-center gap-1.5 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50/40"
-                    >
-                      {c}
-                    </button>
-                  ))}
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Reasignar a otro comprador</p>
+                <div className="space-y-2 mb-3">
+                  <ReassignGroup label="Categorías" items={b.categories} kind="categoría" onPick={(label) => setReassign({ kind: "categoría", label, from: b })} />
+                  <ReassignGroup label="Proveedores" items={suppliersOf(b)} kind="proveedor" onPick={(label) => setReassign({ kind: "proveedor", label, from: b })} />
+                  <ReassignGroup label="Solicitudes" items={requestsOf(b)} kind="solicitud" onPick={(label) => setReassign({ kind: "solicitud", label, from: b })} />
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setOffboard({ buyer: b, mode: "carga" })}>
                   Dar de baja y redistribuir
@@ -102,23 +113,25 @@ export function WorkloadPage() {
       <Modal
         open={!!reassign}
         onClose={() => setReassign(null)}
-        title="Reasignar categoría"
-        description={reassign ? `Mover ${reassign.category} desde ${reassign.from.name}. Elige el destino y revisa el impacto en la carga.` : ""}
+        title={reassign ? `Reasignar ${reassign.kind}` : "Reasignar"}
+        description={reassign ? `Mover ${reassign.kind} “${reassign.label}” desde ${reassign.from.name}. Elige el destino y revisa el impacto en la carga.` : ""}
       >
         {reassign && (
           <div className="space-y-3">
             {buyers.filter((t) => t.id !== reassign.from.id).map((t) => {
-              const share = Math.round(reassign.from.workloadPct / Math.max(1, reassign.from.categories.length));
-              const newPct = Math.min(100, t.workloadPct + Math.round(share * 0.9));
+              // El impacto depende del tipo: una categoría pesa más que una solicitud.
+              const weight = reassign.kind === "categoría" ? 0.9 : reassign.kind === "proveedor" ? 0.4 : 0.15;
+              const share = Math.round((reassign.from.workloadPct / Math.max(1, reassign.from.categories.length)) * weight);
+              const newPct = Math.min(100, t.workloadPct + share);
               return (
                 <div key={t.id} className="border border-slate-200 rounded-xl p-3.5">
                   <div className="flex items-center gap-3">
                     <span className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${BUYER_TONE_AV[t.tone]}`}>{t.initials}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-800">{t.name}</p>
-                      <p className="text-xs text-slate-400">Carga actual {WORKLOAD_CFG[t.workload].label} · {t.workloadPct}% → <b className="text-slate-600">{newPct}%</b> (+{Math.round(share * 0.9)} pts)</p>
+                      <p className="text-xs text-slate-400">Carga actual {WORKLOAD_CFG[t.workload].label} · {t.workloadPct}% → <b className="text-slate-600">{newPct}%</b> (+{share} pts)</p>
                     </div>
-                    <Button size="sm" onClick={() => { toast.success(`${reassign.category} reasignada de ${reassign.from.name} a ${t.name}`); setReassign(null); }}>
+                    <Button size="sm" onClick={() => { toast.success(`${reassign.kind} “${reassign.label}” reasignada de ${reassign.from.name} a ${t.name}`); setReassign(null); }}>
                       Asignar aquí
                     </Button>
                   </div>
@@ -191,6 +204,39 @@ export function WorkloadPage() {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+function ReassignGroup({
+  label,
+  items,
+  kind,
+  onPick,
+}: {
+  label: string;
+  items: string[];
+  kind: ReassignKind;
+  onPick: (label: string) => void;
+}) {
+  if (items.length === 0) return null;
+  const tone =
+    kind === "categoría" ? "hover:border-brand-300 hover:bg-brand-50/40" : kind === "proveedor" ? "hover:border-violet-300 hover:bg-violet-50/40" : "hover:border-amber-300 hover:bg-amber-50/40";
+  return (
+    <div>
+      <p className="text-[10.5px] text-slate-400 mb-1">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((it) => (
+          <button
+            key={it}
+            onClick={() => onPick(it)}
+            className={`inline-flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-600 ${tone}`}
+            title={`Reasignar ${kind}: ${it}`}
+          >
+            {it}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
