@@ -438,9 +438,13 @@ export type SignalChannel = "store" | "web" | "marketplace" | "call_center";
 export type SignalPriority = "high" | "medium" | "low";
 
 export type SignalStatus =
-  | "new" // nuevo, sin revisar
+  | "new" // solicitado, sin revisar
   | "in_review" // el comprador lo está mirando
-  | "accepted" // aceptado / lo tomará
+  | "sourcing" // consultando proveedor
+  | "quoted" // cotizado
+  | "awaiting_customer" // esperando respuesta del cliente
+  | "accepted" // aprobado / lo tomará
+  | "purchased" // comprado
   | "rejected" // rechazado con motivo
   | "resolved"; // resuelto / cerrado
 
@@ -507,6 +511,13 @@ export interface SalesSignal {
   // Gestión por el comprador
   assignedBuyer?: string; // comprador asignado
   rejectionReason?: string; // motivo si fue rechazada
+  // Solicitud formal de compra (vendedor → comprador)
+  customerName?: string; // cliente que la solicita
+  requestedQty?: number; // cantidad requerida
+  requiredDate?: string; // fecha requerida (ISO)
+  targetPrice?: number; // precio objetivo del cliente (CLP)
+  suggestedSupplier?: string; // proveedor sugerido
+  quotedCost?: number; // costo cotizado por el proveedor (CLP)
   // Apoyo + colaboración + trazabilidad
   support: SignalSupport;
   messages: SignalMessage[];

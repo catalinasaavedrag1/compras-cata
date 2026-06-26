@@ -32,7 +32,18 @@ interface SignalPatch {
   priority?: SignalPriority;
   assignedBuyer?: string;
   rejectionReason?: string;
+  customerName?: string;
+  requestedQty?: number;
+  requiredDate?: string;
+  targetPrice?: number;
+  suggestedSupplier?: string;
+  quotedCost?: number;
 }
+
+export type SignalRequestFields = Pick<
+  SignalPatch,
+  "customerName" | "requestedQty" | "requiredDate" | "targetPrice" | "suggestedSupplier" | "quotedCost"
+>;
 
 interface SignalsState {
   created: SalesSignal[];
@@ -64,6 +75,11 @@ export interface NewSignalInput {
   estimatedLostSale?: number;
   evidenceNote?: string;
   support?: SignalSupport;
+  customerName?: string;
+  requestedQty?: number;
+  requiredDate?: string;
+  targetPrice?: number;
+  suggestedSupplier?: string;
 }
 
 interface SignalsContextValue {
@@ -73,6 +89,7 @@ interface SignalsContextValue {
   assign: (id: string, buyer: string) => void;
   setPriority: (id: string, priority: SignalPriority) => void;
   reject: (id: string, reason: string) => void;
+  updateRequest: (id: string, fields: SignalRequestFields) => void;
   addMessage: (
     id: string,
     msg: { role: "seller" | "buyer"; author: string; text: string }
@@ -143,9 +160,13 @@ export function SignalsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SignalsContextValue>(() => {
     const STATUS_TEXT: Record<SignalStatus, string> = {
-      new: "Marcada como nueva",
+      new: "Marcada como solicitada",
       in_review: "Pasó a En revisión",
-      accepted: "Aceptada",
+      sourcing: "Consultando al proveedor",
+      quoted: "Cotización recibida",
+      awaiting_customer: "Esperando respuesta del cliente",
+      accepted: "Aprobada",
+      purchased: "Comprada",
       rejected: "Rechazada",
       resolved: "Resuelta",
     };
@@ -172,6 +193,11 @@ export function SignalsProvider({ children }: { children: ReactNode }) {
           customersAsking: input.customersAsking,
           estimatedLostSale: input.estimatedLostSale,
           evidenceNote: input.evidenceNote,
+          customerName: input.customerName,
+          requestedQty: input.requestedQty,
+          requiredDate: input.requiredDate,
+          targetPrice: input.targetPrice,
+          suggestedSupplier: input.suggestedSupplier,
           support: supportFor(input.sku, input.support),
           messages: input.comment
             ? [
@@ -217,6 +243,10 @@ export function SignalsProvider({ children }: { children: ReactNode }) {
       reject: (id, reason) => {
         patch(id, { status: "rejected", rejectionReason: reason });
         pushEvent(id, "status", "Comprador", `Rechazada — ${reason}`);
+      },
+      updateRequest: (id, fields) => {
+        patch(id, fields);
+        pushEvent(id, "comment", "Comprador", "Datos de la solicitud actualizados");
       },
       addMessage: (id, msg) => {
         const m: SignalMessage = {

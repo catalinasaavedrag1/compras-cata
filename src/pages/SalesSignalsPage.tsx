@@ -43,11 +43,14 @@ import type {
 
 const TABS = [
   { value: "to_review", label: "Por revisar" },
-  { value: "accepted", label: "Aceptadas" },
+  { value: "in_progress", label: "En gestión" },
+  { value: "accepted", label: "Aprobadas" },
   { value: "resolved", label: "Resueltas" },
   { value: "rejected", label: "Rechazadas" },
   { value: "all", label: "Todas" },
 ];
+
+const IN_PROGRESS_STATUSES = ["sourcing", "quoted", "awaiting_customer", "purchased"];
 
 const PRIORITY_ORDER: Record<SignalPriority, number> = {
   high: 0,
@@ -158,6 +161,7 @@ export function SalesSignalsPage() {
       to_review: byFilters.filter(
         (s) => s.status === "new" || s.status === "in_review"
       ).length,
+      in_progress: byFilters.filter((s) => IN_PROGRESS_STATUSES.includes(s.status)).length,
       accepted: byFilters.filter((s) => s.status === "accepted").length,
       resolved: byFilters.filter((s) => s.status === "resolved").length,
       rejected: byFilters.filter((s) => s.status === "rejected").length,
@@ -198,6 +202,8 @@ export function SalesSignalsPage() {
     let base = byFilters;
     if (tab === "to_review")
       base = base.filter((s) => s.status === "new" || s.status === "in_review");
+    else if (tab === "in_progress")
+      base = base.filter((s) => IN_PROGRESS_STATUSES.includes(s.status));
     else if (tab !== "all") base = base.filter((s) => s.status === tab);
     return [...base].sort((a, b) => {
       const p = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];

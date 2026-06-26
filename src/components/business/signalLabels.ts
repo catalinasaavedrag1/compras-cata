@@ -114,9 +114,13 @@ export interface SignalStatusMeta {
 }
 
 export const SIGNAL_STATUS: Record<SignalStatus, SignalStatusMeta> = {
-  new: { label: "Nuevo", tone: "blue" },
+  new: { label: "Solicitado", tone: "blue" },
   in_review: { label: "En revisión", tone: "amber" },
-  accepted: { label: "Aceptado", tone: "green" },
+  sourcing: { label: "Consultando proveedor", tone: "amber" },
+  quoted: { label: "Cotizado", tone: "violet" },
+  awaiting_customer: { label: "Esperando cliente", tone: "amber" },
+  accepted: { label: "Aprobado", tone: "green" },
+  purchased: { label: "Comprado", tone: "green" },
   rejected: { label: "Rechazado", tone: "slate" },
   resolved: { label: "Resuelto", tone: "neutral" },
 };
