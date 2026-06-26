@@ -22,7 +22,7 @@ import {
   formatNumber,
   formatPercent,
 } from "../utils/formatters";
-import { IconOrders, IconInventory, IconSuppliers } from "../components/ui/icons";
+import { IconOrders, IconInventory, IconSuppliers, IconSales, IconBox } from "../components/ui/icons";
 
 export function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +51,27 @@ export function SupplierDetailPage() {
   const supAlerts = alerts.filter((a) => a.relatedEntity === supplier.name || (a.relatedSku && supSkus.has(a.relatedSku)));
   const riskProducts = supProducts.filter((p) => p.availableStock <= 0 && p.salesLast30Days > 0).length;
 
+  // ---- Resumen comercial para atender al proveedor ----
+  const sales30Amount = (p: (typeof supProducts)[number]) => p.salesLast30Days * p.price;
+  const utility30 = (p: (typeof supProducts)[number]) => p.salesLast30Days * (p.price - p.cost);
+  const ventas30 = supProducts.reduce((a, p) => a + sales30Amount(p), 0);
+  const utilidad30 = supProducts.reduce((a, p) => a + utility30(p), 0);
+  const margenProm = ventas30 > 0 ? (utilidad30 / ventas30) * 100 : 0;
+
+  const topSold = [...supProducts].filter((p) => p.salesLast30Days > 0).sort((a, b) => sales30Amount(b) - sales30Amount(a)).slice(0, 5);
+  const detenidos = supProducts.filter((p) => p.purchaseStatus === "overstock" || (p.salesLast30Days === 0 && p.availableStock > 0));
+  const delayedPOs = supPOs.filter((o) => o.status === "delayed" || o.delayedDays > 0);
+
+  // Nivel de importancia: combina compra (90d) vs el mayor del panel y tamaño del surtido
+  const maxBuy = Math.max(1, ...suppliers.map((s) => s.purchasedAmountLast90Days));
+  const share = supplier.purchasedAmountLast90Days / maxBuy;
+  const importance =
+    share >= 0.6 || supplier.associatedSkus >= 200
+      ? { label: "Estratégico", tone: "violet" as const }
+      : share >= 0.3 || supplier.associatedSkus >= 100
+        ? { label: "Importante", tone: "blue" as const }
+        : { label: "Secundario", tone: "neutral" as const };
+
   return (
     <div>
       <PageHeader
@@ -77,6 +98,87 @@ export function SupplierDetailPage() {
           {" · "}última compra {formatDate(supplier.lastPurchaseDate)}.
         </div>
       )}
+
+      {/* Resumen para atender al proveedor */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-card p-4 mb-4">
+        <p className="text-sm font-semibold text-slate-800 mb-3">Para atender al proveedor</p>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+            <p className="text-xs text-slate-400">Importancia</p>
+            <div className="mt-1"><Badge tone={importance.tone}>{importance.label}</Badge></div>
+          </div>
+          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+            <p className="text-xs text-slate-400">Venta 30 días</p>
+            <p className="text-lg font-semibold text-slate-800">{formatCurrencyCompact(ventas30)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+            <p className="text-xs text-slate-400">Margen promedio</p>
+            <p className="text-lg font-semibold text-emerald-700">{formatPercent(margenProm, 1)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+            <p className="text-xs text-slate-400">Utilidad 30 días</p>
+            <p className="text-lg font-semibold text-emerald-700">{formatCurrencyCompact(utilidad30)}</p>
+          </div>
+          <button onClick={() => setTab("ordenes")} className="rounded-lg bg-slate-50 px-3 py-2.5 text-left hover:bg-slate-100">
+            <p className="text-xs text-slate-400">OC atrasadas</p>
+            <p className={`text-lg font-semibold ${delayedPOs.length > 0 ? "text-rose-600" : "text-slate-800"}`}>{formatNumber(delayedPOs.length)}</p>
+          </button>
+        </div>
+      </div>
+
+      {/* Más vendidos / Productos detenidos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <Card>
+          <CardBody>
+            <div className="flex items-center gap-2 mb-2.5">
+              <IconSales className="w-4 h-4 text-emerald-600" />
+              <p className="text-sm font-semibold text-slate-800">Más vendidos (30 días)</p>
+            </div>
+            {topSold.length === 0 ? (
+              <p className="text-sm text-slate-400">Sin ventas registradas.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {topSold.map((p, i) => (
+                  <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50">
+                    <span className="w-5 text-center text-xs font-bold text-slate-400">{i + 1}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-slate-800 truncate">{p.name}</span>
+                      <span className="block text-xs text-slate-400">{formatNumber(p.salesLast30Days)} u. · margen {formatPercent(p.margin, 0)}</span>
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{formatCurrencyCompact(sales30Amount(p))}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <div className="flex items-center gap-2 mb-2.5">
+              <IconBox className="w-4 h-4 text-violet-600" />
+              <p className="text-sm font-semibold text-slate-800">Productos detenidos</p>
+              {detenidos.length > 0 && <Badge tone="violet">{detenidos.length}</Badge>}
+            </div>
+            {detenidos.length === 0 ? (
+              <p className="text-sm text-slate-400">Sin sobrestock ni productos sin venta. 👍</p>
+            ) : (
+              <div className="space-y-1.5">
+                {detenidos.slice(0, 5).map((p) => (
+                  <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-slate-800 truncate">{p.name}</span>
+                      <span className="block text-xs text-slate-400">disp. {formatNumber(p.availableStock)} · vende {formatNumber(p.salesLast30Days)}/mes</span>
+                    </span>
+                    <Badge tone={p.salesLast30Days === 0 ? "red" : "violet"}>{p.salesLast30Days === 0 ? "Sin venta" : "Sobrestock"}</Badge>
+                  </Link>
+                ))}
+                {detenidos.length > 5 && <p className="text-xs text-slate-400 pt-0.5">+{detenidos.length - 5} más · ver pestaña Productos</p>}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
 
       <Tabs
         className="mb-4"
