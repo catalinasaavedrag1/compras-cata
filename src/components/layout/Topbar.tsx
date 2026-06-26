@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "./navItems";
 import { Input } from "../ui/Input";
-import { IconSearch, IconOrders, IconProducts, IconSuppliers } from "../ui/icons";
+import { IconSearch, IconOrders, IconProducts, IconSuppliers, IconCategories } from "../ui/icons";
 import { useOcDraft } from "../../context/OcDraftContext";
 import { useBuyer, initials } from "../../context/BuyerContext";
 import { useRole } from "../../context/RoleContext";
@@ -11,9 +11,12 @@ import { NotificationCenter } from "./NotificationCenter";
 import { BackendStatus } from "./BackendStatus";
 import { TODAY_ISO } from "../../utils/constants";
 import { formatDate, formatNumber } from "../../utils/formatters";
-import { products } from "../../data/mockProducts";
-import { suppliers } from "../../data/mockSuppliers";
-import { purchaseOrders } from "../../data/mockPurchaseOrders";
+import { products as mockProducts } from "../../data/mockProducts";
+import { suppliers as mockSuppliers } from "../../data/mockSuppliers";
+import { purchaseOrders as mockPOs } from "../../data/mockPurchaseOrders";
+import { categories as mockCategories } from "../../data/mockCategories";
+import { useCollection } from "../../context/DataContext";
+import type { Product, Supplier, PurchaseOrder, Category } from "../../types/purchasing";
 
 function currentTitle(pathname: string): string {
   if (pathname.startsWith("/productos/")) return "Detalle de producto";
@@ -24,7 +27,7 @@ function currentTitle(pathname: string): string {
 }
 
 interface SearchResult {
-  type: "product" | "supplier" | "order";
+  type: "product" | "supplier" | "order" | "category";
   title: string;
   subtitle: string;
   to: string;
@@ -36,6 +39,11 @@ export function Topbar() {
   const { count } = useOcDraft();
   const { buyer, setBuyer, buyers } = useBuyer();
   const { role, setRole, persona } = useRole();
+
+  const products = useCollection<Product>("products", mockProducts);
+  const suppliers = useCollection<Supplier>("suppliers", mockSuppliers);
+  const purchaseOrders = useCollection<PurchaseOrder>("purchase-orders", mockPOs);
+  const categories = useCollection<Category>("categories", mockCategories);
 
   const switchRole = (r: "comprador" | "lider") => {
     if (r === role) return;
@@ -64,9 +72,15 @@ export function Topbar() {
     }
     for (const s of suppliers) {
       if (`${s.name} ${s.rut}`.toLowerCase().includes(q)) {
-        out.push({ type: "supplier", title: s.name, subtitle: `${s.rut} · ${s.categories.join(", ")}`, to: "/proveedores" });
+        out.push({ type: "supplier", title: s.name, subtitle: `${s.rut} · ${s.categories.join(", ")}`, to: `/proveedores/${s.id}` });
       }
       if (out.filter((r) => r.type === "supplier").length >= 3) break;
+    }
+    for (const c of categories) {
+      if (c.name.toLowerCase().includes(q)) {
+        out.push({ type: "category", title: c.name, subtitle: `Categoría · ${formatNumber(c.activeSkus)} SKU · ${c.buyer}`, to: `/categorias/${c.id}` });
+      }
+      if (out.filter((r) => r.type === "category").length >= 3) break;
     }
     for (const o of purchaseOrders) {
       if (`${o.number} ${o.supplierName}`.toLowerCase().includes(q)) {
@@ -75,7 +89,7 @@ export function Topbar() {
       if (out.filter((r) => r.type === "order").length >= 3) break;
     }
     return out;
-  }, [search]);
+  }, [search, products, suppliers, categories, purchaseOrders]);
 
   const go = (to: string) => {
     setOpen(false);
@@ -94,11 +108,13 @@ export function Topbar() {
       <IconProducts className="w-4 h-4 text-slate-400" />
     ) : t === "supplier" ? (
       <IconSuppliers className="w-4 h-4 text-slate-400" />
+    ) : t === "category" ? (
+      <IconCategories className="w-4 h-4 text-slate-400" />
     ) : (
       <IconOrders className="w-4 h-4 text-slate-400" />
     );
 
-  const groupLabel = { product: "Productos", supplier: "Proveedores", order: "Órdenes de compra" };
+  const groupLabel = { product: "Productos", supplier: "Proveedores", category: "Categorías", order: "Órdenes de compra" };
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-slate-200 bg-white/90 backdrop-blur flex items-center gap-3 px-4 lg:px-6">
