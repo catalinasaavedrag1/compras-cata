@@ -28,6 +28,31 @@ function profileFor(category: string): number[] {
   return PROFILES.flat;
 }
 
+/**
+ * Factor de demanda estacional para los próximos `monthsAhead` meses respecto al
+ * promedio anual de la categoría. >1 = entrando a temporada alta (comprar más);
+ * <1 = saliendo de temporada (comprar menos). Pensado para ajustar el sugerido.
+ */
+export function seasonalFactor(category: string, monthsAhead = 2): number {
+  const profile = profileFor(category);
+  const avg = profile.reduce((a, b) => a + b, 0) / 12;
+  let sum = 0;
+  for (let i = 1; i <= monthsAhead; i++) sum += profile[(CURRENT_MONTH + i) % 12];
+  const f = sum / monthsAhead / avg;
+  return Math.round(f * 100) / 100;
+}
+
+/** Etiqueta del tipo de demanda según la forma del perfil de la categoría. */
+export function demandType(category: string): "constante" | "estacional" | "permanente_peak" {
+  const profile = profileFor(category);
+  const avg = profile.reduce((a, b) => a + b, 0) / 12;
+  const ratio = Math.max(...profile) / avg;
+  const min = Math.min(...profile) / avg;
+  if (ratio < 1.12) return "constante";
+  if (min >= 0.6) return "permanente_peak"; // vende todo el año con peak (ej. cloro)
+  return "estacional"; // fuerte concentración (ej. piscinas)
+}
+
 export interface MonthPoint {
   ym: string;
   label: string;

@@ -43,6 +43,7 @@ import {
   addDaysISO,
 } from "../utils/calculations";
 import { TODAY_ISO } from "../utils/constants";
+import { seasonalFactor } from "../utils/seasonality";
 import { useState } from "react";
 import {
   formatCurrencyCompact,
@@ -110,6 +111,7 @@ export function MyPanelPage() {
           targetInventoryDays: 45,
           minStock: p.minStock,
           maxStock: p.maxStock,
+          seasonalFactor: seasonalFactor(p.category),
         });
         const suggestedQty = rec?.suggestedQuantity ?? calc.suggestedQuantity;
         const coverageAfter =

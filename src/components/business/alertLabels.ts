@@ -14,4 +14,7 @@ export const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   high_suggested_purchase: "Compra sugerida alta",
   dead_stock: "Stock muerto",
   outdated_cost: "Costo sin actualizar",
+  no_recent_purchase: "Sin compra reciente",
+  season_approaching: "Temporada próxima",
+  lost_opportunity: "Oportunidad no capturada",
 };

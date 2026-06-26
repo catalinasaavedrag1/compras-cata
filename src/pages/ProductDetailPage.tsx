@@ -20,6 +20,7 @@ import { getProductBySku, products } from "../data/mockProducts";
 import { suppliers, getSupplierByName } from "../data/mockSuppliers";
 import { supplierFulfillment } from "../utils/supplierPerf";
 import { productNegotiation } from "../utils/negotiation";
+import { seasonalFactor, demandType } from "../utils/seasonality";
 import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
 import { receptions } from "../data/mockReceptions";
 import { skuOptimizationStatus, ACTION_LABEL, TIER_LABEL } from "../utils/catalogOptimization";
@@ -785,6 +786,27 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
               <NStat label="Tendencia" value={`${neg.tendenciaPct >= 0 ? "+" : ""}${formatPercent(neg.tendenciaPct, 0)}`} tone={neg.tendenciaPct >= 0 ? "good" : "bad"} />
               <NStat label="Rotación" value={`${formatNumber(product.rotation)}x`} sub="al año" />
             </div>
+            {(() => {
+              const sf = seasonalFactor(product.category);
+              const dt = demandType(product.category);
+              const dtLabel = dt === "constante" ? "Venta constante" : dt === "permanente_peak" ? "Permanente con peak" : "Estacional fuerte";
+              const pct = Math.round((sf - 1) * 100);
+              return (
+                <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Demanda estacional ({dtLabel})</span>
+                    <span className={`font-semibold ${sf >= 1.1 ? "text-emerald-700" : sf <= 0.9 ? "text-rose-600" : "text-slate-700"}`}>{pct >= 0 ? "+" : ""}{pct}% próx. meses</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {sf >= 1.1
+                      ? "Entra a temporada alta: el sugerido sube el objetivo de cobertura para no quebrar en el peak."
+                      : sf <= 0.9
+                        ? "Saliendo de temporada: el sugerido baja la compra para no quedar con sobrestock."
+                        : "Sin ajuste estacional relevante para los próximos meses."}
+                  </p>
+                </div>
+              );
+            })()}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge tone={neg.demandTag.tone === "good" ? "green" : neg.demandTag.tone === "bad" ? "red" : "neutral"}>{neg.demandTag.label}</Badge>
               {product.supplierName && (

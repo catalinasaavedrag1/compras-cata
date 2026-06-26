@@ -20,6 +20,7 @@ import { useToast } from "../context/ToastContext";
 import { receptions, RECEPTION_STATUS } from "../data/mockReceptions";
 import { getProductBySku } from "../data/mockProducts";
 import { supplierFulfillment } from "../utils/supplierPerf";
+import { coverageDays } from "../utils/calculations";
 import { uniqueValues } from "../utils/filters";
 import { formatDate, formatNumber, formatPercent } from "../utils/formatters";
 import { IconAlerts, IconCheck, IconClock, IconPlus, IconBox } from "../components/ui/icons";
@@ -421,8 +422,27 @@ function ReceptionDetail({
   hasItem: (sku: string) => boolean;
 }) {
   const perf = supplierFulfillment(detail.supplierName);
+
+  // Impacto de la recepción parcial: SKUs que quedan bajo cobertura mínima
+  const impacted = (detail.items ?? [])
+    .filter((it) => it.expected - it.received > 0)
+    .map((it) => {
+      const p = getProductBySku(it.sku);
+      if (!p || p.salesLast30Days <= 0) return null;
+      const cover = coverageDays(p.availableStock, p.salesLast30Days);
+      const limite = Math.max(7, p.supplierLeadTimeDays);
+      return { sku: it.sku, name: it.productName, cover, atRisk: cover <= limite };
+    })
+    .filter((x): x is { sku: string; name: string; cover: number; atRisk: boolean } => x !== null && x.atRisk)
+    .sort((a, b) => a.cover - b.cover);
+
   return (
     <div className="space-y-4">
+      {impacted.length > 0 && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-800">
+          ⚠ <b>Impacto:</b> esta recepción {RECEPTION_STATUS[detail.status].label.toLowerCase()} deja {impacted.length} SKU bajo cobertura mínima. El más urgente: <b>{impacted[0].name}</b>, quiebre estimado en ~{Math.max(0, Math.round(impacted[0].cover))} días. Reordena lo faltante o busca proveedor alternativo.
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-3">
         <div><p className="text-xs text-slate-400">Esperada</p><p className="text-sm font-medium text-slate-800">{formatDate(detail.expectedDate)}</p></div>
         <div><p className="text-xs text-slate-400">Recibida</p><p className="text-sm font-medium text-slate-800">{detail.receivedDate ? formatDate(detail.receivedDate) : "Pendiente"}</p></div>
@@ -471,6 +491,12 @@ function ReceptionDetail({
                     {missing > 0 && <span className="text-rose-600 font-semibold">Faltan {formatNumber(missing)}</span>}
                   </div>
                   {it.issue && <p className="text-xs text-rose-600 mt-1">⚠ {it.issue}</p>}
+                  {missing > 0 && (() => {
+                    const p = getProductBySku(it.sku);
+                    if (!p || p.salesLast30Days <= 0) return null;
+                    const cover = coverageDays(p.availableStock, p.salesLast30Days);
+                    return <p className="text-[11px] text-slate-500 mt-1">Stock actual cubre ~{Math.max(0, Math.round(cover))} días (vende {formatNumber(p.salesLast30Days)}/mes){cover <= Math.max(7, p.supplierLeadTimeDays) && <span className="text-rose-600 font-medium"> · riesgo de quiebre</span>}.</p>;
+                  })()}
                   {missing > 0 && (
                     <Button size="sm" className="mt-2" variant={hasItem(it.sku) ? "secondary" : "primary"} disabled={hasItem(it.sku)} icon={<IconPlus className="w-3.5 h-3.5" />} onClick={() => reorder(it.sku, it.productName, detail.supplierName, missing)}>
                       {hasItem(it.sku) ? "En borrador de OC" : `Reordenar ${formatNumber(missing)} u.`}

@@ -323,4 +323,46 @@ export const alerts: CommercialAlert[] = [
     responsible: "Juan Pérez",
     status: "new",
   },
+  {
+    id: "ALR-024",
+    type: "lost_opportunity",
+    severity: "high",
+    relatedEntity: "Carretilla reforzada 90 litros",
+    relatedSku: "JAR-003",
+    description:
+      "JAR-003 vendía de forma estable y dejó de comprarse hace meses; quedó sin stock. La categoría Jardín siguió vendiendo, así que no es falta de demanda. Impacto: venta no capturada cada mes que sigue sin reponerse.",
+    recommendation:
+      "Reponer stock base. Ver detalle en Oportunidades no capturadas.",
+    date: "2026-06-25",
+    responsible: "María González",
+    status: "new",
+  },
+  {
+    id: "ALR-025",
+    type: "season_approaching",
+    severity: "medium",
+    relatedEntity: "Herbicida jardín concentrado 1 L",
+    relatedSku: "JAR-002",
+    description:
+      "JAR-002 entra en su temporada alta hacia fin de año (categoría Jardín, estacional). Con el lead time del proveedor, conviene anticipar la compra. Impacto: riesgo de quiebre en plena temporada si se compra tarde.",
+    recommendation:
+      "Negociar OC anticipada y stock reservado antes del peak. Ver Temporadas del proveedor.",
+    date: "2026-06-25",
+    responsible: "María González",
+    status: "new",
+  },
+  {
+    id: "ALR-026",
+    type: "no_recent_purchase",
+    severity: "medium",
+    relatedEntity: "Manguera jardín 1/2 (rollo 15 m)",
+    relatedSku: "JAR-004",
+    description:
+      "JAR-004 no registra compra en los últimos meses pese a venta histórica y categoría en crecimiento. Impacto: se está dejando de vender mientras no se repone.",
+    recommendation:
+      "Reactivar compra base. Ver detalle en Oportunidades no capturadas.",
+    date: "2026-06-24",
+    responsible: "María González",
+    status: "new",
+  },
 ];

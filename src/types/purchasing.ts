@@ -67,7 +67,10 @@ export type AlertType =
   | "po_delayed"
   | "high_suggested_purchase"
   | "dead_stock"
-  | "outdated_cost";
+  | "outdated_cost"
+  | "no_recent_purchase"
+  | "season_approaching"
+  | "lost_opportunity";
 
 export interface StockByLocation {
   locationName: string;

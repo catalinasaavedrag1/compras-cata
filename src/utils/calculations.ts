@@ -38,6 +38,8 @@ export interface SuggestedPurchaseInput {
   targetInventoryDays: number;
   minStock: number;
   maxStock: number;
+  /** Factor estacional para la demanda del horizonte (1 = sin ajuste). */
+  seasonalFactor?: number;
 }
 
 export interface SuggestedPurchaseResult {
@@ -63,14 +65,16 @@ export function calculateSuggestedPurchase(
     targetInventoryDays,
     minStock,
     maxStock,
+    seasonalFactor = 1,
   } = input;
 
   const dailyDemand = monthlySales / 30;
   const netStock = Math.max(0, availableStock - committedStock);
 
-  // Demanda esperada durante lead time + días objetivo de cobertura
+  // Demanda esperada durante lead time + días objetivo de cobertura,
+  // ajustada por el factor estacional del horizonte (temporada alta/baja).
   const horizonDays = leadTimeDays + targetInventoryDays;
-  const demandOverHorizon = dailyDemand * horizonDays;
+  const demandOverHorizon = dailyDemand * horizonDays * seasonalFactor;
 
   // Objetivo de stock = demanda del horizonte, acotado por mín/máx
   let target = Math.max(demandOverHorizon, minStock);

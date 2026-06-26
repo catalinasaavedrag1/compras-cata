@@ -122,6 +122,8 @@ export function AlertsPage() {
       return { label: "Ver órdenes de compra", onClick: () => navigate("/ordenes-compra") };
     if (a.type === "supplier_delay")
       return { label: "Revisar proveedor", onClick: () => navigate("/proveedores") };
+    if (a.type === "lost_opportunity" || a.type === "no_recent_purchase")
+      return { label: "Ver oportunidades no capturadas", onClick: () => navigate("/oportunidades-perdidas") };
     if (a.relatedSku)
       return { label: "Ver producto", onClick: () => navigate(`/productos/${a.relatedSku}`) };
     return undefined;
@@ -267,6 +269,9 @@ const TYPE_GROUP: Record<AlertType, { label: string; tone: BadgeTone }> = {
   low_margin: { label: "Margen", tone: "amber" },
   cost_increase: { label: "Margen", tone: "amber" },
   outdated_cost: { label: "Margen", tone: "neutral" },
+  no_recent_purchase: { label: "Oportunidad", tone: "amber" },
+  season_approaching: { label: "Demanda", tone: "blue" },
+  lost_opportunity: { label: "Oportunidad", tone: "red" },
 };
 
 /** Agrupa alertas por antigüedad (Hoy / Ayer / Esta semana / Anteriores). */
