@@ -50,9 +50,13 @@ export function TeamAlertsPage() {
       navigate("/equipo/carga");
     } else if (a.type === "goal_risk") {
       navigate("/equipo/metas");
+    } else if (a.type === "no_supplier") {
+      navigate("/proveedores");
     } else if (a.buyer) {
       const b = buyers.find((z) => z.name === a.buyer);
       if (b) setSel(b);
+    } else {
+      navigate("/equipo/compradores");
     }
   };
 
