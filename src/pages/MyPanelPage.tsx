@@ -44,6 +44,8 @@ import {
 } from "../utils/calculations";
 import { TODAY_ISO } from "../utils/constants";
 import { seasonalFactor } from "../utils/seasonality";
+import { lostOpportunities } from "../utils/lostOpportunities";
+import { approvalRequests } from "../data/mockApprovals";
 import { useState } from "react";
 import {
   formatCurrencyCompact,
@@ -91,6 +93,11 @@ export function MyPanelPage() {
   );
 
   const myCats = categories.filter((c) => c.buyer === buyer);
+
+  // Oportunidades no capturadas y aprobaciones del comprador
+  const myLostOpps = useMemo(() => lostOpportunities().filter((o) => myCategories.includes(o.category)), [myCategories]);
+  const myLostRevenue = myLostOpps.reduce((a, o) => a + o.ventaPerdida, 0);
+  const myApprovals = approvalRequests.filter((a) => a.buyerName === buyer);
 
   // Riesgo de quiebre: sin stock con venta, o cobertura corta vs lead time
   const riskRows = useMemo<RiskRow[]>(() => {
@@ -466,6 +473,44 @@ export function MyPanelPage() {
           )}
         </CardBody>
       </Card>
+
+      {/* Oportunidades no capturadas y aprobaciones mías */}
+      {(myLostOpps.length > 0 || myApprovals.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          {myLostOpps.length > 0 && (
+            <Card>
+              <CardHeader title="Oportunidades no capturadas" description={`${formatCurrencyCompact(myLostRevenue)}/mes que dejas de vender por no reponer`} action={<Link to="/oportunidades-perdidas"><span className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver todas</span></Link>} />
+              <CardBody className="space-y-1.5">
+                {myLostOpps.slice(0, 4).map((o) => (
+                  <Link key={o.sku} to={`/productos/${o.sku}`} className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-slate-800 truncate">{o.name}</span>
+                      <span className="block text-xs text-slate-400">{o.motivo} · vendía ~{formatNumber(o.histMonthly)}/mes</span>
+                    </span>
+                    <span className="text-sm font-semibold text-rose-600 flex-shrink-0">{formatCurrencyCompact(o.ventaPerdida)}/mes</span>
+                  </Link>
+                ))}
+              </CardBody>
+            </Card>
+          )}
+          {myApprovals.length > 0 && (
+            <Card>
+              <CardHeader title="Mis aprobaciones" description="Compras fuera de criterio a la espera de aprobación" action={<Link to="/aprobaciones"><span className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver todas</span></Link>} />
+              <CardBody className="space-y-1.5">
+                {myApprovals.slice(0, 4).map((a) => (
+                  <Link key={a.id} to="/aprobaciones" className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-slate-800 truncate">{a.productName}</span>
+                      <span className="block text-xs text-slate-400">sugerido {formatNumber(a.suggestedQty)} → {formatNumber(a.requestedQty)} u.</span>
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{formatCurrencyCompact(a.amount)}</span>
+                  </Link>
+                ))}
+              </CardBody>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Mis categorías asignadas */}
       <Card className="mb-4">

@@ -35,6 +35,9 @@ import { salesKpis } from "../data/mockSales";
 import { inventoryKpis } from "../data/mockInventory";
 import { monthlyPurchaseBudget } from "../data/mockRules";
 import { campaignOpportunities } from "../data/mockCampaignOpportunities";
+import { lostOpportunities } from "../utils/lostOpportunities";
+import { purchaseQualityLines } from "../utils/purchaseQuality";
+import { approvalRequests } from "../data/mockApprovals";
 import { signals as salesSignals } from "../data/mockSignals";
 import { STOCKOUT_TYPES } from "../components/business/signalLabels";
 import {
@@ -59,6 +62,12 @@ export function DashboardPage() {
   const avgMargin = products.reduce((acc, p) => acc + p.margin, 0) / products.length;
   const noSupplier = products.filter((p) => !p.supplierName).length;
   const budgetPct = (suggestedTotal / monthlyPurchaseBudget) * 100;
+
+  // Módulos nuevos: oportunidades no capturadas, aprobaciones, calidad de compra
+  const lostOpps = lostOpportunities();
+  const lostRevenue = lostOpps.reduce((a, o) => a + o.ventaPerdida, 0);
+  const pendingApprovals = approvalRequests.length; // mock: todas inician pendientes
+  const shortPurchases = purchaseQualityLines().filter((l) => l.klass === "corta").length;
 
   // "Qué revisar primero" — pasos con conteo en vivo, ordenados por urgencia
   const guideSteps: GuideStep[] = [
@@ -93,6 +102,22 @@ export function DashboardPage() {
       countLabel: `${lowComplianceSuppliers.length} proveedores`,
       to: "/proveedores",
       tone: "red",
+    },
+    {
+      title: "Oportunidades no capturadas",
+      detail: "Productos que vendían, quedaron sin stock y no se recompraron. Venta que se pierde por no comprar.",
+      count: lostOpps.length,
+      countLabel: `${formatCurrencyCompact(lostRevenue)}/mes`,
+      to: "/oportunidades-perdidas",
+      tone: "amber",
+    },
+    {
+      title: "Compras pendientes de aprobación",
+      detail: "Compras fuera de criterio (monto, cobertura, margen o desvío) que esperan aprobación.",
+      count: pendingApprovals,
+      countLabel: `${pendingApprovals} solicitudes`,
+      to: "/aprobaciones",
+      tone: "amber",
     },
     {
       title: "Sobrestock con baja rotación",
@@ -284,6 +309,29 @@ export function DashboardPage() {
                 {c.name} · en {c.days} días
               </Badge>
             ))}
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Disciplina de compra: oportunidades, aprobaciones, calidad y decisiones */}
+      <Card className="mb-5">
+        <CardHeader
+          title="Disciplina de compra"
+          description="Que no se pierda venta por no comprar, ni se compre fuera de criterio. Aprende de las decisiones."
+          action={
+            <Link to="/oportunidades-perdidas">
+              <Button size="sm" variant="secondary" icon={<IconArrowRight className="w-4 h-4" />}>
+                Ver oportunidades
+              </Button>
+            </Link>
+          }
+        />
+        <CardBody>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Link to="/oportunidades-perdidas"><MiniIndicator icon={<IconSales className="w-4 h-4" />} label="Venta no capturada" value={`${formatCurrencyCompact(lostRevenue)}/mes`} tone="bad" /></Link>
+            <Link to="/aprobaciones"><MiniIndicator icon={<IconCheck className="w-4 h-4" />} label="Aprobaciones pendientes" value={formatNumber(pendingApprovals)} tone="warn" /></Link>
+            <Link to="/calidad-compra"><MiniIndicator icon={<IconAlerts className="w-4 h-4" />} label="Compras cortas" value={formatNumber(shortPurchases)} tone="bad" /></Link>
+            <Link to="/decisiones"><MiniIndicator icon={<IconReplenish className="w-4 h-4" />} label="Oportunidades detectadas" value={formatNumber(lostOpps.length)} tone="warn" /></Link>
           </div>
         </CardBody>
       </Card>
