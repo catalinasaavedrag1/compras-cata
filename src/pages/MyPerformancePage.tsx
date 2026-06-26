@@ -17,9 +17,14 @@ import {
   daysToClose,
   seasonStatus,
   SEASON_MOVE_CFG,
+  winnerByCriterion,
 } from "../utils/teamScore";
 import { ChallengeList } from "../components/business/ChallengeList";
+import { CompetitionFeed } from "../components/business/CompetitionFeed";
 import { SEASON, challenges } from "../data/mockChallenges";
+import { competitionFeed } from "../data/mockCompetitionFeed";
+import { defaultRewards, type Reward } from "../data/mockRewards";
+import { useLocalStorage } from "../utils/useLocalStorage";
 
 const RANK_PHRASE: Record<string, string> = {
   margen: "margen bruto",
@@ -72,6 +77,13 @@ export function MyPerformancePage() {
       (c.kind === "duel" && (c.aId === me.id || c.bId === me.id)) ||
       (c.kind === "streak" && c.buyerId === me.id)
   );
+
+  const myFeed = competitionFeed.filter((f) => f.buyerId === me.id);
+  const [rewards] = useLocalStorage<Reward[]>("compras:rewards", defaultRewards);
+  const rewardsInPlay = rewards.map((r) => {
+    const w = winnerByCriterion(r.criterion, buyers);
+    return { reward: r, winner: w, iWin: w?.id === me.id };
+  });
 
   const deg = me.score * 3.6;
 
@@ -203,6 +215,38 @@ export function MyPerformancePage() {
       {/* Tus retos de la semana */}
       <p className="text-sm font-semibold text-slate-700 mb-2.5">Tus retos de la semana</p>
       <div className="mb-4"><ChallengeList items={myChallenges} meId={me.id} /></div>
+
+      {/* Novedades + premios en juego */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mb-4">
+        <Card>
+          <CardBody>
+            <p className="text-sm font-semibold text-slate-800 mb-3">Tus novedades</p>
+            <CompetitionFeed items={myFeed} meId={me.id} />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm font-semibold text-slate-800 mb-1">Premios en juego</p>
+            <p className="text-xs text-slate-400 mb-3">Definidos por tu líder este mes.</p>
+            <div className="space-y-2">
+              {rewardsInPlay.map(({ reward, winner, iWin }) => (
+                <div key={reward.id} className={`rounded-lg border px-3 py-2 ${iWin ? "border-emerald-200 bg-emerald-50/60" : "border-slate-100"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🎁</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-slate-800 truncate">{reward.title}</span>
+                      <span className="block text-xs text-slate-500">{reward.reward}</span>
+                    </span>
+                  </div>
+                  <p className={`text-[11px] mt-1 ${iWin ? "text-emerald-700 font-semibold" : "text-slate-400"}`}>
+                    {iWin ? "¡Lo vas ganando tú!" : `Va ganando: ${winner?.name ?? "—"}`}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
         <Card>

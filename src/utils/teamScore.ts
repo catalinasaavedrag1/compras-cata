@@ -209,6 +209,24 @@ export const SEASON_MOVE_CFG: Record<SeasonMove, { label: string; tone: BadgeTon
   mantiene: { label: "Mantiene", tone: "slate", arrow: "=" },
 };
 
+/** Ganador actual de un premio según su criterio. */
+export function winnerByCriterion(
+  criterion: "general" | "mejora" | "quiebres" | "margen" | "rotacion",
+  all: Buyer[]
+): Buyer | null {
+  if (!all.length) return null;
+  const pick = (fn: (b: Buyer) => number, asc = false) =>
+    [...all].sort((a, b) => (asc ? fn(a) - fn(b) : fn(b) - fn(a)))[0];
+  switch (criterion) {
+    case "general": return pick((b) => b.score);
+    case "mejora": return pick((b) => recovery(b));
+    case "quiebres": return pick((b) => stockoutRate(b), true);
+    case "margen": return pick((b) => b.margin);
+    case "rotacion": return pick((b) => b.rotation);
+    default: return all[0];
+  }
+}
+
 /** Consejos por dimensión del score para "cómo subir mi score". */
 export const SCORE_ADVICE: Record<string, string> = {
   "Cumplimiento de venta": "Asegura disponibilidad en tus productos de mayor venta",

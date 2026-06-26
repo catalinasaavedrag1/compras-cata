@@ -3,8 +3,18 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Modal } from "../components/ui/Modal";
+import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
+import { useLocalStorage } from "../utils/useLocalStorage";
+import { useToast } from "../context/ToastContext";
 import { BuyerDetailDrawer, BUYER_TONE_AV } from "../components/business/BuyerDetailDrawer";
-import { buyers } from "../data/mockBuyers";
+import { CompetitionFeed } from "../components/business/CompetitionFeed";
+import { buyers, getBuyer } from "../data/mockBuyers";
+import { seasonHistory } from "../data/mockSeasonHistory";
+import { competitionFeed } from "../data/mockCompetitionFeed";
+import { defaultRewards, REWARD_CRITERIA, type Reward } from "../data/mockRewards";
 import type { Buyer } from "../types/team";
 import {
   teamAggregate,
@@ -18,6 +28,7 @@ import {
   daysToClose,
   seasonStatus,
   SEASON_MOVE_CFG,
+  winnerByCriterion,
 } from "../utils/teamScore";
 import { ChallengeList } from "../components/business/ChallengeList";
 import { SEASON, PREV_SEASON_NAME, challenges } from "../data/mockChallenges";
@@ -26,8 +37,24 @@ import { IconInfo, IconSales, IconAlerts } from "../components/ui/icons";
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 export function RankingPage() {
+  const toast = useToast();
   const [sel, setSel] = useState<Buyer | null>(null);
+  const [rewards, setRewards] = useLocalStorage<Reward[]>("compras:rewards", defaultRewards);
+  const [rewardForm, setRewardForm] = useState<Reward | null>(null);
   const sorted = [...buyers].sort((a, b) => b.score - a.score);
+
+  const critLabel = (c: Reward["criterion"]) => REWARD_CRITERIA.find((x) => x.value === c)?.label ?? c;
+  const saveReward = () => {
+    if (!rewardForm || !rewardForm.title.trim() || !rewardForm.reward.trim()) {
+      toast.warning("Completa el título y el premio");
+      return;
+    }
+    setRewards((prev) =>
+      prev.some((r) => r.id === rewardForm.id) ? prev.map((r) => (r.id === rewardForm.id ? rewardForm : r)) : [...prev, rewardForm]
+    );
+    toast.success("Premio guardado");
+    setRewardForm(null);
+  };
   const agg = teamAggregate(buyers);
   const avgStockoutRate = Math.round((buyers.reduce((a, b) => a + stockoutRate(b), 0) / buyers.length) * 10) / 10;
   const avgMargin = Math.round((buyers.reduce((a, b) => a + b.margin, 0) / buyers.length) * 10) / 10;
@@ -167,7 +194,107 @@ export function RankingPage() {
 
       {/* Retos de la semana */}
       <p className="text-sm font-semibold text-slate-700 mb-2.5">Retos de la semana</p>
-      <ChallengeList items={challenges} />
+      <div className="mb-6"><ChallengeList items={challenges} /></div>
+
+      {/* Premios de la temporada (configurables por el líder) */}
+      <div className="flex items-center justify-between mb-2.5">
+        <p className="text-sm font-semibold text-slate-700">Premios de la temporada</p>
+        <Button size="sm" variant="secondary" onClick={() => setRewardForm({ id: `r${Date.now()}`, criterion: "general", title: "", reward: "" })}>+ Agregar premio</Button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        {rewards.map((r) => {
+          const w = winnerByCriterion(r.criterion, buyers);
+          return (
+            <Card key={r.id}>
+              <CardBody>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-xl">🎁</span>
+                  <button onClick={() => setRewardForm(r)} className="text-[11px] font-medium text-brand-600 hover:text-brand-700">Editar</button>
+                </div>
+                <p className="text-sm font-semibold text-slate-800 mt-1.5">{r.title}</p>
+                <p className="text-xs text-slate-500">{r.reward}</p>
+                <p className="text-[11px] text-slate-400 mt-1">{critLabel(r.criterion)}</p>
+                {w && (
+                  <button onClick={() => setSel(w)} className="flex items-center gap-2 mt-3 pt-2.5 border-t border-slate-100 w-full text-left">
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${BUYER_TONE_AV[w.tone]}`}>{w.initials}</span>
+                    <span className="text-xs text-slate-600">Va ganando: <b className="text-slate-800">{w.name}</b></span>
+                  </button>
+                )}
+              </CardBody>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Temporadas anteriores */}
+      <p className="text-sm font-semibold text-slate-700 mb-2.5">Temporadas anteriores</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        {seasonHistory.map((s) => {
+          const champ = getBuyer(s.championId);
+          return (
+            <Card key={s.id}>
+              <CardBody>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{s.name}</p>
+                <div className="flex items-center gap-2.5 mt-2">
+                  <span className="text-xl">🥇</span>
+                  {champ && <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${BUYER_TONE_AV[champ.tone]}`}>{champ.initials}</span>}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{champ?.name}</p>
+                    <p className="text-[11px] text-slate-400">Campeón · {s.championScore} pts</p>
+                  </div>
+                </div>
+                <div className="flex gap-1.5 mt-3">
+                  {s.podium.map((id, i) => {
+                    const b = getBuyer(id);
+                    return <span key={id} className="text-[11px] text-slate-500">{["🥇", "🥈", "🥉"][i]} {b?.name.split(" ")[0]}</span>;
+                  })}
+                </div>
+              </CardBody>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Novedades del equipo */}
+      <p className="text-sm font-semibold text-slate-700 mb-2.5">Novedades del equipo</p>
+      <Card className="mb-2">
+        <CardBody><CompetitionFeed items={competitionFeed} /></CardBody>
+      </Card>
+
+      {/* Modal premio */}
+      <Modal
+        open={!!rewardForm}
+        onClose={() => setRewardForm(null)}
+        title={rewardForm && rewards.some((r) => r.id === rewardForm.id) ? "Editar premio" : "Nuevo premio"}
+        description="Define el criterio y la recompensa. El ganador se calcula solo según el desempeño."
+        footer={
+          <>
+            {rewardForm && rewards.some((r) => r.id === rewardForm.id) && (
+              <Button variant="danger" onClick={() => { setRewards((prev) => prev.filter((r) => r.id !== rewardForm.id)); setRewardForm(null); toast.success("Premio eliminado"); }}>Eliminar</Button>
+            )}
+            <span className="flex-1" />
+            <Button variant="secondary" onClick={() => setRewardForm(null)}>Cancelar</Button>
+            <Button onClick={saveReward}>Guardar</Button>
+          </>
+        }
+      >
+        {rewardForm && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Criterio</label>
+              <Select value={rewardForm.criterion} onChange={(e) => setRewardForm({ ...rewardForm, criterion: e.target.value as Reward["criterion"] })} options={REWARD_CRITERIA} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Título</label>
+              <Input value={rewardForm.title} onChange={(e) => setRewardForm({ ...rewardForm, title: e.target.value })} placeholder="Ej: Campeón de la temporada" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Premio / recompensa</label>
+              <Input value={rewardForm.reward} onChange={(e) => setRewardForm({ ...rewardForm, reward: e.target.value })} placeholder="Ej: Bono $150.000 + día libre" />
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <BuyerDetailDrawer buyer={sel} onClose={() => setSel(null)} />
     </div>
