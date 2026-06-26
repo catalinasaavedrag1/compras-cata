@@ -209,6 +209,42 @@ export const SEASON_MOVE_CFG: Record<SeasonMove, { label: string; tone: BadgeTon
   mantiene: { label: "Mantiene", tone: "slate", arrow: "=" },
 };
 
+// ----------------------------------------------------------------------------
+//  OKR: score, nivel, estado e impacto accionable por meta
+// ----------------------------------------------------------------------------
+/** Score OKR 0-100 = avance ponderado por el peso de cada meta. */
+export function okrScore(b: Buyer): number {
+  const totalW = b.goals.reduce((s, g) => s + g.weight, 0);
+  if (!totalW) return 0;
+  return Math.round(b.goals.reduce((s, g) => s + g.pct * g.weight, 0) / totalW);
+}
+
+export function okrLevel(score: number): { label: string; tone: BadgeTone } {
+  if (score >= 85) return { label: "Elite", tone: "violet" };
+  if (score >= 70) return { label: "Oro", tone: "amber" };
+  if (score >= 50) return { label: "En curso", tone: "blue" };
+  return { label: "Riesgo", tone: "red" };
+}
+
+/** Estado general del comprador según metas en riesgo. */
+export function okrState(b: Buyer): { label: string; tone: BadgeTone } {
+  const risk = b.goals.filter((g) => g.status === "risk").length;
+  if (risk >= 2) return { label: "Crítico", tone: "red" };
+  if (risk === 1) return { label: "En observación", tone: "amber" };
+  return { label: "Sin riesgo", tone: "green" };
+}
+
+/** Puntos de score OKR recuperables si la meta llega al 100%. */
+export function goalImpact(weight: number, pct: number): number {
+  return Math.round((weight * (100 - pct)) / 100);
+}
+
+export const GOAL_ORDER: Record<"risk" | "on_track" | "done", number> = {
+  risk: 0,
+  on_track: 1,
+  done: 2,
+};
+
 /** Ganador actual de un premio según su criterio. */
 export function winnerByCriterion(
   criterion: "general" | "mejora" | "quiebres" | "margen" | "rotacion",
