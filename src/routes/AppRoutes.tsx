@@ -39,6 +39,9 @@ const BuyersPage = lazy(() => named(import("../pages/BuyersPage"), "BuyersPage")
 const RankingPage = lazy(() => named(import("../pages/RankingPage"), "RankingPage"));
 const GoalsPage = lazy(() => named(import("../pages/GoalsPage"), "GoalsPage"));
 const WorkloadPage = lazy(() => named(import("../pages/WorkloadPage"), "WorkloadPage"));
+const LostOpportunitiesPage = lazy(() => named(import("../pages/LostOpportunitiesPage"), "LostOpportunitiesPage"));
+const PurchaseQualityPage = lazy(() => named(import("../pages/PurchaseQualityPage"), "PurchaseQualityPage"));
+const DecisionsPage = lazy(() => named(import("../pages/DecisionsPage"), "DecisionsPage"));
 
 function PageLoader() {
   return (
@@ -79,7 +82,10 @@ export default function AppRoutes() {
           <Route path="/proveedores" element={<SuppliersPage />} />
           <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
           <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
+          <Route path="/calidad-compra" element={<PurchaseQualityPage />} />
           <Route path="/recepciones" element={<ReceptionsPage />} />
+          <Route path="/oportunidades-perdidas" element={<LostOpportunitiesPage />} />
+          <Route path="/decisiones" element={<DecisionsPage />} />
           <Route path="/alertas" element={<AlertsPage />} />
           <Route path="/senales-ventas" element={<SalesSignalsPage />} />
           <Route path="/inventario" element={<InventoryAnalysisPage />} />

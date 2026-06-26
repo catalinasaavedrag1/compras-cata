@@ -50,8 +50,11 @@ export const compradorGroups: NavGroup[] = [
       { to: "/reposicion", label: "Reposición", icon: IconReplenish, hint: "Qué comprar, cuánto y por qué" },
       { to: "/campanas", label: "Campañas", icon: IconCampaign, hint: "Productos en descuento, presupuesto por canal y espacios publicitarios" },
       { to: "/campanas-oportunidades", label: "Oportunidades", icon: IconBulb, hint: "Anticipar compras para campañas, liquidaciones y crecimiento" },
+      { to: "/oportunidades-perdidas", label: "Oportunidades perdidas", icon: IconBulb, hint: "Productos que vendían, quedaron sin stock y no se volvieron a comprar" },
       { to: "/ordenes-compra", label: "Órdenes", icon: IconOrders, hint: "Seguimiento de OC y creación desde sugerencias" },
+      { to: "/calidad-compra", label: "Calidad de compra", icon: IconCheck, hint: "¿Se compró corto, saludable o de más? Días comprados vs objetivo" },
       { to: "/recepciones", label: "Recepciones", icon: IconInventory, hint: "Qué viene en camino, qué llegó y cómo llegó" },
+      { to: "/decisiones", label: "Historial de decisiones", icon: IconBulb, hint: "Auditoría: sugerido vs comprado, resultado y aprendizaje" },
     ],
   },
   {
