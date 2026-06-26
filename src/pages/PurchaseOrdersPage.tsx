@@ -83,18 +83,18 @@ export function PurchaseOrdersPage() {
   }, [createdOrders, statusOverrides, approvals, approvalState]);
 
   const counts = useMemo(() => {
-    const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received"];
+    const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received", "with_difference"];
     return {
       all: orders.length,
       draft: orders.filter((o) => o.status === "draft").length,
       open: orders.filter((o) => open.includes(o.status)).length,
       delayed: orders.filter((o) => o.status === "delayed").length,
-      received: orders.filter((o) => o.status === "received").length,
+      received: orders.filter((o) => o.status === "received" || o.status === "closed").length,
     };
   }, [orders]);
 
   const filtered = useMemo(() => {
-    const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received"];
+    const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received", "with_difference"];
     switch (tab) {
       case "draft":
         return orders.filter((o) => o.status === "draft");
@@ -103,7 +103,7 @@ export function PurchaseOrdersPage() {
       case "delayed":
         return orders.filter((o) => o.status === "delayed");
       case "received":
-        return orders.filter((o) => o.status === "received");
+        return orders.filter((o) => o.status === "received" || o.status === "closed");
       default:
         return orders;
     }
@@ -474,28 +474,69 @@ export function PurchaseOrdersPage() {
               <DetailField label="Comprador" value={detail.buyerName} />
               <DetailField label="Creación" value={formatDate(detail.createdAt)} />
               <DetailField label="Fecha esperada" value={formatDate(detail.expectedDate)} />
+              {detail.confirmedDate && <DetailField label="Confirmada proveedor" value={formatDate(detail.confirmedDate)} />}
               <DetailField label="Monto total" value={<span className="font-semibold">{formatCurrency(detail.totalAmount)}</span>} />
               <DetailField label="N° de SKUs" value={formatNumber(detail.skuCount)} />
+              {detail.discountPct != null && <DetailField label="Descuento" value={`${detail.discountPct}%`} />}
+              {detail.paymentTerms && <DetailField label="Pago" value={detail.paymentTerms} />}
             </div>
-            {detail.lines && detail.lines.length > 0 ? (
+
+            {detail.comments && (
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <span className="text-xs text-slate-400">Comentarios: </span>{detail.comments}
+              </div>
+            )}
+            {detail.documents && detail.documents.length > 0 && (
               <div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Productos</p>
-                <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-                  {detail.lines.map((l) => (
-                    <div key={l.sku} className="flex items-center justify-between gap-2 px-3 py-2">
-                      <div>
-                        <span className="text-xs font-mono text-slate-400">{l.sku}</span>
-                        <p className="text-sm text-slate-700">{l.productName}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-slate-800">{formatNumber(l.quantity)} u.</p>
-                        <p className="text-xs text-slate-400">{formatCurrency(l.unitCost)} c/u</p>
-                      </div>
-                    </div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">Documentos</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {detail.documents.map((d) => (
+                    <span key={d} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">📎 {d}</span>
                   ))}
                 </div>
               </div>
-            ) : (
+            )}
+
+            {detail.lines && detail.lines.length > 0 ? (() => {
+              const hasReception = detail.lines.some((l) => l.receivedQty != null);
+              return (
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+                    {hasReception ? "Productos y diferencias de recepción" : "Productos"}
+                  </p>
+                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+                    {detail.lines.map((l) => {
+                      const diff = l.receivedQty != null ? l.receivedQty - l.quantity : null;
+                      return (
+                        <div key={l.sku} className="flex items-center justify-between gap-2 px-3 py-2">
+                          <div className="min-w-0">
+                            <span className="text-xs font-mono text-slate-400">{l.sku}</span>
+                            <p className="text-sm text-slate-700 truncate">{l.productName}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            {hasReception ? (
+                              <>
+                                <p className="text-sm text-slate-700">
+                                  Pedido {formatNumber(l.quantity)} · Recibido <b>{formatNumber(l.receivedQty ?? 0)}</b>
+                                </p>
+                                <p className={`text-xs font-medium ${diff != null && diff < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                                  {diff != null && diff < 0 ? `Faltan ${formatNumber(-diff)}` : "Completo"}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-sm font-medium text-slate-800">{formatNumber(l.quantity)} u.</p>
+                                <p className="text-xs text-slate-400">{formatCurrency(l.unitCost)} c/u</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })() : (
               <p className="text-sm text-slate-400">
                 El detalle de líneas de esta orden no está disponible en la demo.
               </p>

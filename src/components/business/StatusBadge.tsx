@@ -47,6 +47,8 @@ const purchaseOrder: Record<PurchaseOrderStatus, Config> = {
   confirmed: { label: "Confirmada", tone: "blue" },
   partially_received: { label: "Parcial", tone: "amber" },
   received: { label: "Recibida", tone: "green" },
+  with_difference: { label: "Con diferencia", tone: "amber" },
+  closed: { label: "Cerrada", tone: "neutral" },
   delayed: { label: "Atrasada", tone: "red" },
   cancelled: { label: "Cancelada", tone: "neutral" },
 };

@@ -35,6 +35,8 @@ export type PurchaseOrderStatus =
   | "confirmed"
   | "partially_received"
   | "received"
+  | "with_difference"
+  | "closed"
   | "delayed"
   | "cancelled";
 
@@ -159,6 +161,7 @@ export interface PurchaseOrderLine {
   productName: string;
   quantity: number;
   unitCost: number;
+  receivedQty?: number; // recibido (para diferencias)
 }
 
 export interface PurchaseOrder {
@@ -174,6 +177,12 @@ export interface PurchaseOrder {
   buyerName: string;
   delayedDays: number;
   lines?: PurchaseOrderLine[];
+  // Datos comerciales y de gestión (opcionales)
+  discountPct?: number; // descuento negociado %
+  paymentTerms?: string; // condiciones de pago
+  comments?: string; // comentarios de la OC
+  documents?: string[]; // documentos adjuntos (nombres)
+  confirmedDate?: string; // fecha confirmada por el proveedor
 }
 
 export interface CommercialAlert {
