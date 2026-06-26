@@ -408,3 +408,102 @@ export interface CampaignOpportunity {
   recommendation: string;
   actionLabel: string;
 }
+
+// ============================================================================
+//  Señales de Ventas — colaboración vendedor ↔ comprador
+//  El equipo de ventas detecta antes que nadie quiebres, demanda y oportunidades
+//  en el terreno. Esta capa captura esas señales de forma ordenada para que el
+//  comprador las reciba, analice, decida y deje trazabilidad de la decisión.
+// ============================================================================
+
+export type SignalType =
+  | "stockout" // Quiebre detectado en sala
+  | "asked_no_stock" // Cliente preguntó por producto sin stock
+  | "high_demand" // Producto muy solicitado
+  | "restock" // Recomendado para reponer
+  | "campaign" // Candidato para campaña
+  | "liquidation" // Candidato para liquidación
+  | "price_error" // Posible error de precio
+  | "low_rotation" // Baja rotación / no se mueve
+  | "unexpected_demand" // Alta demanda inesperada
+  | "customer_suggested"; // Producto sugerido por cliente (aún no en surtido)
+
+export type SignalChannel = "store" | "web" | "marketplace" | "call_center";
+
+export type SignalPriority = "high" | "medium" | "low";
+
+export type SignalStatus =
+  | "new" // nuevo, sin revisar
+  | "in_review" // el comprador lo está mirando
+  | "accepted" // aceptado / lo tomará
+  | "rejected" // rechazado con motivo
+  | "resolved"; // resuelto / cerrado
+
+export type SignalAuthorRole = "seller" | "buyer";
+
+/** Mensaje del hilo de conversación comprador ↔ vendedor. */
+export interface SignalMessage {
+  id: string;
+  role: SignalAuthorRole;
+  author: string;
+  date: string; // ISO datetime
+  text: string;
+}
+
+export type SignalEventKind =
+  | "created"
+  | "status"
+  | "assigned"
+  | "priority"
+  | "comment"
+  | "converted";
+
+/** Evento de auditoría: deja trazabilidad de cada cambio de la señal. */
+export interface SignalEvent {
+  id: string;
+  date: string; // ISO datetime
+  actor: string;
+  kind: SignalEventKind;
+  text: string;
+}
+
+/** Datos de apoyo simulados que el comprador ve para decidir rápido. */
+export interface SignalSupport {
+  stock: number; // stock disponible actual
+  sales30: number; // unidades vendidas últimos 30 días
+  rotation: number; // veces al año
+  marginPct: number; // margen %
+  stockoutEvents30: number; // quiebres en los últimos 30 días
+  affectedStores: string[]; // tiendas afectadas
+}
+
+export interface SalesSignal {
+  id: string;
+  type: SignalType;
+  priority: SignalPriority;
+  status: SignalStatus;
+  // Producto (sku opcional: el cliente puede sugerir algo que no está en el surtido)
+  sku?: string;
+  productName: string;
+  category: string;
+  brand?: string;
+  // Origen de la señal
+  channel: SignalChannel;
+  store: string; // tienda o canal donde se detectó
+  reportedBy: string; // vendedor que reporta
+  date: string; // fecha de reporte (ISO datetime)
+  // Contenido
+  comment: string; // comentario del vendedor
+  recommendedAction: string; // qué sugiere el vendedor hacer
+  // Evidencia opcional
+  customersAsking?: number; // cuántos clientes preguntaron
+  estimatedLostSale?: number; // venta perdida estimada (CLP)
+  evidenceNote?: string; // foto, link o comentario de apoyo
+  // Gestión por el comprador
+  assignedBuyer?: string; // comprador asignado
+  rejectionReason?: string; // motivo si fue rechazada
+  // Apoyo + colaboración + trazabilidad
+  support: SignalSupport;
+  messages: SignalMessage[];
+  timeline: SignalEvent[];
+}

@@ -28,6 +28,13 @@ import { categories } from "../data/mockCategories";
 import { useBuyer } from "../context/BuyerContext";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
+import { useSignals } from "../context/SignalsContext";
+import {
+  SIGNAL_TYPE,
+  SIGNAL_STATUS,
+  SIGNAL_PRIORITY,
+} from "../components/business/signalLabels";
+import { IconSignal } from "../components/ui/icons";
 import {
   coverageDays,
   coverageSentence,
@@ -56,6 +63,24 @@ interface RiskRow {
 export function MyPanelPage() {
   const navigate = useNavigate();
   const { buyer, myCategories } = useBuyer();
+  const { signals } = useSignals();
+
+  // Señales de ventas que me tocan: asignadas a mí, o de mis categorías sin asignar.
+  const mySignals = useMemo(() => {
+    const order = { high: 0, medium: 1, low: 2 } as const;
+    return signals
+      .filter(
+        (s) =>
+          (s.status === "new" || s.status === "in_review") &&
+          (s.assignedBuyer === buyer ||
+            (!s.assignedBuyer && myCategories.includes(s.category)))
+      )
+      .sort((a, b) => {
+        const p = order[a.priority] - order[b.priority];
+        return p !== 0 ? p : a.date < b.date ? 1 : -1;
+      })
+      .slice(0, 5);
+  }, [signals, buyer, myCategories]);
   const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
 
@@ -459,6 +484,47 @@ export function MyPanelPage() {
                   {c.riskSkus > 0 && <Badge tone="amber">{c.riskSkus} riesgo</Badge>}
                   <StatusBadge kind="category" value={c.status} dot={false} />
                   <IconChevronRight className="w-4 h-4 text-slate-300 group-hover:text-brand-500" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Señales de ventas para mí */}
+      <Card className="mb-4">
+        <CardHeader
+          title="Señales de ventas para mí"
+          description="Lo que ventas reportó en tus categorías y aún espera tu decisión"
+          action={
+            <Link to="/senales-ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
+              Ver todas
+            </Link>
+          }
+        />
+        <CardBody>
+          {mySignals.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No tienes señales de ventas pendientes. Todo al día por aquí.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {mySignals.map((s) => (
+                <Link
+                  key={s.id}
+                  to="/senales-ventas"
+                  className="flex items-start gap-2 rounded-lg border border-slate-200 p-2.5 hover:border-brand-300 hover:bg-brand-50/40"
+                >
+                  <IconSignal className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge tone={SIGNAL_PRIORITY[s.priority].tone}>{SIGNAL_PRIORITY[s.priority].label}</Badge>
+                      <Badge tone={SIGNAL_TYPE[s.type].tone}>{SIGNAL_TYPE[s.type].short}</Badge>
+                      <span className="text-sm font-medium text-slate-800 truncate">{s.productName}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 truncate mt-0.5">{s.comment}</p>
+                  </div>
+                  <Badge tone={SIGNAL_STATUS[s.status].tone} dot>{SIGNAL_STATUS[s.status].label}</Badge>
                 </Link>
               ))}
             </div>
