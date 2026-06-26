@@ -4,7 +4,7 @@ import { Badge } from "../components/ui/Badge";
 import { BuyerDetailDrawer, BUYER_TONE_AV } from "../components/business/BuyerDetailDrawer";
 import { buyers } from "../data/mockBuyers";
 import type { Buyer } from "../types/team";
-import { scoreColor, scoreLabel, trendText, trendColor, WORKLOAD_CFG } from "../utils/teamScore";
+import { scoreColor, trendText, trendColor, WORKLOAD_CFG, leagueOf } from "../utils/teamScore";
 
 export function BuyersPage() {
   const [sel, setSel] = useState<Buyer | null>(null);
@@ -38,8 +38,8 @@ export function BuyersPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Badge tone={leagueOf(b.score).league.tone}>Nivel {leagueOf(b.score).league.name}</Badge>
                 <Badge tone={wl.tone}>Carga {wl.label}</Badge>
-                <span className="text-xs font-medium" style={{ color: scoreColor(b.score) }}>{scoreLabel(b.score)}</span>
               </div>
               <div className="grid grid-cols-4 gap-2 border-t border-slate-100 pt-3">
                 <div><p className="text-base font-semibold text-slate-800">{b.fillRate}%</p><p className="text-[10.5px] text-slate-400">Fill Rate</p></div>

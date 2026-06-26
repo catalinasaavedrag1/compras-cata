@@ -1,9 +1,27 @@
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
+import { Badge } from "../components/ui/Badge";
 import { GoalRow, Sparkline } from "../components/business/BuyerDetailDrawer";
 import { buyers, getBuyer, CURRENT_BUYER_ID } from "../data/mockBuyers";
 import { useBuyer } from "../context/BuyerContext";
-import { teamAggregate, scoreLabel, scoreColor, trendText, trendColor } from "../utils/teamScore";
+import {
+  teamAggregate,
+  scoreColor,
+  trendText,
+  trendColor,
+  leagueOf,
+  percentileSimilarLoad,
+  RANKING_DEFS,
+  badgesOf,
+  SCORE_ADVICE,
+} from "../utils/teamScore";
+
+const RANK_PHRASE: Record<string, string> = {
+  margen: "margen bruto",
+  quiebres: "reducción de quiebres",
+  rotacion: "rotación saludable",
+  recuperacion: "recuperación del mes",
+};
 
 export function MyPerformancePage() {
   const { buyer: buyerName } = useBuyer();
@@ -11,6 +29,8 @@ export function MyPerformancePage() {
   const sorted = [...buyers].sort((a, b) => b.score - a.score);
   const pos = sorted.findIndex((b) => b.id === me.id) + 1;
   const agg = teamAggregate(buyers);
+  const { league, next, ptsToNext } = leagueOf(me.score);
+  const percentile = percentileSimilarLoad(me, buyers);
 
   const kpis = [
     { label: "Fill Rate", value: `${me.fillRate}%`, avg: `${agg.fillRate}%`, good: me.fillRate >= agg.fillRate },
@@ -19,42 +39,78 @@ export function MyPerformancePage() {
     { label: "Quiebres", value: String(me.stockouts), avg: String(Math.round(agg.stockouts / agg.n)), good: me.stockouts <= agg.stockouts / agg.n },
   ];
 
+  // Mejor posición en rankings específicos (encuadre positivo)
+  const myRanks = RANKING_DEFS.map((def) => {
+    const order = [...buyers].sort((a, b) => (def.asc ? def.sortValue(a) - def.sortValue(b) : def.sortValue(b) - def.sortValue(a)));
+    return { key: def.key, rank: order.findIndex((x) => x.id === me.id) + 1 };
+  }).sort((a, b) => a.rank - b.rank);
+  const bestRank = myRanks[0];
+
+  // Cómo subir mi score: dimensiones más débiles ponderadas por su peso
+  const improvements = [...me.breakdown]
+    .map((f) => {
+      const target = Math.min(95, f.value + 15);
+      const pts = Math.round(((target - f.value) * f.weight) / 100);
+      return { label: f.label, pts, advice: SCORE_ADVICE[f.label] ?? "" };
+    })
+    .filter((x) => x.pts >= 1)
+    .sort((a, b) => b.pts - a.pts)
+    .slice(0, 3);
+
+  const myBadges = badgesOf(buyers).filter((b) => b.winner.id === me.id);
+
   const deg = me.score * 3.6;
 
   return (
     <div>
       <PageHeader
         title="Mi desempeño"
-        description="Tu score, tus metas y tu posición frente al equipo. Una referencia para mejorar, sin ver el detalle de los demás."
+        description="Tu score, tu nivel y tu posición frente al equipo. No solo el problema: también cómo subir. El ranking de los demás está anonimizado."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-4 mb-4">
-        {/* Score gauge */}
+        {/* Score gauge + nivel */}
         <Card>
           <CardBody className="flex flex-col items-center justify-center text-center py-6">
-            <div
-              className="w-32 h-32 rounded-full flex items-center justify-center"
-              style={{ background: `conic-gradient(${scoreColor(me.score)} ${deg}deg, #eef2f7 0)` }}
-            >
+            <div className="w-32 h-32 rounded-full flex items-center justify-center" style={{ background: `conic-gradient(${scoreColor(me.score)} ${deg}deg, #eef2f7 0)` }}>
               <div className="w-24 h-24 rounded-full bg-white flex flex-col items-center justify-center">
                 <span className="text-3xl font-bold leading-none" style={{ color: scoreColor(me.score) }}>{me.score}</span>
                 <span className="text-[11px] text-slate-400">/ 100</span>
               </div>
             </div>
-            <p className="mt-3 text-base font-semibold" style={{ color: scoreColor(me.score) }}>{scoreLabel(me.score)}</p>
-            <p className="text-xs font-semibold mt-0.5" style={{ color: trendColor(me.trend) }}>{trendText(me.trend)} vs semana anterior</p>
-            <div className="w-full mt-4">
-              <Sparkline data={me.scoreHist} />
-            </div>
+            <Badge tone={league.tone} className="mt-3">Nivel {league.name}</Badge>
+            <p className="text-xs font-semibold mt-1.5" style={{ color: trendColor(me.trend) }}>{trendText(me.trend)} vs semana anterior</p>
+            {next && (
+              <div className="w-full mt-3">
+                <div className="flex justify-between text-[11px] text-slate-400 mb-1"><span>{league.name}</span><span>{next.name}</span></div>
+                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(6, ((me.score - league.min) / (next.min - league.min)) * 100))}%`, background: league.color }} />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">Faltan <b className="text-slate-700">{ptsToNext} pts</b> para {next.name}</p>
+              </div>
+            )}
+            <div className="w-full mt-4"><Sparkline data={me.scoreHist} /></div>
           </CardBody>
         </Card>
 
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-3 gap-3">
             <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Tu posición</p><p className="text-3xl font-bold text-brand-700 mt-1">#{pos}</p><p className="text-[11px] text-slate-400">de {agg.n} compradores</p></CardBody></Card>
-            <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Promedio equipo</p><p className="text-3xl font-bold text-slate-700 mt-1">{agg.avgScore}</p><p className="text-[11px] text-slate-400">tu score: {me.score}</p></CardBody></Card>
+            <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Percentil</p><p className="text-3xl font-bold text-slate-700 mt-1">{percentile}</p><p className="text-[11px] text-slate-400">vs carga similar</p></CardBody></Card>
             <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Cumpl. metas</p><p className="text-3xl font-bold text-emerald-700 mt-1">{me.goalComp}%</p><p className="text-[11px] text-slate-400">objetivos del mes</p></CardBody></Card>
           </div>
+          {/* Encuadre positivo */}
+          <Card>
+            <CardBody className="flex items-center gap-3">
+              <span className="text-2xl flex-shrink-0">💪</span>
+              <p className="text-sm text-slate-700 leading-snug">
+                Vas <b className="text-slate-900">#{pos} de {agg.n}</b> en general
+                {bestRank && bestRank.rank <= 3 && (
+                  <> — y eres <b style={{ color: scoreColor(90) }}>{bestRank.rank === 1 ? "#1 del equipo" : `#${bestRank.rank}`}</b> en {RANK_PHRASE[bestRank.key]}.</>
+                )}
+              </p>
+            </CardBody>
+          </Card>
           <Card>
             <CardBody>
               <p className="text-sm font-semibold text-slate-800 mb-3">Tus indicadores vs promedio del equipo</p>
@@ -72,6 +128,48 @@ export function MyPerformancePage() {
             </CardBody>
           </Card>
         </div>
+      </div>
+
+      {/* Cómo subir mi score + reconocimientos */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 mb-4">
+        <Card>
+          <CardBody>
+            <p className="text-sm font-semibold text-slate-800 mb-1">Cómo subir mi score</p>
+            <p className="text-xs text-slate-400 mb-3">Foco en tus dimensiones más débiles, ordenadas por impacto.</p>
+            <div className="space-y-2.5">
+              {improvements.map((imp) => (
+                <div key={imp.label} className="flex items-start gap-3 border border-slate-100 rounded-lg px-3 py-2.5">
+                  <span className="inline-flex items-center justify-center rounded-md bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-1 flex-shrink-0">+{imp.pts} pts</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800">{imp.label}</p>
+                    <p className="text-xs text-slate-500 leading-snug">{imp.advice}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm font-semibold text-slate-800 mb-1">Tus reconocimientos</p>
+            <p className="text-xs text-slate-400 mb-3">Insignias que lideras este mes.</p>
+            {myBadges.length === 0 ? (
+              <p className="text-sm text-slate-400">Aún no lideras ninguna insignia. Revisa "Cómo subir mi score" para acercarte.</p>
+            ) : (
+              <div className="space-y-2">
+                {myBadges.map((bg) => (
+                  <div key={bg.key} className="flex items-center gap-3 bg-amber-50/60 border border-amber-100 rounded-lg px-3 py-2">
+                    <span className="text-xl flex-shrink-0">🏅</span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-slate-800">{bg.label}</span>
+                      <span className="block text-xs text-slate-500">{bg.valueText}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">

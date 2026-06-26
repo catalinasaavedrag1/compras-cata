@@ -94,7 +94,7 @@ export const liderGroups: NavGroup[] = [
     title: "Equipo",
     items: [
       { to: "/equipo/compradores", label: "Compradores", icon: IconSuppliers, hint: "Ficha y desempeño por comprador" },
-      { to: "/equipo/ranking", label: "Ranking", icon: IconSales, hint: "Posiciones por score global" },
+      { to: "/equipo/ranking", label: "Competencia", icon: IconSales, hint: "Ranking general, rankings por dimensión y reconocimientos del mes" },
       { to: "/equipo/metas", label: "Metas", icon: IconCheck, hint: "OKRs por comprador" },
     ],
   },

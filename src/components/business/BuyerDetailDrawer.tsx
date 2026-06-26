@@ -4,7 +4,7 @@ import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import type { Buyer, BuyerGoal } from "../../types/team";
 import {
-  scoreLabel,
+  leagueOf,
   scoreColor,
   WORKLOAD_CFG,
   trendText,
@@ -114,7 +114,7 @@ export function BuyerDetailDrawer({ buyer, onClose }: { buyer: Buyer | null; onC
             </span>
             <div>
               <p className="text-3xl font-bold leading-none" style={{ color: scoreColor(buyer.score) }}>{buyer.score}</p>
-              <p className="text-xs font-semibold" style={{ color: scoreColor(buyer.score) }}>{scoreLabel(buyer.score)}</p>
+              <p className="text-xs font-semibold" style={{ color: scoreColor(buyer.score) }}>Nivel {leagueOf(buyer.score).league.name}</p>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5">
