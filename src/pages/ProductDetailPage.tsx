@@ -19,6 +19,7 @@ import { IconPlus, IconInfo, IconAlerts, IconSignal } from "../components/ui/ico
 import { getProductBySku, products } from "../data/mockProducts";
 import { suppliers, getSupplierByName } from "../data/mockSuppliers";
 import { supplierFulfillment } from "../utils/supplierPerf";
+import { productNegotiation } from "../utils/negotiation";
 import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
 import { receptions } from "../data/mockReceptions";
 import { skuOptimizationStatus, ACTION_LABEL, TIER_LABEL } from "../utils/catalogOptimization";
@@ -588,6 +589,10 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
 
   const alternativas = suppliers.filter((s) => s.name !== product.supplierName && s.status !== "inactive" && s.categories.includes(product.category));
 
+  const neg = productNegotiation(product);
+  const locations = [...product.stockByLocation].sort((a, b) => b.stock - a.stock);
+  const maxLocStock = Math.max(1, ...locations.map((l) => l.stock));
+
   // Objetivos de negociación sugeridos
   const objetivos: string[] = [];
   if (brecha > 0 && bajaCosto > 0) objetivos.push(`Bajar el costo ~${formatPercent(bajaCosto, 0)} (a ${formatCurrency(costoObjetivo)}) para alcanzar el margen objetivo de ${formatPercent(objetivo, 0)}`);
@@ -670,6 +675,142 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
               </div>
             ) : (
               <p className="text-sm text-rose-600">Sin proveedor asignado: no se puede negociar ni reponer.</p>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Costo neto real + Precio/historial */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader title="Costo neto real" description="El descuento no es el costo: mira lo que pagas de verdad" />
+          <CardBody>
+            <div className="space-y-1">
+              {neg.costLines.map((l) => {
+                const isTotal = l.kind === "total";
+                const color = l.kind === "discount" ? "text-emerald-600" : l.kind === "extra" ? "text-rose-600" : "text-slate-800";
+                return (
+                  <div key={l.label} className={`flex items-center justify-between py-1 ${isTotal ? "border-t border-slate-200 mt-1 pt-1.5" : ""}`}>
+                    <span className={`text-sm ${isTotal ? "font-semibold text-slate-800" : "text-slate-600"}`}>{l.label}</span>
+                    <span className={`text-sm tabular-nums ${isTotal ? "font-semibold text-slate-900" : color}`}>
+                      {l.amount < 0 ? "−" : ""}{formatCurrency(Math.abs(l.amount))}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2.5 flex items-center justify-between">
+              <span className="text-xs text-slate-500">Margen nominal vs real</span>
+              <span className="text-sm font-semibold">
+                <span className="text-slate-500">{formatPercent(neg.margenNominal, 0)}</span>
+                <span className="text-slate-300 mx-1.5">→</span>
+                <span className={neg.margenReal < objetivo ? "text-rose-600" : "text-emerald-700"}>{formatPercent(neg.margenReal, 0)}</span>
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2">El costo real suma flete, logística y merma sobre el costo de factura. Negocia sobre el costo real, no sobre el descuento de lista.</p>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Precio, costo e historial" description="Para comparar contra costo, mercado y precio real de venta" />
+          <CardBody>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <NStat label="Costo actual" value={formatCurrency(product.cost)} sub={`act. ${formatDate(product.costUpdatedAt)}`} />
+              <NStat label="Último costo" value={formatCurrency(neg.ultimoCosto)} />
+              <NStat label="Variación costo" value={`${neg.varCostoPct >= 0 ? "+" : ""}${formatPercent(neg.varCostoPct, 0)}`} tone={neg.varCostoPct > 5 ? "bad" : neg.varCostoPct > 0 ? "warn" : "good"} sub="vs compra anterior" />
+              <NStat label="Precio venta" value={formatCurrency(product.price)} />
+              <NStat label="Precio prom. vendido" value={formatCurrency(neg.precioPromedioVendido)} sub={`−${formatPercent(neg.descuentoPromVenta, 0)} desc. medio`} />
+              <NStat label="Precio competencia" value={formatCurrency(neg.precioCompetencia)} tone={neg.vsCompetenciaPct > 3 ? "warn" : "good"} sub={neg.vsCompetenciaPct >= 0 ? "estás más caro" : "estás más barato"} />
+            </div>
+            {neg.varCostoPct > 5 && (
+              <p className="text-xs text-amber-700 mt-2.5">⚠ El costo subió {formatPercent(neg.varCostoPct, 0)}: pide justificación del alza o congela precio por volumen.</p>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Stock por ubicación + Calidad del proveedor */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader title="Stock por tienda / CD" description="Dónde falta y dónde sobra — argumento de venta perdida" />
+          <CardBody>
+            {locations.length === 0 ? (
+              <p className="text-sm text-slate-400">Sin desglose por ubicación.</p>
+            ) : (
+              <div className="space-y-2">
+                {locations.map((l) => (
+                  <div key={l.locationName}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-slate-700">{l.locationName}</span>
+                      <span className={`font-medium ${l.available <= 0 ? "text-rose-600" : "text-slate-700"}`}>{formatNumber(l.available)} disp.{l.committed > 0 && <span className="text-slate-400"> · {formatNumber(l.committed)} comp.</span>}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className={`h-full rounded-full ${l.available <= 0 ? "bg-rose-400" : "bg-brand-500"}`} style={{ width: `${Math.max(3, (l.stock / maxLocStock) * 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 grid grid-cols-3 gap-2.5">
+              <NStat label="Stock mín." value={formatNumber(product.minStock)} />
+              <NStat label="Stock máx." value={formatNumber(product.maxStock)} />
+              <NStat label="Punto reorden" value={formatNumber(product.reorderPoint)} />
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Calidad y condiciones del proveedor" description="Lo que puedes exigir además del precio" />
+          <CardBody>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <NStat label="Condiciones pago" value={`${neg.condicionesPago} días`} />
+              <NStat label="Devoluciones" value={formatPercent(neg.devolucionesPct, 1)} tone={neg.devolucionesPct > 3 ? "warn" : "good"} sub="del despacho" />
+              <NStat label="Notas de crédito" value={formatNumber(neg.notasCredito)} tone={neg.notasCredito > 2 ? "warn" : "good"} sub="últimos 90 días" />
+              <NStat label="Reclamos" value={formatNumber(neg.reclamos)} tone={neg.reclamos > 1 ? "warn" : "good"} sub="abiertos" />
+              <NStat label="Quiebres provocados" value={formatNumber(neg.quiebresProvocados)} tone={neg.quiebresProvocados > 2 ? "bad" : "good"} sub="por no despachar" />
+              <NStat label="Lead time" value={master ? formatDays(master.averageLeadTimeDays) : "—"} tone={master && master.averageLeadTimeDays >= 15 ? "warn" : undefined} />
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Demanda futura + sustitutos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader title="Demanda futura" description="Anticipa: no negocies solo mirando el pasado" />
+          <CardBody>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <NStat label="Venta 180 días" value={`${formatNumber(product.salesLast180Days)} u.`} />
+              <NStat label="Proyección 90d" value={`${formatNumber(neg.proyeccion90)} u.`} sub="según tendencia" />
+              <NStat label="Tendencia" value={`${neg.tendenciaPct >= 0 ? "+" : ""}${formatPercent(neg.tendenciaPct, 0)}`} tone={neg.tendenciaPct >= 0 ? "good" : "bad"} />
+              <NStat label="Rotación" value={`${formatNumber(product.rotation)}x`} sub="al año" />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge tone={neg.demandTag.tone === "good" ? "green" : neg.demandTag.tone === "bad" ? "red" : "neutral"}>{neg.demandTag.label}</Badge>
+              {product.supplierName && (
+                <Link to={`/proveedores/${master?.id ?? ""}?tab=temporadas`} className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver estacionalidad del proveedor →</Link>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Productos sustitutos" description="Alternativas si el proveedor falla o sube el costo" />
+          <CardBody>
+            {neg.sustitutos.length === 0 ? (
+              <p className="text-sm text-slate-400">No hay sustitutos en la subcategoría {product.subcategory}.</p>
+            ) : (
+              <div className="space-y-2">
+                {neg.sustitutos.map((s) => (
+                  <Link key={s.sku} to={`/productos/${s.sku}`} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
+                      <span className="block text-xs text-slate-400 truncate">{s.supplierName} · margen {formatPercent(s.margin, 0)}</span>
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{formatCurrency(s.price)}</span>
+                  </Link>
+                ))}
+              </div>
             )}
           </CardBody>
         </Card>
