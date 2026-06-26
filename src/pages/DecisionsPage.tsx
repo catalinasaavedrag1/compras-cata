@@ -9,6 +9,7 @@ import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { OUTCOME_META, type DecisionOutcome } from "../data/mockDecisions";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
+import { supplierPath } from "../utils/entityLinks";
 import { IconBulb, IconCheck, IconAlerts } from "../components/ui/icons";
 import { formatNumber } from "../utils/formatters";
 
@@ -87,7 +88,7 @@ export function DecisionsPage() {
                         <Link to={`/productos/${d.sku}`} className="text-sm font-semibold text-slate-900 hover:text-brand-700 truncate">{d.productName}</Link>
                         <Badge tone={OUTCOME_META[d.outcome].tone}>{OUTCOME_META[d.outcome].label}</Badge>
                       </div>
-                      <p className="text-xs text-slate-400">{fmtDate(d.date)} · {d.buyerName}{d.approvedBy !== "—" && <> · aprobó {d.approvedBy}</>} · {d.supplierName}</p>
+                      <p className="text-xs text-slate-400">{fmtDate(d.date)} · {d.buyerName}{d.approvedBy !== "—" && <> · aprobó {d.approvedBy}</>} · <Link to={supplierPath(d.supplierName)} className="hover:text-brand-600 hover:underline">{d.supplierName}</Link></p>
                     </div>
                   </div>
 

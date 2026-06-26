@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
@@ -162,7 +163,7 @@ export function SalesAnalysisPage() {
         <Card>
           <CardBody className="space-y-2">
             {salesBySupplier.map((s) => (
-              <Link key={s.supplier} to="/proveedores" className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5 hover:border-brand-300 hover:bg-brand-50/40">
+              <Link key={s.supplier} to={supplierPath(s.supplier)} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5 hover:border-brand-300 hover:bg-brand-50/40">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800">{s.supplier}</p>
                   <p className="text-xs text-slate-500">{formatCurrencyCompact(s.last90Days)} en 90 días · {formatPercent(s.share, 1)} participación</p>

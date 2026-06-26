@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -237,7 +238,7 @@ export function PurchaseOrdersPage() {
         </div>
       ),
     },
-    { key: "supplier", header: "Proveedor", render: (o) => <span className="text-sm text-slate-700">{o.supplierName}</span> },
+    { key: "supplier", header: "Proveedor", render: (o) => <Link to={supplierPath(o.supplierName)} className="text-sm text-slate-700 hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{o.supplierName}</Link> },
     {
       key: "dates",
       header: "Creación / Esperada",

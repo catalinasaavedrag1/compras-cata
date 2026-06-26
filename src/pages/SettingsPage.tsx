@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { supplierPath, categoryPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -100,7 +101,16 @@ export function SettingsPage() {
       header: "Ámbito",
       render: ({ r }) => (
         <div className="min-w-[150px]">
-          <p className="font-medium text-slate-800">{r.scope}</p>
+          {r.scopeType === "category" || r.scopeType === "supplier" ? (
+            <Link
+              to={r.scopeType === "category" ? categoryPath(r.scopeValue) : supplierPath(r.scopeValue)}
+              className="font-medium text-slate-800 hover:text-brand-700 hover:underline"
+            >
+              {r.scope}
+            </Link>
+          ) : (
+            <p className="font-medium text-slate-800">{r.scope}</p>
+          )}
           <div className="flex items-center gap-1.5 mt-0.5">
             <Badge tone={SCOPE_TYPE[r.scopeType].tone}>{SCOPE_TYPE[r.scopeType].label}</Badge>
             {vsGlobal(r) && <span className="text-xs text-amber-600">{vsGlobal(r)}</span>}

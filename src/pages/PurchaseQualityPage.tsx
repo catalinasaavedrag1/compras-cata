@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
@@ -36,7 +37,7 @@ export function PurchaseQualityPage() {
         </div>
       ),
     },
-    { key: "supplier", header: "Proveedor", hideOnMobile: true, render: (l) => <span className="text-sm text-slate-600">{l.supplierName}</span> },
+    { key: "supplier", header: "Proveedor", hideOnMobile: true, render: (l) => <Link to={supplierPath(l.supplierName)} className="text-sm text-slate-600 hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{l.supplierName}</Link> },
     { key: "qty", header: "Comprado", align: "right", render: (l) => <span className="text-sm">{formatNumber(l.quantity)} u.</span> },
     {
       key: "dias",

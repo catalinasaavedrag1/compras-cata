@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { supplierPath, categoryPath, productPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
@@ -235,8 +236,8 @@ export function CampaignOpportunitiesPage() {
             <span className="text-xs font-mono text-slate-400">{o.sku}</span>
             <span className="text-xs text-slate-400">{o.brand}</span>
           </div>
-          <p className="font-medium text-slate-800 leading-snug">{o.productName}</p>
-          <p className="text-xs text-slate-500">{o.category} · {o.supplierName || "Sin proveedor"}</p>
+          <Link to={productPath(o.sku)} className="font-medium text-slate-800 leading-snug hover:text-brand-700 hover:underline block" onClick={(e) => e.stopPropagation()}>{o.productName}</Link>
+          <p className="text-xs text-slate-500"><Link to={categoryPath(o.category)} className="hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{o.category}</Link> · {o.supplierName ? <Link to={supplierPath(o.supplierName)} className="hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{o.supplierName}</Link> : "Sin proveedor"}</p>
         </div>
       ),
     },
@@ -501,7 +502,7 @@ export function CampaignOpportunitiesPage() {
                 <div key={g.supplier} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-800 truncate">{g.supplier}</span>
+                      <Link to={supplierPath(g.supplier)} className="text-sm font-medium text-slate-800 truncate hover:text-brand-700 hover:underline">{g.supplier}</Link>
                       <Badge tone={critical ? "red" : "green"}>{critical ? `Lead ${formatDays(g.leadTime)} ≥ ${formatDays(g.minDays)} a campaña` : `Lead ${formatDays(g.leadTime)} OK`}</Badge>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">{g.items.length} SKU · {formatNumber(g.units)} u. · {formatCurrencyCompact(g.amount)} · campaña en {formatDays(g.minDays)}</p>

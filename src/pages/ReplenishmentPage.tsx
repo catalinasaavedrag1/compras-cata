@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
 import { Card } from "../components/ui/Card";
@@ -262,7 +263,7 @@ export function ReplenishmentPage() {
       hideOnMobile: true,
       render: (r) => (
         <div className="text-sm">
-          <p className="text-slate-700">{r.supplierName}</p>
+          <Link to={supplierPath(r.supplierName)} className="text-slate-700 hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{r.supplierName}</Link>
           <p className="text-xs text-slate-400">Lead time {r.supplierLeadTimeDays} d</p>
         </div>
       ),

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { supplierPath, categoryPath, productPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
@@ -296,9 +297,9 @@ function SkuCard({ group, onOpen, onTask }: { group: SkuGroup; onOpen: () => voi
               <span className="text-xs font-mono text-slate-400">{group.sku}</span>
               <Badge tone={gen.tone} dot>{gen.label}</Badge>
             </div>
-            <p className="font-semibold text-slate-800 leading-snug">{group.productName}</p>
+            <Link to={productPath(group.sku)} className="font-semibold text-slate-800 leading-snug hover:text-brand-700 hover:underline block">{group.productName}</Link>
             <p className="text-xs text-slate-500">
-              {group.category} · {group.supplierName || "Sin proveedor"} · objetivo {formatPercent(group.target, 0)} · {group.buyer}
+              <Link to={categoryPath(group.category)} className="hover:text-brand-700 hover:underline">{group.category}</Link> · {group.supplierName ? <Link to={supplierPath(group.supplierName)} className="hover:text-brand-700 hover:underline">{group.supplierName}</Link> : "Sin proveedor"} · objetivo {formatPercent(group.target, 0)} · {group.buyer}
             </p>
           </div>
           <div className="flex gap-2 flex-shrink-0">

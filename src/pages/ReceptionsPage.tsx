@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { supplierPath, productPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
@@ -150,7 +151,7 @@ export function ReceptionsPage() {
       render: (r) => (
         <div className="min-w-[160px]">
           <p className="font-medium text-slate-800">{r.poNumber}</p>
-          <p className="text-xs text-slate-500">{r.supplierName}</p>
+          <Link to={supplierPath(r.supplierName)} className="text-xs text-slate-500 hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{r.supplierName}</Link>
           <p className="text-xs text-slate-400">{scope === "todos" ? r.buyer : r.warehouse}</p>
         </div>
       ),
@@ -480,7 +481,7 @@ function ReceptionDetail({
                 <div key={it.sku} className={`rounded-lg border px-3 py-2.5 ${missing > 0 ? "border-rose-200 bg-rose-50/40" : "border-slate-200"}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800 leading-snug">{it.productName}</p>
+                      <Link to={productPath(it.sku)} className="text-sm font-medium text-slate-800 leading-snug hover:text-brand-700 hover:underline block">{it.productName}</Link>
                       <p className="text-xs text-slate-400 font-mono">{it.sku}</p>
                     </div>
                     <Badge tone={st.tone}>{st.label}</Badge>

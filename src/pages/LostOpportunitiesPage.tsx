@@ -9,6 +9,7 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { lostOpportunities } from "../utils/lostOpportunities";
+import { supplierPath, categoryPath } from "../utils/entityLinks";
 import { getProductBySku } from "../data/mockProducts";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
@@ -84,7 +85,7 @@ export function LostOpportunitiesPage() {
                       <Link to={`/productos/${o.sku}`} className="text-sm font-semibold text-slate-900 hover:text-brand-700 truncate">{o.name}</Link>
                       <Badge tone={o.tone}>{o.motivo}</Badge>
                     </div>
-                    <p className="text-xs text-slate-500">{o.category} · {o.supplierName} · vendía ~{formatNumber(o.histMonthly)}/mes · ahora {formatNumber(o.recent)}/mes</p>
+                    <p className="text-xs text-slate-500"><Link to={categoryPath(o.category)} className="hover:text-brand-600 hover:underline">{o.category}</Link> · <Link to={supplierPath(o.supplierName)} className="hover:text-brand-600 hover:underline">{o.supplierName}</Link> · vendía ~{formatNumber(o.histMonthly)}/mes · ahora {formatNumber(o.recent)}/mes</p>
                     <p className="text-xs text-slate-500 mt-1">{o.insight}</p>
                   </div>
                   <div className="flex items-center gap-4 flex-shrink-0">

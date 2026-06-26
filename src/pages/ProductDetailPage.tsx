@@ -21,6 +21,7 @@ import { suppliers, getSupplierByName } from "../data/mockSuppliers";
 import { supplierFulfillment } from "../utils/supplierPerf";
 import { productNegotiation } from "../utils/negotiation";
 import { seasonalFactor, demandType } from "../utils/seasonality";
+import { supplierPath } from "../utils/entityLinks";
 import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
 import { receptions } from "../data/mockReceptions";
 import { skuOptimizationStatus, ACTION_LABEL, TIER_LABEL } from "../utils/catalogOptimization";
@@ -162,7 +163,7 @@ export function ProductDetailPage() {
         <StatusBadge kind="product" value={product.productStatus} />
         <StatusBadge kind="purchase" value={product.purchaseStatus} dot={false} />
         {product.supplierName ? (
-          <Link to="/proveedores" className="text-xs text-brand-600 hover:text-brand-700 font-medium">
+          <Link to={supplierPath(product.supplierName)} className="text-xs text-brand-600 hover:text-brand-700 font-medium">
             Proveedor: {product.supplierName}
           </Link>
         ) : (

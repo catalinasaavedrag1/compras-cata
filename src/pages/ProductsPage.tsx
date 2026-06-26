@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { categoryPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -103,7 +104,7 @@ export function ProductsPage() {
             <span className="text-xs text-slate-400">{p.brand}</span>
           </div>
           <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
-          <p className="text-xs text-slate-500">{p.category} · {p.subcategory}</p>
+          <p className="text-xs text-slate-500"><Link to={categoryPath(p.category)} className="hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{p.category}</Link> · {p.subcategory}</p>
         </div>
       ),
     },

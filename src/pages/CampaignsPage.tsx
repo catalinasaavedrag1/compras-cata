@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { productPath, categoryPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -489,10 +491,10 @@ export function CampaignsPage() {
                     <tr key={`${p.sku}-${idx}`} className="border-b border-slate-100">
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-medium text-slate-800">{p.name}</span>
+                          <Link to={productPath(p.sku)} className="text-sm font-medium text-slate-800 hover:text-brand-700 hover:underline">{p.name}</Link>
                           {p.isNew && <span className="rounded-full px-1.5 py-px text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700">Nuevo</span>}
                         </div>
-                        <p className="text-[11px] text-slate-400">{p.sku} · {p.category}</p>
+                        <p className="text-[11px] text-slate-400">{p.sku} · <Link to={categoryPath(p.category)} className="hover:text-brand-700 hover:underline">{p.category}</Link></p>
                       </td>
                       <td className="px-3 py-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">

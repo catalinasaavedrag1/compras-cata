@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
@@ -81,7 +82,7 @@ export function ApprovalsPage() {
                         <Link to={`/productos/${r.sku}`} className="text-sm font-semibold text-slate-900 hover:text-brand-700 truncate">{r.productName}</Link>
                         {state !== "pendiente" && <Badge tone={state === "aprobada" ? "green" : "red"}>{state === "aprobada" ? "Aprobada" : "Rechazada"}</Badge>}
                       </div>
-                      <p className="text-xs text-slate-400">{fmtDate(r.date)} · {r.buyerName} · {r.supplierName}</p>
+                      <p className="text-xs text-slate-400">{fmtDate(r.date)} · {r.buyerName} · <Link to={supplierPath(r.supplierName)} className="hover:text-brand-600 hover:underline">{r.supplierName}</Link></p>
                     </div>
                     <p className="text-sm font-semibold text-slate-800 flex-shrink-0">{formatCurrency(r.amount)}</p>
                   </div>

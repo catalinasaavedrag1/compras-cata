@@ -389,7 +389,7 @@ export function DashboardPage() {
           <CardHeader title="Categorías que necesitan atención" description="Ordenadas por SKUs con quiebre y en riesgo" />
           <CardBody className="space-y-2">
             {criticalCategories.map((c) => (
-              <div key={c.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0">
+              <Link key={c.id} to={`/categorias/${c.id}`} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 rounded-lg px-1 -mx-1">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800 truncate">{c.name}</p>
                   <p className="text-xs text-slate-500">Comprador: {c.buyer}</p>
@@ -399,7 +399,7 @@ export function DashboardPage() {
                   <Badge tone="amber">{c.riskSkus} riesgo</Badge>
                   <StatusBadge kind="category" value={c.status} dot={false} />
                 </div>
-              </div>
+              </Link>
             ))}
           </CardBody>
         </Card>
@@ -409,7 +409,7 @@ export function DashboardPage() {
           <CardHeader title="Proveedores con problemas" description="Bajo cumplimiento de entrega. Pueden frenar la reposición." />
           <CardBody className="space-y-2">
             {worstSuppliers.map((s) => (
-              <div key={s.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0">
+              <Link key={s.id} to={`/proveedores/${s.id}`} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 rounded-lg px-1 -mx-1">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800 truncate">{s.name}</p>
                   <p className="text-xs text-slate-500">Lead time {s.averageLeadTimeDays} días · {s.openPurchaseOrders} OC abiertas</p>
@@ -420,7 +420,7 @@ export function DashboardPage() {
                   </span>
                   <StatusBadge kind="supplier" value={s.status} dot={false} />
                 </div>
-              </div>
+              </Link>
             ))}
           </CardBody>
         </Card>
