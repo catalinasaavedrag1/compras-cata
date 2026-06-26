@@ -88,16 +88,15 @@ export function ReceptionsPage() {
     return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
   }, [undeliveredLines]);
 
-  // Responsables de reordenar (quién, para el líder)
+  // Responsables de reordenar (quién y qué productos, para el líder)
   const byBuyer = useMemo(() => {
-    const m = new Map<string, { count: number; suppliers: Set<string> }>();
+    const m = new Map<string, MissingLine[]>();
     undeliveredLines.forEach((l) => {
-      const e = m.get(l.r.buyer) ?? { count: 0, suppliers: new Set<string>() };
-      e.count += 1;
-      e.suppliers.add(l.r.supplierName);
-      m.set(l.r.buyer, e);
+      const arr = m.get(l.r.buyer) ?? [];
+      arr.push(l);
+      m.set(l.r.buyer, arr);
     });
-    return [...m.entries()].sort((a, b) => b[1].count - a[1].count);
+    return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
   }, [undeliveredLines]);
 
   const counts = {
@@ -267,14 +266,22 @@ export function ReceptionsPage() {
                     <p className="text-xs text-slate-400">Encargados de compra con SKUs sin reponer por incumplimiento del proveedor.</p>
                   </div>
                   <div className="divide-y divide-slate-50">
-                    {byBuyer.map(([bName, info]) => (
-                      <button key={bName} onClick={() => setScope(bName === buyer ? "mias" : bName)} className="flex items-center gap-3 w-full text-left px-4 py-2.5 hover:bg-slate-50">
-                        <span className="flex-1 min-w-0">
-                          <span className="block text-sm font-medium text-slate-800">{bName}</span>
-                          <span className="block text-xs text-slate-400 truncate">Proveedores: {[...info.suppliers].join(", ")}</span>
-                        </span>
-                        <Badge tone="red">{info.count} SKU{info.count === 1 ? "" : "s"} por reordenar</Badge>
-                      </button>
+                    {byBuyer.map(([bName, lines]) => (
+                      <div key={bName} className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex-1 text-sm font-medium text-slate-800">{bName}</span>
+                          <Badge tone="red">{lines.length} por reordenar</Badge>
+                          <button onClick={() => setScope(bName === buyer ? "mias" : bName)} className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver</button>
+                        </div>
+                        <ul className="mt-1.5 space-y-1">
+                          {lines.map(({ r, it, missing }) => (
+                            <li key={`${r.id}-${it.sku}`} className="flex items-center justify-between gap-2 text-xs">
+                              <span className="min-w-0 truncate text-slate-600"><b className="font-medium text-slate-800">{it.productName}</b> <span className="text-slate-400">· {r.supplierName}</span></span>
+                              <span className="text-rose-600 font-medium flex-shrink-0">faltan {formatNumber(missing)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
                   </div>
                 </Card>
