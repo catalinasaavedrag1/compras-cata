@@ -16,6 +16,7 @@ import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { receptions, RECEPTION_STATUS } from "../data/mockReceptions";
 import { alerts } from "../data/mockAlerts";
 import { supplierFulfillment } from "../utils/supplierPerf";
+import { supplierSeasonality } from "../utils/seasonality";
 import type { Supplier } from "../types/purchasing";
 import {
   formatCurrency,
@@ -189,6 +190,7 @@ export function SupplierDetailPage() {
         onChange={setTab}
         tabs={[
           { value: "negociacion", label: "Negociación" },
+          { value: "temporadas", label: "Temporadas" },
           { value: "productos", label: "Productos", count: supProducts.length },
           { value: "ordenes", label: "Órdenes", count: supPOs.length },
           { value: "recepciones", label: "Recepciones", count: supReceptions.length },
@@ -197,6 +199,8 @@ export function SupplierDetailPage() {
       />
 
       {tab === "negociacion" && <SupplierNegotiation supplier={supplier} />}
+
+      {tab === "temporadas" && <SeasonView supplier={supplier} />}
 
       {tab === "productos" && (
         <Card>
@@ -479,6 +483,126 @@ function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
             </ul>
           </CardBody>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+/** Vista de estacionalidad: temporadas, cumplimiento en peak y qué negociar antes. */
+function SeasonView({ supplier }: { supplier: Supplier }) {
+  const s = supplierSeasonality(supplier.name);
+  const last12 = s.series.slice(12);
+  const maxSales = Math.max(1, ...s.series.map((p) => p.sales));
+  const scoreTone = s.score >= 80 ? "good" : s.score >= 60 ? "warn" : "bad";
+
+  // Curva 24 meses (SVG)
+  const W = 240;
+  const H = 56;
+  const pts = s.series
+    .map((p, i) => `${((i / (s.series.length - 1)) * W).toFixed(1)},${(H - (p.sales / maxSales) * H).toFixed(1)}`)
+    .join(" ");
+
+  return (
+    <div className="space-y-4">
+      {/* Pre-temporada alerta */}
+      {s.preSeason && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          ⏳ <b>Entra en temporada alta en ~{s.preSeason.days} días</b> (peak histórico en {s.preSeason.month}). Stock actual y fill {s.fill}% · lead {formatDays(s.leadTime)}. Conviene negociar la OC y el stock reservado ahora.
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
+        <GStat label="Venta 12m" value={formatCurrencyCompact(s.ventaActual)} />
+        <GStat label="vs 12m previos" value={`${s.varPct >= 0 ? "+" : ""}${formatPercent(s.varPct, 0)}`} tone={s.varPct >= 0 ? "good" : "bad"} />
+        <GStat label="Margen prom." value={formatPercent(s.marginAvg, 0)} tone={s.marginAvg < 25 ? "warn" : "good"} />
+        <GStat label="Quiebres 12m" value={formatNumber(s.quiebres12)} tone={s.quiebres12 >= 8 ? "bad" : "good"} />
+        <GStat label="Fill rate" value={`${s.fill}%`} tone={s.fill < 90 ? "bad" : "good"} />
+        <GStat label="Venta perdida" value={s.lost12 > 0 ? formatCurrencyCompact(s.lost12) : "—"} tone={s.lost12 > 0 ? "bad" : "good"} sub="12 meses" />
+        <GStat label="Score temporada" value={`${s.score}`} tone={scoreTone} sub="0-100" />
+      </div>
+
+      {/* Clasificación */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-card p-4 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Comportamiento</span>
+        <Badge tone={s.classification.tone}>{s.classification.label}</Badge>
+        {s.peakMonths.length > 0 && <span className="text-sm text-slate-600">Meses clave: <b className="text-slate-800">{s.peakMonths.join(" · ")}</b></span>}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Heatmap 12 meses */}
+        <Card>
+          <CardHeader title="Estacionalidad (últimos 12 meses)" description="Intensidad de venta y quiebres por mes" />
+          <CardBody>
+            <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+              {last12.map((p) => {
+                const intensity = p.sales / maxSales;
+                return (
+                  <div key={p.ym} className="text-center">
+                    <div className="h-10 rounded-md flex items-center justify-center text-[10px] font-semibold" style={{ background: `rgba(31,73,214,${0.12 + intensity * 0.8})`, color: intensity > 0.55 ? "#fff" : "#1e3a8a" }} title={`${p.label}: ${formatCurrencyCompact(p.sales)} · ${p.stockouts} quiebres`}>
+                      {p.stockouts > 0 ? `⚠${p.stockouts}` : ""}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{p.label.split(" ")[0]}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2">Más oscuro = más venta. ⚠ = quiebres ese mes.</p>
+          </CardBody>
+        </Card>
+
+        {/* Curva 24 meses */}
+        <Card>
+          <CardHeader title="Curva de venta (24 meses)" description="Tendencia y temporadas" />
+          <CardBody>
+            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full" style={{ height: 90 }}>
+              <polyline points={pts} fill="none" stroke="#1f49d6" strokeWidth={2} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+            </svg>
+            <div className="flex justify-between mt-1">
+              <span className="text-[10px] text-slate-400">{s.series[0].label}</span>
+              <span className="text-[10px] text-slate-400">{s.series[s.series.length - 1].label}</span>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Pre / Temporada / Post */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {[
+          { t: "Pretemporada", c: "border-blue-200 bg-blue-50", items: ["Negociar costo y stock reservado", "Confirmar disponibilidad del proveedor", "Crear OC anticipada", "Definir campañas"] },
+          { t: "Temporada", c: "border-emerald-200 bg-emerald-50", items: ["Monitorear venta semanal", "Reponer rápido para evitar quiebres", "Exigir despacho parcial", "Activar campañas"] },
+          { t: "Postemporada", c: "border-amber-200 bg-amber-50", items: ["Liquidar productos lentos", "Devolver lo acordado", "Medir resultado y fill", "Evaluar al proveedor"] },
+        ].map((b) => (
+          <div key={b.t} className={`rounded-xl border ${b.c} p-3`}>
+            <p className="text-sm font-semibold text-slate-800 mb-1.5">{b.t}</p>
+            <ul className="space-y-1">
+              {b.items.map((it) => <li key={it} className="text-xs text-slate-600 flex gap-1.5"><span className="text-slate-400">·</span>{it}</li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {/* Top productos de temporada */}
+      <Card>
+        <CardHeader title="Top productos de temporada" description="Qué explica la temporada y qué hacer con cada uno" />
+        <CardBody className="space-y-1.5">
+          {s.topProducts.map((p) => (
+            <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-slate-800 truncate">{p.name}</span>
+                <span className="block text-xs text-slate-400">{p.type} · margen {formatPercent(p.margin, 0)}</span>
+              </span>
+              <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{formatCurrencyCompact(p.sales)}</span>
+              <Badge tone="blue">{p.action}</Badge>
+            </Link>
+          ))}
+        </CardBody>
+      </Card>
+
+      {/* Recomendación */}
+      <div className="rounded-xl border border-brand-100 bg-brand-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-brand-700 mb-1">Conclusión y recomendación</p>
+        <p className="text-sm text-brand-900 leading-relaxed">{s.recommendation}</p>
       </div>
     </div>
   );
