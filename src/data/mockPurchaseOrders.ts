@@ -2,6 +2,27 @@ import type { PurchaseOrder } from "../types/purchasing";
 
 export const purchaseOrders: PurchaseOrder[] = [
   {
+    id: "PO-2026-0137",
+    number: "OC-2026-0137",
+    supplierName: "Proveedor Andes",
+    createdAt: "2026-05-30",
+    expectedDate: "2026-06-08",
+    status: "closed",
+    totalAmount: 2749800,
+    skuCount: 2,
+    destinationWarehouse: "Centro de Distribución",
+    buyerName: "Catalina Saavedra",
+    delayedDays: 0,
+    paymentTerms: "30 días",
+    comments: "OC cerrada. Quedó como ejemplo de calidad de compra: una línea corta y una sobrecompra.",
+    lines: [
+      // Compra corta: cemento de alta rotación con cantidad insuficiente
+      { sku: "CON-001", productName: "Cemento Polpaico 25 kg", quantity: 120, unitCost: 4290 },
+      // Sobrecompra: demasiadas unidades para la rotación
+      { sku: "ELE-002", productName: "Ampolleta LED 12W luz fría", quantity: 1500, unitCost: 1490 },
+    ],
+  },
+  {
     id: "PO-2026-0142",
     number: "OC-2026-0142",
     supplierName: "Proveedor Andes",
