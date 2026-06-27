@@ -343,6 +343,22 @@ export function PurchaseOrdersPage() {
               ? "No tienes borradores. Crea uno desde las sugerencias de reposición."
               : "No hay órdenes de compra en esta vista."
           }
+          mobileCard={(o) => (
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-800">{o.number}</p>
+                  <p className="text-xs text-slate-400">{o.supplierName} · {o.buyerName}</p>
+                </div>
+                <StatusBadge kind="purchaseOrder" value={o.status} dot={false} />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                <div><p className="text-xs text-slate-400">Esperada</p><p className="text-slate-700">{formatDate(o.expectedDate)}</p></div>
+                <div><p className="text-xs text-slate-400">SKUs</p><p className="text-slate-700">{formatNumber(o.skuCount)}</p></div>
+                <div><p className="text-xs text-slate-400">Monto</p><p className="text-slate-700">{formatCurrencyCompact(o.totalAmount)}</p></div>
+              </div>
+            </div>
+          )}
         />
       </Card>
 
