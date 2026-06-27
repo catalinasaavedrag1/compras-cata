@@ -10,11 +10,19 @@ import { HelpNote } from "../components/business/HelpNote";
 import { Badge } from "../components/ui/Badge";
 import { DataTable, type Column } from "../components/ui/Table";
 import { purchaseQualityLines, PURCHASE_CLASS, type PurchaseClass, type PurchaseQualityLine } from "../utils/purchaseQuality";
+import { useBuyer } from "../context/BuyerContext";
+import { useRole } from "../context/RoleContext";
 import { IconOrders, IconCheck, IconAlerts } from "../components/ui/icons";
 import { formatCurrencyCompact, formatNumber } from "../utils/formatters";
 
 export function PurchaseQualityPage() {
-  const all = useMemo(() => purchaseQualityLines(), []);
+  const { buyer } = useBuyer();
+  const { role } = useRole();
+  const all = useMemo(() => {
+    const lines = purchaseQualityLines();
+    // El comprador solo evalúa SUS compras; el líder ve las de todo el equipo.
+    return role === "lider" ? lines : lines.filter((l) => l.buyerName === buyer);
+  }, [role, buyer]);
   const [query, setQuery] = useUrlState("q");
   const [klass, setKlass] = useUrlState("tipo");
 

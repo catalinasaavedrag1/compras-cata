@@ -11,7 +11,7 @@ import { Button } from "../ui/Button";
 //  rol con acceso explícito. Si no lo tiene, mostramos un "sin permisos" claro.
 // ============================================================================
 export function RoleGate({ allow, children }: { allow: Role; children: ReactNode }) {
-  const { role, setRole } = useRole();
+  const { role } = useRole();
   const navigate = useNavigate();
 
   if (role === allow) return <>{children}</>;
@@ -19,14 +19,9 @@ export function RoleGate({ allow, children }: { allow: Role; children: ReactNode
   return (
     <div className="py-10">
       <EmptyState
-        title="Vista del Líder de Compras"
-        description="Esta sección es del equipo de compras (datos de todos los compradores). Como comprador solo ves tu propia cartera. Cambia al rol Líder para acceder."
-        action={
-          <div className="flex gap-2">
-            <Button onClick={() => { setRole("lider"); }}>Cambiar a rol Líder</Button>
-            <Button variant="secondary" onClick={() => navigate("/")}>Volver al inicio</Button>
-          </div>
-        }
+        title="Sección del Líder de Compras"
+        description="Esta vista muestra datos de todo el equipo (varios compradores). Tu rol actual es Comprador, que solo accede a su propia cartera."
+        action={<Button onClick={() => navigate("/")}>Volver al inicio</Button>}
       />
     </div>
   );

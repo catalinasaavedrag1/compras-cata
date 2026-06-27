@@ -10,14 +10,21 @@ import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { OUTCOME_META, type DecisionOutcome } from "../data/mockDecisions";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
+import { useBuyer } from "../context/BuyerContext";
+import { useRole } from "../context/RoleContext";
 import { supplierPath } from "../utils/entityLinks";
 import { IconBulb, IconCheck, IconAlerts } from "../components/ui/icons";
 import { formatNumber } from "../utils/formatters";
 
 export function DecisionsPage() {
-  const { decisions: all } = usePurchaseFlow();
+  const { decisions } = usePurchaseFlow();
+  const { buyer } = useBuyer();
+  const { role } = useRole();
   const [query, setQuery] = useUrlState("q");
   const [outcome, setOutcome] = useUrlState("resultado");
+
+  // Cada comprador ve su propio historial; el líder ve el de todo el equipo.
+  const all = role === "lider" ? decisions : decisions.filter((d) => d.buyerName === buyer);
 
   const filtered = all.filter((d) => {
     if (query.trim() && !`${d.productName} ${d.sku} ${d.buyerName} ${d.supplierName}`.toLowerCase().includes(query.toLowerCase())) return false;

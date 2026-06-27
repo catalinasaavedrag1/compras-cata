@@ -24,6 +24,8 @@ import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
+import { useBuyer } from "../context/BuyerContext";
+import { useRole } from "../context/RoleContext";
 import { coverageDays } from "../utils/calculations";
 import { TODAY_ISO } from "../utils/constants";
 import type { ApprovalCriterion } from "../data/mockApprovals";
@@ -49,6 +51,8 @@ export function PurchaseOrdersPage() {
   const { items, count, totalAmount, updateQuantity, removeItem, clear, addItem, hasItem } = useOcDraft();
   const toast = useToast();
   const { addApproval, addDecision, approvals, approvalState } = usePurchaseFlow();
+  const { buyer } = useBuyer();
+  const { role } = useRole();
   const seedPOs = useCollection<PurchaseOrder>("purchase-orders", mockPOs);
 
   // Persistente: órdenes creadas por el usuario + cambios de estado sobre las semilla
@@ -82,9 +86,11 @@ export function PurchaseOrdersPage() {
       const derived = approvalDerivedStatus(o);
       return derived !== o.status ? { ...o, status: derived } : o;
     };
-    return [...createdOrders.map(apply), ...seedPOs.map(apply)];
+    const all = [...createdOrders.map(apply), ...seedPOs.map(apply)];
+    // El comprador solo ve sus propias OC; el líder, las de todo el equipo.
+    return role === "lider" ? all : all.filter((o) => o.buyerName === buyer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createdOrders, statusOverrides, approvals, approvalState, seedPOs]);
+  }, [createdOrders, statusOverrides, approvals, approvalState, seedPOs, role, buyer]);
 
   const counts = useMemo(() => {
     const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received", "with_difference"];
@@ -133,7 +139,7 @@ export function PurchaseOrdersPage() {
   const createOrder = () => {
     if (count === 0) return;
     const num = `OC-2026-${String(143 + createdOrders.length).padStart(4, "0")}`;
-    const buyerName = "Catalina Saavedra";
+    const buyerName = role === "lider" ? "Catalina Saavedra" : buyer;
 
     // Cerrar el ciclo: por cada línea, evaluar desvío vs sugerido y criterio.
     let approvalsCreated = 0;

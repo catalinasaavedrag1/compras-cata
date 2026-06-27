@@ -39,6 +39,8 @@ import { campaignOpportunities } from "../data/mockCampaignOpportunities";
 import { lostOpportunities } from "../utils/lostOpportunities";
 import { purchaseQualityLines } from "../utils/purchaseQuality";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
+import { useBuyer } from "../context/BuyerContext";
+import { useRole } from "../context/RoleContext";
 import { signals as salesSignals } from "../data/mockSignals";
 import { STOCKOUT_TYPES } from "../components/business/signalLabels";
 import {
@@ -52,6 +54,8 @@ import { coverageSentence } from "../utils/calculations";
 
 export function DashboardPage() {
   const { pendingApprovalsCount } = usePurchaseFlow();
+  const { buyer } = useBuyer();
+  const { role } = useRole();
   const activeSkus = products.filter((p) => p.productStatus !== "discontinued").length;
   const stockoutSkus = products.filter((p) => p.availableStock <= 0).length;
   const criticalRecs = recommendations.filter((r) => r.status === "critical");
@@ -139,11 +143,16 @@ export function DashboardPage() {
     .sort((a, b) => b.suggestedPurchaseAmount - a.suggestedPurchaseAmount)
     .slice(0, 5);
 
-  const criticalCategories = [...categories]
+  // El comprador ve sus categorías/proveedores; el líder, la visión global.
+  const myCats = role === "lider" ? null : new Set(categories.filter((c) => c.buyer === buyer).map((c) => c.name));
+  const visibleCategories = myCats ? categories.filter((c) => myCats.has(c.name)) : categories;
+  const visibleSuppliers = myCats ? suppliers.filter((s) => s.categories.some((c) => myCats.has(c))) : suppliers;
+
+  const criticalCategories = [...visibleCategories]
     .sort((a, b) => b.stockoutSkus + b.riskSkus - (a.stockoutSkus + a.riskSkus))
     .slice(0, 5);
 
-  const worstSuppliers = [...suppliers]
+  const worstSuppliers = [...visibleSuppliers]
     .filter((s) => s.status !== "inactive")
     .sort((a, b) => a.deliveryCompliance - b.deliveryCompliance)
     .slice(0, 5);

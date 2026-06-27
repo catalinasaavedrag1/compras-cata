@@ -10,6 +10,8 @@ import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useToast } from "../context/ToastContext";
 import { usePurchaseFlow, type ApprovalState } from "../context/PurchaseFlowContext";
+import { useBuyer } from "../context/BuyerContext";
+import { useRole } from "../context/RoleContext";
 import { CRITERION_LABEL } from "../data/mockApprovals";
 import { IconCheck, IconAlerts, IconOrders } from "../components/ui/icons";
 import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/formatters";
@@ -18,8 +20,13 @@ type Decision = ApprovalState;
 
 export function ApprovalsPage() {
   const toast = useToast();
-  const { approvals: approvalRequests, approvalState, setApprovalState } = usePurchaseFlow();
+  const { approvals, approvalState, setApprovalState } = usePurchaseFlow();
+  const { buyer } = useBuyer();
+  const { role } = useRole();
   const [filter, setFilter] = useState<Decision | "todas">("pendiente");
+
+  // Un comprador solo ve y gestiona SUS aprobaciones; el líder, las de todo el equipo.
+  const approvalRequests = role === "lider" ? approvals : approvals.filter((r) => r.buyerName === buyer);
 
   const stateOf = (id: string): Decision => approvalState[id] ?? "pendiente";
   const decide = (id: string, d: Decision, name: string) => {
