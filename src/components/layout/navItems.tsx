@@ -16,6 +16,9 @@ import {
 } from "../ui/icons";
 import type { Role } from "../../context/RoleContext";
 
+/** Claves de badge dinámico: el conteo y tono se resuelven en useNavBadges(). */
+export type NavBadgeKey = "alertas" | "aprobaciones" | "senales" | "equipoAlertas";
+
 export interface NavItem {
   to: string;
   label: string;
@@ -23,6 +26,8 @@ export interface NavItem {
   end?: boolean;
   /** Descripción corta para tooltip / ayuda. */
   hint: string;
+  /** Indicador de pendientes/alertas en el menú (conteo dinámico). */
+  badge?: NavBadgeKey;
 }
 
 export interface NavGroup {
@@ -40,8 +45,8 @@ export const compradorGroups: NavGroup[] = [
       { to: "/", label: "Dashboard", icon: IconDashboard, end: true, hint: "Resumen del día y qué revisar primero" },
       { to: "/mi-panel", label: "Mi panel", icon: IconCheck, hint: "Mis tareas, categorías, riesgos de quiebre y proveedores" },
       { to: "/mi-desempeno", label: "Mi desempeño", icon: IconBulb, hint: "Tu score, metas y posición frente al equipo" },
-      { to: "/alertas", label: "Alertas", icon: IconAlerts, hint: "Problemas que requieren atención del comprador" },
-      { to: "/senales-ventas", label: "Señales de ventas", icon: IconSignal, hint: "Lo que ventas detecta en el terreno: quiebres, demanda y oportunidades" },
+      { to: "/alertas", label: "Alertas", icon: IconAlerts, hint: "Problemas que requieren atención del comprador", badge: "alertas" },
+      { to: "/senales-ventas", label: "Señales de ventas", icon: IconSignal, hint: "Lo que ventas detecta en el terreno: quiebres, demanda y oportunidades", badge: "senales" },
     ],
   },
   {
@@ -52,7 +57,7 @@ export const compradorGroups: NavGroup[] = [
       { to: "/campanas-oportunidades", label: "Oportunidades", icon: IconBulb, hint: "Anticipar compras para campañas, liquidaciones y crecimiento" },
       { to: "/oportunidades-perdidas", label: "Oportunidades perdidas", icon: IconBulb, hint: "Productos que vendían, quedaron sin stock y no se volvieron a comprar" },
       { to: "/ordenes-compra", label: "Órdenes", icon: IconOrders, hint: "Seguimiento de OC y creación desde sugerencias" },
-      { to: "/aprobaciones", label: "Aprobaciones", icon: IconCheck, hint: "Compras fuera de criterio que requieren aprobación y justificación" },
+      { to: "/aprobaciones", label: "Aprobaciones", icon: IconCheck, hint: "Compras fuera de criterio que requieren aprobación y justificación", badge: "aprobaciones" },
       { to: "/calidad-compra", label: "Calidad de compra", icon: IconCheck, hint: "¿Se compró corto, saludable o de más? Días comprados vs objetivo" },
       { to: "/recepciones", label: "Recepciones", icon: IconInventory, hint: "Qué viene en camino, qué llegó y cómo llegó" },
       { to: "/decisiones", label: "Historial de decisiones", icon: IconBulb, hint: "Auditoría: sugerido vs comprado, resultado y aprendizaje" },
@@ -91,7 +96,7 @@ export const liderGroups: NavGroup[] = [
     title: "Inicio",
     items: [
       { to: "/equipo", label: "Panel del equipo", icon: IconDashboard, end: true, hint: "Cómo está funcionando el área de compras hoy" },
-      { to: "/equipo/alertas", label: "Alertas del equipo", icon: IconAlerts, hint: "Riesgos del equipo priorizados" },
+      { to: "/equipo/alertas", label: "Alertas del equipo", icon: IconAlerts, hint: "Riesgos del equipo priorizados", badge: "equipoAlertas" },
     ],
   },
   {
@@ -106,7 +111,7 @@ export const liderGroups: NavGroup[] = [
     title: "Gestión",
     items: [
       { to: "/equipo/carga", label: "Carga & reasignación", icon: IconRules, hint: "Equilibrar la carga del equipo" },
-      { to: "/aprobaciones", label: "Aprobaciones", icon: IconCheck, hint: "Aprobar o rechazar compras fuera de criterio" },
+      { to: "/aprobaciones", label: "Aprobaciones", icon: IconCheck, hint: "Aprobar o rechazar compras fuera de criterio", badge: "aprobaciones" },
       { to: "/decisiones", label: "Historial de decisiones", icon: IconBulb, hint: "Auditoría: sugerido vs comprado, resultado y aprendizaje" },
     ],
   },

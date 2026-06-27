@@ -5,6 +5,26 @@ import { cn } from "../../utils/cn";
 import { useLocalStorage } from "../../utils/useLocalStorage";
 import { useRole } from "../../context/RoleContext";
 import { IconChevronRight } from "../ui/icons";
+import { useNavBadges } from "./useNavBadges";
+
+const BADGE_DOT: Record<string, string> = {
+  red: "bg-rose-500",
+  amber: "bg-amber-500",
+  blue: "bg-brand-500",
+  green: "bg-emerald-500",
+  violet: "bg-violet-500",
+  neutral: "bg-slate-400",
+  slate: "bg-slate-500",
+};
+const BADGE_PILL: Record<string, string> = {
+  red: "bg-rose-100 text-rose-700",
+  amber: "bg-amber-100 text-amber-700",
+  blue: "bg-brand-100 text-brand-700",
+  green: "bg-emerald-100 text-emerald-700",
+  violet: "bg-violet-100 text-violet-700",
+  neutral: "bg-slate-100 text-slate-600",
+  slate: "bg-slate-100 text-slate-600",
+};
 
 /** Datos del tooltip flotante que se muestra en modo colapsado. */
 interface HoverTip {
@@ -18,6 +38,7 @@ export function Sidebar() {
   const [tip, setTip] = useState<HoverTip | null>(null);
   const { role } = useRole();
   const navGroups = navGroupsFor(role);
+  const badges = useNavBadges();
 
   // Atajo de teclado: "[" colapsa/expande sin usar el mouse.
   useEffect(() => {
@@ -89,7 +110,10 @@ export function Sidebar() {
             )}
             {collapsed && <div className="h-px bg-slate-100 mx-2 mb-2" />}
             <div className="space-y-0.5">
-              {group.items.map((item) => (
+              {group.items.map((item) => {
+                const b = item.badge ? badges[item.badge] : undefined;
+                const showBadge = !!b && b.count > 0;
+                return (
                 <NavLink
                   key={item.to}
                   to={item.to}
@@ -99,7 +123,7 @@ export function Sidebar() {
                   onMouseLeave={() => setTip(null)}
                   className={({ isActive }) =>
                     cn(
-                      "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
+                      "relative flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
                       collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2",
                       isActive ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     )
@@ -107,12 +131,25 @@ export function Sidebar() {
                 >
                   {({ isActive }) => (
                     <>
-                      <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive ? "text-brand-600" : "text-slate-400")} />
+                      {/* Barra de acento del estado activo (más evidente que solo color) */}
+                      {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-brand-600" />}
+                      <span className="relative flex-shrink-0">
+                        <item.icon className={cn("w-5 h-5", isActive ? "text-brand-600" : "text-slate-400")} />
+                        {collapsed && showBadge && (
+                          <span className={cn("absolute -top-1 -right-1 w-2 h-2 rounded-full ring-2 ring-white", BADGE_DOT[b!.tone])} />
+                        )}
+                      </span>
                       {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsed && showBadge && (
+                        <span className={cn("ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 min-w-[20px] text-center", BADGE_PILL[b!.tone])}>
+                          {b!.count > 99 ? "99+" : b!.count}
+                        </span>
+                      )}
                     </>
                   )}
                 </NavLink>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}

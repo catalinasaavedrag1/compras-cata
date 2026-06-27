@@ -6,6 +6,13 @@ import { cn } from "../../utils/cn";
 import { Input } from "../ui/Input";
 import { useRole } from "../../context/RoleContext";
 import { IconClose, IconSearch } from "../ui/icons";
+import { useNavBadges } from "./useNavBadges";
+
+const PILL: Record<string, string> = {
+  red: "bg-rose-100 text-rose-700",
+  amber: "bg-amber-100 text-amber-700",
+  blue: "bg-brand-100 text-brand-700",
+};
 
 interface MobileNavProps {
   open: boolean;
@@ -17,6 +24,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
   const [search, setSearch] = useState("");
   const { role } = useRole();
   const navGroups = navGroupsFor(role);
+  const badges = useNavBadges();
 
   if (!open) return null;
 
@@ -57,7 +65,10 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
                 {group.title}
               </p>
               <div className="space-y-0.5">
-                {group.items.map((item) => (
+                {group.items.map((item) => {
+                  const b = item.badge ? badges[item.badge] : undefined;
+                  const showBadge = !!b && b.count > 0;
+                  return (
                   <NavLink
                     key={item.to}
                     to={item.to}
@@ -81,10 +92,16 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
                           )}
                         />
                         {item.label}
+                        {showBadge && (
+                          <span className={cn("ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 min-w-[20px] text-center", PILL[b!.tone] ?? "bg-slate-100 text-slate-600")}>
+                            {b!.count > 99 ? "99+" : b!.count}
+                          </span>
+                        )}
                       </>
                     )}
                   </NavLink>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
