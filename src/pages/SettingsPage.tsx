@@ -7,6 +7,7 @@ import { DataTable, type Column } from "../components/ui/Table";
 import { Button } from "../components/ui/Button";
 import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { Drawer } from "../components/ui/Drawer";
+import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { Input } from "../components/ui/Input";
 import { Tabs } from "../components/ui/Tabs";
 import { KpiCard } from "../components/business/KpiCard";
@@ -265,8 +266,13 @@ export function SettingsPage() {
 
 function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; onClose: () => void; onSave: (r: PurchaseRule) => void }) {
   const [draft, setDraft] = useState<PurchaseRule | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   if (rule && (!draft || draft.id !== rule.id)) setDraft({ ...rule });
   if (!rule || !draft) return null;
+
+  // Guardia de cambios sin guardar: si el borrador difiere, confirmar al cerrar.
+  const dirty = JSON.stringify(draft) !== JSON.stringify(rule);
+  const guardedClose = () => (dirty ? setConfirmDiscard(true) : onClose());
 
   const set = (k: keyof PurchaseRule, v: number) => setDraft({ ...draft, [k]: v });
   const errors: string[] = [];
@@ -283,15 +289,16 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
   const deltaPct = rule.targetInventoryDays > 0 ? Math.round((draft.targetInventoryDays / rule.targetInventoryDays - 1) * 100) : 0;
 
   return (
+    <>
     <Drawer
       open={!!rule}
-      onClose={onClose}
+      onClose={guardedClose}
       title={`Editar regla · ${rule.scope}`}
       description={rule.updatedAt ? `Última modificación: ${formatDate(rule.updatedAt)} · ${rule.updatedBy ?? ""}` : "Ajusta los parámetros y ve el impacto."}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button disabled={errors.length > 0} onClick={() => onSave(draft)}>Guardar cambios</Button>
+          <Button variant="secondary" onClick={guardedClose}>Cancelar</Button>
+          <Button disabled={errors.length > 0 || !dirty} onClick={() => onSave(draft)}>{dirty ? "Guardar cambios" : "Sin cambios"}</Button>
         </>
       }
     >
@@ -332,6 +339,18 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
         </div>
       </div>
     </Drawer>
+
+    <ConfirmModal
+      open={confirmDiscard}
+      title="Descartar cambios"
+      message="Tienes cambios sin guardar en esta regla. Si sales ahora se perderán."
+      confirmLabel="Descartar cambios"
+      cancelLabel="Seguir editando"
+      danger
+      onCancel={() => setConfirmDiscard(false)}
+      onConfirm={() => { setConfirmDiscard(false); onClose(); }}
+    />
+    </>
   );
 }
 

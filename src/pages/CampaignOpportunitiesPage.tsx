@@ -596,18 +596,27 @@ export function CampaignOpportunitiesPage() {
         initialName={builderTemplate}
       />
 
-      <ConfirmModal
-        open={pendingDelete !== null}
-        title="Eliminar campaña"
-        message="¿Seguro que quieres eliminar esta campaña? Esta acción no se puede deshacer."
-        confirmLabel="Eliminar campaña"
-        danger
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={() => {
-          if (pendingDelete) deleteCampaign(pendingDelete);
-          setPendingDelete(null);
-        }}
-      />
+      {(() => {
+        const c = createdCampaigns.find((x) => x.id === pendingDelete);
+        return (
+          <ConfirmModal
+            open={pendingDelete !== null}
+            title="Eliminar campaña"
+            message={
+              c
+                ? `Vas a eliminar la campaña "${c.name}" con ${c.products.length} producto${c.products.length === 1 ? "" : "s"} y ${c.channels.length} canal${c.channels.length === 1 ? "" : "es"}. Esta acción no se puede deshacer.`
+                : "Esta acción no se puede deshacer."
+            }
+            confirmLabel="Eliminar campaña"
+            danger
+            onCancel={() => setPendingDelete(null)}
+            onConfirm={() => {
+              if (pendingDelete) deleteCampaign(pendingDelete);
+              setPendingDelete(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
