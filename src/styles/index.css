@@ -9,6 +9,15 @@
   body {
     @apply bg-slate-50 text-slate-800;
   }
+  /* Accesibilidad: foco visible y consistente al navegar con teclado, sin
+     ensuciar el clic con mouse (solo :focus-visible). */
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible,
+  summary:focus-visible {
+    @apply outline-none ring-2 ring-brand-400 ring-offset-1 ring-offset-white rounded-lg;
+  }
 }
 
 @keyframes slideIn {

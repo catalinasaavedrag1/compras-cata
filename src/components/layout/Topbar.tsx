@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "./navItems";
 import { Input } from "../ui/Input";
@@ -55,6 +55,25 @@ export function Topbar() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Atajo global: ⌘K / Ctrl+K (o "/") enfoca el buscador desde cualquier vista.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+      const isK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k";
+      const isSlash = e.key === "/" && !typing;
+      if (isK || isSlash) {
+        e.preventDefault();
+        const el = document.getElementById("global-search") as HTMLInputElement | null;
+        el?.focus();
+        el?.select();
+        setOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const results = useMemo<SearchResult[]>(() => {
     const q = search.trim().toLowerCase();
@@ -137,14 +156,18 @@ export function Topbar() {
       >
         <form onSubmit={handleSubmit}>
           <Input
+            id="global-search"
             icon={<IconSearch className="w-4 h-4" />}
-            placeholder="Buscar SKU, producto, proveedor u OC..."
+            placeholder="Buscar SKU, producto, proveedor, categoría u OC..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setOpen(true);
             }}
           />
+          {!search && (
+            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden lg:inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 pointer-events-none">⌘K</kbd>
+          )}
         </form>
 
         {open && search.trim().length >= 2 && (
@@ -154,7 +177,7 @@ export function Topbar() {
                 Sin resultados para “{search.trim()}”.
               </p>
             ) : (
-              (["product", "supplier", "order"] as const).map((type) => {
+              (["product", "supplier", "category", "order"] as const).map((type) => {
                 const group = results.filter((r) => r.type === type);
                 if (group.length === 0) return null;
                 return (
