@@ -6,6 +6,7 @@ import { useLocalStorage } from "../../utils/useLocalStorage";
 import { useRole } from "../../context/RoleContext";
 import { IconChevronRight } from "../ui/icons";
 import { useNavBadges } from "./useNavBadges";
+import { useRecentRoutes } from "./useRecentRoutes";
 
 const BADGE_DOT: Record<string, string> = {
   red: "bg-rose-500",
@@ -39,6 +40,9 @@ export function Sidebar() {
   const { role } = useRole();
   const navGroups = navGroupsFor(role);
   const badges = useNavBadges();
+  // Accesos rápidos: visitados recientemente dentro del menú del rol actual.
+  const roleRoutes = new Set(navGroups.flatMap((g) => g.items.map((i) => i.to)));
+  const recent = useRecentRoutes(3).filter((i) => roleRoutes.has(i.to));
 
   // Atajo de teclado: "[" colapsa/expande sin usar el mouse.
   useEffect(() => {
@@ -103,6 +107,24 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3 overflow-y-auto no-scrollbar">
+        {!collapsed && recent.length > 0 && (
+          <div className="mb-3">
+            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Recientes</p>
+            <div className="space-y-0.5">
+              {recent.map((item) => (
+                <NavLink
+                  key={`recent-${item.to}`}
+                  to={item.to}
+                  end={item.end}
+                  className="flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                >
+                  <item.icon className="w-4 h-4 flex-shrink-0 text-slate-400" />
+                  <span className="truncate">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        )}
         {navGroups.map((group) => (
           <div key={group.title} className="mb-3 last:mb-0">
             {!collapsed && (
