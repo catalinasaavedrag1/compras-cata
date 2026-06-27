@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUrlState } from "../utils/useUrlState";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -27,8 +28,8 @@ import type { Supplier } from "../types/purchasing";
 export function SuppliersPage() {
   const navigate = useNavigate();
   const suppliers = useCollection<Supplier>("suppliers", mockSuppliers);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
+  const [query, setQuery] = useUrlState("q");
+  const [status, setStatus] = useUrlState("estado");
 
   const filtered = useMemo(
     () =>

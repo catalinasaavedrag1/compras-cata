@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useUrlState } from "../utils/useUrlState";
 import { Link } from "react-router-dom";
 import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -14,8 +15,8 @@ import { formatCurrencyCompact, formatNumber } from "../utils/formatters";
 
 export function PurchaseQualityPage() {
   const all = useMemo(() => purchaseQualityLines(), []);
-  const [query, setQuery] = useState("");
-  const [klass, setKlass] = useState("");
+  const [query, setQuery] = useUrlState("q");
+  const [klass, setKlass] = useUrlState("tipo");
 
   const filtered = all.filter((l) => {
     if (query.trim() && !`${l.productName} ${l.sku} ${l.poNumber} ${l.buyerName} ${l.supplierName}`.toLowerCase().includes(query.toLowerCase())) return false;

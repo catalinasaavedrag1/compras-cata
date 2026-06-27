@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useUrlState } from "../utils/useUrlState";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
@@ -15,8 +16,8 @@ import { formatNumber } from "../utils/formatters";
 
 export function DecisionsPage() {
   const { decisions: all } = usePurchaseFlow();
-  const [query, setQuery] = useState("");
-  const [outcome, setOutcome] = useState("");
+  const [query, setQuery] = useUrlState("q");
+  const [outcome, setOutcome] = useUrlState("resultado");
 
   const filtered = all.filter((d) => {
     if (query.trim() && !`${d.productName} ${d.sku} ${d.buyerName} ${d.supplierName}`.toLowerCase().includes(query.toLowerCase())) return false;

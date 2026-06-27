@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useUrlState } from "../utils/useUrlState";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
@@ -20,8 +21,8 @@ export function LostOpportunitiesPage() {
   const all = useMemo(() => lostOpportunities(), []);
   const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
-  const [query, setQuery] = useState("");
-  const [motivo, setMotivo] = useState("");
+  const [query, setQuery] = useUrlState("q");
+  const [motivo, setMotivo] = useUrlState("motivo");
 
   const motivos = useMemo(() => [...new Set(all.map((o) => o.motivo))], [all]);
 
