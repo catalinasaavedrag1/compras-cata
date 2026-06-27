@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { cn } from "../../utils/cn";
 import { EmptyState } from "./EmptyState";
+import { useDensity } from "../../context/DensityContext";
 
 export interface Column<T> {
   key: string;
@@ -65,6 +66,8 @@ export function DataTable<T>({
   onSortChange,
   mobileCard,
 }: DataTableProps<T>) {
+  const { compact } = useDensity();
+  const cellY = compact ? "py-1" : "py-2";
   const sortedData = useMemo(() => {
     if (!sort?.key) return data;
     const col = columns.find((c) => c.key === sort.key);
@@ -185,7 +188,7 @@ export function DataTable<T>({
                 )}
               >
                 {selection && (
-                  <td className="px-3 py-2 w-10" onClick={(e) => e.stopPropagation()}>
+                  <td className={cn("px-3 w-10", cellY)} onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       className="rounded border-slate-300 text-brand-600 focus:ring-brand-300 cursor-pointer"
@@ -199,7 +202,8 @@ export function DataTable<T>({
                   <td
                     key={col.key}
                     className={cn(
-                      "px-3 py-2 text-slate-700 align-middle",
+                      "px-3 text-slate-700 align-middle",
+                      cellY,
                       alignClass[col.align ?? "left"],
                       col.hideOnMobile && "hidden lg:table-cell",
                       col.className

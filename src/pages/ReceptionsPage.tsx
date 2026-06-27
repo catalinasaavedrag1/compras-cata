@@ -21,6 +21,7 @@ import { useToast } from "../context/ToastContext";
 import { receptions, RECEPTION_STATUS } from "../data/mockReceptions";
 import { getProductBySku } from "../data/mockProducts";
 import { supplierFulfillment } from "../utils/supplierPerf";
+import { CollapsibleSection } from "../components/ui/CollapsibleSection";
 import { coverageDays } from "../utils/calculations";
 import { uniqueValues } from "../utils/filters";
 import { formatDate, formatNumber, formatPercent } from "../utils/formatters";
@@ -279,14 +280,17 @@ export function ReceptionsPage() {
             <>
               {/* Responsables de reordenar (vista global / líder) */}
               {byBuyer.length > 1 && (
-                <Card className="mb-4">
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <p className="text-sm font-semibold text-slate-800">Responsables de reordenar</p>
-                    <p className="text-xs text-slate-400">Encargados de compra con SKUs sin reponer por incumplimiento del proveedor.</p>
-                  </div>
-                  <div className="divide-y divide-slate-50">
+                <CollapsibleSection
+                  id="recep-responsables"
+                  className="mb-4"
+                  title="Responsables de reordenar"
+                  description="Encargados de compra con SKUs sin reponer por incumplimiento del proveedor."
+                  hint={`${byBuyer.length} compradores`}
+                  defaultOpen
+                >
+                  <div className="divide-y divide-slate-50 -mx-1">
                     {byBuyer.map(([bName, lines]) => (
-                      <div key={bName} className="px-4 py-3">
+                      <div key={bName} className="px-1 py-3">
                         <div className="flex items-center gap-3">
                           <span className="flex-1 text-sm font-medium text-slate-800">{bName}</span>
                           <Badge tone="red">{lines.length} por reordenar</Badge>
@@ -303,7 +307,7 @@ export function ReceptionsPage() {
                       </div>
                     ))}
                   </div>
-                </Card>
+                </CollapsibleSection>
               )}
 
               {/* Agrupado por proveedor que no cumplió */}
