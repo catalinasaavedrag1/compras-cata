@@ -50,7 +50,9 @@ export function ReceptionsPage() {
   const isLeader = role === "lider";
   const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
-  const [scope, setScope] = useUrlState("alcance", isLeader ? "todos" : "mias");
+  const [scopeRaw, setScope] = useUrlState("alcance", isLeader ? "todos" : "mias");
+  // Un comprador solo ve sus propias recepciones; el alcance de equipo es del líder.
+  const scope = isLeader ? scopeRaw : "mias";
   const [tab, setTab] = useUrlState("tab", "arriving");
   const [query, setQuery] = useUrlState("q");
   const [supplier, setSupplier] = useUrlState("prov");
@@ -207,18 +209,20 @@ export function ReceptionsPage() {
       />
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
-        <div className="sm:w-72">
-          <Select
-            label="Viendo"
-            value={scope}
-            onChange={(e) => setScope(e.target.value)}
-            options={[
-              { value: "todos", label: "Todo el equipo" },
-              { value: "mias", label: `Mis recepciones (${buyer})` },
-              ...buyers.filter((b) => b !== buyer).map((b) => ({ value: b, label: `Comprador: ${b}` })),
-            ]}
-          />
-        </div>
+        {isLeader && (
+          <div className="sm:w-72">
+            <Select
+              label="Viendo"
+              value={scope}
+              onChange={(e) => setScope(e.target.value)}
+              options={[
+                { value: "todos", label: "Todo el equipo" },
+                { value: "mias", label: `Mis recepciones (${buyer})` },
+                ...buyers.filter((b) => b !== buyer).map((b) => ({ value: b, label: `Comprador: ${b}` })),
+              ]}
+            />
+          </div>
+        )}
         <div className="sm:w-40">
           <Input label="Desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         </div>

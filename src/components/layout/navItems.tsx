@@ -89,39 +89,39 @@ export const compradorGroups: NavGroup[] = [
 ];
 
 // ----------------------------------------------------------------------------
-//  Menú del Líder de Compras
+//  Grupos EXTRA solo del Líder de Compras (visión de equipo y cross-comprador).
+//  El líder ve todo lo del comprador + estos grupos. Un comprador no los ve.
 // ----------------------------------------------------------------------------
-export const liderGroups: NavGroup[] = [
-  {
-    title: "Inicio",
-    items: [
-      { to: "/equipo", label: "Panel del equipo", icon: IconDashboard, end: true, hint: "Cómo está funcionando el área de compras hoy" },
-      { to: "/equipo/alertas", label: "Alertas del equipo", icon: IconAlerts, hint: "Riesgos del equipo priorizados", badge: "equipoAlertas" },
-    ],
-  },
+export const liderExtraGroups: NavGroup[] = [
   {
     title: "Equipo",
     items: [
+      { to: "/equipo", label: "Panel del equipo", icon: IconDashboard, end: true, hint: "Cómo está funcionando el área de compras hoy" },
+      { to: "/equipo/alertas", label: "Alertas del equipo", icon: IconAlerts, hint: "Riesgos del equipo priorizados", badge: "equipoAlertas" },
       { to: "/equipo/compradores", label: "Compradores", icon: IconSuppliers, hint: "Ficha y desempeño por comprador" },
       { to: "/equipo/ranking", label: "Competencia", icon: IconSales, hint: "Ranking general, rankings por dimensión y reconocimientos del mes" },
       { to: "/equipo/metas", label: "Metas", icon: IconCheck, hint: "OKRs por comprador" },
     ],
   },
   {
-    title: "Gestión",
+    title: "Gestión del equipo",
     items: [
       { to: "/equipo/carga", label: "Carga & reasignación", icon: IconRules, hint: "Equilibrar la carga del equipo" },
-      { to: "/aprobaciones", label: "Aprobaciones", icon: IconCheck, hint: "Aprobar o rechazar compras fuera de criterio", badge: "aprobaciones" },
-      { to: "/decisiones", label: "Historial de decisiones", icon: IconBulb, hint: "Auditoría: sugerido vs comprado, resultado y aprendizaje" },
     ],
   },
 ];
+
+// El líder ve el mismo menú operativo del comprador + sus grupos de equipo.
+export const liderGroups: NavGroup[] = [...compradorGroups, ...liderExtraGroups];
 
 export function navGroupsFor(role: Role): NavGroup[] {
   return role === "lider" ? liderGroups : compradorGroups;
 }
 
-/** Lista plana de todos los ítems (para títulos de ruta, etc.). */
-export const navItems: NavItem[] = [...compradorGroups, ...liderGroups].flatMap(
+/** Rutas que son exclusivas del líder (cross-comprador). Un comprador no entra. */
+export const LEADER_ONLY_PREFIXES = ["/equipo"];
+
+/** Lista plana de todos los ítems (para títulos de ruta, recientes, etc.). */
+export const navItems: NavItem[] = [...compradorGroups, ...liderExtraGroups].flatMap(
   (g) => g.items
 );

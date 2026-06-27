@@ -10,6 +10,7 @@ import { SignalsProvider } from "../context/SignalsContext";
 import { PurchaseFlowProvider } from "../context/PurchaseFlowContext";
 import { DataProvider } from "../context/DataContext";
 import { DensityProvider } from "../context/DensityContext";
+import { RoleGate } from "../components/layout/RoleGate";
 
 // Carga diferida por ruta: cada página viaja en su propio chunk.
 const named = <T extends Record<string, unknown>, K extends keyof T>(p: Promise<T>, key: K) =>
@@ -72,12 +73,12 @@ export default function AppRoutes() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/mi-panel" element={<MyPanelPage />} />
           <Route path="/mi-desempeno" element={<MyPerformancePage />} />
-          <Route path="/equipo" element={<TeamDashboardPage />} />
-          <Route path="/equipo/alertas" element={<TeamAlertsPage />} />
-          <Route path="/equipo/compradores" element={<BuyersPage />} />
-          <Route path="/equipo/ranking" element={<RankingPage />} />
-          <Route path="/equipo/metas" element={<GoalsPage />} />
-          <Route path="/equipo/carga" element={<WorkloadPage />} />
+          <Route path="/equipo" element={<RoleGate allow="lider"><TeamDashboardPage /></RoleGate>} />
+          <Route path="/equipo/alertas" element={<RoleGate allow="lider"><TeamAlertsPage /></RoleGate>} />
+          <Route path="/equipo/compradores" element={<RoleGate allow="lider"><BuyersPage /></RoleGate>} />
+          <Route path="/equipo/ranking" element={<RoleGate allow="lider"><RankingPage /></RoleGate>} />
+          <Route path="/equipo/metas" element={<RoleGate allow="lider"><GoalsPage /></RoleGate>} />
+          <Route path="/equipo/carga" element={<RoleGate allow="lider"><WorkloadPage /></RoleGate>} />
           <Route path="/reposicion" element={<ReplenishmentPage />} />
           <Route path="/campanas" element={<CampaignsPage />} />
           <Route path="/campanas-oportunidades" element={<CampaignOpportunitiesPage />} />
