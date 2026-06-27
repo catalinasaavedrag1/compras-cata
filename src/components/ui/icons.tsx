@@ -110,6 +110,13 @@ export const IconClose = base(<path d="M18 6 6 18M6 6l12 12" />);
 
 export const IconMenu = base(<path d="M3 6h18M3 12h18M3 18h18" />);
 
+// Densidad: filas con distinto interlineado (cómodo vs compacto).
+export const IconDensity = base(
+  <>
+    <path d="M3 5h18M3 9h18M3 15h18M3 19h18" />
+  </>
+);
+
 export const IconChevronRight = base(<path d="m9 6 6 6-6 6" />);
 
 export const IconArrowUp = base(<path d="M12 19V5M5 12l7-7 7 7" />);

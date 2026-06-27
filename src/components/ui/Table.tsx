@@ -138,35 +138,38 @@ export function DataTable<T>({
             )}
             {columns.map((col) => {
               const isSorted = sort?.key === col.key;
+              const canSort = col.sortable && !!onSortChange;
               return (
                 <th
                   key={col.key}
-                  onClick={
-                    col.sortable && onSortChange
-                      ? () => onSortChange(col.key)
-                      : undefined
-                  }
+                  scope="col"
+                  aria-sort={isSorted ? (sort?.dir === "asc" ? "ascending" : "descending") : canSort ? "none" : undefined}
                   className={cn(
                     "px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap",
                     alignClass[col.align ?? "left"],
                     col.hideOnMobile && "hidden lg:table-cell",
-                    col.sortable && "cursor-pointer select-none hover:text-slate-700",
                     col.className
                   )}
                 >
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1",
-                      col.align === "right" && "flex-row-reverse"
-                    )}
-                  >
-                    {col.header}
-                    {col.sortable && (
+                  {canSort ? (
+                    <button
+                      type="button"
+                      onClick={() => onSortChange!(col.key)}
+                      className={cn(
+                        "inline-flex items-center gap-1 select-none hover:text-slate-700 uppercase tracking-wide",
+                        col.align === "right" && "flex-row-reverse"
+                      )}
+                    >
+                      {col.header}
                       <span className={cn("text-[10px]", isSorted ? "text-brand-600" : "text-slate-300")}>
                         {isSorted ? (sort?.dir === "asc" ? "▲" : "▼") : "↕"}
                       </span>
-                    )}
-                  </span>
+                    </button>
+                  ) : (
+                    <span className={cn("inline-flex items-center gap-1", col.align === "right" && "flex-row-reverse")}>
+                      {col.header}
+                    </span>
+                  )}
                 </th>
               );
             })}

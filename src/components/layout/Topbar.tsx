@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "./navItems";
 import { Input } from "../ui/Input";
-import { IconSearch, IconOrders, IconProducts, IconSuppliers, IconCategories, IconRules } from "../ui/icons";
+import { IconSearch, IconOrders, IconProducts, IconSuppliers, IconCategories, IconDensity } from "../ui/icons";
 import { useDensity } from "../../context/DensityContext";
 import { useOcDraft } from "../../context/OcDraftContext";
 import { useBuyer, initials } from "../../context/BuyerContext";
@@ -159,6 +159,7 @@ export function Topbar() {
             id="global-search"
             icon={<IconSearch className="w-4 h-4" />}
             placeholder="Buscar SKU, producto, proveedor, categoría u OC..."
+            aria-label="Buscar en la plataforma"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -217,7 +218,7 @@ export function Topbar() {
         title={compact ? "Vista cómoda" : "Vista compacta (más información, menos scroll)"}
         className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
       >
-        <IconRules className="w-4 h-4" />
+        <IconDensity className="w-4 h-4" />
         {compact ? "Compacto" : "Cómodo"}
       </button>
 
@@ -247,6 +248,7 @@ export function Topbar() {
         onClick={() => navigate("/ordenes-compra")}
         className="relative inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
         title="Borrador de orden de compra"
+        aria-label={count > 0 ? `Borrador de orden de compra, ${count} ítems` : "Borrador de orden de compra"}
       >
         <IconOrders className="w-4 h-4" />
         <span className="hidden sm:inline">Borrador OC</span>

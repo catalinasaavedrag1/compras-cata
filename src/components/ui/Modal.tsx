@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { IconClose } from "./icons";
+import { useDialogA11y } from "../../utils/useDialogA11y";
 
 interface ModalProps {
   open: boolean;
@@ -26,6 +27,7 @@ export function Modal({
   footer,
   size = "lg",
 }: ModalProps) {
+  const ref = useDialogA11y(open, onClose);
   if (!open) return null;
 
   return (
@@ -35,7 +37,12 @@ export function Modal({
         onClick={onClose}
       />
       <div
-        className={`relative w-full ${sizes[size]} bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col`}
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className={`relative w-full ${sizes[size]} bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col focus:outline-none`}
       >
         <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100">
           <div>

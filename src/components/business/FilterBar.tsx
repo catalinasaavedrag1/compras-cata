@@ -83,6 +83,7 @@ export function FilterBar({
             <Input
               icon={<IconSearch className="w-4 h-4" />}
               placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
               value={searchValue}
               onChange={(e) => onSearchChange(e.target.value)}
             />
@@ -90,7 +91,7 @@ export function FilterBar({
           <div className="flex-1 flex flex-wrap gap-2">
             {primarySelects.map((s) => (
               <div key={s.key} className="w-44">
-                <Select placeholder={s.placeholder} value={s.value} options={s.options} onChange={(e) => s.onChange(e.target.value)} />
+                <Select placeholder={s.placeholder} aria-label={s.placeholder} value={s.value} options={s.options} onChange={(e) => s.onChange(e.target.value)} />
               </div>
             ))}
           </div>
@@ -116,7 +117,7 @@ export function FilterBar({
               <div className="flex flex-wrap gap-2">
                 {advancedSelects.map((s) => (
                   <div key={s.key} className="w-44">
-                    <Select placeholder={s.placeholder} value={s.value} options={s.options} onChange={(e) => s.onChange(e.target.value)} />
+                    <Select placeholder={s.placeholder} aria-label={s.placeholder} value={s.value} options={s.options} onChange={(e) => s.onChange(e.target.value)} />
                   </div>
                 ))}
               </div>
@@ -214,7 +215,7 @@ export function FilterBar({
           {selects.map((s) => (
             <div key={s.key}>
               <p className="text-xs font-medium text-slate-600 mb-1">{s.placeholder}</p>
-              <Select placeholder={`Todos`} value={s.value} options={s.options} onChange={(e) => s.onChange(e.target.value)} />
+              <Select placeholder={`Todos`} aria-label={s.placeholder} value={s.value} options={s.options} onChange={(e) => s.onChange(e.target.value)} />
             </div>
           ))}
           {toggles.length > 0 && (

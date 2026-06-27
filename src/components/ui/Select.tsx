@@ -1,4 +1,4 @@
-import type { SelectHTMLAttributes } from "react";
+import { useId, type SelectHTMLAttributes } from "react";
 import { cn } from "../../utils/cn";
 
 interface Option {
@@ -20,15 +20,17 @@ export function Select({
   id,
   ...props
 }: SelectProps) {
+  const reactId = useId();
+  const fieldId = id ?? reactId;
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={id} className="block text-xs font-medium text-slate-600 mb-1">
+        <label htmlFor={fieldId} className="block text-xs font-medium text-slate-600 mb-1">
           {label}
         </label>
       )}
       <select
-        id={id}
+        id={fieldId}
         className={cn(
           "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100",
           className

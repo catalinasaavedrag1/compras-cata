@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { IconClose } from "./icons";
+import { useDialogA11y } from "../../utils/useDialogA11y";
 
 interface DrawerProps {
   open: boolean;
@@ -18,6 +19,7 @@ export function Drawer({
   children,
   footer,
 }: DrawerProps) {
+  const ref = useDialogA11y(open, onClose);
   if (!open) return null;
 
   return (
@@ -26,7 +28,14 @@ export function Drawer({
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-xl bg-white shadow-2xl h-full flex flex-col animate-[slideIn_0.2s_ease-out]">
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className="relative w-full max-w-xl bg-white shadow-2xl h-full flex flex-col animate-[slideIn_0.2s_ease-out] focus:outline-none"
+      >
         <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-semibold text-slate-800">{title}</h2>

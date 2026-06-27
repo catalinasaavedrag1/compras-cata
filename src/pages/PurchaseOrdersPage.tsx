@@ -413,6 +413,7 @@ export function PurchaseOrdersPage() {
                     <Input
                       type="number"
                       min={0}
+                      aria-label={`Cantidad de ${it.productName}`}
                       value={it.quantity}
                       onChange={(e) => updateQuantity(it.sku, Number(e.target.value))}
                     />
