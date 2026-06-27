@@ -202,11 +202,21 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
 
   const peakMonths = profile.map((v, i) => ({ v, i })).filter((x) => x.v >= avgMult * 1.12).map((x) => MABBR[x.i]);
 
-  // Pre-temporada: próximo mes peak dentro de 60 días
+  // Pre-temporada: próximo mes en que el perfil ENTRA en temporada alta
+  // (umbral relativo al promedio, no al peak) dentro de los próximos 6 meses.
+  // Solo aplica a categorías con estacionalidad marcada (ratio >= 1.12).
   let preSeason: { month: string; days: number } | null = null;
-  for (let off = 1; off <= 3; off++) {
-    const idx = (CURRENT_MONTH + off) % 12;
-    if (profile[idx] >= peakMult * 0.9) { preSeason = { month: MABBR[idx], days: off * 30 }; break; }
+  if (ratio >= 1.12) {
+    const hi = avgMult * 1.15;
+    for (let off = 1; off <= 6; off++) {
+      const idx = (CURRENT_MONTH + off) % 12;
+      const prev = (CURRENT_MONTH + off - 1 + 12) % 12;
+      // Entra a temporada: este mes es alto y el anterior no lo era.
+      if (profile[idx] >= hi && profile[prev] < hi) {
+        preSeason = { month: MABBR[idx], days: off * 30 };
+        break;
+      }
+    }
   }
 
   // Top productos de temporada
