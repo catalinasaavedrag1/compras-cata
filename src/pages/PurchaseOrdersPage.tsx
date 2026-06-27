@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
@@ -91,6 +91,23 @@ export function PurchaseOrdersPage() {
     return role === "lider" ? all : all.filter((o) => o.buyerName === buyer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createdOrders, statusOverrides, approvals, approvalState, seedPOs, role, buyer]);
+
+  // Deep-link: /ordenes-compra?oc=OC-XXXX abre el detalle de esa orden.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ocParam = searchParams.get("oc");
+  useEffect(() => {
+    if (!ocParam) return;
+    const po = orders.find((o) => o.number === ocParam);
+    if (po) setDetail(po);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ocParam, orders.length]);
+  const closeDetail = () => {
+    setDetail(null);
+    if (ocParam) {
+      searchParams.delete("oc");
+      setSearchParams(searchParams, { replace: true });
+    }
+  };
 
   const counts = useMemo(() => {
     const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received", "with_difference"];
@@ -472,13 +489,13 @@ export function PurchaseOrdersPage() {
       {/* Modal detalle OC */}
       <Modal
         open={!!detail}
-        onClose={() => setDetail(null)}
+        onClose={closeDetail}
         title={detail?.number ?? ""}
         description={detail ? `${detail.supplierName} · ${detail.destinationWarehouse}` : ""}
         footer={
           detail && (
             <>
-              <Button variant="secondary" onClick={() => setDetail(null)}>
+              <Button variant="secondary" onClick={closeDetail}>
                 Cerrar
               </Button>
               {detail.status === "pending_approval" && (

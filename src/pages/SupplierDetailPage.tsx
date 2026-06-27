@@ -241,7 +241,7 @@ export function SupplierDetailPage() {
               <EmptyState title="Sin órdenes" description="No hay órdenes de compra con este proveedor." />
             ) : (
               supPOs.map((o) => (
-                <Link key={o.id} to="/ordenes-compra" className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                <Link key={o.id} to={`/ordenes-compra?oc=${encodeURIComponent(o.number)}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-800">{o.number}</p>
                     <p className="text-xs text-slate-500">espera {formatDate(o.expectedDate)} · {formatCurrency(o.totalAmount)}</p>
@@ -264,7 +264,7 @@ export function SupplierDetailPage() {
               <EmptyState title="Sin recepciones" description="No hay recepciones registradas de este proveedor." />
             ) : (
               supReceptions.map((r) => (
-                <Link key={r.id} to="/recepciones" className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                <Link key={r.id} to={`/recepciones?rid=${encodeURIComponent(r.id)}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-800">{r.poNumber}</p>
                     <p className="text-xs text-slate-500">{r.warehouse} · espera {formatDate(r.expectedDate)} · {r.qualityOk ? "conforme" : "con observación"}</p>

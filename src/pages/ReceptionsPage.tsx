@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supplierPath, productPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
@@ -59,6 +59,22 @@ export function ReceptionsPage() {
   const [from, setFrom] = useUrlState("desde");
   const [to, setTo] = useUrlState("hasta");
   const [detail, setDetail] = useState<Reception | null>(null);
+
+  // Deep-link: /recepciones?rid=REC-XXX abre el detalle de esa recepción.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ridParam = searchParams.get("rid");
+  useEffect(() => {
+    if (!ridParam) return;
+    const r = receptions.find((x) => x.id === ridParam);
+    if (r) setDetail(r);
+  }, [ridParam]);
+  const closeDetail = () => {
+    setDetail(null);
+    if (ridParam) {
+      searchParams.delete("rid");
+      setSearchParams(searchParams, { replace: true });
+    }
+  };
 
   // Fecha de referencia para medir por período: la de recepción si llegó, si no la esperada.
   const refDate = (r: Reception) => r.receivedDate ?? r.expectedDate;
@@ -404,12 +420,12 @@ export function ReceptionsPage() {
       {/* Detalle de recepción */}
       <Drawer
         open={!!detail}
-        onClose={() => setDetail(null)}
+        onClose={closeDetail}
         title={detail ? detail.poNumber : ""}
         description={detail ? `${detail.supplierName} · resp. ${detail.buyer}` : ""}
         footer={
           detail && missingOf(detail).length > 0 ? (
-            <Button icon={<IconPlus className="w-4 h-4" />} onClick={() => { missingOf(detail).forEach((it) => reorder(it.sku, it.productName, detail.supplierName, it.expected - it.received)); setDetail(null); }}>
+            <Button icon={<IconPlus className="w-4 h-4" />} onClick={() => { missingOf(detail).forEach((it) => reorder(it.sku, it.productName, detail.supplierName, it.expected - it.received)); closeDetail(); }}>
               Reordenar todo lo no despachado
             </Button>
           ) : undefined

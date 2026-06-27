@@ -264,6 +264,17 @@ export function SettingsPage() {
   );
 }
 
+// Enlace a los productos afectados según el ámbito de la regla (categoría/proveedor/marca).
+function affectedProductsLink(r: PurchaseRule): string {
+  const v = r.scopeValue ?? r.scope;
+  switch (r.scopeType) {
+    case "category": return `/productos?cat=${encodeURIComponent(v)}`;
+    case "supplier": return `/productos?prov=${encodeURIComponent(v)}`;
+    case "brand": return `/productos?marca=${encodeURIComponent(v)}`;
+    default: return "/productos"; // global y channel: ProductsPage no filtra por canal
+  }
+}
+
 function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; onClose: () => void; onSave: (r: PurchaseRule) => void }) {
   const [draft, setDraft] = useState<PurchaseRule | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -332,7 +343,7 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
         </div>
 
         <div className="flex items-center justify-between">
-          <Link to={isGlobal(draft) ? "/productos" : `/productos?cat=${encodeURIComponent(draft.scope)}`} className="text-xs font-medium text-brand-600 hover:text-brand-700" onClick={onClose}>
+          <Link to={affectedProductsLink(draft)} className="text-xs font-medium text-brand-600 hover:text-brand-700" onClick={onClose}>
             Ver productos afectados
           </Link>
           <button onClick={() => setDraft({ ...seedRules.find((s) => s.id === rule.id)! })} className="text-xs text-slate-500 hover:text-slate-700">Restaurar valores</button>

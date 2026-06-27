@@ -379,7 +379,7 @@ export function ProductDetailPage() {
                 relatedPOs.map((o) => (
                   <Link
                     key={o.id}
-                    to="/ordenes-compra"
+                    to={`/ordenes-compra?oc=${encodeURIComponent(o.number)}`}
                     className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5 hover:border-brand-300 hover:bg-brand-50/40"
                   >
                     <div>
@@ -810,8 +810,8 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
             })()}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge tone={neg.demandTag.tone === "good" ? "green" : neg.demandTag.tone === "bad" ? "red" : "neutral"}>{neg.demandTag.label}</Badge>
-              {product.supplierName && (
-                <Link to={`/proveedores/${master?.id ?? ""}?tab=temporadas`} className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver estacionalidad del proveedor →</Link>
+              {product.supplierName && master && (
+                <Link to={`/proveedores/${master.id}?tab=temporadas`} className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver estacionalidad del proveedor →</Link>
               )}
             </div>
           </CardBody>
