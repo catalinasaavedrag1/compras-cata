@@ -4,6 +4,7 @@ import { Sidebar } from "../components/layout/Sidebar";
 import { Topbar } from "../components/layout/Topbar";
 import { MobileNav } from "../components/layout/MobileNav";
 import { MobileBottomNav } from "../components/layout/MobileBottomNav";
+import { ScrollToHash } from "../components/layout/ScrollToHash";
 import { Toaster } from "../components/ui/Toaster";
 
 export function AppLayout() {
@@ -11,6 +12,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen flex bg-slate-50">
+      <ScrollToHash />
       <Sidebar />
       <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="flex-1 min-w-0 flex flex-col">
