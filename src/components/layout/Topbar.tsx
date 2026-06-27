@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navItems } from "./navItems";
 import { Input } from "../ui/Input";
-import { IconSearch, IconOrders, IconProducts, IconSuppliers, IconCategories } from "../ui/icons";
+import { IconSearch, IconOrders, IconProducts, IconSuppliers, IconCategories, IconRules } from "../ui/icons";
+import { useDensity } from "../../context/DensityContext";
 import { useOcDraft } from "../../context/OcDraftContext";
 import { useBuyer, initials } from "../../context/BuyerContext";
 import { useRole } from "../../context/RoleContext";
@@ -39,6 +40,7 @@ export function Topbar() {
   const { count } = useOcDraft();
   const { buyer, setBuyer, buyers } = useBuyer();
   const { role, setRole, persona } = useRole();
+  const { compact, toggle: toggleDensity } = useDensity();
 
   const products = useCollection<Product>("products", mockProducts);
   const suppliers = useCollection<Supplier>("suppliers", mockSuppliers);
@@ -185,6 +187,16 @@ export function Topbar() {
       <div className="flex-1" />
 
       <BackendStatus />
+
+      {/* Densidad: cómodo / compacto */}
+      <button
+        onClick={toggleDensity}
+        title={compact ? "Vista cómoda" : "Vista compacta (más información, menos scroll)"}
+        className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+      >
+        <IconRules className="w-4 h-4" />
+        {compact ? "Compacto" : "Cómodo"}
+      </button>
 
       {/* Cambio de rol: Comprador / Líder */}
       <div className="hidden sm:flex bg-slate-100 rounded-lg p-0.5">

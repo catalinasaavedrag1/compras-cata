@@ -9,6 +9,7 @@ import { NotificationProvider } from "../context/NotificationContext";
 import { SignalsProvider } from "../context/SignalsContext";
 import { PurchaseFlowProvider } from "../context/PurchaseFlowContext";
 import { DataProvider } from "../context/DataContext";
+import { DensityProvider } from "../context/DensityContext";
 
 // Carga diferida por ruta: cada página viaja en su propio chunk.
 const named = <T extends Record<string, unknown>, K extends keyof T>(p: Promise<T>, key: K) =>
@@ -57,6 +58,7 @@ function PageLoader() {
 export default function AppRoutes() {
   return (
     <ToastProvider>
+      <DensityProvider>
       <DataProvider>
       <RoleProvider>
       <BuyerProvider>
@@ -109,6 +111,7 @@ export default function AppRoutes() {
       </BuyerProvider>
       </RoleProvider>
       </DataProvider>
+      </DensityProvider>
     </ToastProvider>
   );
 }

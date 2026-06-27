@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Breadcrumbs, type Crumb } from "./Breadcrumbs";
+import { useDensity } from "../../context/DensityContext";
 
 interface PageHeaderProps {
   title: string;
@@ -9,13 +10,15 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ title, description, action, breadcrumbs }: PageHeaderProps) {
+  const { compact } = useDensity();
   return (
-    <div className="mb-5">
+    <div className={compact ? "mb-3" : "mb-5"}>
       {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
-          {description && (
+          <h1 className={`${compact ? "text-lg" : "text-xl"} font-semibold text-slate-900`}>{title}</h1>
+          {/* En modo compacto se oculta la descripción larga para ganar densidad. */}
+          {description && !compact && (
             <p className="text-sm text-slate-500 mt-1 max-w-3xl">{description}</p>
           )}
         </div>

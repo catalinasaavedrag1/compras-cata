@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../../utils/cn";
 import { IconArrowDown, IconArrowUp, IconChevronRight } from "../ui/icons";
+import { useDensity } from "../../context/DensityContext";
 
 type Tone = "neutral" | "good" | "warn" | "bad" | "info";
 
@@ -51,6 +52,7 @@ export function KpiCard({
   onClick,
   active,
 }: KpiCardProps) {
+  const { compact } = useDensity();
   const hasDelta = delta !== undefined && Number.isFinite(delta);
   const up = (delta ?? 0) >= 0;
   const good = up === deltaPositiveIsGood;
@@ -71,7 +73,7 @@ export function KpiCard({
         )}
       </div>
       <div className="flex items-baseline gap-2 flex-wrap">
-        <span className={cn("text-2xl font-semibold tracking-tight", toneValue[tone])}>
+        <span className={cn(compact ? "text-xl" : "text-2xl", "font-semibold tracking-tight", toneValue[tone])}>
           {value}
         </span>
         {hasDelta && (
@@ -99,8 +101,10 @@ export function KpiCard({
     </>
   );
 
-  const baseClass =
-    "bg-white border border-slate-200 rounded-xl shadow-card p-4 flex flex-col gap-2";
+  const baseClass = cn(
+    "bg-white border border-slate-200 rounded-xl shadow-card flex flex-col",
+    compact ? "p-3 gap-1" : "p-4 gap-2"
+  );
 
   if (to) {
     return (

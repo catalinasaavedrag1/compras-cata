@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../../utils/cn";
+import { useDensity } from "../../context/DensityContext";
 
 interface CardProps {
   children: ReactNode;
@@ -27,10 +28,12 @@ interface CardHeaderProps {
 }
 
 export function CardHeader({ title, description, action, className }: CardHeaderProps) {
+  const { compact } = useDensity();
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100",
+        "flex items-start justify-between gap-3 border-b border-slate-100",
+        compact ? "px-4 py-2.5" : "px-5 py-4",
         className
       )}
     >
@@ -46,5 +49,6 @@ export function CardHeader({ title, description, action, className }: CardHeader
 }
 
 export function CardBody({ children, className }: CardProps) {
-  return <div className={cn("p-5", className)}>{children}</div>;
+  const { compact } = useDensity();
+  return <div className={cn(compact ? "p-3.5" : "p-5", className)}>{children}</div>;
 }
