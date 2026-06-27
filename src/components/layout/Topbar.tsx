@@ -4,6 +4,8 @@ import { navItems } from "./navItems";
 import { Input } from "../ui/Input";
 import { IconSearch, IconOrders, IconProducts, IconSuppliers, IconCategories, IconDensity } from "../ui/icons";
 import { useDensity } from "../../context/DensityContext";
+import { useAuth } from "../../context/AuthContext";
+import { IconLogout } from "../ui/icons";
 import { useOcDraft } from "../../context/OcDraftContext";
 import { useBuyer, initials } from "../../context/BuyerContext";
 import { useRole } from "../../context/RoleContext";
@@ -41,6 +43,21 @@ export function Topbar() {
   const { buyer, setBuyer, buyers } = useBuyer();
   const { role, setRole, persona } = useRole();
   const { compact, toggle: toggleDensity } = useDensity();
+  const { email, logout } = useAuth();
+  const [acctOpen, setAcctOpen] = useState(false);
+  const acctRef = useRef<HTMLDivElement>(null);
+
+  // Cierre del menú de cuenta por clic-fuera y Escape.
+  useEffect(() => {
+    if (!acctOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (acctRef.current && !acctRef.current.contains(e.target as Node)) setAcctOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setAcctOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [acctOpen]);
 
   const products = useCollection<Product>("products", mockProducts);
   const suppliers = useCollection<Supplier>("suppliers", mockSuppliers);
@@ -280,14 +297,36 @@ export function Topbar() {
           </div>
         )}
       </div>
-      <div
-        className={cn(
-          "w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0",
-          role === "lider" ? "bg-violet-100 text-violet-700" : "bg-brand-100 text-brand-700"
+      <div className="relative" ref={acctRef}>
+        <button
+          onClick={() => setAcctOpen((v) => !v)}
+          className={cn(
+            "w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0",
+            role === "lider" ? "bg-violet-100 text-violet-700" : "bg-brand-100 text-brand-700"
+          )}
+          title="Cuenta"
+          aria-label="Menú de cuenta"
+          aria-haspopup="menu"
+          aria-expanded={acctOpen}
+        >
+          {role === "lider" ? persona.initials : initials(buyer)}
+        </button>
+        {acctOpen && (
+          <div role="menu" className="absolute right-0 mt-2 w-60 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
+            <div className="px-4 py-3 border-b border-slate-100">
+              <p className="text-sm font-medium text-slate-800 truncate">{role === "lider" ? persona.name : buyer}</p>
+              <p className="text-xs text-slate-400 truncate">{email || (role === "lider" ? "Líder de Compras" : "Comprador")}</p>
+            </div>
+            <button
+              role="menuitem"
+              onClick={() => { setAcctOpen(false); logout(); navigate("/login"); }}
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-slate-50"
+            >
+              <IconLogout className="w-4 h-4" />
+              Cerrar sesión
+            </button>
+          </div>
         )}
-        title={role === "lider" ? persona.name : buyer}
-      >
-        {role === "lider" ? persona.initials : initials(buyer)}
       </div>
     </header>
   );

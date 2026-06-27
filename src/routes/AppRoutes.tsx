@@ -1,6 +1,8 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { AppLayout } from "../layouts/AppLayout";
+import { AuthProvider, useAuth } from "../context/AuthContext";
+import { LoginPage } from "../pages/LoginPage";
 import { OcDraftProvider } from "../context/OcDraftContext";
 import { ToastProvider } from "../context/ToastContext";
 import { BuyerProvider } from "../context/BuyerContext";
@@ -56,8 +58,24 @@ function PageLoader() {
   );
 }
 
+/** Exige sesión: si no hay, redirige a /login recordando la ruta de origen. */
+function RequireAuth() {
+  const { authenticated } = useAuth();
+  const location = useLocation();
+  if (!authenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  return <AppLayout />;
+}
+
+/** Si ya hay sesión, no muestra el login: lleva al inicio. */
+function LoginGate() {
+  const { authenticated } = useAuth();
+  if (authenticated) return <Navigate to="/" replace />;
+  return <LoginPage />;
+}
+
 export default function AppRoutes() {
   return (
+    <AuthProvider>
     <ToastProvider>
       <DensityProvider>
       <DataProvider>
@@ -68,7 +86,8 @@ export default function AppRoutes() {
       <PurchaseFlowProvider>
       <SignalsProvider>
         <Routes>
-        <Route element={<AppLayout />}>
+        <Route path="/login" element={<LoginGate />} />
+        <Route element={<RequireAuth />}>
           <Route element={<Suspense fallback={<PageLoader />}><Outlet /></Suspense>}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/mi-panel" element={<MyPanelPage />} />
@@ -114,5 +133,6 @@ export default function AppRoutes() {
       </DataProvider>
       </DensityProvider>
     </ToastProvider>
+    </AuthProvider>
   );
 }

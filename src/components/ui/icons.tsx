@@ -117,6 +117,43 @@ export const IconDensity = base(
   </>
 );
 
+export const IconEye = base(
+  <>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </>
+);
+
+export const IconEyeOff = base(
+  <>
+    <path d="M9.9 5.1A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.5 6.5A17 17 0 0 0 2 12s3.5 7 10 7a9.8 9.8 0 0 0 3.5-.6" />
+    <path d="M9.5 9.5a3 3 0 0 0 4.2 4.2" />
+    <path d="m3 3 18 18" />
+  </>
+);
+
+export const IconLogout = base(
+  <>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <path d="m16 17 5-5-5-5" />
+    <path d="M21 12H9" />
+  </>
+);
+
+export const IconLock = base(
+  <>
+    <rect x="4" y="11" width="16" height="9" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </>
+);
+
+export const IconMail = base(
+  <>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m3 7 9 6 9-6" />
+  </>
+);
+
 export const IconChevronRight = base(<path d="m9 6 6 6-6 6" />);
 
 export const IconArrowUp = base(<path d="M12 19V5M5 12l7-7 7 7" />);
