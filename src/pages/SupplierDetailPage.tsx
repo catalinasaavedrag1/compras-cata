@@ -7,6 +7,7 @@ import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
+import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { Input } from "../components/ui/Input";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useLocalStorage } from "../utils/useLocalStorage";
@@ -730,8 +731,11 @@ function SupplierTermsAgreements({ supplier }: { supplier: Supplier }) {
   const [editTerms, setEditTerms] = useState(false);
   const [draft, setDraft] = useState<SupplierTerms>(terms);
   const [newAgr, setNewAgr] = useState<Agreement | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
+  const termsDirty = JSON.stringify(draft) !== JSON.stringify(terms);
   const openTerms = () => { setDraft(terms); setEditTerms(true); };
+  const closeTerms = () => (termsDirty ? setConfirmDiscard(true) : setEditTerms(false));
   const saveTerms = () => { setTerms(draft); setEditTerms(false); toast.success("Condiciones comerciales actualizadas"); };
 
   const openAgr = () => setNewAgr({ id: `ag${Date.now()}`, date: "2026-06-26", objective: "", agreed: "", followUp: "" });
@@ -804,11 +808,11 @@ function SupplierTermsAgreements({ supplier }: { supplier: Supplier }) {
       {/* Modal editar condiciones */}
       <Modal
         open={editTerms}
-        onClose={() => setEditTerms(false)}
+        onClose={closeTerms}
         title="Editar condiciones comerciales"
         description={supplier.name}
         size="lg"
-        footer={<><Button variant="secondary" onClick={() => setEditTerms(false)}>Cancelar</Button><Button onClick={saveTerms}>Guardar</Button></>}
+        footer={<><Button variant="secondary" onClick={closeTerms}>Cancelar</Button><Button onClick={saveTerms} disabled={!termsDirty}>{termsDirty ? "Guardar" : "Sin cambios"}</Button></>}
       >
         <div className="grid grid-cols-2 gap-3.5">
           <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">Plazo de pago (días)</label><Input type="number" min={0} value={draft.paymentDays} onChange={(e) => setDraft({ ...draft, paymentDays: Number(e.target.value) })} /></div>
@@ -821,6 +825,17 @@ function SupplierTermsAgreements({ supplier }: { supplier: Supplier }) {
           <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">Ejecutivo asignado</label><Input value={draft.account} onChange={(e) => setDraft({ ...draft, account: e.target.value })} /></div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={confirmDiscard}
+        title="Descartar cambios"
+        message="Tienes cambios sin guardar en las condiciones comerciales. Si sales ahora se perderán."
+        confirmLabel="Descartar cambios"
+        cancelLabel="Seguir editando"
+        danger
+        onCancel={() => setConfirmDiscard(false)}
+        onConfirm={() => { setConfirmDiscard(false); setEditTerms(false); }}
+      />
 
       {/* Modal registrar acuerdo */}
       <Modal
