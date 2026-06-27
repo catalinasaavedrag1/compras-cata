@@ -33,7 +33,8 @@ export function PurchaseQualityPage() {
   });
 
   const countOf = (k: PurchaseClass) => all.filter((l) => l.klass === k).length;
-  const saludablePct = all.length > 0 ? Math.round((countOf("saludable") / all.filter((l) => l.klass !== "sin_venta").length || 0) * 100) : 0;
+  const conVenta = all.filter((l) => l.klass !== "sin_venta").length;
+  const saludablePct = conVenta > 0 ? Math.round((countOf("saludable") / conVenta) * 100) : 0;
 
   const columns: Column<PurchaseQualityLine>[] = [
     {

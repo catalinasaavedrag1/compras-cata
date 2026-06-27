@@ -39,7 +39,7 @@ export function SuppliersPage() {
         if (status && s.status !== status) return false;
         return true;
       }),
-    [query, status]
+    [suppliers, query, status]
   );
 
   // KPIs según el resultado filtrado

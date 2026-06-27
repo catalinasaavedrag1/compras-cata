@@ -74,7 +74,7 @@ export function ProductsPage() {
       result = result.filter((p) => p.availableStock <= 0);
     }
     return result;
-  }, [query, category, subcategory, brand, supplier, productStatus, purchaseStatus, toggles, outOfStock]);
+  }, [allProducts, query, category, subcategory, brand, supplier, productStatus, purchaseStatus, toggles, outOfStock]);
 
   const clearFilters = () => {
     setQuery("");

@@ -195,7 +195,7 @@ export function MyPerformancePage() {
                   </div>
                 ))}
               </div>
-              <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">{attr.fairNote}{attr.scoreAdjust > 0 && <> <b>Score ajustado por causa: +{attr.scoreAdjust} pts.</b></>}</p>
+              <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">{attr.fairNote}{attr.scoreAdjust > 0 && <> <b>Estos quiebres no deberían penalizar tu score.</b></>}</p>
             </CardBody>
           </Card>
         );

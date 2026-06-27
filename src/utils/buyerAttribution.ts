@@ -29,8 +29,31 @@ export interface BuyerAttribution {
   scoreAdjust: number; // pts que el score "debería" devolver por causas externas
 }
 
+const SLICE_META = {
+  comprador: { label: "Tu decisión", tone: "red" as const, desc: "Compró poco, tarde o no repuso a tiempo" },
+  proveedor: { label: "Proveedor", tone: "amber" as const, desc: "No despachó, entregó parcial o subió el costo" },
+  demanda: { label: "Demanda", tone: "blue" as const, desc: "Venta inesperada, campaña o licitación no planificada" },
+};
+
 export function buyerAttribution(buyer: Buyer): BuyerAttribution {
   const total = buyer.stockouts;
+
+  // Caso sin quiebres: nada que atribuir, mensaje positivo.
+  if (total <= 0) {
+    const slices: CauseSlice[] = (["comprador", "proveedor", "demanda"] as const).map((key) => ({
+      key,
+      ...SLICE_META[key],
+      count: 0,
+      pct: 0,
+    }));
+    return {
+      total: 0,
+      slices,
+      fairNote: "Sin quiebres este período. Excelente disponibilidad — mantén el ritmo de reposición.",
+      scoreAdjust: 0,
+    };
+  }
+
   const h = hashStr(buyer.id);
   const h2 = hashStr(buyer.id + "x");
 
@@ -41,13 +64,25 @@ export function buyerAttribution(buyer: Buyer): BuyerAttribution {
   const demanda = Math.round(total * demShare);
   const comprador = Math.max(0, total - proveedor - demanda);
 
-  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+  // Porcentajes con método del resto mayor (Hamilton) para que sumen 100.
+  const counts = { comprador, proveedor, demanda };
+  const raw = { comprador: (comprador / total) * 100, proveedor: (proveedor / total) * 100, demanda: (demanda / total) * 100 };
+  const floors = { comprador: Math.floor(raw.comprador), proveedor: Math.floor(raw.proveedor), demanda: Math.floor(raw.demanda) };
+  let remainder = 100 - (floors.comprador + floors.proveedor + floors.demanda);
+  const byFrac = (Object.keys(raw) as (keyof typeof raw)[]).sort((a, b) => (raw[b] - floors[b]) - (raw[a] - floors[a]));
+  const pctMap = { ...floors };
+  for (const k of byFrac) {
+    if (remainder <= 0) break;
+    pctMap[k] += 1;
+    remainder--;
+  }
 
-  const slices: CauseSlice[] = [
-    { key: "comprador", label: "Tu decisión", count: comprador, pct: pct(comprador), tone: "red", desc: "Compró poco, tarde o no repuso a tiempo" },
-    { key: "proveedor", label: "Proveedor", count: proveedor, pct: pct(proveedor), tone: "amber", desc: "No despachó, entregó parcial o subió el costo" },
-    { key: "demanda", label: "Demanda", count: demanda, pct: pct(demanda), tone: "blue", desc: "Venta inesperada, campaña o licitación no planificada" },
-  ];
+  const slices: CauseSlice[] = (["comprador", "proveedor", "demanda"] as const).map((key) => ({
+    key,
+    ...SLICE_META[key],
+    count: counts[key],
+    pct: pctMap[key],
+  }));
 
   const externos = proveedor + demanda;
   const scoreAdjust = Math.round(externos * 0.8);
