@@ -15,7 +15,7 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BarList } from "../components/business/BarList";
-import { IconPlus, IconInfo, IconAlerts, IconSignal } from "../components/ui/icons";
+import { IconPlus, IconInfo, IconAlerts, IconSignal, IconChevronRight } from "../components/ui/icons";
 import { getProductBySku, products } from "../data/mockProducts";
 import { suppliers, getSupplierByName } from "../data/mockSuppliers";
 import { supplierFulfillment } from "../utils/supplierPerf";
@@ -608,12 +608,40 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
     { label: "Mantener", on: true },
   ];
 
+  // La decisión a destacar: la primera accionable que no sea "Mantener".
+  const proximaDecision = (decisiones.find((d) => d.on && d.label !== "Mantener") ?? decisiones[decisiones.length - 1]).label;
+  // El argumento principal: el primer objetivo concreto de la lista.
+  const objetivoPrincipal = objetivos[0];
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-900">
-        <b>Panel de negociación.</b> Todo lo que necesitas para llegar a la reunión con argumentos: cuánto vende, cuánto rinde, qué stock hay, qué tan confiable es el proveedor y qué alternativas tienes.
-      </div>
+      {/* Resumen ejecutivo: el argumento y la decisión en cinco segundos.
+          El detalle queda plegado en acordeones más abajo (T8). */}
+      <Card>
+        <CardBody>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Para la negociación</span>
+            <p className="text-base font-semibold text-slate-900">{objetivoPrincipal}</p>
+            <p className="text-sm text-slate-600">
+              Próxima decisión sugerida:{" "}
+              <span className="inline-flex items-center rounded-full bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200 px-2.5 py-0.5 text-xs font-medium align-middle">{proximaDecision}</span>
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3 pt-3 border-t border-slate-100">
+            <NStat label="Venta 30 días" value={`${formatNumber(sales30)} u.`} sub={`${tendencia >= 0 ? "+" : ""}${formatPercent(tendencia, 0)} vs 90d`} tone={tendencia >= 0 ? "good" : "bad"} />
+            <NStat label="Margen" value={formatPercent(product.margin, 0)} tone={product.margin < objetivo ? "warn" : "good"} sub={`objetivo ${formatPercent(objetivo, 0)}`} />
+            <NStat label="Inventario" value={enQuiebre ? "En quiebre" : `${formatNumber(product.inventoryDays)} d`} tone={enQuiebre ? "bad" : product.inventoryDays > 120 ? "warn" : "good"} sub={enQuiebre ? `pierde ${formatCurrencyCompact(ventaPerdida)}/mes` : "de inventario"} />
+            <NStat label="Proveedor" value={master ? formatPercent(master.deliveryCompliance, 0) : "—"} tone={master && master.deliveryCompliance < 70 ? "bad" : master && master.deliveryCompliance < 85 ? "warn" : "good"} sub={master ? "cumplimiento" : "sin asignar"} />
+          </div>
+        </CardBody>
+      </Card>
 
+      <details className="group rounded-xl border border-slate-200 bg-white">
+        <summary className="flex cursor-pointer items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-slate-700 list-none">
+          <span>Ver cifras de respaldo — venta, margen, inventario y proveedor</span>
+          <IconChevronRight className="w-4 h-4 text-slate-500 transition-transform group-open:rotate-90" />
+        </summary>
+        <div className="px-4 pb-4 pt-1">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Venta */}
         <Card>
@@ -675,7 +703,16 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
         </Card>
       </div>
 
+        </div>
+      </details>
+
       {/* Alternativas + Objetivos */}
+      <details className="group rounded-xl border border-slate-200 bg-white" open>
+        <summary className="flex cursor-pointer items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-slate-700 list-none">
+          <span>Ver alternativas y objetivos de la negociación</span>
+          <IconChevronRight className="w-4 h-4 text-slate-500 transition-transform group-open:rotate-90" />
+        </summary>
+        <div className="px-4 pb-4 pt-1">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader title="Proveedores alternativos" description="Tu poder de negociación: no dependes de uno solo" />
@@ -723,6 +760,8 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
           </CardBody>
         </Card>
       </div>
+        </div>
+      </details>
     </div>
   );
 }
