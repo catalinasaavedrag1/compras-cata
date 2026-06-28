@@ -113,23 +113,23 @@ export function SupplierDetailPage() {
         <p className="text-sm font-semibold text-slate-800 mb-3">Para atender al proveedor</p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="text-xs text-slate-400">Importancia</p>
+            <p className="text-xs text-slate-500">Importancia</p>
             <div className="mt-1"><Badge tone={importance.tone}>{importance.label}</Badge></div>
           </div>
           <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="text-xs text-slate-400">Venta 30 días</p>
+            <p className="text-xs text-slate-500">Venta 30 días</p>
             <p className="text-lg font-semibold text-slate-800">{formatCurrencyCompact(ventas30)}</p>
           </div>
           <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="text-xs text-slate-400">Margen promedio</p>
+            <p className="text-xs text-slate-500">Margen promedio</p>
             <p className="text-lg font-semibold text-emerald-700">{formatPercent(margenProm, 1)}</p>
           </div>
           <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="text-xs text-slate-400">Utilidad 30 días</p>
+            <p className="text-xs text-slate-500">Utilidad 30 días</p>
             <p className="text-lg font-semibold text-emerald-700">{formatCurrencyCompact(utilidad30)}</p>
           </div>
           <button onClick={() => setTab("ordenes")} className="rounded-lg bg-slate-50 px-3 py-2.5 text-left hover:bg-slate-100">
-            <p className="text-xs text-slate-400">OC atrasadas</p>
+            <p className="text-xs text-slate-500">OC atrasadas</p>
             <p className={`text-lg font-semibold ${delayedPOs.length > 0 ? "text-rose-600" : "text-slate-800"}`}>{formatNumber(delayedPOs.length)}</p>
           </button>
         </div>
@@ -144,15 +144,15 @@ export function SupplierDetailPage() {
               <p className="text-sm font-semibold text-slate-800">Más vendidos (30 días)</p>
             </div>
             {topSold.length === 0 ? (
-              <p className="text-sm text-slate-400">Sin ventas registradas.</p>
+              <p className="text-sm text-slate-500">Sin ventas registradas.</p>
             ) : (
               <div className="space-y-1.5">
                 {topSold.map((p, i) => (
                   <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50">
-                    <span className="w-5 text-center text-xs font-bold text-slate-400">{i + 1}</span>
+                    <span className="w-5 text-center text-xs font-bold text-slate-500">{i + 1}</span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-medium text-slate-800 truncate">{p.name}</span>
-                      <span className="block text-xs text-slate-400">{formatNumber(p.salesLast30Days)} u. · margen {formatPercent(p.margin, 0)}</span>
+                      <span className="block text-xs text-slate-500">{formatNumber(p.salesLast30Days)} u. · margen {formatPercent(p.margin, 0)}</span>
                     </span>
                     <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{formatCurrencyCompact(sales30Amount(p))}</span>
                   </Link>
@@ -170,19 +170,19 @@ export function SupplierDetailPage() {
               {detenidos.length > 0 && <Badge tone="violet">{detenidos.length}</Badge>}
             </div>
             {detenidos.length === 0 ? (
-              <p className="text-sm text-slate-400">Sin sobrestock ni productos sin venta. 👍</p>
+              <p className="text-sm text-slate-500">Sin sobrestock ni productos sin venta. 👍</p>
             ) : (
               <div className="space-y-1.5">
                 {detenidos.slice(0, 5).map((p) => (
                   <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50">
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-medium text-slate-800 truncate">{p.name}</span>
-                      <span className="block text-xs text-slate-400">disp. {formatNumber(p.availableStock)} · vende {formatNumber(p.salesLast30Days)}/mes</span>
+                      <span className="block text-xs text-slate-500">disp. {formatNumber(p.availableStock)} · vende {formatNumber(p.salesLast30Days)}/mes</span>
                     </span>
                     <Badge tone={p.salesLast30Days === 0 ? "red" : "violet"}>{p.salesLast30Days === 0 ? "Sin venta" : "Sobrestock"}</Badge>
                   </Link>
                 ))}
-                {detenidos.length > 5 && <p className="text-xs text-slate-400 pt-0.5">+{detenidos.length - 5} más · ver pestaña Productos</p>}
+                {detenidos.length > 5 && <p className="text-xs text-slate-500 pt-0.5">+{detenidos.length - 5} más · ver pestaña Productos</p>}
               </div>
             )}
           </CardBody>
@@ -221,7 +221,7 @@ export function SupplierDetailPage() {
               supProducts.map((p) => (
                 <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
                   <div className="min-w-0">
-                    <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+                    <span className="text-xs font-mono text-slate-500">{p.sku}</span>
                     <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
                     <p className="text-xs text-slate-500">{p.category} · disp. {formatNumber(p.availableStock)} · vende {formatNumber(p.salesLast30Days)}/mes</p>
                   </div>
@@ -293,9 +293,9 @@ function GStat({ label, value, tone, sub }: { label: string; value: string; tone
   const c = tone === "bad" ? "text-rose-700" : tone === "warn" ? "text-amber-700" : tone === "good" ? "text-emerald-700" : "text-slate-800";
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-      <p className="text-xs text-slate-400">{label}</p>
+      <p className="text-xs text-slate-500">{label}</p>
       <p className={`text-lg font-semibold ${c}`}>{value}</p>
-      {sub && <p className="text-[11px] text-slate-400 leading-tight">{sub}</p>}
+      {sub && <p className="text-[11px] text-slate-500 leading-tight">{sub}</p>}
     </div>
   );
 }
@@ -370,7 +370,7 @@ function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
         <div className="flex flex-wrap items-center gap-2 mb-1.5">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rol del proveedor</span>
           <Badge tone={role.tone}>{role.label}</Badge>
-          <span className="text-xs text-slate-400">· proveedor #{rankingProv} por compra</span>
+          <span className="text-xs text-slate-500">· proveedor #{rankingProv} por compra</span>
         </div>
         <p className="text-sm text-slate-700">{role.tip}</p>
       </div>
@@ -418,7 +418,7 @@ function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
                 <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
                   <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.max(3, Math.min(100, p.part))}%` }} />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Margen proveedor {formatPercent(margenProm, 0)} vs categoría {formatPercent(p.catMargin, 0)}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Margen proveedor {formatPercent(margenProm, 0)} vs categoría {formatPercent(p.catMargin, 0)}</p>
               </div>
             ))}
           </CardBody>
@@ -436,11 +436,11 @@ function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Top vendidos</p>
             <div className="space-y-1">
               {topSold.length === 0 ? (
-                <p className="text-sm text-slate-400">Sin ventas registradas.</p>
+                <p className="text-sm text-slate-500">Sin ventas registradas.</p>
               ) : (
                 topSold.map((p, i) => (
                   <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center gap-2 text-sm rounded px-1.5 py-1 hover:bg-slate-50">
-                    <span className="w-4 text-center text-xs font-bold text-slate-400">{i + 1}</span>
+                    <span className="w-4 text-center text-xs font-bold text-slate-500">{i + 1}</span>
                     <span className="flex-1 min-w-0 truncate text-slate-700">{p.name}</span>
                     <span className="text-xs font-semibold text-slate-600">{formatCurrencyCompact(sales30Amount(p))}</span>
                   </Link>
@@ -467,7 +467,7 @@ function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
                   {alternativas.map((s) => (
                     <Link key={s.id} to={`/proveedores/${s.id}`} className="flex items-center gap-2 text-sm rounded-lg border border-slate-200 px-2.5 py-1.5 hover:border-brand-300 hover:bg-brand-50/40">
                       <span className="flex-1 min-w-0 truncate text-slate-700">{s.name}</span>
-                      <span className="text-xs text-slate-400">lead {formatDays(s.averageLeadTimeDays)} · cumple {formatPercent(s.deliveryCompliance, 0)}</span>
+                      <span className="text-xs text-slate-500">lead {formatDays(s.averageLeadTimeDays)} · cumple {formatPercent(s.deliveryCompliance, 0)}</span>
                     </Link>
                   ))}
                 </div>
@@ -552,12 +552,12 @@ function SeasonView({ supplier }: { supplier: Supplier }) {
                     <div className="h-10 rounded-md flex items-center justify-center text-[10px] font-semibold" style={{ background: `rgba(31,73,214,${0.12 + intensity * 0.8})`, color: intensity > 0.55 ? "#fff" : "#1e3a8a" }} title={`${p.label}: ${formatCurrencyCompact(p.sales)} · ${p.stockouts} quiebres`}>
                       {p.stockouts > 0 ? `⚠${p.stockouts}` : ""}
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{p.label.split(" ")[0]}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{p.label.split(" ")[0]}</p>
                   </div>
                 );
               })}
             </div>
-            <p className="text-[11px] text-slate-400 mt-2">Más oscuro = más venta. ⚠ = quiebres ese mes.</p>
+            <p className="text-[11px] text-slate-500 mt-2">Más oscuro = más venta. ⚠ = quiebres ese mes.</p>
           </CardBody>
         </Card>
 
@@ -569,8 +569,8 @@ function SeasonView({ supplier }: { supplier: Supplier }) {
               <polyline points={pts} fill="none" stroke="#1f49d6" strokeWidth={2} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
             </svg>
             <div className="flex justify-between mt-1">
-              <span className="text-[10px] text-slate-400">{s.series[0].label}</span>
-              <span className="text-[10px] text-slate-400">{s.series[s.series.length - 1].label}</span>
+              <span className="text-[10px] text-slate-500">{s.series[0].label}</span>
+              <span className="text-[10px] text-slate-500">{s.series[s.series.length - 1].label}</span>
             </div>
           </CardBody>
         </Card>
@@ -586,7 +586,7 @@ function SeasonView({ supplier }: { supplier: Supplier }) {
           <div key={b.t} className={`rounded-xl border ${b.c} p-3`}>
             <p className="text-sm font-semibold text-slate-800 mb-1.5">{b.t}</p>
             <ul className="space-y-1">
-              {b.items.map((it) => <li key={it} className="text-xs text-slate-600 flex gap-1.5"><span className="text-slate-400">·</span>{it}</li>)}
+              {b.items.map((it) => <li key={it} className="text-xs text-slate-600 flex gap-1.5"><span className="text-slate-500">·</span>{it}</li>)}
             </ul>
           </div>
         ))}
@@ -600,7 +600,7 @@ function SeasonView({ supplier }: { supplier: Supplier }) {
             <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
               <span className="flex-1 min-w-0">
                 <span className="block text-sm font-medium text-slate-800 truncate">{p.name}</span>
-                <span className="block text-xs text-slate-400">{p.type} · margen {formatPercent(p.margin, 0)}</span>
+                <span className="block text-xs text-slate-500">{p.type} · margen {formatPercent(p.margin, 0)}</span>
               </span>
               <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{formatCurrencyCompact(p.sales)}</span>
               <Badge tone="blue">{p.action}</Badge>
@@ -692,7 +692,7 @@ function SupplierTermsAgreements({ supplier }: { supplier: Supplier }) {
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
             {termRows.map((r) => (
               <div key={r.label} className="flex flex-col">
-                <span className="text-[11px] text-slate-400">{r.label}</span>
+                <span className="text-[11px] text-slate-500">{r.label}</span>
                 <span className="text-sm font-medium text-slate-800">{r.value}</span>
               </div>
             ))}
@@ -709,7 +709,7 @@ function SupplierTermsAgreements({ supplier }: { supplier: Supplier }) {
         />
         <CardBody>
           {agreements.length === 0 ? (
-            <p className="text-sm text-slate-400">Sin acuerdos registrados. Registra lo conversado en la próxima reunión.</p>
+            <p className="text-sm text-slate-500">Sin acuerdos registrados. Registra lo conversado en la próxima reunión.</p>
           ) : (
             <div className="space-y-2.5">
               {agreements.map((a) => (
@@ -718,8 +718,8 @@ function SupplierTermsAgreements({ supplier }: { supplier: Supplier }) {
                     <span className="text-xs font-semibold text-slate-700">{formatDate(a.date)}</span>
                     {a.followUp && <Badge tone="amber">Seguir {formatDate(a.followUp)}</Badge>}
                   </div>
-                  <p className="text-sm text-slate-800"><span className="text-slate-400">Objetivo:</span> {a.objective}</p>
-                  {a.agreed && <p className="text-sm text-emerald-700 mt-0.5"><span className="text-slate-400">Acordado:</span> {a.agreed}</p>}
+                  <p className="text-sm text-slate-800"><span className="text-slate-500">Objetivo:</span> {a.objective}</p>
+                  {a.agreed && <p className="text-sm text-emerald-700 mt-0.5"><span className="text-slate-500">Acordado:</span> {a.agreed}</p>}
                 </div>
               ))}
             </div>

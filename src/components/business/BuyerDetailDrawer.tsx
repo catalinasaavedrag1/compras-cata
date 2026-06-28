@@ -40,7 +40,7 @@ export function GoalRow({ goal, showWeight }: { goal: BuyerGoal; showWeight?: bo
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-800 leading-snug">{goal.name}</p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {goal.indicator}
             {showWeight && ` · peso ${goal.weight}%`}
           </p>
@@ -133,7 +133,7 @@ export function BuyerDetailDrawer({ buyer, onClose }: { buyer: Buyer | null; onC
           ].map((x) => (
             <div key={x.label} className="rounded-lg border border-slate-200 px-3 py-2">
               <p className="text-lg font-semibold text-slate-800">{x.value}</p>
-              <p className="text-[11px] text-slate-400">{x.label}</p>
+              <p className="text-[11px] text-slate-500">{x.label}</p>
             </div>
           ))}
         </div>
@@ -145,7 +145,7 @@ export function BuyerDetailDrawer({ buyer, onClose }: { buyer: Buyer | null; onC
             {kpis.map((k) => (
               <div key={k.label} className="rounded-lg border border-slate-200 px-3 py-2">
                 <p className={`text-base font-semibold ${k.tone ? kpiColor[k.tone] : "text-slate-800"}`}>{k.value}</p>
-                <p className="text-[10.5px] text-slate-400 leading-tight">{k.label}</p>
+                <p className="text-[10.5px] text-slate-500 leading-tight">{k.label}</p>
               </div>
             ))}
           </div>
@@ -162,7 +162,7 @@ export function BuyerDetailDrawer({ buyer, onClose }: { buyer: Buyer | null; onC
                   <div className="h-full rounded-full" style={{ width: `${x.value}%`, background: goalBar(x.value) }} />
                 </div>
                 <span className="w-8 text-right text-xs font-semibold" style={{ color: goalBar(x.value) }}>{x.value}</span>
-                <span className="w-8 text-right text-[11px] text-slate-400">{x.weight}%</span>
+                <span className="w-8 text-right text-[11px] text-slate-500">{x.weight}%</span>
               </div>
             ))}
           </div>
@@ -174,7 +174,7 @@ export function BuyerDetailDrawer({ buyer, onClose }: { buyer: Buyer | null; onC
           <Sparkline data={buyer.scoreHist} />
           <div className="flex justify-between mt-1">
             {buyer.scoreHist.map((v, i) => (
-              <span key={i} className="text-[10.5px] text-slate-400">{v}</span>
+              <span key={i} className="text-[10.5px] text-slate-500">{v}</span>
             ))}
           </div>
         </div>

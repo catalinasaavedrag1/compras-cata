@@ -16,7 +16,7 @@ export function Input({ icon, label, className, id, ...props }: InputProps) {
       )}
       <div className="relative">
         {icon && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
             {icon}
           </span>
         )}

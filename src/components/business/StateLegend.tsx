@@ -18,14 +18,14 @@ export function StateLegend() {
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
       >
-        <IconInfo className="w-4 h-4 text-slate-400" />
+        <IconInfo className="w-4 h-4 text-slate-500" />
         <span className="text-sm font-medium text-slate-700">
           ¿Qué significa cada estado?
         </span>
         <div className="flex-1" />
         <IconChevronRight
           className={cn(
-            "w-4 h-4 text-slate-400 transition-transform",
+            "w-4 h-4 text-slate-500 transition-transform",
             open && "rotate-90"
           )}
         />

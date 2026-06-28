@@ -44,7 +44,7 @@ export function CategoriesPage() {
       render: (c) => (
         <div className="text-sm">
           <p className="text-slate-700">{formatCurrencyCompact(c.salesLast30Days)}</p>
-          <p className="text-xs text-slate-400">{formatCurrencyCompact(c.salesLast90Days)}</p>
+          <p className="text-xs text-slate-500">{formatCurrencyCompact(c.salesLast90Days)}</p>
         </div>
       ),
     },

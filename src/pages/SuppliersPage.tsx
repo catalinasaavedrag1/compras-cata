@@ -66,7 +66,7 @@ export function SuppliersPage() {
       render: (s) => (
         <div>
           <p className="font-medium text-slate-800">{s.name}</p>
-          <p className="text-xs text-slate-400 font-mono">{s.rut}</p>
+          <p className="text-xs text-slate-500 font-mono">{s.rut}</p>
         </div>
       ),
     },
@@ -191,7 +191,7 @@ El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuán
               <Link key={s.id} to={`/proveedores/${s.id}?tab=temporadas`} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
-                  <span className="block text-xs text-slate-400">Peak {seas.preSeason!.month} en ~{seas.preSeason!.days} días · fill {seas.fill}% · lead {formatDays(s.averageLeadTimeDays)}</span>
+                  <span className="block text-xs text-slate-500">Peak {seas.preSeason!.month} en ~{seas.preSeason!.days} días · fill {seas.fill}% · lead {formatDays(s.averageLeadTimeDays)}</span>
                 </span>
                 <Badge tone={seas.classification.risky ? "red" : "amber"}>{seas.classification.risky ? "Riesgo de quiebre" : "Preparar compra"}</Badge>
               </Link>
@@ -211,14 +211,14 @@ El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuán
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800">{s.name}</p>
-                  <p className="text-xs text-slate-400 font-mono">{s.rut}</p>
+                  <p className="text-xs text-slate-500 font-mono">{s.rut}</p>
                 </div>
                 <StatusBadge kind="supplier" value={s.status} dot={false} />
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                <div><p className="text-xs text-slate-400">Cumple</p><p className={s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatPercent(s.deliveryCompliance, 0)}</p></div>
-                <div><p className="text-xs text-slate-400">Lead time</p><p className="text-slate-700">{formatDays(s.averageLeadTimeDays)}</p></div>
-                <div><p className="text-xs text-slate-400">OC abiertas</p><p className="text-slate-700">{formatNumber(s.openPurchaseOrders)}</p></div>
+                <div><p className="text-xs text-slate-500">Cumple</p><p className={s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatPercent(s.deliveryCompliance, 0)}</p></div>
+                <div><p className="text-xs text-slate-500">Lead time</p><p className="text-slate-700">{formatDays(s.averageLeadTimeDays)}</p></div>
+                <div><p className="text-xs text-slate-500">OC abiertas</p><p className="text-slate-700">{formatNumber(s.openPurchaseOrders)}</p></div>
               </div>
             </div>
           )}
@@ -244,7 +244,7 @@ function MiniRank({
           <div key={it.name} className="flex items-center justify-between gap-2 py-1 border-b border-slate-50 last:border-0">
             <div className="min-w-0">
               <p className="text-sm font-medium text-slate-800 truncate">{it.name}</p>
-              <p className="text-xs text-slate-400">{it.sub}</p>
+              <p className="text-xs text-slate-500">{it.sub}</p>
             </div>
             <span className={`text-sm font-semibold flex-shrink-0 ${toneText[it.tone]}`}>{it.value}</span>
           </div>

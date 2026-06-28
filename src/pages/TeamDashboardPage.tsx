@@ -63,7 +63,7 @@ export function TeamDashboardPage() {
       <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${BUYER_TONE_AV[b.tone]}`}>{b.initials}</span>
       <span className="flex-1 min-w-0">
         <span className="block text-sm font-semibold text-slate-800">{b.name}</span>
-        <span className="block text-xs text-slate-400 truncate">{sub}</span>
+        <span className="block text-xs text-slate-500 truncate">{sub}</span>
       </span>
       <span className="text-right">
         <span className="block text-lg font-bold" style={{ color: scoreColor(b.score) }}>{b.score}</span>
@@ -109,7 +109,7 @@ export function TeamDashboardPage() {
                 <button key={e.id} onClick={() => openByName(e.buyer)} className="flex items-center gap-3 w-full text-left rounded-lg border border-slate-100 px-3 py-2.5 hover:bg-slate-50" style={{ borderLeftWidth: 3, borderLeftColor: sev.tone === "red" ? "#f43f5e" : sev.tone === "amber" ? "#f59e0b" : "#94a3b8" }}>
                   <span className="flex-1 min-w-0">
                     <span className="block text-sm font-semibold text-slate-800">{e.title}</span>
-                    <span className="block text-xs text-slate-400 truncate">{e.buyer ?? "Área"} · {e.action}</span>
+                    <span className="block text-xs text-slate-500 truncate">{e.buyer ?? "Área"} · {e.action}</span>
                   </span>
                   <Badge tone={sev.tone}>{sev.label}</Badge>
                 </button>

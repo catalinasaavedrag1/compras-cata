@@ -183,8 +183,8 @@ export function CampaignOpportunitiesPage() {
       render: (o) => (
         <div className="min-w-[200px]">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-slate-400">{o.sku}</span>
-            <span className="text-xs text-slate-400">{o.brand}</span>
+            <span className="text-xs font-mono text-slate-500">{o.sku}</span>
+            <span className="text-xs text-slate-500">{o.brand}</span>
           </div>
           <p className="font-medium text-slate-800 leading-snug">{o.productName}</p>
           <p className="text-xs text-slate-500">{o.category} · {o.supplierName || "Sin proveedor"}</p>
@@ -203,7 +203,7 @@ export function CampaignOpportunitiesPage() {
       render: (o) => (
         <div className="text-sm min-w-[150px]">
           <p className="text-slate-700">{o.campaignName}</p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             {CHANNEL_LABELS[o.channel]} · {formatDate(o.campaignDate)}
           </p>
         </div>
@@ -280,7 +280,7 @@ export function CampaignOpportunitiesPage() {
         o.suggestedPurchaseQuantity > 0 ? (
           <div className="text-sm">
             <p className="font-semibold text-slate-900">{formatNumber(o.suggestedPurchaseQuantity)} u.</p>
-            <p className="text-xs text-slate-400">{formatCurrency(o.suggestedPurchaseQuantity * o.unitCost)}</p>
+            <p className="text-xs text-slate-500">{formatCurrency(o.suggestedPurchaseQuantity * o.unitCost)}</p>
           </div>
         ) : (
           <span className="text-slate-300">—</span>
@@ -491,16 +491,16 @@ export function CampaignOpportunitiesPage() {
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{o.sku}</span>
+                  <span className="text-xs font-mono text-slate-500">{o.sku}</span>
                   <p className="font-medium text-slate-800 leading-snug">{o.productName}</p>
                   <p className="text-xs text-slate-500">{CHANNEL_LABELS[o.channel]} · {o.campaignName} · en {formatDays(o.daysToCampaign)}</p>
                 </div>
                 <Badge tone={CAMPAIGN_STATUS[o.status].tone} dot>{CAMPAIGN_STATUS[o.status].label}</Badge>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                <div><p className="text-xs text-slate-400">Stock</p><p className={o.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(o.availableStock)}</p></div>
-                <div><p className="text-xs text-slate-400">Brecha</p><p className={o.stockGap > 0 ? "text-rose-600" : "text-emerald-600"}>{o.stockGap > 0 ? `-${formatNumber(o.stockGap)}` : "OK"}</p></div>
-                <div><p className="text-xs text-slate-400">Sugerido</p><p className="font-semibold text-slate-900">{o.suggestedPurchaseQuantity > 0 ? `${formatNumber(o.suggestedPurchaseQuantity)} u.` : "—"}</p></div>
+                <div><p className="text-xs text-slate-500">Stock</p><p className={o.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(o.availableStock)}</p></div>
+                <div><p className="text-xs text-slate-500">Brecha</p><p className={o.stockGap > 0 ? "text-rose-600" : "text-emerald-600"}>{o.stockGap > 0 ? `-${formatNumber(o.stockGap)}` : "OK"}</p></div>
+                <div><p className="text-xs text-slate-500">Sugerido</p><p className="font-semibold text-slate-900">{o.suggestedPurchaseQuantity > 0 ? `${formatNumber(o.suggestedPurchaseQuantity)} u.` : "—"}</p></div>
               </div>
               <p className="text-xs text-slate-500 mt-1.5">{o.recommendation}</p>
             </div>
@@ -583,7 +583,7 @@ function CreatedCampaignsView({
                   </Badge>
                   <button
                     onClick={() => onDelete(c.id)}
-                    className="text-slate-400 hover:text-rose-600"
+                    className="text-slate-500 hover:text-rose-600"
                     aria-label="Eliminar campaña"
                   >
                     <IconClose className="w-4 h-4" />
@@ -604,7 +604,7 @@ function CreatedCampaignsView({
                 {c.products.map((p) => (
                   <div key={p.sku} className="flex flex-wrap items-center gap-3 px-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+                      <span className="text-xs font-mono text-slate-500">{p.sku}</span>
                       <p className="text-sm font-medium text-slate-800 truncate">{p.productName}</p>
                       <p className="text-xs text-slate-500">
                         Stock {formatNumber(p.availableStock)}
@@ -613,7 +613,7 @@ function CreatedCampaignsView({
                     </div>
                     <Badge tone="amber">-{p.discountPct}%</Badge>
                     <div className="text-right w-28">
-                      <p className="text-xs text-slate-400 line-through">{formatCurrency(p.basePrice)}</p>
+                      <p className="text-xs text-slate-500 line-through">{formatCurrency(p.basePrice)}</p>
                       <p className="text-sm font-semibold text-emerald-600">{formatCurrency(p.campaignPrice)}</p>
                     </div>
                     <button

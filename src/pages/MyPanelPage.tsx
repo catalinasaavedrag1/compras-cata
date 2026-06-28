@@ -292,7 +292,7 @@ export function MyPanelPage() {
       header: "Producto",
       render: ({ product: p }) => (
         <div className="min-w-[200px]">
-          <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+          <span className="text-xs font-mono text-slate-500">{p.sku}</span>
           <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
           <p className="text-xs text-slate-500">{p.category} · {p.supplierName || "Sin proveedor"}</p>
           <p className="text-xs mt-0.5 leading-snug text-rose-600">
@@ -327,7 +327,7 @@ export function MyPanelPage() {
           <p className={r.coverage <= r.product.supplierLeadTimeDays ? "text-rose-600 font-semibold" : "text-amber-600 font-medium"}>
             {r.product.availableStock <= 0 ? "En quiebre" : formatDate(r.stockoutDate ?? "")}
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             cubre {formatDays(r.coverage)} · lead {formatDays(r.product.supplierLeadTimeDays)}
           </p>
         </div>
@@ -340,7 +340,7 @@ export function MyPanelPage() {
       render: (r) => (
         <div className="text-sm">
           <p className="font-semibold text-slate-900">{formatNumber(r.suggestedQty)} u.</p>
-          <p className="text-xs text-slate-400">para ~{formatDays(r.coverageAfter)}</p>
+          <p className="text-xs text-slate-500">para ~{formatDays(r.coverageAfter)}</p>
         </div>
       ),
     },
@@ -515,7 +515,7 @@ export function MyPanelPage() {
                   to="/senales-ventas"
                   className="flex items-start gap-2 rounded-lg border border-slate-200 p-2.5 hover:border-brand-300 hover:bg-brand-50/40"
                 >
-                  <IconSignal className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                  <IconSignal className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <Badge tone={SIGNAL_PRIORITY[s.priority].tone}>{SIGNAL_PRIORITY[s.priority].label}</Badge>
@@ -567,7 +567,7 @@ export function MyPanelPage() {
               <div>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="text-xs font-mono text-slate-400">{r.product.sku}</span>
+                    <span className="text-xs font-mono text-slate-500">{r.product.sku}</span>
                     <p className="font-medium text-slate-800 leading-snug">{r.product.name}</p>
                     <p className="text-xs text-slate-500">{r.product.category} · {r.product.supplierName || "Sin proveedor"}</p>
                     <p className="text-xs mt-0.5 leading-snug text-rose-600 font-medium">
@@ -577,9 +577,9 @@ export function MyPanelPage() {
                   <Badge tone="red" dot>{r.product.availableStock <= 0 ? "Quiebre" : "Riesgo"}</Badge>
                 </div>
                 <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                  <div><p className="text-xs text-slate-400">Stock</p><p className={r.product.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(r.product.availableStock)}</p></div>
-                  <div><p className="text-xs text-slate-400">Quiebre</p><p className="text-slate-700">{r.product.availableStock <= 0 ? "hoy" : formatDate(r.stockoutDate ?? "")}</p></div>
-                  <div><p className="text-xs text-slate-400">Comprar</p><p className="font-semibold text-slate-900">{formatNumber(r.suggestedQty)} u.</p></div>
+                  <div><p className="text-xs text-slate-500">Stock</p><p className={r.product.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(r.product.availableStock)}</p></div>
+                  <div><p className="text-xs text-slate-500">Quiebre</p><p className="text-slate-700">{r.product.availableStock <= 0 ? "hoy" : formatDate(r.stockoutDate ?? "")}</p></div>
+                  <div><p className="text-xs text-slate-500">Comprar</p><p className="font-semibold text-slate-900">{formatNumber(r.suggestedQty)} u.</p></div>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">Cubre ~{formatDays(r.coverageAfter)} · lead {formatDays(r.product.supplierLeadTimeDays)}</p>
                 <Button

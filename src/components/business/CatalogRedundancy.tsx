@@ -95,7 +95,7 @@ function GroupCard({
             </p>
           </div>
           <span className="flex-shrink-0 text-right">
-            <span className="block text-xs text-slate-400">Capital liberable</span>
+            <span className="block text-xs text-slate-500">Capital liberable</span>
             <span className="block text-sm font-semibold text-rose-600">
               {formatCurrencyCompact(group.freeableCapital)}
             </span>
@@ -105,7 +105,7 @@ function GroupCard({
         {/* Surtido sugerido: uno por gama */}
         {keepers.length > 0 && (
           <>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Conservar (uno por gama)</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Conservar (uno por gama)</p>
             {keepers.map((k) => (
               <Link
                 key={k.product.sku}
@@ -113,7 +113,7 @@ function GroupCard({
                 className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 hover:border-emerald-300"
               >
                 <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{k.product.sku}</span>
+                  <span className="text-xs font-mono text-slate-500">{k.product.sku}</span>
                   <p className="text-sm font-medium text-slate-800 truncate">{k.product.name}</p>
                   <p className="text-xs text-slate-500">
                     gama {TIER_LABEL[k.segment]} · vende {formatNumber(k.product.salesLast30Days)}/mes · rota {formatNumber(k.product.rotation)}× · margen {formatPercent(k.product.margin, 0)}
@@ -133,7 +133,7 @@ function GroupCard({
         {/* Redundantes: sobran en su gama */}
         {candidates.length > 0 && (
           <>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 pt-0.5">Sobran</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 pt-0.5">Sobran</p>
             {candidates.map((c) => (
               <Link
                 key={c.product.sku}
@@ -141,7 +141,7 @@ function GroupCard({
                 className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
               >
                 <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{c.product.sku}</span>
+                  <span className="text-xs font-mono text-slate-500">{c.product.sku}</span>
                   <p className="text-sm font-medium text-slate-800 truncate">{c.product.name}</p>
                   <p className="text-xs text-slate-500 line-clamp-2">{c.reason}</p>
                 </div>

@@ -90,11 +90,11 @@ export function Topbar() {
 
   const iconFor = (t: SearchResult["type"]) =>
     t === "product" ? (
-      <IconProducts className="w-4 h-4 text-slate-400" />
+      <IconProducts className="w-4 h-4 text-slate-500" />
     ) : t === "supplier" ? (
-      <IconSuppliers className="w-4 h-4 text-slate-400" />
+      <IconSuppliers className="w-4 h-4 text-slate-500" />
     ) : (
-      <IconOrders className="w-4 h-4 text-slate-400" />
+      <IconOrders className="w-4 h-4 text-slate-500" />
     );
 
   const groupLabel = { product: "Productos", supplier: "Proveedores", order: "Órdenes de compra" };
@@ -140,7 +140,7 @@ export function Topbar() {
                 if (group.length === 0) return null;
                 return (
                   <div key={type} className="py-1">
-                    <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       {groupLabel[type]}
                     </p>
                     {group.map((r, i) => (
@@ -204,7 +204,7 @@ export function Topbar() {
       </button>
 
       <div className="hidden sm:flex flex-col items-end leading-tight">
-        <span className="text-xs text-slate-400">{formatDate(TODAY_ISO)}</span>
+        <span className="text-xs text-slate-500">{formatDate(TODAY_ISO)}</span>
         {role === "lider" ? (
           <span className="text-sm font-medium text-slate-700">{persona.name}</span>
         ) : (

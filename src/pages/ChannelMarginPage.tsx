@@ -293,7 +293,7 @@ function SkuCard({ group, onOpen, onTask }: { group: SkuGroup; onOpen: () => voi
         <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono text-slate-400">{group.sku}</span>
+              <span className="text-xs font-mono text-slate-500">{group.sku}</span>
               <Badge tone={gen.tone} dot>{gen.label}</Badge>
             </div>
             <p className="font-semibold text-slate-800 leading-snug">{group.productName}</p>
@@ -346,7 +346,7 @@ function SkuCard({ group, onOpen, onTask }: { group: SkuGroup; onOpen: () => voi
                     {diff >= 0 ? "+" : ""}{diff.toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pts
                   </span>
                 </div>
-                {c.commission > 0 && <p className="text-xs text-slate-400 mt-0.5">comisión {formatCurrency(c.commission)}</p>}
+                {c.commission > 0 && <p className="text-xs text-slate-500 mt-0.5">comisión {formatCurrency(c.commission)}</p>}
                 {(c.status === "low" || c.status === "negative") && (
                   <p className="text-xs text-brand-700 mt-1">Sugerido: <b>{formatCurrency(c.suggestedPrice)}</b></p>
                 )}

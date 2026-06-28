@@ -46,7 +46,7 @@ export function Modal({
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-100"
+            className="text-slate-500 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-100"
             aria-label="Cerrar"
           >
             <IconClose />

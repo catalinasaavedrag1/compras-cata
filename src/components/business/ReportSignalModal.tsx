@@ -235,7 +235,7 @@ export function ReportSignalModal({
       <div className="space-y-4">
         {/* 1. Tipo de señal */}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
             1 · ¿Qué estás viendo?
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
@@ -274,7 +274,7 @@ export function ReportSignalModal({
         {/* 2. Producto */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               2 · Producto
             </p>
             <button
@@ -343,11 +343,11 @@ export function ReportSignalModal({
                         <span className="block text-sm text-slate-700 truncate">
                           {p.name}
                         </span>
-                        <span className="block text-xs text-slate-400">
+                        <span className="block text-xs text-slate-500">
                           {p.category} · {p.brand}
                         </span>
                       </span>
-                      <span className="text-xs font-mono text-slate-400 flex-shrink-0">
+                      <span className="text-xs font-mono text-slate-500 flex-shrink-0">
                         {p.sku}
                       </span>
                     </button>
@@ -361,7 +361,7 @@ export function ReportSignalModal({
         {/* 3. Origen + prioridad */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Canal
             </label>
             <select
@@ -377,7 +377,7 @@ export function ReportSignalModal({
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               {channel === "store" ? "Tienda" : "Punto"}
             </label>
             {channel === "store" ? (
@@ -400,10 +400,10 @@ export function ReportSignalModal({
         {/* Prioridad sugerida */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Prioridad
             </label>
-            <span className="text-[11px] text-slate-400">Sugerida automáticamente</span>
+            <span className="text-[11px] text-slate-500">Sugerida automáticamente</span>
           </div>
           <div className="flex gap-1.5">
             {(["high", "medium", "low"] as SignalPriority[]).map((p) => (
@@ -434,7 +434,7 @@ export function ReportSignalModal({
 
         {/* 4. Comentario */}
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             ¿Qué pasó? <span className="text-rose-500">*</span>
           </label>
           <textarea

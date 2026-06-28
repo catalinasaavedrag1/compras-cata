@@ -48,7 +48,7 @@ export function MobileBottomNav({ menuOpen, onToggleMenu, onNavigate }: MobileBo
         >
           {({ isActive }) => (
             <>
-              <item.icon className={cn("w-5 h-5", isActive && !menuOpen ? "text-brand-600" : "text-slate-400")} />
+              <item.icon className={cn("w-5 h-5", isActive && !menuOpen ? "text-brand-600" : "text-slate-500")} />
               {item.label}
             </>
           )}
@@ -62,7 +62,7 @@ export function MobileBottomNav({ menuOpen, onToggleMenu, onNavigate }: MobileBo
           menuOpen ? "text-brand-700" : "text-slate-500"
         )}
       >
-        <IconMenu className={cn("w-5 h-5", menuOpen ? "text-brand-600" : "text-slate-400")} />
+        <IconMenu className={cn("w-5 h-5", menuOpen ? "text-brand-600" : "text-slate-500")} />
         Más
       </button>
     </nav>

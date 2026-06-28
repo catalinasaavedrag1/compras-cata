@@ -37,7 +37,7 @@ export function WorkloadPage() {
 
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-4 px-4 py-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Niveles</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Niveles</span>
           {LEVELS.map((l) => (
             <span key={l.label} className="flex items-center gap-1.5 text-xs text-slate-600">
               <span className="w-2.5 h-2.5 rounded-full" style={{ background: l.color }} />
@@ -73,11 +73,11 @@ export function WorkloadPage() {
                   {factors.map((f) => (
                     <div key={f.label} className="bg-slate-50 rounded-lg px-3 py-2">
                       <p className="text-[15px] font-semibold text-slate-700">{f.value}</p>
-                      <p className="text-[10.5px] text-slate-400">{f.label}</p>
+                      <p className="text-[10.5px] text-slate-500">{f.label}</p>
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Mover una categoría a otro comprador</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Mover una categoría a otro comprador</p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {b.categories.map((c) => (
                     <button
@@ -116,7 +116,7 @@ export function WorkloadPage() {
                     <span className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${BUYER_TONE_AV[t.tone]}`}>{t.initials}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-800">{t.name}</p>
-                      <p className="text-xs text-slate-400">Carga actual {WORKLOAD_CFG[t.workload].label} · {t.workloadPct}% → <b className="text-slate-600">{newPct}%</b> (+{Math.round(share * 0.9)} pts)</p>
+                      <p className="text-xs text-slate-500">Carga actual {WORKLOAD_CFG[t.workload].label} · {t.workloadPct}% → <b className="text-slate-600">{newPct}%</b> (+{Math.round(share * 0.9)} pts)</p>
                     </div>
                     <Button size="sm" onClick={() => { toast.success(`${reassign.category} reasignada de ${reassign.from.name} a ${t.name}`); setReassign(null); }}>
                       Asignar aquí
@@ -162,7 +162,7 @@ export function WorkloadPage() {
                     className={`text-left border rounded-xl px-3 py-2.5 ${offboard.mode === m.id ? "border-brand-400 bg-brand-50/40" : "border-slate-200 hover:border-slate-300"}`}
                   >
                     <span className="block text-sm font-semibold text-slate-800">{m.label}</span>
-                    <span className="block text-[11px] text-slate-400 leading-tight mt-0.5">{m.desc}</span>
+                    <span className="block text-[11px] text-slate-500 leading-tight mt-0.5">{m.desc}</span>
                   </button>
                 ))}
               </div>

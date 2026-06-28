@@ -222,7 +222,7 @@ export function SalesAnalysisPage() {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-sm font-semibold text-rose-600">{formatCurrencyCompact(lost)}</p>
-                    <p className="text-xs text-slate-400">venta perdida/mes</p>
+                    <p className="text-xs text-slate-500">venta perdida/mes</p>
                   </div>
                 </Link>
               ))

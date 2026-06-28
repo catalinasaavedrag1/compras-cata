@@ -71,7 +71,7 @@ export function Sidebar() {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg p-1.5",
+            "text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg p-1.5",
             collapsed && "absolute top-4 -right-3 bg-white border border-slate-200 shadow-sm"
           )}
           title={`${collapsed ? "Expandir" : "Colapsar"} menú  ( [ )`}
@@ -85,7 +85,7 @@ export function Sidebar() {
         {navGroups.map((group) => (
           <div key={group.title} className="mb-3 last:mb-0">
             {!collapsed && (
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{group.title}</p>
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{group.title}</p>
             )}
             {collapsed && <div className="h-px bg-slate-100 mx-2 mb-2" />}
             <div className="space-y-0.5">
@@ -107,7 +107,7 @@ export function Sidebar() {
                 >
                   {({ isActive }) => (
                     <>
-                      <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive ? "text-brand-600" : "text-slate-400")} />
+                      <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive ? "text-brand-600" : "text-slate-500")} />
                       {!collapsed && <span className="truncate">{item.label}</span>}
                     </>
                   )}

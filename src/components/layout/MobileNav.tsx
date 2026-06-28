@@ -36,7 +36,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
           <Brand />
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100"
+            className="text-slate-500 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100"
             aria-label="Cerrar menú"
           >
             <IconClose />
@@ -53,7 +53,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
         <nav className="flex-1 px-3 py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] overflow-y-auto scrollbar-thin">
           {navGroups.map((group) => (
             <div key={group.title} className="mb-3 last:mb-0">
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 {group.title}
               </p>
               <div className="space-y-0.5">
@@ -77,7 +77,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
                         <item.icon
                           className={cn(
                             "w-5 h-5",
-                            isActive ? "text-brand-600" : "text-slate-400"
+                            isActive ? "text-brand-600" : "text-slate-500"
                           )}
                         />
                         {item.label}

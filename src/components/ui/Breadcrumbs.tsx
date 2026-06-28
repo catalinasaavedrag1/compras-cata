@@ -9,7 +9,7 @@ export interface Crumb {
 /** Ruta de navegación: dónde está el usuario y cómo volver. */
 export function Breadcrumbs({ items }: { items: Crumb[] }) {
   return (
-    <nav className="flex items-center gap-1.5 text-xs text-slate-400 mb-3" aria-label="Ruta">
+    <nav className="flex items-center gap-1.5 text-xs text-slate-500 mb-3" aria-label="Ruta">
       {items.map((c, i) => {
         const last = i === items.length - 1;
         return (

@@ -97,8 +97,8 @@ export function ProductsPage() {
       render: (p) => (
         <div className="min-w-[200px]">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-slate-400">{p.sku}</span>
-            <span className="text-xs text-slate-400">{p.brand}</span>
+            <span className="text-xs font-mono text-slate-500">{p.sku}</span>
+            <span className="text-xs text-slate-500">{p.brand}</span>
           </div>
           <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
           <p className="text-xs text-slate-500">{p.category} · {p.subcategory}</p>
@@ -124,7 +124,7 @@ export function ProductsPage() {
       render: (p) => (
         <div className="text-sm">
           <p className="text-slate-700">{formatCurrency(p.price)}</p>
-          <p className="text-xs text-slate-400">{formatCurrency(p.cost)} costo</p>
+          <p className="text-xs text-slate-500">{formatCurrency(p.cost)} costo</p>
         </div>
       ),
     },
@@ -147,7 +147,7 @@ export function ProductsPage() {
           <p className={p.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>
             {formatNumber(p.availableStock)}
           </p>
-          <p className="text-xs text-slate-400">{formatNumber(p.totalStock)} total</p>
+          <p className="text-xs text-slate-500">{formatNumber(p.totalStock)} total</p>
         </div>
       ),
     },
@@ -266,11 +266,14 @@ export function ProductsPage() {
         />
       </div>
 
+      {/* KPIs de lectura (cuánto hay en la vista actual). Para segmentar,
+          usar los toggles de la barra de filtros — no duplicamos el filtro
+          aquí para no competir con ese único modelo de segmentación. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard title="SKUs en vista" value={formatNumber(filtered.length)} tone="info" icon={<IconProducts className="w-4 h-4" />} description="Según filtros" />
-        <KpiCard title="Margen bajo (<25%)" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconSales className="w-4 h-4" />} description="Filtrar" active={toggles.lowMargin} onClick={() => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin }))} />
-        <KpiCard title="Sin proveedor" value={formatNumber(noSupplierCount)} tone={noSupplierCount ? "bad" : "good"} icon={<IconSuppliers className="w-4 h-4" />} description="Filtrar" active={toggles.noSupplier} onClick={() => setToggles((t) => ({ ...t, noSupplier: !t.noSupplier }))} />
-        <KpiCard title="Sin venta (30d)" value={formatNumber(noSalesCount)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} description="Filtrar" active={toggles.noSales} onClick={() => setToggles((t) => ({ ...t, noSales: !t.noSales }))} />
+        <KpiCard title="Margen bajo (<25%)" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconSales className="w-4 h-4" />} description="En la vista actual" />
+        <KpiCard title="Sin proveedor" value={formatNumber(noSupplierCount)} tone={noSupplierCount ? "bad" : "good"} icon={<IconSuppliers className="w-4 h-4" />} description="En la vista actual" />
+        <KpiCard title="Sin venta (30d)" value={formatNumber(noSalesCount)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} description="En la vista actual" />
       </div>
 
       <Card>
@@ -283,7 +286,7 @@ export function ProductsPage() {
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+                  <span className="text-xs font-mono text-slate-500">{p.sku}</span>
                   <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
                   <p className="text-xs text-slate-500">{p.category} · {p.brand}</p>
                 </div>
@@ -291,15 +294,15 @@ export function ProductsPage() {
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
                 <div>
-                  <p className="text-xs text-slate-400">Stock disp.</p>
+                  <p className="text-xs text-slate-500">Stock disp.</p>
                   <p className={p.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(p.availableStock)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Venta mes</p>
+                  <p className="text-xs text-slate-500">Venta mes</p>
                   <p className="text-slate-700">{formatNumber(p.salesLast30Days)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Margen</p>
+                  <p className="text-xs text-slate-500">Margen</p>
                   <p className={p.margin < 25 ? "text-amber-600 font-medium" : "text-slate-700"}>{formatPercent(p.margin)}</p>
                 </div>
               </div>

@@ -120,11 +120,11 @@ export function RankingPage() {
                   <Badge tone={league.tone}>{league.name}</Badge>
                   <span className="text-[11px] font-semibold" style={{ color: trendColor(b.trend) }}>{trendText(b.trend)}</span>
                 </span>
-                <span className="block text-[11px] text-slate-400 mt-1">{i === 0 ? "Líder del equipo" : `A ${gap} pts del #${i}`}</span>
+                <span className="block text-[11px] text-slate-500 mt-1">{i === 0 ? "Líder del equipo" : `A ${gap} pts del #${i}`}</span>
               </span>
               <span className="text-right w-20 flex-shrink-0">
                 <span className="block text-2xl font-bold leading-none" style={{ color: scoreColor(b.score) }}>{b.score}</span>
-                <span className="block text-[10.5px] text-slate-400 mt-0.5">pts</span>
+                <span className="block text-[10.5px] text-slate-500 mt-0.5">pts</span>
               </span>
             </button>
           );
@@ -161,7 +161,7 @@ export function RankingPage() {
           <button key={bg.key} onClick={() => setSel(bg.winner)} className="flex items-center gap-3 text-left bg-white border border-slate-200 rounded-xl shadow-card px-4 py-3 hover:border-brand-300">
             <span className="text-2xl flex-shrink-0">🏅</span>
             <span className="min-w-0">
-              <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">{bg.label}</span>
+              <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{bg.label}</span>
               <span className="block text-sm font-semibold text-slate-800 truncate">{bg.winner.name}</span>
               <span className="block text-xs text-slate-500">{bg.valueText}</span>
             </span>
@@ -170,7 +170,7 @@ export function RankingPage() {
       </div>
 
       {/* Movimientos de liga */}
-      <p className="text-sm font-semibold text-slate-700 mb-2.5 mt-6">Movimientos de liga <span className="font-normal text-slate-400">vs {PREV_SEASON_NAME}</span></p>
+      <p className="text-sm font-semibold text-slate-700 mb-2.5 mt-6">Movimientos de liga <span className="font-normal text-slate-500">vs {PREV_SEASON_NAME}</span></p>
       <Card className="mb-6">
         <CardBody className="space-y-2.5">
           {[...buyers].sort((a, b) => b.score - a.score).map((b) => {
@@ -213,7 +213,7 @@ export function RankingPage() {
                 </div>
                 <p className="text-sm font-semibold text-slate-800 mt-1.5">{r.title}</p>
                 <p className="text-xs text-slate-500">{r.reward}</p>
-                <p className="text-[11px] text-slate-400 mt-1">{critLabel(r.criterion)}</p>
+                <p className="text-[11px] text-slate-500 mt-1">{critLabel(r.criterion)}</p>
                 {w && (
                   <button onClick={() => setSel(w)} className="flex items-center gap-2 mt-3 pt-2.5 border-t border-slate-100 w-full text-left">
                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${BUYER_TONE_AV[w.tone]}`}>{w.initials}</span>
@@ -234,13 +234,13 @@ export function RankingPage() {
           return (
             <Card key={s.id}>
               <CardBody>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{s.name}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{s.name}</p>
                 <div className="flex items-center gap-2.5 mt-2">
                   <span className="text-xl">🥇</span>
                   {champ && <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${BUYER_TONE_AV[champ.tone]}`}>{champ.initials}</span>}
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-800 truncate">{champ?.name}</p>
-                    <p className="text-[11px] text-slate-400">Campeón · {s.championScore} pts</p>
+                    <p className="text-[11px] text-slate-500">Campeón · {s.championScore} pts</p>
                   </div>
                 </div>
                 <div className="flex gap-1.5 mt-3">

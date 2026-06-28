@@ -20,7 +20,7 @@ const dotTone = {
 /** Historial de actividad / auditoría básica en formato línea de tiempo. */
 export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-slate-400 py-4 text-center">Sin actividad registrada.</p>;
+    return <p className="text-sm text-slate-500 py-4 text-center">Sin actividad registrada.</p>;
   }
 
   return (
@@ -37,7 +37,7 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
           />
           <div className="flex items-baseline justify-between gap-2">
             <p className="text-sm font-medium text-slate-800">{it.title}</p>
-            <span className="text-xs text-slate-400 flex-shrink-0">{formatDate(it.date)}</span>
+            <span className="text-xs text-slate-500 flex-shrink-0">{formatDate(it.date)}</span>
           </div>
           {it.description && (
             <p className="text-xs text-slate-500 mt-0.5 leading-snug">{it.description}</p>

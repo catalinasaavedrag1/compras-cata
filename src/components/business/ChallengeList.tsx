@@ -30,7 +30,7 @@ export function ChallengeList({ items, meId }: { items: Challenge[]; meId?: stri
                 </div>
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-xs font-semibold text-slate-700">{c.progress}% · {c.targetText}</span>
-                  <span className="text-[11px] text-slate-400">{ends}</span>
+                  <span className="text-[11px] text-slate-500">{ends}</span>
                 </div>
               </CardBody>
             </Card>
@@ -56,7 +56,7 @@ export function ChallengeList({ items, meId }: { items: Challenge[]; meId?: stri
                     </div>
                     {aWin && <span className="ml-auto text-[10px] font-bold text-emerald-600">LIDERA</span>}
                   </div>
-                  <span className="text-[11px] font-bold text-slate-400 flex-shrink-0">VS</span>
+                  <span className="text-[11px] font-bold text-slate-500 flex-shrink-0">VS</span>
                   <div className={`flex-1 flex items-center gap-2.5 rounded-lg px-3 py-2 ${!aWin ? "bg-emerald-50" : "bg-slate-50"}`}>
                     <Avatar id={c.bId} size="w-8 h-8" />
                     <div className="min-w-0">
@@ -66,7 +66,7 @@ export function ChallengeList({ items, meId }: { items: Challenge[]; meId?: stri
                     {!aWin && <span className="ml-auto text-[10px] font-bold text-emerald-600">LIDERA</span>}
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-2 text-right">{c.metric} · {ends}</p>
+                <p className="text-[11px] text-slate-500 mt-2 text-right">{c.metric} · {ends}</p>
               </CardBody>
             </Card>
           );
@@ -95,7 +95,7 @@ export function ChallengeList({ items, meId }: { items: Challenge[]; meId?: stri
               </div>
               <div className="flex items-center justify-between mt-1.5">
                 <span className="text-xs font-semibold text-slate-700">{c.weeks}/{c.goalWeeks} semanas</span>
-                <span className="text-[11px] text-slate-400">{ends}</span>
+                <span className="text-[11px] text-slate-500">{ends}</span>
               </div>
             </CardBody>
           </Card>

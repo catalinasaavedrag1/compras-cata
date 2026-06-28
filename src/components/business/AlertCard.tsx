@@ -49,7 +49,7 @@ export function AlertCard({
           </div>
           <div className="flex items-center gap-2">
             <StatusBadge kind="alert" value={alert.status} dot={false} />
-            <span className="text-xs text-slate-400">{formatDate(alert.date)}</span>
+            <span className="text-xs text-slate-500">{formatDate(alert.date)}</span>
           </div>
         </div>
 
@@ -79,7 +79,7 @@ export function AlertCard({
         )}
 
         <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-slate-500">
             Responsable: {alert.responsible}
           </span>
           {(onReview || onResolve) &&

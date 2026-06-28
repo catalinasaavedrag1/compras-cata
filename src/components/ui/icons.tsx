@@ -203,3 +203,46 @@ export const IconCart = base(
     <path d="M2 3h2l2.4 12.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L21 7H5.2" />
   </>
 );
+
+// Desempeño / score (medalla): cómo voy.
+export const IconTrophy = base(
+  <>
+    <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z" />
+    <path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" />
+  </>
+);
+
+// Anticipación / adelantarse en el tiempo (calendario con flecha).
+export const IconAnticipate = base(
+  <>
+    <rect x="3" y="4" width="18" height="17" rx="2" />
+    <path d="M3 9h18M8 2v4M16 2v4" />
+    <path d="M9 15l2.5 2.5L16 13" />
+  </>
+);
+
+// Racionalizar surtido / podar redundancia (tijeras).
+export const IconScissors = base(
+  <>
+    <circle cx="6" cy="6" r="2.5" />
+    <circle cx="6" cy="18" r="2.5" />
+    <path d="M8 7.5 20 18M8 16.5 20 6" />
+  </>
+);
+
+// Recepciones / en camino (camión).
+export const IconTruck = base(
+  <>
+    <path d="M3 6h11v9H3zM14 9h4l3 3v3h-7z" />
+    <circle cx="7" cy="18" r="1.6" />
+    <circle cx="17" cy="18" r="1.6" />
+  </>
+);
+
+// Precio / margen (etiqueta).
+export const IconTag = base(
+  <>
+    <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" />
+    <circle cx="7.5" cy="7.5" r="1.4" fill="currentColor" stroke="none" />
+  </>
+);

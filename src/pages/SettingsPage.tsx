@@ -119,7 +119,7 @@ export function SettingsPage() {
       render: ({ r }) => (
         <div className="text-sm">
           <p className="text-slate-700">{affectedCount(r)} SKU</p>
-          <p className="text-xs text-slate-400">{formatCurrencyCompact(affectedPurchase(r))}</p>
+          <p className="text-xs text-slate-500">{formatCurrencyCompact(affectedPurchase(r))}</p>
         </div>
       ),
     },
@@ -201,9 +201,9 @@ export function SettingsPage() {
                     <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                    <div><p className="text-xs text-slate-400">Días obj.</p><p className="text-slate-700">{formatDays(r.targetInventoryDays)}</p></div>
-                    <div><p className="text-xs text-slate-400">Mín/Máx</p><p className="text-slate-700">{formatNumber(r.minStock)}/{formatNumber(r.maxStock)}</p></div>
-                    <div><p className="text-xs text-slate-400">Lead</p><p className="text-slate-700">{formatDays(r.leadTimeDays)}</p></div>
+                    <div><p className="text-xs text-slate-500">Días obj.</p><p className="text-slate-700">{formatDays(r.targetInventoryDays)}</p></div>
+                    <div><p className="text-xs text-slate-500">Mín/Máx</p><p className="text-slate-700">{formatNumber(r.minStock)}/{formatNumber(r.maxStock)}</p></div>
+                    <div><p className="text-xs text-slate-500">Lead</p><p className="text-slate-700">{formatDays(r.leadTimeDays)}</p></div>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">{affectedCount(r)} SKU · {formatCurrencyCompact(affectedPurchase(r))} compra sugerida</p>
                   <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar regla</Button>

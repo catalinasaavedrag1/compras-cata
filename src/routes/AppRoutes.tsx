@@ -42,7 +42,7 @@ const WorkloadPage = lazy(() => named(import("../pages/WorkloadPage"), "Workload
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center py-24 text-sm text-slate-400">
+    <div className="flex items-center justify-center py-24 text-sm text-slate-500">
       Cargando…
     </div>
   );

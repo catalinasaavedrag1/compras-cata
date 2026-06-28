@@ -78,7 +78,7 @@ export function TeamAlertsPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <Badge tone={sev.tone}>Severidad {sev.label}</Badge>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{TYPE_LABEL[a.type]}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{TYPE_LABEL[a.type]}</span>
                   <span className="text-xs text-slate-300">·</span>
                   <span className="text-xs font-medium text-slate-500">{a.buyer ?? "Área"}</span>
                 </div>
@@ -90,7 +90,7 @@ export function TeamAlertsPage() {
                 </div>
               </div>
               <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Acción</span>
+                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">Acción</span>
                 <Button size="sm" onClick={() => handle(a)} icon={<IconArrowRight className="w-3.5 h-3.5" />}>{a.action}</Button>
               </div>
             </Card>

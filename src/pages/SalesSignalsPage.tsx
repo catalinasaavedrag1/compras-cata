@@ -374,7 +374,7 @@ export function SalesSignalsPage() {
           <div className="space-y-3 lg:max-h-[74vh] lg:overflow-y-auto no-scrollbar lg:pr-1">
             {groupByTime(filtered).map((bucket) => (
               <div key={bucket.key}>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-1 mb-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 px-1 mb-1.5">
                   {bucket.label}
                 </p>
                 <div className="space-y-1.5">
@@ -455,7 +455,7 @@ function MiniBar({
     <div>
       <p className="text-xs font-semibold text-slate-600 mb-2">{title}</p>
       {items.length === 0 ? (
-        <p className="text-xs text-slate-400">{empty}</p>
+        <p className="text-xs text-slate-500">{empty}</p>
       ) : (
         <BarList items={items} />
       )}
@@ -520,7 +520,7 @@ function SignalRow({
         {unread && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" title="Sin revisar" />}
         {mine && <Badge tone="violet">Para mí</Badge>}
         <div className="flex-1" />
-        <span className="text-xs text-slate-400 flex-shrink-0">{fmtDate(signal.date)}</span>
+        <span className="text-xs text-slate-500 flex-shrink-0">{fmtDate(signal.date)}</span>
       </div>
       <p className={cn("text-sm truncate", unread ? "font-semibold text-slate-900" : "font-medium text-slate-700")}>
         {signal.productName}
@@ -530,7 +530,7 @@ function SignalRow({
         <Badge tone={status.tone} dot>
           {status.label}
         </Badge>
-        <span className="text-xs text-slate-400 truncate">
+        <span className="text-xs text-slate-500 truncate">
           {SIGNAL_CHANNEL[signal.channel]} · {signal.store}
         </span>
       </div>

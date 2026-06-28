@@ -101,14 +101,14 @@ export function MyPerformancePage() {
             <div className="w-32 h-32 rounded-full flex items-center justify-center" style={{ background: `conic-gradient(${scoreColor(me.score)} ${deg}deg, #eef2f7 0)` }}>
               <div className="w-24 h-24 rounded-full bg-white flex flex-col items-center justify-center">
                 <span className="text-3xl font-bold leading-none" style={{ color: scoreColor(me.score) }}>{me.score}</span>
-                <span className="text-[11px] text-slate-400">/ 100</span>
+                <span className="text-[11px] text-slate-500">/ 100</span>
               </div>
             </div>
             <Badge tone={league.tone} className="mt-3">Nivel {league.name}</Badge>
             <p className="text-xs font-semibold mt-1.5" style={{ color: trendColor(me.trend) }}>{trendText(me.trend)} vs semana anterior</p>
             {next && (
               <div className="w-full mt-3">
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1"><span>{league.name}</span><span>{next.name}</span></div>
+                <div className="flex justify-between text-[11px] text-slate-500 mb-1"><span>{league.name}</span><span>{next.name}</span></div>
                 <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(6, ((me.score - league.min) / (next.min - league.min)) * 100))}%`, background: league.color }} />
                 </div>
@@ -121,9 +121,9 @@ export function MyPerformancePage() {
 
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-3 gap-3">
-            <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Tu posición</p><p className="text-3xl font-bold text-brand-700 mt-1">#{pos}</p><p className="text-[11px] text-slate-400">de {agg.n} compradores</p></CardBody></Card>
-            <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Percentil</p><p className="text-3xl font-bold text-slate-700 mt-1">{percentile}</p><p className="text-[11px] text-slate-400">vs carga similar</p></CardBody></Card>
-            <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Cumpl. metas</p><p className="text-3xl font-bold text-emerald-700 mt-1">{me.goalComp}%</p><p className="text-[11px] text-slate-400">objetivos del mes</p></CardBody></Card>
+            <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Tu posición</p><p className="text-3xl font-bold text-brand-700 mt-1">#{pos}</p><p className="text-[11px] text-slate-500">de {agg.n} compradores</p></CardBody></Card>
+            <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Percentil</p><p className="text-3xl font-bold text-slate-700 mt-1">{percentile}</p><p className="text-[11px] text-slate-500">vs carga similar</p></CardBody></Card>
+            <Card><CardBody className="text-center py-4"><p className="text-xs text-slate-500">Cumpl. metas</p><p className="text-3xl font-bold text-emerald-700 mt-1">{me.goalComp}%</p><p className="text-[11px] text-slate-500">objetivos del mes</p></CardBody></Card>
           </div>
           {/* Encuadre positivo */}
           <Card>
@@ -175,7 +175,7 @@ export function MyPerformancePage() {
         <Card>
           <CardBody>
             <p className="text-sm font-semibold text-slate-800 mb-1">Cómo subir mi score</p>
-            <p className="text-xs text-slate-400 mb-3">Foco en tus dimensiones más débiles, ordenadas por impacto.</p>
+            <p className="text-xs text-slate-500 mb-3">Foco en tus dimensiones más débiles, ordenadas por impacto.</p>
             <div className="space-y-2.5">
               {improvements.map((imp) => (
                 <div key={imp.label} className="flex items-start gap-3 border border-slate-100 rounded-lg px-3 py-2.5">
@@ -192,9 +192,9 @@ export function MyPerformancePage() {
         <Card>
           <CardBody>
             <p className="text-sm font-semibold text-slate-800 mb-1">Tus reconocimientos</p>
-            <p className="text-xs text-slate-400 mb-3">Insignias que lideras este mes.</p>
+            <p className="text-xs text-slate-500 mb-3">Insignias que lideras este mes.</p>
             {myBadges.length === 0 ? (
-              <p className="text-sm text-slate-400">Aún no lideras ninguna insignia. Revisa "Cómo subir mi score" para acercarte.</p>
+              <p className="text-sm text-slate-500">Aún no lideras ninguna insignia. Revisa "Cómo subir mi score" para acercarte.</p>
             ) : (
               <div className="space-y-2">
                 {myBadges.map((bg) => (
@@ -227,7 +227,7 @@ export function MyPerformancePage() {
         <Card>
           <CardBody>
             <p className="text-sm font-semibold text-slate-800 mb-1">Premios en juego</p>
-            <p className="text-xs text-slate-400 mb-3">Definidos por tu líder este mes.</p>
+            <p className="text-xs text-slate-500 mb-3">Definidos por tu líder este mes.</p>
             <div className="space-y-2">
               {rewardsInPlay.map(({ reward, winner, iWin }) => (
                 <div key={reward.id} className={`rounded-lg border px-3 py-2 ${iWin ? "border-emerald-200 bg-emerald-50/60" : "border-slate-100"}`}>
@@ -238,7 +238,7 @@ export function MyPerformancePage() {
                       <span className="block text-xs text-slate-500">{reward.reward}</span>
                     </span>
                   </div>
-                  <p className={`text-[11px] mt-1 ${iWin ? "text-emerald-700 font-semibold" : "text-slate-400"}`}>
+                  <p className={`text-[11px] mt-1 ${iWin ? "text-emerald-700 font-semibold" : "text-slate-500"}`}>
                     {iWin ? "¡Lo vas ganando tú!" : `Va ganando: ${winner?.name ?? "—"}`}
                   </p>
                 </div>
@@ -262,7 +262,7 @@ export function MyPerformancePage() {
         <Card>
           <CardBody>
             <p className="text-sm font-semibold text-slate-800">Ranking del equipo</p>
-            <p className="text-[11px] text-slate-400 mb-3">Anonimizado — solo ves tu posición y el resto resumido.</p>
+            <p className="text-[11px] text-slate-500 mb-3">Anonimizado — solo ves tu posición y el resto resumido.</p>
             <div className="space-y-1.5">
               {sorted.map((b, i) => {
                 const isMe = b.id === me.id;

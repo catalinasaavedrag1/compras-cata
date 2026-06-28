@@ -30,7 +30,7 @@ export function BuyersPage() {
                 <span className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${BUYER_TONE_AV[b.tone]}`}>{b.initials}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[15px] font-semibold text-slate-800">{b.name}</p>
-                  <p className="text-xs text-slate-400 truncate">{b.categories.join(" · ")}</p>
+                  <p className="text-xs text-slate-500 truncate">{b.categories.join(" · ")}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="text-2xl font-bold leading-none" style={{ color: scoreColor(b.score) }}>{b.score}</p>
@@ -42,10 +42,10 @@ export function BuyersPage() {
                 <Badge tone={wl.tone}>Carga {wl.label}</Badge>
               </div>
               <div className="grid grid-cols-4 gap-2 border-t border-slate-100 pt-3">
-                <div><p className="text-base font-semibold text-slate-800">{b.fillRate}%</p><p className="text-[10.5px] text-slate-400">Fill Rate</p></div>
-                <div><p className="text-base font-semibold text-rose-700">{b.stockouts}</p><p className="text-[10.5px] text-slate-400">Quiebres</p></div>
-                <div><p className="text-base font-semibold text-amber-700">{b.pending}</p><p className="text-[10.5px] text-slate-400">Pendientes</p></div>
-                <div><p className="text-base font-semibold text-rose-600">{b.alerts}</p><p className="text-[10.5px] text-slate-400">Alertas</p></div>
+                <div><p className="text-base font-semibold text-slate-800">{b.fillRate}%</p><p className="text-[10.5px] text-slate-500">Fill Rate</p></div>
+                <div><p className="text-base font-semibold text-rose-700">{b.stockouts}</p><p className="text-[10.5px] text-slate-500">Quiebres</p></div>
+                <div><p className="text-base font-semibold text-amber-700">{b.pending}</p><p className="text-[10.5px] text-slate-500">Pendientes</p></div>
+                <div><p className="text-base font-semibold text-rose-600">{b.alerts}</p><p className="text-[10.5px] text-slate-500">Alertas</p></div>
               </div>
             </button>
           );

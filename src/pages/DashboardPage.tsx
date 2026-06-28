@@ -318,7 +318,7 @@ export function DashboardPage() {
                   className="block rounded-lg border border-slate-200 p-2.5 hover:border-brand-300 hover:bg-brand-50/40"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-mono text-slate-400">{r.sku}</span>
+                    <span className="text-xs font-mono text-slate-500">{r.sku}</span>
                     <PriorityBadge priority={r.priority} />
                   </div>
                   <p className="text-sm font-medium text-slate-800 truncate mt-0.5">{r.productName}</p>

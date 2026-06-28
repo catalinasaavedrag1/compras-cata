@@ -24,7 +24,7 @@ export function BottomSheet({ open, onClose, title, children, footer }: BottomSh
           <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+            className="text-slate-500 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
             aria-label="Cerrar"
           >
             <IconClose className="w-5 h-5" />

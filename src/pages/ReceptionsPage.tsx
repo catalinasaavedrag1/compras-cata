@@ -150,7 +150,7 @@ export function ReceptionsPage() {
         <div className="min-w-[160px]">
           <p className="font-medium text-slate-800">{r.poNumber}</p>
           <p className="text-xs text-slate-500">{r.supplierName}</p>
-          <p className="text-xs text-slate-400">{scope === "todos" ? r.buyer : r.warehouse}</p>
+          <p className="text-xs text-slate-500">{scope === "todos" ? r.buyer : r.warehouse}</p>
         </div>
       ),
     },
@@ -161,7 +161,7 @@ export function ReceptionsPage() {
       render: (r) => (
         <div className="text-sm">
           <p className="text-slate-700">{formatDate(r.expectedDate)}</p>
-          <p className="text-xs text-slate-400">{r.receivedDate ? `recibida ${formatDate(r.receivedDate)}` : "pendiente"}</p>
+          <p className="text-xs text-slate-500">{r.receivedDate ? `recibida ${formatDate(r.receivedDate)}` : "pendiente"}</p>
         </div>
       ),
     },
@@ -280,7 +280,7 @@ export function ReceptionsPage() {
                 <Card className="mb-4">
                   <div className="px-4 py-3 border-b border-slate-100">
                     <p className="text-sm font-semibold text-slate-800">Responsables de reordenar</p>
-                    <p className="text-xs text-slate-400">Encargados de compra con SKUs sin reponer por incumplimiento del proveedor.</p>
+                    <p className="text-xs text-slate-500">Encargados de compra con SKUs sin reponer por incumplimiento del proveedor.</p>
                   </div>
                   <div className="divide-y divide-slate-50">
                     {byBuyer.map(([bName, lines]) => (
@@ -293,7 +293,7 @@ export function ReceptionsPage() {
                         <ul className="mt-1.5 space-y-1">
                           {lines.map(({ r, it, missing }) => (
                             <li key={`${r.id}-${it.sku}`} className="flex items-center justify-between gap-2 text-xs">
-                              <span className="min-w-0 truncate text-slate-600"><b className="font-medium text-slate-800">{it.productName}</b> <span className="text-slate-400">· {r.supplierName}</span></span>
+                              <span className="min-w-0 truncate text-slate-600"><b className="font-medium text-slate-800">{it.productName}</b> <span className="text-slate-500">· {r.supplierName}</span></span>
                               <span className="text-rose-600 font-medium flex-shrink-0">faltan {formatNumber(missing)}</span>
                             </li>
                           ))}
@@ -325,7 +325,7 @@ export function ReceptionsPage() {
                             <div key={`${r.id}-${it.sku}`} className="flex items-center gap-3 px-4 py-3">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs font-mono text-slate-400">{it.sku}</span>
+                                  <span className="text-xs font-mono text-slate-500">{it.sku}</span>
                                   <Badge tone={st.tone}>{st.label}</Badge>
                                   {scope === "todos" && <span className="text-[11px] text-slate-500">resp. <b className="text-slate-700">{r.buyer}</b></span>}
                                 </div>
@@ -376,9 +376,9 @@ export function ReceptionsPage() {
                       <Badge tone={RECEPTION_STATUS[r.status].tone} dot>{RECEPTION_STATUS[r.status].label}</Badge>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                      <div><p className="text-xs text-slate-400">Esperada</p><p className="text-slate-700">{formatDate(r.expectedDate)}</p></div>
-                      <div><p className="text-xs text-slate-400">Recepción</p><p className="text-slate-700">{formatPercent(p, 0)}</p></div>
-                      <div><p className="text-xs text-slate-400">Calidad</p><p className={r.qualityOk ? "text-emerald-600" : "text-rose-600"}>{r.qualityOk ? "Conforme" : "Observada"}</p></div>
+                      <div><p className="text-xs text-slate-500">Esperada</p><p className="text-slate-700">{formatDate(r.expectedDate)}</p></div>
+                      <div><p className="text-xs text-slate-500">Recepción</p><p className="text-slate-700">{formatPercent(p, 0)}</p></div>
+                      <div><p className="text-xs text-slate-500">Calidad</p><p className={r.qualityOk ? "text-emerald-600" : "text-rose-600"}>{r.qualityOk ? "Conforme" : "Observada"}</p></div>
                     </div>
                     {miss.length > 0 && ARRIVED.includes(r.status) && (
                       <p className="text-xs text-rose-600 mt-1.5 font-medium">{miss.length} SKU{miss.length === 1 ? "" : "s"} sin despachar · toca para ver</p>
@@ -424,9 +424,9 @@ function ReceptionDetail({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
-        <div><p className="text-xs text-slate-400">Esperada</p><p className="text-sm font-medium text-slate-800">{formatDate(detail.expectedDate)}</p></div>
-        <div><p className="text-xs text-slate-400">Recibida</p><p className="text-sm font-medium text-slate-800">{detail.receivedDate ? formatDate(detail.receivedDate) : "Pendiente"}</p></div>
-        <div><p className="text-xs text-slate-400">Estado</p><Badge tone={RECEPTION_STATUS[detail.status].tone} dot>{RECEPTION_STATUS[detail.status].label}</Badge></div>
+        <div><p className="text-xs text-slate-500">Esperada</p><p className="text-sm font-medium text-slate-800">{formatDate(detail.expectedDate)}</p></div>
+        <div><p className="text-xs text-slate-500">Recibida</p><p className="text-sm font-medium text-slate-800">{detail.receivedDate ? formatDate(detail.receivedDate) : "Pendiente"}</p></div>
+        <div><p className="text-xs text-slate-500">Estado</p><Badge tone={RECEPTION_STATUS[detail.status].tone} dot>{RECEPTION_STATUS[detail.status].label}</Badge></div>
       </div>
 
       {/* Rendimiento del proveedor */}
@@ -436,9 +436,9 @@ function ReceptionDetail({
           <Badge tone={perf.tone}>{perf.ratingLabel}</Badge>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center">
-          <div><p className="text-lg font-bold text-slate-800">{perf.fillRate}%</p><p className="text-[10.5px] text-slate-400">Despacho completo</p></div>
-          <div><p className="text-lg font-bold text-slate-800">{perf.compliance !== null ? `${perf.compliance}%` : "—"}</p><p className="text-[10.5px] text-slate-400">Entrega a tiempo</p></div>
-          <div><p className="text-lg font-bold text-rose-600">{perf.undeliveredSkus}</p><p className="text-[10.5px] text-slate-400">SKUs sin despachar (hist.)</p></div>
+          <div><p className="text-lg font-bold text-slate-800">{perf.fillRate}%</p><p className="text-[10.5px] text-slate-500">Despacho completo</p></div>
+          <div><p className="text-lg font-bold text-slate-800">{perf.compliance !== null ? `${perf.compliance}%` : "—"}</p><p className="text-[10.5px] text-slate-500">Entrega a tiempo</p></div>
+          <div><p className="text-lg font-bold text-rose-600">{perf.undeliveredSkus}</p><p className="text-[10.5px] text-slate-500">SKUs sin despachar (hist.)</p></div>
         </div>
         {perf.tone !== "green" && (
           <p className="text-[11px] text-amber-700 mt-2">⚠ Este proveedor no cumple siempre: despachó el {perf.fillRate}% de lo pedido en {perf.arrivedOrders} recepciones. Considera proveedor alternativo para SKUs críticos.</p>
@@ -450,7 +450,7 @@ function ReceptionDetail({
       <div>
         <p className="text-xs font-semibold text-slate-700 mb-2">Detalle por producto ({(detail.items ?? []).length})</p>
         {(detail.items ?? []).length === 0 ? (
-          <p className="text-sm text-slate-400">Esta recepción no tiene desglose por SKU.</p>
+          <p className="text-sm text-slate-500">Esta recepción no tiene desglose por SKU.</p>
         ) : (
           <div className="space-y-2">
             {(detail.items ?? []).map((it) => {
@@ -461,7 +461,7 @@ function ReceptionDetail({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-800 leading-snug">{it.productName}</p>
-                      <p className="text-xs text-slate-400 font-mono">{it.sku}</p>
+                      <p className="text-xs text-slate-500 font-mono">{it.sku}</p>
                     </div>
                     <Badge tone={st.tone}>{st.label}</Badge>
                   </div>

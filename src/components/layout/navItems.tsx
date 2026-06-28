@@ -11,8 +11,12 @@ import {
   IconRules,
   IconCampaign,
   IconCheck,
-  IconBulb,
   IconSignal,
+  IconTrophy,
+  IconAnticipate,
+  IconScissors,
+  IconTruck,
+  IconTag,
 } from "../ui/icons";
 import type { Role } from "../../context/RoleContext";
 
@@ -39,7 +43,7 @@ export const compradorGroups: NavGroup[] = [
     items: [
       { to: "/", label: "Dashboard", icon: IconDashboard, end: true, hint: "Resumen del día y qué revisar primero" },
       { to: "/mi-panel", label: "Mi panel", icon: IconCheck, hint: "Mis tareas, categorías, riesgos de quiebre y proveedores" },
-      { to: "/mi-desempeno", label: "Mi desempeño", icon: IconBulb, hint: "Tu score, metas y posición frente al equipo" },
+      { to: "/mi-desempeno", label: "Mi desempeño", icon: IconTrophy, hint: "Tu score, metas y posición frente al equipo" },
       { to: "/alertas", label: "Alertas", icon: IconAlerts, hint: "Problemas que requieren atención del comprador" },
       { to: "/senales-ventas", label: "Señales de ventas", icon: IconSignal, hint: "Lo que ventas detecta en el terreno: quiebres, demanda y oportunidades" },
     ],
@@ -49,9 +53,9 @@ export const compradorGroups: NavGroup[] = [
     items: [
       { to: "/reposicion", label: "Reposición", icon: IconReplenish, hint: "Qué comprar, cuánto y por qué" },
       { to: "/campanas", label: "Campañas", icon: IconCampaign, hint: "Productos en descuento, presupuesto por canal y espacios publicitarios" },
-      { to: "/campanas-oportunidades", label: "Oportunidades", icon: IconBulb, hint: "Anticipar compras para campañas, liquidaciones y crecimiento" },
+      { to: "/campanas-oportunidades", label: "Anticipación", icon: IconAnticipate, hint: "Anticipar compras para campañas, liquidaciones y crecimiento" },
       { to: "/ordenes-compra", label: "Órdenes", icon: IconOrders, hint: "Seguimiento de OC y creación desde sugerencias" },
-      { to: "/recepciones", label: "Recepciones", icon: IconInventory, hint: "Qué viene en camino, qué llegó y cómo llegó" },
+      { to: "/recepciones", label: "Recepciones", icon: IconTruck, hint: "Qué viene en camino, qué llegó y cómo llegó" },
     ],
   },
   {
@@ -60,7 +64,7 @@ export const compradorGroups: NavGroup[] = [
       { to: "/productos", label: "Productos", icon: IconProducts, hint: "Maestro de productos del surtido" },
       { to: "/categorias", label: "Categorías", icon: IconCategories, hint: "Salud comercial por categoría" },
       { to: "/proveedores", label: "Proveedores", icon: IconSuppliers, hint: "Cumplimiento, lead time y proveedores a revisar" },
-      { to: "/catalogo-optimizado", label: "Catálogo optimizado", icon: IconBulb, hint: "Productos redundantes por subcategoría para racionalizar el surtido" },
+      { to: "/catalogo-optimizado", label: "Catálogo optimizado", icon: IconScissors, hint: "Productos redundantes por subcategoría para racionalizar el surtido" },
     ],
   },
   {
@@ -68,7 +72,7 @@ export const compradorGroups: NavGroup[] = [
     items: [
       { to: "/inventario", label: "Inventario", icon: IconInventory, hint: "Capital inmovilizado, sobrestock y quiebres" },
       { to: "/ventas", label: "Ventas", icon: IconSales, hint: "Qué se vende, qué crece y qué cae" },
-      { to: "/margen-canal", label: "Margen por canal", icon: IconSales, hint: "Precio y margen por marketplace, web y tienda" },
+      { to: "/margen-canal", label: "Margen por canal", icon: IconTag, hint: "Precio y margen por marketplace, web y tienda" },
     ],
   },
   {

@@ -15,7 +15,7 @@ const KIND_CFG: Record<FeedKind, { icon: string; bg: string; fg: string }> = {
 
 export function CompetitionFeed({ items, meId }: { items: FeedItem[]; meId?: string }) {
   if (items.length === 0) {
-    return <p className="text-sm text-slate-400">Sin novedades por ahora.</p>;
+    return <p className="text-sm text-slate-500">Sin novedades por ahora.</p>;
   }
   return (
     <div className="space-y-2">
@@ -32,7 +32,7 @@ export function CompetitionFeed({ items, meId }: { items: FeedItem[]; meId?: str
               </span>
             </span>
             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] flex-shrink-0 ${cfg.bg} ${cfg.fg}`}>{cfg.icon}</span>
-            <span className="text-[11px] text-slate-400 flex-shrink-0 w-12 text-right">{it.time}</span>
+            <span className="text-[11px] text-slate-500 flex-shrink-0 w-12 text-right">{it.time}</span>
           </div>
         );
       })}

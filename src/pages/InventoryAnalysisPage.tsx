@@ -57,7 +57,7 @@ export function InventoryAnalysisPage() {
       header: "Producto",
       render: (p) => (
         <Link to={`/productos/${p.sku}`} className="block hover:text-brand-700">
-          <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+          <span className="text-xs font-mono text-slate-500">{p.sku}</span>
           <p className="font-medium text-slate-800">{p.name}</p>
         </Link>
       ),
@@ -150,7 +150,7 @@ export function InventoryAnalysisPage() {
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+                  <span className="text-xs font-mono text-slate-500">{p.sku}</span>
                   <p className="font-medium text-slate-800 truncate">{p.name}</p>
                   <p className="text-xs text-slate-500">Disp. {formatNumber(p.availableStock)} · {formatNumber(p.inventoryDays)} días inv.</p>
                 </div>
@@ -219,7 +219,7 @@ function ListCard({
             </Link>
           ))
         ) : (
-          <p className="text-sm text-slate-400 py-3 text-center">Sin productos en esta categoría.</p>
+          <p className="text-sm text-slate-500 py-3 text-center">Sin productos en esta categoría.</p>
         )}
       </CardBody>
     </Card>

@@ -38,7 +38,7 @@ export function Toaster() {
           </div>
           <button
             onClick={() => dismiss(t.id)}
-            className="text-slate-400 hover:text-slate-600 flex-shrink-0"
+            className="text-slate-500 hover:text-slate-600 flex-shrink-0"
             aria-label="Cerrar notificación"
           >
             <IconClose className="w-3.5 h-3.5" />

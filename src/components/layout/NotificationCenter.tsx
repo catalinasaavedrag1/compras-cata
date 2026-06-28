@@ -37,7 +37,7 @@ export function NotificationCenter() {
           <IconArrowRight className="w-5 h-5 rotate-180" />
         </button>
         <p className="flex-1 min-w-0 text-sm font-semibold text-slate-800">
-          Notificaciones {unreadCount > 0 && <span className="text-slate-400 font-normal">({unreadCount} sin leer)</span>}
+          Notificaciones {unreadCount > 0 && <span className="text-slate-500 font-normal">({unreadCount} sin leer)</span>}
         </p>
         {unreadCount > 0 && (
           <button
@@ -72,7 +72,7 @@ export function NotificationCenter() {
                   <span className="text-sm font-medium text-slate-800 truncate">{n.title}</span>
                 </span>
                 <span className="block text-xs text-slate-500 mt-0.5 leading-snug line-clamp-2">{n.message}</span>
-                <span className="block text-[11px] text-slate-400 mt-0.5">{formatDate(n.date)}</span>
+                <span className="block text-[11px] text-slate-500 mt-0.5">{formatDate(n.date)}</span>
               </span>
             </button>
           ))

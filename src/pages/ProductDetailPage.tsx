@@ -235,7 +235,7 @@ export function ProductDetailPage() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex gap-2.5 rounded-lg border-l-2 border-slate-300 bg-slate-50 px-3 py-2">
-                      <IconInfo className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                      <IconInfo className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
                       <p className="text-sm text-slate-700">
                         <span className="font-medium text-slate-500">Motivo: </span>
                         {rec.reason}
@@ -279,7 +279,7 @@ export function ProductDetailPage() {
                   <div className="bg-emerald-500 h-full" style={{ width: `${(loc.available / Math.max(loc.stock, 1)) * 100}%` }} />
                   <div className="bg-amber-400 h-full" style={{ width: `${(loc.committed / Math.max(loc.stock, 1)) * 100}%` }} />
                 </div>
-                <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+                <div className="flex justify-between text-xs text-slate-500 mt-0.5">
                   <span>Disp. {formatNumber(loc.available)}</span>
                   <span>Comp. {formatNumber(loc.committed)}</span>
                 </div>
@@ -314,16 +314,16 @@ export function ProductDetailPage() {
                 <div key={h.number} className="flex items-center justify-between text-sm py-1.5 border-b border-slate-50 last:border-0">
                   <div>
                     <p className="font-medium text-slate-700">{h.number}</p>
-                    <p className="text-xs text-slate-400">{formatDate(h.date)}</p>
+                    <p className="text-xs text-slate-500">{formatDate(h.date)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-slate-700">{formatNumber(h.qty)} u.</p>
-                    <p className="text-xs text-slate-400">{formatCurrency(h.cost)} c/u</p>
+                    <p className="text-xs text-slate-500">{formatCurrency(h.cost)} c/u</p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-400 py-4 text-center">Sin compras recientes registradas.</p>
+              <p className="text-sm text-slate-500 py-4 text-center">Sin compras recientes registradas.</p>
             )}
           </CardBody>
         </Card>
@@ -336,10 +336,10 @@ export function ProductDetailPage() {
               <div key={c.date} className="flex items-center justify-between text-sm py-1.5 border-b border-slate-50 last:border-0">
                 <div>
                   <p className="font-medium text-slate-700">{formatCurrency(c.cost)}</p>
-                  <p className="text-xs text-slate-400">{c.note}</p>
+                  <p className="text-xs text-slate-500">{c.note}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-400">{formatDate(c.date)}</p>
+                  <p className="text-xs text-slate-500">{formatDate(c.date)}</p>
                   {i === 0 && <Badge tone="green">Vigente</Badge>}
                 </div>
               </div>
@@ -550,9 +550,9 @@ function NStat({ label, value, tone, sub }: { label: string; value: string; tone
   const c = tone === "bad" ? "text-rose-700" : tone === "warn" ? "text-amber-700" : tone === "good" ? "text-emerald-700" : "text-slate-800";
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-      <p className="text-xs text-slate-400">{label}</p>
+      <p className="text-xs text-slate-500">{label}</p>
       <p className={`text-lg font-semibold ${c}`}>{value}</p>
-      {sub && <p className="text-[11px] text-slate-400 leading-tight">{sub}</p>}
+      {sub && <p className="text-[11px] text-slate-500 leading-tight">{sub}</p>}
     </div>
   );
 }
@@ -681,7 +681,7 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
           <CardHeader title="Proveedores alternativos" description="Tu poder de negociación: no dependes de uno solo" />
           <CardBody>
             {alternativas.length === 0 ? (
-              <p className="text-sm text-slate-400">No hay proveedores alternativos para esta categoría.</p>
+              <p className="text-sm text-slate-500">No hay proveedores alternativos para esta categoría.</p>
             ) : (
               <div className="space-y-2">
                 {alternativas.map((s) => {
@@ -690,7 +690,7 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
                     <Link key={s.id} to={`/proveedores/${s.id}`} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
                       <span className="flex-1 min-w-0">
                         <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
-                        <span className="block text-xs text-slate-400">lead {formatDays(s.averageLeadTimeDays)} · cumple {formatPercent(s.deliveryCompliance, 0)} · fill {f.arrivedOrders > 0 ? `${f.fillRate}%` : "s/d"}</span>
+                        <span className="block text-xs text-slate-500">lead {formatDays(s.averageLeadTimeDays)} · cumple {formatPercent(s.deliveryCompliance, 0)} · fill {f.arrivedOrders > 0 ? `${f.fillRate}%` : "s/d"}</span>
                       </span>
                       <Badge tone={s.deliveryCompliance >= 85 ? "green" : s.deliveryCompliance >= 70 ? "amber" : "red"}>{s.deliveryCompliance >= 85 ? "Buena opción" : "Revisar"}</Badge>
                     </Link>

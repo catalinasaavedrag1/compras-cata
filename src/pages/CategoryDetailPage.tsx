@@ -88,7 +88,7 @@ export function CategoryDetailPage() {
               catProducts.map((p) => (
                 <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
                   <div className="min-w-0">
-                    <span className="text-xs font-mono text-slate-400">{p.sku}</span>
+                    <span className="text-xs font-mono text-slate-500">{p.sku}</span>
                     <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
                     <p className="text-xs text-slate-500">disp. {formatNumber(p.availableStock)} · vende {formatNumber(p.salesLast30Days)}/mes · margen {formatPercent(p.margin)}</p>
                   </div>

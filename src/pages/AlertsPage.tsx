@@ -45,7 +45,6 @@ export function AlertsPage() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState("");
   const [severity, setSeverity] = useState("");
-  const [responsible, setResponsible] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileDetail, setMobileDetail] = useState(false);
 
@@ -64,13 +63,8 @@ export function AlertsPage() {
 
   // Filtrado por la barra de filtros (sin la pestaña): controla KPIs y conteos
   const byFilters = useMemo(
-    () => filterAlerts(alerts, { query, type, severity }).filter((a) => !responsible || a.responsible === responsible),
-    [alerts, query, type, severity, responsible]
-  );
-
-  const responsibles = useMemo(
-    () => Array.from(new Set(seedAlerts.map((a) => a.responsible))).sort((x, y) => x.localeCompare(y, "es")),
-    []
+    () => filterAlerts(alerts, { query, type, severity }),
+    [alerts, query, type, severity]
   );
 
   const counts = useMemo(
@@ -142,7 +136,7 @@ export function AlertsPage() {
           searchPlaceholder="Buscar por producto, proveedor o SKU"
           resultCount={byFilters.length}
           summary={`${byFilters.length} alerta${byFilters.length === 1 ? "" : "s"} · ${highCount} alta severidad · ${counts.in_review} en revisión`}
-          onClear={() => { setQuery(""); setType(""); setSeverity(""); setResponsible(""); }}
+          onClear={() => { setQuery(""); setType(""); setSeverity(""); }}
           selects={[
             {
               key: "severity",
@@ -162,22 +156,17 @@ export function AlertsPage() {
               onChange: setType,
               options: Object.entries(ALERT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
             },
-            {
-              key: "responsible",
-              placeholder: "Responsable",
-              value: responsible,
-              onChange: setResponsible,
-              options: responsibles.map((r) => ({ value: r, label: r })),
-            },
           ]}
         />
       </div>
 
+      {/* KPIs de lectura: resumen del estado. Para segmentar se usan las
+          pestañas de abajo (único modelo de segmentación), no estas tarjetas. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Alertas activas" value={formatNumber(counts.active)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} description="Ver activas" active={tab === "active"} onClick={() => setTab("active")} />
-        <KpiCard title="Severidad alta" value={formatNumber(highCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Filtrar alta" active={severity === "high"} onClick={() => { setSeverity("high"); setTab("active"); }} />
-        <KpiCard title="En revisión" value={formatNumber(counts.in_review)} tone="info" icon={<IconAlerts className="w-4 h-4" />} description="Ver en revisión" active={tab === "in_review"} onClick={() => setTab("in_review")} />
-        <KpiCard title="Resueltas" value={formatNumber(counts.resolved)} tone="good" icon={<IconAlerts className="w-4 h-4" />} description="Ver resueltas" active={tab === "resolved"} onClick={() => setTab("resolved")} />
+        <KpiCard title="Alertas activas" value={formatNumber(counts.active)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} description="Nuevas + en revisión" />
+        <KpiCard title="Severidad alta" value={formatNumber(highCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Entre las activas" />
+        <KpiCard title="En revisión" value={formatNumber(counts.in_review)} tone="info" icon={<IconAlerts className="w-4 h-4" />} description="En curso" />
+        <KpiCard title="Resueltas" value={formatNumber(counts.resolved)} tone="good" icon={<IconAlerts className="w-4 h-4" />} description="Cerradas" />
       </div>
 
       <div className="mb-4">
@@ -209,7 +198,7 @@ export function AlertsPage() {
           <div className="space-y-3 lg:max-h-[72vh] lg:overflow-y-auto no-scrollbar lg:pr-1">
             {groupByTime(filtered).map((bucket) => (
               <div key={bucket.key}>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-1 mb-1.5">{bucket.label}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 px-1 mb-1.5">{bucket.label}</p>
                 <div className="space-y-1.5">
                   {bucket.items.map((a) => (
                     <AlertRow
@@ -315,7 +304,7 @@ function AlertRow({
         <Badge tone={type.tone}>{type.label}</Badge>
         {unread && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" title="No leída" />}
         <div className="flex-1" />
-        <span className="text-xs text-slate-400 flex-shrink-0">{formatDate(alert.date)}</span>
+        <span className="text-xs text-slate-500 flex-shrink-0">{formatDate(alert.date)}</span>
       </div>
       <p className={cn("text-sm truncate", unread ? "font-semibold text-slate-900" : "font-medium text-slate-700")}>{alert.relatedEntity}</p>
       <p className="text-xs text-slate-500 line-clamp-2">{alert.description}</p>
@@ -354,7 +343,7 @@ function AlertDetail({
           <span className="text-xs font-medium text-slate-500">{ALERT_TYPE_LABELS[alert.type]}</span>
           <div className="flex-1" />
           <StatusBadge kind="alert" value={alert.status} dot={false} />
-          <span className="text-xs text-slate-400">{formatDate(alert.date)}</span>
+          <span className="text-xs text-slate-500">{formatDate(alert.date)}</span>
         </div>
 
         {alert.relatedSku ? (
@@ -378,9 +367,8 @@ function AlertDetail({
         </div>
 
         <div className="mt-4 pt-3 border-t border-slate-100">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Detalle</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Detalle</p>
           <div className="space-y-1 text-sm">
-            <div className="flex justify-between gap-2"><span className="text-slate-500">Responsable</span><span className="text-slate-700">{alert.responsible}</span></div>
             <div className="flex justify-between gap-2"><span className="text-slate-500">Fecha</span><span className="text-slate-700">{formatDate(alert.date)}</span></div>
             {alert.relatedSku && <div className="flex justify-between gap-2"><span className="text-slate-500">SKU</span><span className="font-mono text-slate-700">{alert.relatedSku}</span></div>}
           </div>

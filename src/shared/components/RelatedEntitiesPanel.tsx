@@ -58,7 +58,7 @@ export function RelatedEntitiesPanel({ entities }: { entities: EntityRef[] }) {
         const Icon = ENTITY_ICON[g.type];
         return (
           <div key={g.type}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
               {entityTypeLabel(g.type)}
             </p>
             <div className="space-y-1.5">
@@ -68,7 +68,7 @@ export function RelatedEntitiesPanel({ entities }: { entities: EntityRef[] }) {
                   to={e.route}
                   className="group flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40 transition-colors"
                 >
-                  <Icon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <Icon className="w-4 h-4 text-slate-500 flex-shrink-0" />
                   <span className="text-sm font-medium text-slate-800 truncate flex-1">
                     {e.displayName}
                   </span>

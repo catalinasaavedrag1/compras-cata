@@ -190,7 +190,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
             <p className="text-xs font-medium text-slate-500">
               Reportado por {signal.reportedBy}
             </p>
-            <span className="text-xs text-slate-400">{fmtDateTime(signal.date)}</span>
+            <span className="text-xs text-slate-500">{fmtDateTime(signal.date)}</span>
           </div>
           <p className="text-sm text-slate-700 mt-1">{signal.comment}</p>
         </div>
@@ -231,7 +231,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
 
         {/* Datos de apoyo simulados */}
         <div className="mt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
             Datos de apoyo para decidir
           </p>
           <div className="grid grid-cols-3 gap-2">
@@ -354,12 +354,12 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
 
         {/* Conversación comprador ↔ vendedor */}
         <div className="mt-4 pt-3 border-t border-slate-100">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1">
             <IconChat className="w-3.5 h-3.5" /> Conversación con ventas
           </p>
           <div className="space-y-2 max-h-52 overflow-y-auto no-scrollbar pr-1">
             {signal.messages.length === 0 ? (
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Aún no hay mensajes. Escríbele al vendedor para coordinar.
               </p>
             ) : (
@@ -381,7 +381,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
                   >
                     {m.text}
                   </div>
-                  <span className="text-[10px] text-slate-400 mt-0.5 px-1">
+                  <span className="text-[10px] text-slate-500 mt-0.5 px-1">
                     {m.author} · {fmtDateTime(m.date)}
                   </span>
                 </div>
@@ -409,7 +409,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
           <button
             type="button"
             onClick={() => setShowHistory((v) => !v)}
-            className="text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600"
+            className="text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-600"
           >
             {showHistory ? "− Ocultar" : "+ Ver"} historial ({signal.timeline.length})
           </button>
@@ -421,7 +421,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
                   <li key={ev.id} className="relative">
                     <span className="absolute -left-[15px] top-1 w-2 h-2 rounded-full bg-slate-300" />
                     <p className="text-sm text-slate-700">{ev.text}</p>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-slate-500">
                       {ev.actor} · {fmtDateTime(ev.date)}
                     </p>
                   </li>

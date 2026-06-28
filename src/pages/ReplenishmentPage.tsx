@@ -6,7 +6,6 @@ import { Card } from "../components/ui/Card";
 import { DataTable, type Column, type SortState } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 import { RecommendationBadge } from "../components/business/RecommendationBadge";
-import { PriorityBadge } from "../components/business/PriorityBadge";
 import { StateLegend } from "../components/business/StateLegend";
 import { recommendationUrgency, priorityUrgency } from "../components/business/statusInfo";
 import { Button } from "../components/ui/Button";
@@ -21,7 +20,6 @@ import { suppliers } from "../data/mockSuppliers";
 import { monthlyPurchaseBudget } from "../data/mockRules";
 import { filterRecommendations, uniqueValues } from "../utils/filters";
 import { coverageDays, coverageSentence } from "../utils/calculations";
-import { cn } from "../utils/cn";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -245,14 +243,11 @@ export function ReplenishmentPage() {
       render: (r) => (
         <div className="min-w-[200px]">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-slate-400">{r.sku}</span>
-            <span className="text-xs text-slate-400">{r.brand}</span>
+            <span className="text-xs font-mono text-slate-500">{r.sku}</span>
+            <span className="text-xs text-slate-500">{r.brand}</span>
           </div>
           <p className="font-medium text-slate-800 leading-snug">{r.productName}</p>
           <p className="text-xs text-slate-500">{r.category}</p>
-          <p className={cn("text-xs mt-0.5 leading-snug", coverageToneText(r))}>
-            {coverageSentence(r.availableStock, r.salesLast30Days)}
-          </p>
         </div>
       ),
     },
@@ -263,7 +258,7 @@ export function ReplenishmentPage() {
       render: (r) => (
         <div className="text-sm">
           <p className="text-slate-700">{r.supplierName}</p>
-          <p className="text-xs text-slate-400">Lead time {r.supplierLeadTimeDays} d</p>
+          <p className="text-xs text-slate-500">Lead time {r.supplierLeadTimeDays} d</p>
         </div>
       ),
     },
@@ -279,7 +274,7 @@ export function ReplenishmentPage() {
           <p className={r.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>
             {formatNumber(r.availableStock)}
           </p>
-          <p className="text-xs text-slate-400">comp. {formatNumber(r.committedStock)}</p>
+          <p className="text-xs text-slate-500">comp. {formatNumber(r.committedStock)}</p>
         </div>
       ),
     },
@@ -301,7 +296,7 @@ export function ReplenishmentPage() {
       render: (r) => (
         <div className="text-sm">
           <p className="text-slate-700">{formatNumber(r.salesLast30Days)}</p>
-          <p className="text-xs text-slate-400">{formatNumber(r.salesLast90Days)} (90d)</p>
+          <p className="text-xs text-slate-500">{formatNumber(r.salesLast90Days)} (90d)</p>
         </div>
       ),
     },
@@ -322,7 +317,7 @@ export function ReplenishmentPage() {
             {r.suggestedQuantity > 0 ? (
               <p className="text-xs text-emerald-600">para ~{coverAfter} días</p>
             ) : (
-              <p className="text-xs text-slate-400">{formatCurrency(r.unitCost)} c/u</p>
+              <p className="text-xs text-slate-500">{formatCurrency(r.unitCost)} c/u</p>
             )}
           </div>
         );
@@ -354,17 +349,24 @@ export function ReplenishmentPage() {
       ),
     },
     {
-      key: "priority",
-      header: "Prioridad",
-      align: "center",
-      sortable: true,
-      sortValue: (r) => ({ high: 0, medium: 1, low: 2 })[r.priority],
-      render: (r) => <PriorityBadge priority={r.priority} />,
-    },
-    {
       key: "status",
       header: "Acción",
       render: (r) => <RecommendationBadge status={r.status} />,
+    },
+    {
+      // Prioridad baja a texto secundario neutro: la urgencia ya la comunica
+      // el badge de Acción (señal primaria) y el fondo rojo de lo crítico.
+      key: "priority",
+      header: "Prioridad",
+      align: "right",
+      hideOnMobile: true,
+      sortable: true,
+      sortValue: (r) => ({ high: 0, medium: 1, low: 2 })[r.priority],
+      render: (r) => (
+        <span className="text-sm text-slate-600">
+          {{ high: "Alta", medium: "Media", low: "Baja" }[r.priority]}
+        </span>
+      ),
     },
     {
       key: "reason",
@@ -471,7 +473,7 @@ export function ReplenishmentPage() {
               <span className="text-2xl font-semibold text-slate-900">
                 {formatCurrency(totalSuggested)}
               </span>
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-slate-500">
                 de {formatCurrencyCompact(monthlyPurchaseBudget)}
               </span>
             </div>
@@ -491,7 +493,7 @@ export function ReplenishmentPage() {
                 style={{ width: `${Math.min(100, budgetUsedPct)}%` }}
               />
             </div>
-            <p className="text-xs text-slate-400 mt-1.5">
+            <p className="text-xs text-slate-500 mt-1.5">
               Suma de la reposición recomendada vigente (excluye sugerencias ignoradas). Ajusta cantidades para encajar en presupuesto.
             </p>
           </div>
@@ -501,19 +503,21 @@ export function ReplenishmentPage() {
         </div>
       </Card>
 
-      {/* Cards resumen */}
+      {/* Cards resumen (lectura). Para segmentar la tabla se usan las pestañas
+          de Foco de abajo — único modelo de segmentación; estas tarjetas no
+          actúan como un segundo set de filtros que compite con ellas. */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-        <KpiCard title="Compra sugerida total" value={formatCurrencyCompact(totalSuggested)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Ver urgentes" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
-        <KpiCard title="SKUs críticos" value={formatNumber(criticalCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Comprar de inmediato" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
-        <KpiCard title="Para comprar ahora" value={formatNumber(buyNowCount)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Stock bajo vs lead time" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
-        <KpiCard title="Con sobrestock" value={formatNumber(overstockCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="No conviene comprar" active={foco === "overstock"} onClick={() => setFoco("overstock")} />
-        <KpiCard title="Con margen bajo" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Margen menor a 25%" active={toggles.lowMargin} onClick={() => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin }))} />
+        <KpiCard title="Compra sugerida total" value={formatCurrencyCompact(totalSuggested)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Del mes vigente" />
+        <KpiCard title="SKUs críticos" value={formatNumber(criticalCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Comprar de inmediato" />
+        <KpiCard title="Para comprar ahora" value={formatNumber(buyNowCount)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Stock bajo vs lead time" />
+        <KpiCard title="Con sobrestock" value={formatNumber(overstockCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="No conviene comprar" />
+        <KpiCard title="Con margen bajo" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Margen menor a 25%" />
       </div>
 
       {/* Ayuda breve + leyenda de estados (colapsable) */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1">
-          <IconInfo className="w-3.5 h-3.5 text-slate-400" />
+          <IconInfo className="w-3.5 h-3.5 text-slate-500" />
           La cantidad sugerida cubre lead time + días objetivo. <b className="font-medium text-slate-600">"para ~N días"</b> = cobertura tras comprar.
         </span>
         {overstockSavings > 0 && (
@@ -659,7 +663,7 @@ export function ReplenishmentPage() {
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{r.sku}</span>
+                  <span className="text-xs font-mono text-slate-500">{r.sku}</span>
                   <p className="font-medium text-slate-800 leading-snug">{r.productName}</p>
                   <p className="text-xs text-slate-500">{r.category} · {r.supplierName}</p>
                 </div>
@@ -667,19 +671,19 @@ export function ReplenishmentPage() {
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
                 <div>
-                  <p className="text-xs text-slate-400">Stock disp.</p>
+                  <p className="text-xs text-slate-500">Stock disp.</p>
                   <p className={r.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(r.availableStock)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Sugerido</p>
+                  <p className="text-xs text-slate-500">Sugerido</p>
                   <p className="font-semibold text-slate-900">{formatNumber(r.suggestedQuantity)} u.</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Compra</p>
+                  <p className="text-xs text-slate-500">Compra</p>
                   <p className="font-semibold text-slate-900">{formatCurrency(r.suggestedPurchaseAmount)}</p>
                 </div>
               </div>
-              <p className={cn("text-xs mt-1.5 leading-snug font-medium", coverageToneText(r))}>
+              <p className="text-xs mt-1.5 leading-snug text-slate-600">
                 {coverageSentence(r.availableStock, r.salesLast30Days)}
               </p>
               <p className="text-xs text-slate-500 mt-0.5 leading-snug">{r.reason}</p>
@@ -754,41 +758,20 @@ export function ReplenishmentPage() {
   );
 }
 
-/** Color de la frase de cobertura según urgencia frente al lead time. */
-function coverageToneText(rec: PurchaseRecommendation): string {
-  if (rec.salesLast30Days <= 0) return "text-slate-400";
-  const cover = coverageDays(rec.availableStock, rec.salesLast30Days);
-  const lead = rec.supplierLeadTimeDays;
-  if (rec.availableStock <= 0 || cover <= lead) return "text-rose-600";
-  if (cover <= lead * 2) return "text-amber-600";
-  return "text-emerald-600";
-}
-
-/** Celda de cobertura en días con barra y color según el lead time. */
+/** Celda de cobertura en días, como texto secundario neutro. La urgencia ya
+ *  la comunica el badge de Acción y el fondo de las filas críticas, así que
+ *  aquí no repetimos el semáforo de color (ver T4 de la auditoría). */
 function CoverageCell({ rec }: { rec: PurchaseRecommendation }) {
   const cover = coverageDays(rec.availableStock, rec.salesLast30Days);
-  const lead = rec.supplierLeadTimeDays;
 
   // Sin venta: no aplica cobertura por riesgo de quiebre
   if (rec.salesLast30Days <= 0) {
-    return <span className="text-xs text-slate-400">sin venta</span>;
+    return <span className="text-xs text-slate-500">sin venta</span>;
   }
 
-  const tone =
-    cover <= lead ? "rose" : cover <= lead * 2 ? "amber" : "emerald";
-  const toneText = { rose: "text-rose-600", amber: "text-amber-600", emerald: "text-emerald-600" };
-  const toneBar = { rose: "bg-rose-500", amber: "bg-amber-500", emerald: "bg-emerald-500" };
-  // Escala visual sobre 60 días
-  const pct = Math.min(100, (cover / 60) * 100);
-
   return (
-    <div className="inline-flex flex-col items-end gap-1 min-w-[64px]">
-      <span className={`text-sm font-medium ${toneText[tone]}`}>
-        {cover >= 999 ? "+999" : formatNumber(cover)} d
-      </span>
-      <div className="h-1.5 w-16 rounded-full bg-slate-100 overflow-hidden">
-        <div className={`h-full rounded-full ${toneBar[tone]}`} style={{ width: `${Math.max(4, pct)}%` }} />
-      </div>
-    </div>
+    <span className="text-sm text-slate-600">
+      {cover >= 999 ? "+999" : formatNumber(cover)} d
+    </span>
   );
 }

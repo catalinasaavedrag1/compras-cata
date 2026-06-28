@@ -85,7 +85,7 @@ export function GoalsPage() {
             const color = LEVEL_COLOR[lvl.label];
             return (
               <div key={b.id} className="flex items-center gap-3">
-                <span className="w-6 text-center text-sm font-bold text-slate-400 flex-shrink-0">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
+                <span className="w-6 text-center text-sm font-bold text-slate-500 flex-shrink-0">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
                 <span className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${BUYER_TONE_AV[b.tone]}`}>{b.initials}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -143,7 +143,7 @@ export function GoalsPage() {
                       <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${BUYER_TONE_AV[b.tone]}`}>{b.initials}</span>
                       <span className="text-sm font-semibold text-slate-800 truncate">{b.name}</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">#{i + 1} de {ranking.length} · {i > 0 ? `a ${distance} pts del #${i}` : "lidera el equipo"}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">#{i + 1} de {ranking.length} · {i > 0 ? `a ${distance} pts del #${i}` : "lidera el equipo"}</p>
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <Badge tone={lvl.tone}>{lvl.label}</Badge>
                       <Badge tone={st.tone}>{st.label}</Badge>
@@ -177,13 +177,13 @@ export function GoalsPage() {
                             <div className="h-full rounded-full" style={{ width: `${g.pct}%`, background: goalBar(g.pct) }} />
                           </div>
                           <span className="text-[11px] font-semibold text-slate-600 w-16 text-right">{g.current}/{g.target}</span>
-                          <span className="text-[11px] text-slate-400 w-20 text-right">peso {g.weight}%{impact > 0 ? ` · +${impact}` : ""}</span>
+                          <span className="text-[11px] text-slate-500 w-20 text-right">peso {g.weight}%{impact > 0 ? ` · +${impact}` : ""}</span>
                         </div>
                       </div>
                     );
                   })}
                   {doneCount > 0 && (
-                    <p className="text-[11px] text-slate-400 pt-0.5">✓ {doneCount} cumplida{doneCount === 1 ? "" : "s"}</p>
+                    <p className="text-[11px] text-slate-500 pt-0.5">✓ {doneCount} cumplida{doneCount === 1 ? "" : "s"}</p>
                   )}
                 </div>
               </CardBody>
