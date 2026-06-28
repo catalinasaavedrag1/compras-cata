@@ -256,26 +256,13 @@ export function SettingsPage() {
 
 function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; onClose: () => void; onSave: (r: PurchaseRule) => void }) {
   const [draft, setDraft] = useState<PurchaseRule | null>(null);
-  if (rule && (!draft || draft.id !== rule.id)) setDraft({ ...rule });
-  if (!rule || !draft) return null;
 
-  const set = (k: keyof PurchaseRule, v: number) => setDraft({ ...draft, [k]: v });
-  const errors: string[] = [];
-  if (draft.maxStock > 0 && draft.maxStock < draft.minStock) errors.push("El stock máximo no puede ser menor que el mínimo.");
-  if (draft.targetInventoryDays <= 0) errors.push("Los días objetivo deben ser mayores a 0.");
-  if (draft.minMargin < 0 || draft.minMargin > 80) errors.push("El margen mínimo debe estar entre 0 y 80%.");
-
-  const warnings: string[] = [];
-  if (draft.targetInventoryDays >= 55) warnings.push("Días objetivo altos: riesgo de sobrestock.");
-  if (draft.targetInventoryDays > 0 && draft.targetInventoryDays <= 20) warnings.push("Días objetivo bajos: riesgo de quiebre.");
-  if (draft.leadTimeDays >= 15) warnings.push("Lead time alto: comprar con más anticipación.");
-
-  const affected = affectedCount(draft);
-
-  // Simulación real: recalcula la compra sugerida de los SKUs afectados con
-  // los parámetros actuales de la regla vs. los del borrador, usando la misma
-  // fórmula del sistema. Permite ver el impacto antes de aplicar.
+  // Simulación real: recalcula la compra sugerida de los SKU afectados con los
+  // parámetros actuales de la regla vs. los del borrador, usando la misma
+  // fórmula del sistema. Permite ver el impacto antes de aplicar. Se declara
+  // antes de cualquier return temprano (regla de hooks); protege null.
   const sim = useMemo(() => {
+    if (!rule || !draft) return { before: 0, after: 0, delta: 0, pct: 0 };
     const prods = affectedProductsOf(draft);
     const purchaseWith = (p: PurchaseRule) =>
       prods.reduce((sum, prod) => {
@@ -297,6 +284,22 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
     const pct = before > 0 ? Math.round((after / before - 1) * 100) : after > 0 ? 100 : 0;
     return { before, after, delta, pct };
   }, [draft, rule]);
+
+  if (rule && (!draft || draft.id !== rule.id)) setDraft({ ...rule });
+  if (!rule || !draft) return null;
+
+  const set = (k: keyof PurchaseRule, v: number) => setDraft({ ...draft, [k]: v });
+  const errors: string[] = [];
+  if (draft.maxStock > 0 && draft.maxStock < draft.minStock) errors.push("El stock máximo no puede ser menor que el mínimo.");
+  if (draft.targetInventoryDays <= 0) errors.push("Los días objetivo deben ser mayores a 0.");
+  if (draft.minMargin < 0 || draft.minMargin > 80) errors.push("El margen mínimo debe estar entre 0 y 80%.");
+
+  const warnings: string[] = [];
+  if (draft.targetInventoryDays >= 55) warnings.push("Días objetivo altos: riesgo de sobrestock.");
+  if (draft.targetInventoryDays > 0 && draft.targetInventoryDays <= 20) warnings.push("Días objetivo bajos: riesgo de quiebre.");
+  if (draft.leadTimeDays >= 15) warnings.push("Lead time alto: comprar con más anticipación.");
+
+  const affected = affectedCount(draft);
   const deltaPct = sim.pct;
 
   return (
