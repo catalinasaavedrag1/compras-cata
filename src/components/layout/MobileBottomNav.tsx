@@ -9,8 +9,8 @@ import {
 } from "../ui/icons";
 
 const items = [
-  { to: "/", label: "Inicio", icon: IconDashboard, end: true },
-  { to: "/mi-panel", label: "Mi panel", icon: IconCheck },
+  { to: "/", label: "Mi jornada", icon: IconCheck, end: true },
+  { to: "/resumen", label: "Resumen", icon: IconDashboard },
   { to: "/reposicion", label: "Reposición", icon: IconReplenish },
   { to: "/alertas", label: "Alertas", icon: IconAlerts },
 ];

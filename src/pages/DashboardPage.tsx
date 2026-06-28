@@ -177,12 +177,12 @@ export function DashboardPage() {
   return (
     <div>
       <PageHeader
-        title="Dashboard de compras"
-        description="Tu portada de decisiones del día: qué está crítico, qué revisar primero, cuánta plata implica la compra sugerida y qué proveedores están fallando. Datos de ejemplo al 24/06/2026."
+        title="Resumen del área de compras"
+        description="Mirada agregada de toda el área: qué está crítico, cuánta plata implica la compra sugerida, qué proveedores están fallando y dónde se concentra la venta. Para tu trabajo del día, ve a Mi jornada. Datos de ejemplo al 24/06/2026."
         action={
-          <Link to="/mi-panel">
+          <Link to="/">
             <Button variant="secondary" icon={<IconCheck className="w-4 h-4" />}>
-              Ir a Mi panel
+              Ir a Mi jornada
             </Button>
           </Link>
         }

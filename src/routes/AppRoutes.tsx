@@ -59,8 +59,11 @@ export default function AppRoutes() {
         <Routes>
         <Route element={<AppLayout />}>
           <Route element={<Suspense fallback={<PageLoader />}><Outlet /></Suspense>}>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/mi-panel" element={<MyPanelPage />} />
+          {/* Una sola portada operativa del comprador: "Mi jornada" es el home.
+              El Dashboard queda como mirada agregada del área en /resumen. */}
+          <Route path="/" element={<MyPanelPage />} />
+          <Route path="/mi-panel" element={<Navigate to="/" replace />} />
+          <Route path="/resumen" element={<DashboardPage />} />
           <Route path="/mi-desempeno" element={<MyPerformancePage />} />
           <Route path="/equipo" element={<TeamDashboardPage />} />
           <Route path="/equipo/alertas" element={<TeamAlertsPage />} />

@@ -41,8 +41,8 @@ export const compradorGroups: NavGroup[] = [
   {
     title: "Inicio",
     items: [
-      { to: "/", label: "Dashboard", icon: IconDashboard, end: true, hint: "Resumen del día y qué revisar primero" },
-      { to: "/mi-panel", label: "Mi panel", icon: IconCheck, hint: "Mis tareas, categorías, riesgos de quiebre y proveedores" },
+      { to: "/", label: "Mi jornada", icon: IconCheck, end: true, hint: "Tu portada del día: qué hacer hoy, agenda y riesgos de tus categorías" },
+      { to: "/resumen", label: "Resumen del área", icon: IconDashboard, hint: "Mirada agregada de compras: KPIs, categorías, proveedores e inventario del área" },
       { to: "/mi-desempeno", label: "Mi desempeño", icon: IconTrophy, hint: "Tu score, metas y posición frente al equipo" },
       { to: "/alertas", label: "Alertas", icon: IconAlerts, hint: "Problemas que requieren atención del comprador" },
       { to: "/senales-ventas", label: "Señales de ventas", icon: IconSignal, hint: "Lo que ventas detecta en el terreno: quiebres, demanda y oportunidades" },

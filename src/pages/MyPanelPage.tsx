@@ -2,19 +2,13 @@ import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
-import { KpiCard } from "../components/business/KpiCard";
 import { DataTable, type Column } from "../components/ui/Table";
 import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { StatusBadge } from "../components/business/StatusBadge";
-import { PriorityGuide, type GuideStep } from "../components/business/PriorityGuide";
 import {
-  IconAlerts,
-  IconBox,
-  IconOrders,
-  IconSuppliers,
   IconReplenish,
   IconCheck,
   IconPlus,
@@ -142,8 +136,6 @@ export function MyPanelPage() {
       ["review", "delayed", "inactive"].includes(s.status)
   );
 
-  const noSupplierProducts = myProducts.filter((p) => !p.supplierName);
-
   // ---- Agenda por horizonte de tiempo ----
   const [horizon, setHorizon] = useState<"hoy" | "semana" | "mes" | "trimestre">("hoy");
   const daysTo = (iso: string) =>
@@ -242,50 +234,6 @@ export function MyPanelPage() {
   const ocPorLlegar = myOpenOrders.length;
   const criticalActions = quiebresHoy + myDelayedPOs.length + mySuppliersToReview.filter((s) => s.status === "delayed").length;
 
-  // Tareas consolidadas del comprador
-  const tasks: GuideStep[] = [
-    {
-      title: "Comprar productos en riesgo de quiebre",
-      detail: "SKUs sin stock o con cobertura menor al doble del lead time.",
-      count: riskRows.length,
-      countLabel: `${riskRows.length} productos`,
-      to: "#riesgo",
-      tone: "red",
-    },
-    {
-      title: "Seguir órdenes de compra sin recibir",
-      detail: "Mercadería que aún no llega. Revisa las atrasadas primero.",
-      count: myOpenOrders.length,
-      countLabel: `${myOpenOrders.length} órdenes`,
-      to: "#ordenes",
-      tone: myDelayedPOs.length > 0 ? "red" : "amber",
-    },
-    {
-      title: "Revisar proveedores con problemas",
-      detail: "Proveedores de mis categorías a revisar este mes.",
-      count: mySuppliersToReview.length,
-      countLabel: `${mySuppliersToReview.length} proveedores`,
-      to: "#proveedores",
-      tone: "amber",
-    },
-    {
-      title: "Gestionar sobrestock",
-      detail: "Inventario inmovilizado: liquidar o dejar de comprar.",
-      count: overstockProducts.length,
-      countLabel: `${overstockProducts.length} productos`,
-      to: "#sobrestock",
-      tone: "violet",
-    },
-    {
-      title: "Asignar proveedor a productos sin proveedor",
-      detail: "No se pueden reponer hasta tener proveedor.",
-      count: noSupplierProducts.length,
-      countLabel: `${noSupplierProducts.length} productos`,
-      to: "/productos?prov=&compra=",
-      tone: "neutral",
-    },
-  ];
-
   const riskColumns: Column<RiskRow>[] = [
     {
       key: "product",
@@ -378,13 +326,14 @@ export function MyPanelPage() {
         }
       />
 
-      {/* Resumen compacto del día (chips cliqueables) */}
+      {/* Resumen compacto del día (lectura). La navegación va por la agenda
+          de abajo; estos chips son un vistazo rápido de cuánto hay. */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-3 pb-0.5">
         <Chip tone="red" label={`${quiebresHoy} quiebres hoy`} onClick={() => { setHorizon("hoy"); }} />
-        <Chip tone="amber" label={`${riskRows.length} en riesgo`} to="#riesgo" />
-        <Chip tone="blue" label={`${ocPorLlegar} OC sin recibir`} to="#ordenes" />
-        <Chip tone="amber" label={`${mySuppliersToReview.length} proveedores`} to="#proveedores" />
-        <Chip tone="violet" label={`${overstockProducts.length} sobrestock`} to="#sobrestock" />
+        <Chip tone="amber" label={`${riskRows.length} en riesgo`} />
+        <Chip tone="blue" label={`${ocPorLlegar} OC sin recibir`} />
+        <Chip tone="amber" label={`${mySuppliersToReview.length} proveedores`} />
+        <Chip tone="violet" label={`${overstockProducts.length} sobrestock`} />
       </div>
 
       {/* Acción recomendada hoy */}
@@ -532,20 +481,15 @@ export function MyPanelPage() {
         </CardBody>
       </Card>
 
-      {/* KPIs de tareas (cliqueables) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="En riesgo de quiebre" value={formatNumber(riskRows.length)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Ver abajo" to="#riesgo" />
-        <KpiCard title="OC sin recibir" value={formatNumber(myOpenOrders.length)} tone={myDelayedPOs.length ? "bad" : "warn"} icon={<IconOrders className="w-4 h-4" />} description={`${myDelayedPOs.length} atrasadas`} to="#ordenes" />
-        <KpiCard title="Proveedores por revisar" value={formatNumber(mySuppliersToReview.length)} tone="warn" icon={<IconSuppliers className="w-4 h-4" />} description="Este mes" to="#proveedores" />
-        <KpiCard title="Con sobrestock" value={formatNumber(overstockProducts.length)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Capital inmovilizado" to="#sobrestock" />
-      </div>
-
-      {/* Todas mis tareas */}
-      <Card className="mb-5">
-        <CardHeader title="Todas mis tareas" description="Ordenadas por urgencia. Empieza por arriba." />
-        <PriorityGuide steps={tasks} />
-      </Card>
-
+      {/* Detalle y acciones por tipo — bajo demanda. La agenda de arriba ya
+          consolida estas mismas listas por fecha; aquí quedan plegadas para
+          quien quiera trabajarlas una por una (T3). */}
+      <details className="group mb-5">
+        <summary className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 list-none">
+          <span>Ver detalle y acciones por tipo — riesgo, OC, proveedores y sobrestock</span>
+          <IconChevronRight className="w-4 h-4 text-slate-500 transition-transform group-open:rotate-90" />
+        </summary>
+        <div className="pt-4">
       {/* Bloque inferior en 2 columnas (escritorio aprovecha el ancho) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
       <div className="lg:col-span-2 space-y-5">
@@ -676,6 +620,8 @@ export function MyPanelPage() {
       </div>
       </div>{/* fin columna derecha */}
       </div>{/* fin grid 2 columnas */}
+        </div>
+      </details>
     </div>
   );
 }
@@ -699,5 +645,6 @@ function Chip({
   }[tone];
   const cls = `whitespace-nowrap flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${toneClass}`;
   if (to) return <a href={to} className={cls}>{label}</a>;
-  return <button onClick={onClick} className={cls}>{label}</button>;
+  if (onClick) return <button onClick={onClick} className={cls}>{label}</button>;
+  return <span className={cls}>{label}</span>;
 }
