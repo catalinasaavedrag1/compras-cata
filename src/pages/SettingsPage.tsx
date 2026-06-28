@@ -13,7 +13,8 @@ import { useToast } from "../context/ToastContext";
 import { purchaseRules as seedRules, specialRules } from "../data/mockRules";
 import { products } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
-import { formatCurrencyCompact, formatDate, formatDays, formatNumber, formatPercent } from "../utils/formatters";
+import { calculateSuggestedPurchase } from "../utils/calculations";
+import { formatCurrency, formatCurrencyCompact, formatDate, formatDays, formatNumber, formatPercent } from "../utils/formatters";
 import { IconRules, IconAlerts, IconArrowRight } from "../components/ui/icons";
 import type { PurchaseRule } from "../types/purchasing";
 
@@ -270,7 +271,33 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
   if (draft.leadTimeDays >= 15) warnings.push("Lead time alto: comprar con más anticipación.");
 
   const affected = affectedCount(draft);
-  const deltaPct = rule.targetInventoryDays > 0 ? Math.round((draft.targetInventoryDays / rule.targetInventoryDays - 1) * 100) : 0;
+
+  // Simulación real: recalcula la compra sugerida de los SKUs afectados con
+  // los parámetros actuales de la regla vs. los del borrador, usando la misma
+  // fórmula del sistema. Permite ver el impacto antes de aplicar.
+  const sim = useMemo(() => {
+    const prods = affectedProductsOf(draft);
+    const purchaseWith = (p: PurchaseRule) =>
+      prods.reduce((sum, prod) => {
+        const qty = calculateSuggestedPurchase({
+          availableStock: prod.availableStock,
+          committedStock: prod.committedStock,
+          monthlySales: prod.salesLast30Days,
+          leadTimeDays: p.leadTimeDays,
+          targetInventoryDays: p.targetInventoryDays,
+          // Cota por los mín/máx propios del SKU (más realista que un clamp único).
+          minStock: prod.minStock,
+          maxStock: prod.maxStock,
+        }).suggestedQuantity;
+        return sum + qty * prod.cost;
+      }, 0);
+    const before = purchaseWith(rule);
+    const after = purchaseWith(draft);
+    const delta = after - before;
+    const pct = before > 0 ? Math.round((after / before - 1) * 100) : after > 0 ? 100 : 0;
+    return { before, after, delta, pct };
+  }, [draft, rule]);
+  const deltaPct = sim.pct;
 
   return (
     <Drawer
@@ -306,12 +333,15 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
         )}
 
         <div className="rounded-lg border border-slate-200 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Impacto estimado</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Simulación del impacto</p>
           <div className="space-y-1 text-sm">
             <Row label="SKU afectados" value={`${affected}`} />
-            <Row label="Cambio en compra sugerida" value={`${deltaPct >= 0 ? "+" : ""}${deltaPct}%`} tone={deltaPct > 0 ? "bad" : deltaPct < 0 ? "good" : undefined} />
+            <Row label="Compra sugerida actual" value={formatCurrency(sim.before)} />
+            <Row label="Compra sugerida simulada" value={formatCurrency(sim.after)} tone={sim.delta > 0 ? "bad" : sim.delta < 0 ? "good" : undefined} />
+            <Row label="Cambio" value={`${sim.delta >= 0 ? "+" : "−"}${formatCurrency(Math.abs(sim.delta))} (${deltaPct >= 0 ? "+" : ""}${deltaPct}%)`} tone={sim.delta > 0 ? "bad" : sim.delta < 0 ? "good" : undefined} />
             <Row label="Riesgo" value={deltaPct > 15 ? "Más capital / sobrestock" : deltaPct < -15 ? "Posible quiebre" : "Bajo"} />
           </div>
+          <p className="text-xs text-slate-500 mt-2">Recalculado con la fórmula del sistema sobre los SKU afectados. Aún no se aplica: revisa el impacto y luego guarda.</p>
         </div>
 
         <div className="flex items-center justify-between">

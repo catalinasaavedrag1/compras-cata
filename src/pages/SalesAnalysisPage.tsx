@@ -235,6 +235,13 @@ export function SalesAnalysisPage() {
 }
 
 function TrendList({ trends, positive }: { trends: typeof growingProducts; positive: boolean | null }) {
+  // "Qué hacer" según la tendencia: cierra el loop análisis → acción.
+  const action =
+    positive === null
+      ? "Planificar la compra de temporada con anticipación"
+      : positive
+      ? "Adelantar la compra si el stock no cubre el alza"
+      : "Evitar sobrecomprar; revisar inventario y sobrestock";
   return (
     <Card>
       <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -253,6 +260,9 @@ function TrendList({ trends, positive }: { trends: typeof growingProducts; posit
                 {p && cover !== null && cover < 999 && <> · cubre {formatDays(cover)}</>}
               </p>
               <p className="text-xs text-slate-500 mt-0.5">{t.note}</p>
+              <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-600">
+                {action} <IconArrowRight className="w-3.5 h-3.5" />
+              </span>
             </Link>
           );
         })}

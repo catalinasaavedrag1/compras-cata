@@ -21,7 +21,7 @@ import {
   formatCurrencyCompact,
   formatNumber,
 } from "../utils/formatters";
-import { IconInventory, IconBox, IconAlerts } from "../components/ui/icons";
+import { IconInventory, IconBox, IconAlerts, IconArrowRight } from "../components/ui/icons";
 import type { Product } from "../types/purchasing";
 
 const GROUP_TABS = [
@@ -95,7 +95,7 @@ export function InventoryAnalysisPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <KpiCard title="Inventario valorizado" value={formatCurrencyCompact(inventoryKpis.totalInventoryValue)} tone="info" icon={<IconInventory className="w-4 h-4" />} description={`${inventoryKpis.averageInventoryDays} días prom.`} />
         <KpiCard title="Sobrestock" value={formatCurrencyCompact(inventoryKpis.overstockValue)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Liberar capital" to="/reposicion?foco=overstock" />
-        <KpiCard title="Stock muerto" value={formatCurrencyCompact(inventoryKpis.deadStockValue)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Sin venta 90 días" />
+        <KpiCard title="Stock muerto" value={formatCurrencyCompact(inventoryKpis.deadStockValue)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Liquidar / descontinuar" to="/catalogo-optimizado" />
         <KpiCard title="SKUs con quiebre" value={formatNumber(inventoryKpis.stockoutSkus)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Ver sin stock" to="/productos?stock=1" />
       </div>
 
@@ -167,18 +167,24 @@ export function InventoryAnalysisPage() {
           subtitle="Stock sobre el máximo"
           products={overstock}
           tone="violet"
+          actionTo="/reposicion?foco=overstock"
+          actionLabel="Gestionar en reposición"
         />
         <ListCard
           title="Sin venta en 90 días"
           subtitle="Candidatos a stock muerto"
           products={noSales90}
           tone="amber"
+          actionTo="/catalogo-optimizado"
+          actionLabel="Evaluar liquidar / descontinuar"
         />
         <ListCard
           title="Stock crítico"
           subtitle="Quiebre con venta activa"
           products={criticalStock}
           tone="red"
+          actionTo="/reposicion?foco=urgent"
+          actionLabel="Comprar ahora"
         />
       </div>
     </div>
@@ -190,16 +196,27 @@ function ListCard({
   subtitle,
   products,
   tone,
+  actionTo,
+  actionLabel,
 }: {
   title: string;
   subtitle: string;
   products: Product[];
   tone: "violet" | "amber" | "red";
+  /** Acción de grupo: cierra el loop análisis → acción para este corte. */
+  actionTo?: string;
+  actionLabel?: string;
 }) {
   return (
     <Card>
       <CardHeader title={title} description={subtitle} action={<Badge tone={tone}>{products.length}</Badge>} />
       <CardBody className="space-y-2">
+        {actionTo && actionLabel && products.length > 0 && (
+          <Link to={actionTo} className="flex items-center justify-between gap-2 rounded-lg bg-brand-50/60 border border-brand-100 px-2.5 py-2 text-xs font-medium text-brand-700 hover:bg-brand-50">
+            <span>{actionLabel}</span>
+            <IconArrowRight className="w-4 h-4 flex-shrink-0" />
+          </Link>
+        )}
         {products.length > 0 ? (
           products.map((p) => (
             <Link
