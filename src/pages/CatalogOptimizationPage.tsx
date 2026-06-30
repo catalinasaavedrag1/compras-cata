@@ -25,8 +25,8 @@ export function CatalogOptimizationPage() {
   return (
     <div>
       <PageHeader
-        title="Catálogo optimizado"
-        description="Productos redundantes por subcategoría: SKUs que se solapan con uno mejor. Racionaliza el surtido y libera capital inmovilizado."
+        title="Surtido redundante"
+        description="Productos repetidos dentro de una misma subcategoría que puedes racionalizar: SKUs que se solapan con uno mejor. Libera capital inmovilizado."
         action={
           <Select
             aria-label="Filtrar por categoría"

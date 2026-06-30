@@ -43,8 +43,8 @@ export function LostOpportunitiesPage() {
   return (
     <div>
       <PageHeader
-        title="Oportunidades no capturadas"
-        description="Productos que vendían, quedaron sin stock y no se volvieron a comprar — mientras la categoría siguió vendiendo. Venta que se está perdiendo por no comprar, no por falta de demanda."
+        title="Venta no capturada"
+        description="Productos que vendían, quedaron sin stock y no se recompraron — mientras la categoría siguió vendiendo. Venta que se pierde por no reponer, no por falta de demanda."
       />
 
       <HelpNote className="mb-4">

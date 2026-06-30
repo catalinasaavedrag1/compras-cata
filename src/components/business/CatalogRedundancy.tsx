@@ -264,9 +264,11 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
         </div>
       )}
 
-      <HelpNote variant="tip" title="Cómo leerlo:">
-        Basta una opción por <strong>gama</strong> (económica, media, premium): se conserva la mejor de
-        cada una; las demás <strong>sobran</strong>.
+      <HelpNote variant="tip" title="¿Qué es “redundante”?">
+        Cuando dentro del mismo tipo de producto y <strong>gama de precio</strong> (económica, media, premium)
+        hay varias opciones, basta con la <strong>mejor por venta, rotación y margen</strong>. Las demás de esa
+        gama sobran: se sugiere <strong>liquidar</strong> (con stock) o <strong>descontinuar</strong> (sin ventas).
+        Si la mejor está marcada “no comprar”, se sugiere <strong>reactivarla</strong>.
       </HelpNote>
 
       {/* Filtros por acción + acciones (exportar / campaña de liquidación). */}

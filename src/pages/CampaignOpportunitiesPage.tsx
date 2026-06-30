@@ -404,8 +404,8 @@ export function CampaignOpportunitiesPage() {
   return (
     <div>
       <PageHeader
-        title="Campañas y oportunidades"
-        description="Analiza productos que irán a campañas comerciales, oportunidades de liquidación, crecimiento acelerado y riesgos de quiebre, y crea tus propias campañas con productos en descuento."
+        title="Anticipación de campañas"
+        description="Comprar antes del peak, liquidar y detectar crecimiento por canal: productos que irán a campañas, oportunidades de liquidación, crecimiento acelerado y riesgos de quiebre."
         action={
           <div className="flex flex-wrap gap-2">
             <ExportButton
