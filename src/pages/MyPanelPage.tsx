@@ -380,8 +380,8 @@ export function MyPanelPage() {
   return (
     <div>
       <PageHeader
-        title={`Mi jornada de compras · ${buyer}`}
-        description={criticalActions > 0 ? `Hoy tienes ${criticalActions} acción${criticalActions === 1 ? "" : "es"} crítica${criticalActions === 1 ? "" : "s"}.` : "Sin acciones críticas para hoy."}
+        title={`Hola, ${buyer}`}
+        description={`${formatDate(TODAY_ISO)} · ${criticalActions > 0 ? `Tienes ${criticalActions} acción${criticalActions === 1 ? "" : "es"} crítica${criticalActions === 1 ? "" : "s"} para hoy.` : "Sin acciones críticas para hoy."}`}
         action={
           <Button variant="secondary" onClick={() => navigate("/reposicion")} icon={<IconReplenish className="w-4 h-4" />}>
             Ir a reposición
@@ -481,7 +481,7 @@ export function MyPanelPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           {myLostOpps.length > 0 && (
             <Card>
-              <CardHeader title="Oportunidades no capturadas" description={`${formatCurrencyCompact(myLostRevenue)}/mes que dejas de vender por no reponer`} action={<Link to="/oportunidades-perdidas"><span className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver todas</span></Link>} />
+              <CardHeader title="Venta no capturada" description={`${formatCurrencyCompact(myLostRevenue)}/mes que dejas de vender por no reponer`} action={<Link to="/venta-no-capturada"><span className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver todas</span></Link>} />
               <CardBody className="space-y-1.5">
                 {myLostOpps.slice(0, 4).map((o) => (
                   <Link key={o.sku} to={`/productos/${o.sku}`} className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">

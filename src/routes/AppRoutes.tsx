@@ -18,9 +18,8 @@ import { RoleGate } from "../components/layout/RoleGate";
 const named = <T extends Record<string, unknown>, K extends keyof T>(p: Promise<T>, key: K) =>
   p.then((m) => ({ default: m[key] as unknown as React.ComponentType }));
 
-const DashboardPage = lazy(() => named(import("../pages/DashboardPage"), "DashboardPage"));
 const SalesSignalsPage = lazy(() => named(import("../pages/SalesSignalsPage"), "SalesSignalsPage"));
-const MyPanelPage = lazy(() => named(import("../pages/MyPanelPage"), "MyPanelPage"));
+const InicioPage = lazy(() => named(import("../pages/MyPanelPage"), "MyPanelPage"));
 const ReplenishmentPage = lazy(() => named(import("../pages/ReplenishmentPage"), "ReplenishmentPage"));
 const ProductsPage = lazy(() => named(import("../pages/ProductsPage"), "ProductsPage"));
 const ProductDetailPage = lazy(() => named(import("../pages/ProductDetailPage"), "ProductDetailPage"));
@@ -46,8 +45,7 @@ const RankingPage = lazy(() => named(import("../pages/RankingPage"), "RankingPag
 const GoalsPage = lazy(() => named(import("../pages/GoalsPage"), "GoalsPage"));
 const WorkloadPage = lazy(() => named(import("../pages/WorkloadPage"), "WorkloadPage"));
 const LostOpportunitiesPage = lazy(() => named(import("../pages/LostOpportunitiesPage"), "LostOpportunitiesPage"));
-const PurchaseQualityPage = lazy(() => named(import("../pages/PurchaseQualityPage"), "PurchaseQualityPage"));
-const DecisionsPage = lazy(() => named(import("../pages/DecisionsPage"), "DecisionsPage"));
+const AprendizajePage = lazy(() => named(import("../pages/AprendizajePage"), "AprendizajePage"));
 const ApprovalsPage = lazy(() => named(import("../pages/ApprovalsPage"), "ApprovalsPage"));
 
 function PageLoader() {
@@ -89,8 +87,9 @@ export default function AppRoutes() {
         <Route path="/login" element={<LoginGate />} />
         <Route element={<RequireAuth />}>
           <Route element={<Suspense fallback={<PageLoader />}><Outlet /></Suspense>}>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/mi-panel" element={<MyPanelPage />} />
+          {/* Inicio: una sola portada operativa (antes "Dashboard" + "Mi panel"). */}
+          <Route path="/" element={<InicioPage />} />
+          <Route path="/mi-panel" element={<Navigate to="/" replace />} />
           <Route path="/mi-desempeno" element={<MyPerformancePage />} />
           <Route path="/equipo" element={<RoleGate allow="lider"><TeamDashboardPage /></RoleGate>} />
           <Route path="/equipo/alertas" element={<RoleGate allow="lider"><TeamAlertsPage /></RoleGate>} />
@@ -100,19 +99,27 @@ export default function AppRoutes() {
           <Route path="/equipo/carga" element={<RoleGate allow="lider"><WorkloadPage /></RoleGate>} />
           <Route path="/reposicion" element={<ReplenishmentPage />} />
           <Route path="/campanas" element={<CampaignsPage />} />
-          <Route path="/campanas-oportunidades" element={<CampaignOpportunitiesPage />} />
+          {/* Renombrada: "Oportunidades" → "Anticipación de campañas". */}
+          <Route path="/anticipacion" element={<CampaignOpportunitiesPage />} />
+          <Route path="/campanas-oportunidades" element={<Navigate to="/anticipacion" replace />} />
           <Route path="/productos" element={<ProductsPage />} />
           <Route path="/productos/:sku" element={<ProductDetailPage />} />
           <Route path="/categorias" element={<CategoriesPage />} />
           <Route path="/categorias/:id" element={<CategoryDetailPage />} />
-          <Route path="/catalogo-optimizado" element={<CatalogOptimizationPage />} />
+          {/* Renombrada: "Catálogo optimizado" → "Surtido redundante". */}
+          <Route path="/surtido-redundante" element={<CatalogOptimizationPage />} />
+          <Route path="/catalogo-optimizado" element={<Navigate to="/surtido-redundante" replace />} />
           <Route path="/proveedores" element={<SuppliersPage />} />
           <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
           <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
-          <Route path="/calidad-compra" element={<PurchaseQualityPage />} />
           <Route path="/recepciones" element={<ReceptionsPage />} />
-          <Route path="/oportunidades-perdidas" element={<LostOpportunitiesPage />} />
-          <Route path="/decisiones" element={<DecisionsPage />} />
+          {/* Renombrada: "Oportunidades perdidas" → "Venta no capturada". */}
+          <Route path="/venta-no-capturada" element={<LostOpportunitiesPage />} />
+          <Route path="/oportunidades-perdidas" element={<Navigate to="/venta-no-capturada" replace />} />
+          {/* Fusión: "Calidad de compra" + "Historial de decisiones" → "Aprendizaje de compra". */}
+          <Route path="/aprendizaje" element={<AprendizajePage />} />
+          <Route path="/calidad-compra" element={<Navigate to="/aprendizaje" replace />} />
+          <Route path="/decisiones" element={<Navigate to="/aprendizaje?tab=decisiones" replace />} />
           <Route path="/aprobaciones" element={<ApprovalsPage />} />
           <Route path="/alertas" element={<AlertsPage />} />
           <Route path="/senales-ventas" element={<SalesSignalsPage />} />

@@ -16,7 +16,7 @@ import { supplierPath } from "../utils/entityLinks";
 import { IconBulb, IconCheck, IconAlerts } from "../components/ui/icons";
 import { formatNumber } from "../utils/formatters";
 
-export function DecisionsPage() {
+export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { decisions } = usePurchaseFlow();
   const { buyer } = useBuyer();
   const { role } = useRole();
@@ -50,10 +50,12 @@ export function DecisionsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Historial de decisiones"
-        description="Auditoría de compras: qué sugería el sistema, qué se compró, por qué se cambió y cómo resultó. Sin historial, los errores se repiten."
-      />
+      {!embedded && (
+        <PageHeader
+          title="Historial de decisiones"
+          description="Auditoría de compras: qué sugería el sistema, qué se compró, por qué se cambió y cómo resultó. Sin historial, los errores se repiten."
+        />
+      )}
 
       <HelpNote className="mb-4">
         Cada decisión guarda el <b>sugerido original</b> vs <b>lo comprado</b>, el <b>motivo del desvío</b>, quién compró y

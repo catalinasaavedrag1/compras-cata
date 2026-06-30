@@ -225,7 +225,7 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
     setCampaignOpen(false);
     toast.success(`Campaña “${campaign.name}” creada con ${campaign.products.length} producto(s)`, {
       label: "Ver campañas",
-      onClick: () => navigate("/campanas-oportunidades"),
+      onClick: () => navigate("/anticipacion"),
     });
   };
 

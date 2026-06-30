@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { navItems } from "./navItems";
+import { useNavigate } from "react-router-dom";
 import { Input } from "../ui/Input";
 import { IconSearch, IconOrders, IconProducts, IconSuppliers, IconCategories, IconDensity } from "../ui/icons";
 import { useDensity } from "../../context/DensityContext";
@@ -21,14 +20,6 @@ import { categories as mockCategories } from "../../data/mockCategories";
 import { useCollection } from "../../context/DataContext";
 import type { Product, Supplier, PurchaseOrder, Category } from "../../types/purchasing";
 
-function currentTitle(pathname: string): string {
-  if (pathname.startsWith("/productos/")) return "Detalle de producto";
-  const match = navItems.find((item) =>
-    item.end ? pathname === item.to : pathname.startsWith(item.to)
-  );
-  return match?.label ?? "Plataforma de Compras";
-}
-
 interface SearchResult {
   type: "product" | "supplier" | "order" | "category";
   title: string;
@@ -36,8 +27,7 @@ interface SearchResult {
   to: string;
 }
 
-export function Topbar() {
-  const location = useLocation();
+export function TopbarActions() {
   const navigate = useNavigate();
   const { count } = useOcDraft();
   const { buyer, setBuyer, buyers } = useBuyer();
@@ -155,14 +145,10 @@ export function Topbar() {
   const groupLabel = { product: "Productos", supplier: "Proveedores", category: "Categorías", order: "Órdenes de compra" };
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-slate-200 bg-white/90 backdrop-blur flex items-center gap-3 px-4 lg:px-6">
-      <h2 className="text-sm font-semibold text-slate-700 lg:hidden">
-        {currentTitle(location.pathname)}
-      </h2>
-
+    <>
       {/* Buscador global con resultados instantáneos */}
       <div
-        className="hidden md:block relative w-96"
+        className="hidden xl:block relative w-64 2xl:w-80"
         onBlur={() => {
           blurTimer.current = setTimeout(() => setOpen(false), 120);
         }}
@@ -225,22 +211,20 @@ export function Topbar() {
         )}
       </div>
 
-      <div className="flex-1" />
-
       <BackendStatus />
 
       {/* Densidad: cómodo / compacto */}
       <button
         onClick={toggleDensity}
         title={compact ? "Vista cómoda" : "Vista compacta (más información, menos scroll)"}
-        className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        className="hidden xl:inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
       >
         <IconDensity className="w-4 h-4" />
         {compact ? "Compacto" : "Cómodo"}
       </button>
 
       {/* Cambio de rol: Comprador / Líder */}
-      <div className="hidden sm:flex bg-slate-100 rounded-lg p-0.5">
+      <div className="hidden lg:flex bg-slate-100 rounded-lg p-0.5">
         {(["comprador", "lider"] as const).map((r) => (
           <button
             key={r}
@@ -276,7 +260,7 @@ export function Topbar() {
         )}
       </button>
 
-      <div className="hidden sm:flex flex-col items-end leading-tight">
+      <div className="hidden 2xl:flex flex-col items-end leading-tight">
         <span className="text-xs text-slate-400">{formatDate(TODAY_ISO)}</span>
         {role === "lider" ? (
           <span className="text-sm font-medium text-slate-700">{persona.name}</span>
@@ -328,6 +312,6 @@ export function Topbar() {
           </div>
         )}
       </div>
-    </header>
+    </>
   );
 }

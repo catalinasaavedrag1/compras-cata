@@ -41,7 +41,7 @@ export const moduleRegistry: Record<string, { label: string; basePath: string }>
   ordenes: { label: "Órdenes de compra", basePath: "/ordenes-compra" },
   reposicion: { label: "Reposición", basePath: "/reposicion" },
   alertas: { label: "Alertas", basePath: "/alertas" },
-  campanas: { label: "Campañas", basePath: "/campanas-oportunidades" },
+  campanas: { label: "Campañas", basePath: "/anticipacion" },
 };
 
 const ENTITY_TYPE_LABEL: Record<EntityType, string> = {
@@ -155,7 +155,7 @@ export function relatedEntitiesForProduct(sku: string): EntityRef[] {
       moduleKey: "campanas",
       displayName: opp.campaignName,
       status: opp.status,
-      route: "/campanas-oportunidades",
+      route: "/anticipacion",
     });
   }
 
