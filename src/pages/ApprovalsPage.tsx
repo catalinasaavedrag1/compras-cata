@@ -13,7 +13,7 @@ import { usePurchaseFlow, type ApprovalState } from "../context/PurchaseFlowCont
 import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
 import { CRITERION_LABEL } from "../data/mockApprovals";
-import { IconCheck, IconAlerts, IconOrders } from "../components/ui/icons";
+import { IconCheck, IconAlerts, IconOrders, IconLock } from "../components/ui/icons";
 import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/formatters";
 
 type Decision = ApprovalState;
@@ -24,6 +24,9 @@ export function ApprovalsPage() {
   const { buyer } = useBuyer();
   const { role } = useRole();
   const [filter, setFilter] = useState<Decision | "todas">("pendiente");
+
+  // Flujo de roles explícito: el comprador solicita, el líder aprueba.
+  const canApprove = role === "lider";
 
   // Un comprador solo ve y gestiona SUS aprobaciones; el líder, las de todo el equipo.
   const approvalRequests = role === "lider" ? approvals : approvals.filter((r) => r.buyerName === buyer);
@@ -51,6 +54,7 @@ export function ApprovalsPage() {
       <HelpNote className="mb-4">
         No todo lo que se sale del rango es malo: un descuento por volumen o una compra de temporada pueden justificarlo.
         Pero <b>debe quedar trazado</b> el <b>sugerido vs lo solicitado</b> y el <b>motivo</b>. Eso alimenta el historial de decisiones.
+        Flujo de roles: el <b>comprador solicita</b> y el <b>líder aprueba</b> — cambia el rol arriba a la derecha para habilitar las acciones.
       </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -120,13 +124,23 @@ export function ApprovalsPage() {
                   <p className="text-sm text-slate-700 mb-3"><span className="text-slate-400">Justificación del comprador:</span> {r.justification}</p>
 
                   {state === "pendiente" ? (
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => decide(r.id, "aprobada", r.productName)} icon={<IconCheck className="w-4 h-4" />}>Aprobar</Button>
-                      <Button size="sm" variant="secondary" onClick={() => decide(r.id, "rechazada", r.productName)}>Rechazar</Button>
-                    </div>
-                  ) : (
+                    canApprove ? (
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => decide(r.id, "aprobada", r.productName)} icon={<IconCheck className="w-4 h-4" />}>Aprobar</Button>
+                        <Button size="sm" variant="secondary" onClick={() => decide(r.id, "rechazada", r.productName)}>Rechazar</Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                        <IconLock className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                        <span>
+                          {r.buyerName === buyer ? "Tú solicitaste esta compra. " : ""}
+                          La aprobación requiere rol <b className="text-slate-700">Líder</b> — cámbialo arriba a la derecha para aprobar o rechazar.
+                        </span>
+                      </div>
+                    )
+                  ) : canApprove ? (
                     <button onClick={() => decide(r.id, "pendiente", r.productName)} className="text-xs font-medium text-slate-400 hover:text-slate-600">Revertir a pendiente</button>
-                  )}
+                  ) : null}
                 </CardBody>
               </Card>
             );
