@@ -123,7 +123,7 @@ export function AlertsPage() {
     if (a.type === "supplier_delay")
       return { label: "Revisar proveedor", onClick: () => navigate("/proveedores") };
     if (a.type === "lost_opportunity" || a.type === "no_recent_purchase")
-      return { label: "Ver oportunidades no capturadas", onClick: () => navigate("/oportunidades-perdidas") };
+      return { label: "Ver venta no capturada", onClick: () => navigate("/venta-no-capturada") };
     if (a.relatedSku)
       return { label: "Ver producto", onClick: () => navigate(`/productos/${a.relatedSku}`) };
     return undefined;

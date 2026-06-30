@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { cn } from "../../utils/cn";
 import {
   IconDashboard,
-  IconCheck,
+  IconOrders,
   IconReplenish,
   IconAlerts,
   IconMenu,
@@ -10,8 +10,8 @@ import {
 
 const items = [
   { to: "/", label: "Inicio", icon: IconDashboard, end: true },
-  { to: "/mi-panel", label: "Mi panel", icon: IconCheck },
   { to: "/reposicion", label: "Reposición", icon: IconReplenish },
+  { to: "/ordenes-compra", label: "Órdenes", icon: IconOrders },
   { to: "/alertas", label: "Alertas", icon: IconAlerts },
 ];
 

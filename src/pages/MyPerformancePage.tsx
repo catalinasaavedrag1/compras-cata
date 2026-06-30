@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
@@ -94,6 +95,24 @@ export function MyPerformancePage() {
         title="Mi desempeño"
         description="Tu score, tu nivel y tu posición frente al equipo. No solo el problema: también cómo subir. El ranking de los demás está anonimizado."
       />
+
+      {/* Foco de hoy: la palanca de mayor impacto para subir el score, con su acción. */}
+      {improvements[0] && (
+        <Link
+          to="/reposicion"
+          className="group flex items-center gap-3 mb-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 hover:bg-brand-100/70 transition-colors"
+        >
+          <span className="text-xl flex-shrink-0">🎯</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-700">Foco de hoy</p>
+            <p className="text-sm font-medium text-slate-800 leading-snug">
+              {improvements[0].advice || `Mejora tu ${improvements[0].label.toLowerCase()}`}{" "}
+              <span className="font-semibold text-brand-700 whitespace-nowrap">(+{improvements[0].pts} pts)</span>
+            </p>
+          </div>
+          <span className="text-sm font-semibold text-brand-700 whitespace-nowrap group-hover:underline">Ir a reposición →</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-4 mb-4">
         {/* Score gauge + nivel */}

@@ -98,8 +98,8 @@ export function ProductDetailPage() {
   // Estado en el catálogo optimizado (surtido redundante / a reactivar)
   const optStatus = skuOptimizationStatus(product.sku, products);
   const optLink = optStatus.category
-    ? `/catalogo-optimizado?cat=${encodeURIComponent(optStatus.category)}`
-    : "/catalogo-optimizado";
+    ? `/surtido-redundante?cat=${encodeURIComponent(optStatus.category)}`
+    : "/surtido-redundante";
 
   // Margen por canal
   const channelMargin = channelMarginsForSku(product.sku);

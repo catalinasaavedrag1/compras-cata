@@ -523,6 +523,12 @@ function SignalRow({
           {SIGNAL_PRIORITY[signal.priority].label}
         </Badge>
         <Badge tone={meta.tone}>{meta.short}</Badge>
+        <span
+          className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 rounded px-1.5 py-0.5"
+          title="Reportada desde el terreno por el equipo de ventas (no es una alerta automática del sistema)"
+        >
+          Terreno
+        </span>
         {unread && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" title="Sin revisar" />}
         {mine && <Badge tone="violet">Para mí</Badge>}
         <div className="flex-1" />

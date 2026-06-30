@@ -15,7 +15,7 @@ import { useRole } from "../context/RoleContext";
 import { IconOrders, IconCheck, IconAlerts } from "../components/ui/icons";
 import { formatCurrencyCompact, formatNumber } from "../utils/formatters";
 
-export function PurchaseQualityPage() {
+export function PurchaseQualityPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { buyer } = useBuyer();
   const { role } = useRole();
   const all = useMemo(() => {
@@ -70,10 +70,12 @@ export function PurchaseQualityPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Calidad de compra"
-        description="Mide si se compró bien: los 'días comprados' (cantidad ÷ venta diaria) frente al rango objetivo de cobertura de cada producto. Detecta compras cortas y sobrecompras."
-      />
+      {!embedded && (
+        <PageHeader
+          title="Calidad de compra"
+          description="Mide si se compró bien: los 'días comprados' (cantidad ÷ venta diaria) frente al rango objetivo de cobertura de cada producto. Detecta compras cortas y sobrecompras."
+        />
+      )}
 
       <HelpNote className="mb-4">
         <b>Días comprados</b> = cantidad comprada ÷ venta diaria esperada. Si el objetivo es 30–45 días y se compró para 8,

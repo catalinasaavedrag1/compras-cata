@@ -188,6 +188,12 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
           <Badge tone={meta.tone} dot>
             {meta.label}
           </Badge>
+          <span
+            className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 rounded px-1.5 py-0.5"
+            title="Reportada desde el terreno por el equipo de ventas (no es una alerta automática del sistema)"
+          >
+            Terreno
+          </span>
           <Badge tone={SIGNAL_PRIORITY[signal.priority].tone}>
             Prioridad {SIGNAL_PRIORITY[signal.priority].label.toLowerCase()}
           </Badge>

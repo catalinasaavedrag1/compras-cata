@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
@@ -98,6 +98,29 @@ export function CategoriesPage() {
       header: "Estado",
       render: (c) => <StatusBadge kind="category" value={c.status} />,
     },
+    {
+      key: "actions",
+      header: "Acción",
+      align: "right",
+      render: (c) => (
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <Link
+            to={`/reposicion?cat=${encodeURIComponent(c.name)}`}
+            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 whitespace-nowrap"
+            title={`Ver reposición de ${c.name}`}
+          >
+            Reposición
+          </Link>
+          <Link
+            to={`/surtido-redundante?cat=${encodeURIComponent(c.name)}`}
+            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 whitespace-nowrap"
+            title={`Optimizar surtido de ${c.name}`}
+          >
+            Surtido
+          </Link>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -110,7 +133,7 @@ export function CategoriesPage() {
       <HelpNote className="mb-4">
         Empieza por las tarjetas de la izquierda: muestran las <b>categorías críticas</b> (más quiebres
         y riesgo). En la columna Quiebre/Riesgo/Sobrestock, los números rojo/ámbar/violeta resumen cuántos
-        SKUs requieren acción en cada categoría.
+        SKUs requieren acción en cada categoría. Cada fila enlaza directo a su acción: <b>Reposición</b> o <b>Surtido</b>.
       </HelpNote>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
@@ -178,6 +201,10 @@ export function CategoriesPage() {
                 {c.overstockSkus > 0 && <Badge tone="violet">{c.overstockSkus} sobre</Badge>}
               </div>
               <p className="text-xs text-slate-500 mt-1.5">{formatCurrencyCompact(c.salesLast30Days)} venta · compra sug. {formatCurrencyCompact(c.suggestedPurchase)}</p>
+              <div className="flex items-center gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
+                <Link to={`/reposicion?cat=${encodeURIComponent(c.name)}`} className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50">Reposición</Link>
+                <Link to={`/surtido-redundante?cat=${encodeURIComponent(c.name)}`} className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">Surtido</Link>
+              </div>
             </div>
           )}
         />

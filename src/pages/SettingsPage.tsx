@@ -17,6 +17,7 @@ import { products } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
 import { formatCurrencyCompact, formatDate, formatDays, formatNumber, formatPercent } from "../utils/formatters";
 import { IconRules, IconAlerts, IconArrowRight } from "../components/ui/icons";
+import { cn } from "../utils/cn";
 import type { PurchaseRule } from "../types/purchasing";
 
 type RuleHealth = "ok" | "incoherent" | "high_lead" | "overstock_risk" | "stockout_risk";
@@ -82,6 +83,46 @@ export function SettingsPage() {
   const conAlerta = withHealth.filter((x) => x.health !== "ok").length;
   const leadProm = Math.round(rules.reduce((a, r) => a + r.leadTimeDays, 0) / rules.length);
   const diasProm = Math.round(rules.reduce((a, r) => a + r.targetInventoryDays, 0) / rules.length);
+
+  // ---- Simulador de "días objetivo" -------------------------------------
+  // Modelo: la compra del mes escala con la cobertura (lead + días objetivo).
+  // Permite ver el impacto en la compra sugerida ANTES de aplicar el cambio.
+  const baseTargetDays = global?.targetInventoryDays ?? diasProm;
+  const baseByCat = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const rec of recommendations) m.set(rec.category, (m.get(rec.category) ?? 0) + rec.suggestedPurchaseAmount);
+    return m;
+  }, []);
+  const leadByCat = useMemo(() => {
+    const sum = new Map<string, { t: number; n: number }>();
+    for (const p of products) {
+      const e = sum.get(p.category) ?? { t: 0, n: 0 };
+      e.t += p.supplierLeadTimeDays;
+      e.n += 1;
+      sum.set(p.category, e);
+    }
+    const m = new Map<string, number>();
+    for (const [cat, { t, n }] of sum) m.set(cat, n ? t / n : leadProm);
+    return m;
+  }, [leadProm]);
+  const simOptions = useMemo(
+    () => Array.from(new Set([baseTargetDays, 45, 60, 90])).sort((a, b) => a - b),
+    [baseTargetDays]
+  );
+  const [simDays, setSimDays] = useState<number>(baseTargetDays);
+  const projection = useMemo(() => {
+    const rows = Array.from(baseByCat.entries())
+      .map(([cat, base]) => {
+        const lead = leadByCat.get(cat) ?? leadProm;
+        const ratio = (lead + simDays) / (lead + baseTargetDays);
+        const proj = Math.round(base * ratio);
+        return { cat, base, proj, delta: proj - base };
+      })
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+    const baseTotal = rows.reduce((a, r) => a + r.base, 0);
+    const projTotal = rows.reduce((a, r) => a + r.proj, 0);
+    return { rows, baseTotal, projTotal, delta: projTotal - baseTotal };
+  }, [simDays, baseByCat, leadByCat, baseTargetDays, leadProm]);
 
   const visible = withHealth
     .filter((x) => (scopeFilter === "all" ? true : x.r.scopeType === scopeFilter))
@@ -153,6 +194,75 @@ export function SettingsPage() {
         <KpiCard title="Días objetivo prom." value={formatDays(diasProm)} tone="neutral" icon={<IconRules className="w-4 h-4" />} />
         <KpiCard title="Lead time prom." value={formatDays(leadProm)} tone="neutral" icon={<IconRules className="w-4 h-4" />} />
       </div>
+
+      {/* Simulador de días objetivo: ve el impacto en la compra sugerida antes de aplicar */}
+      <Card className="mb-4">
+        <CardHeader
+          title="Simular días objetivo de inventario"
+          description="Mueve los días objetivo y observa el impacto en la compra sugerida del mes — antes de aplicar el cambio."
+        />
+        <CardBody>
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <div>
+              <p className="text-xs text-slate-400">Días objetivo actual (global)</p>
+              <p className="text-lg font-semibold text-slate-800">{formatDays(baseTargetDays)}</p>
+            </div>
+            <div className="h-9 w-px bg-slate-200 hidden sm:block" />
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Simular</p>
+              <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
+                {simOptions.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setSimDays(d)}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
+                      simDays === d ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    {d === baseTargetDays ? `${d} d · actual` : `${d} días`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="ml-auto text-right">
+              <p className="text-xs text-slate-400">Compra sugerida proyectada</p>
+              <p className="text-xl font-bold text-slate-900">{formatCurrencyCompact(projection.projTotal)}</p>
+              <p
+                className={cn(
+                  "text-xs font-semibold",
+                  projection.delta > 0 ? "text-rose-600" : projection.delta < 0 ? "text-emerald-600" : "text-slate-400"
+                )}
+              >
+                {projection.delta >= 0 ? "+" : ""}{formatCurrencyCompact(projection.delta)} vs actual
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Impacto por categoría</p>
+          <div className="space-y-1.5">
+            {projection.rows.slice(0, 6).map((r) => (
+              <div key={r.cat} className="flex items-center gap-2.5 text-sm">
+                <span className="w-36 sm:w-44 truncate text-slate-700">{r.cat}</span>
+                <span className="text-slate-400 tabular-nums">{formatCurrencyCompact(r.base)}</span>
+                <IconArrowRight className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
+                <span className="font-medium text-slate-800 tabular-nums">{formatCurrencyCompact(r.proj)}</span>
+                <span
+                  className={cn(
+                    "ml-auto text-xs font-semibold tabular-nums",
+                    r.delta > 0 ? "text-rose-600" : r.delta < 0 ? "text-emerald-600" : "text-slate-400"
+                  )}
+                >
+                  {r.delta >= 0 ? "+" : ""}{formatCurrencyCompact(r.delta)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500 mt-3">
+            Subir los días objetivo aumenta la cobertura y, con ella, la compra sugerida del mes. Revisa el presupuesto antes de aplicar.
+          </p>
+        </CardBody>
+      </Card>
 
       {/* Alertas de configuración */}
       {alerts.length > 0 && (
