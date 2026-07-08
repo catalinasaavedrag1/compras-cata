@@ -24,9 +24,18 @@ interface PurchaseFlowValue {
 const PurchaseFlowContext = createContext<PurchaseFlowValue | null>(null);
 
 export function PurchaseFlowProvider({ children }: { children: ReactNode }) {
-  const [createdApprovals, setCreatedApprovals] = useLocalStorage<ApprovalRequest[]>("compras:approvals-created", []);
-  const [createdDecisions, setCreatedDecisions] = useLocalStorage<PurchaseDecision[]>("compras:decisions-created", []);
-  const [approvalState, setApprovalStateMap] = useLocalStorage<Record<string, ApprovalState>>("compras:approvals", {});
+  const [createdApprovals, setCreatedApprovals] = useLocalStorage<ApprovalRequest[]>(
+    "compras:approvals-created",
+    []
+  );
+  const [createdDecisions, setCreatedDecisions] = useLocalStorage<PurchaseDecision[]>(
+    "compras:decisions-created",
+    []
+  );
+  const [approvalState, setApprovalStateMap] = useLocalStorage<Record<string, ApprovalState>>(
+    "compras:approvals",
+    {}
+  );
 
   const value = useMemo<PurchaseFlowValue>(() => {
     const approvals = [...createdApprovals, ...seedApprovals];
@@ -51,7 +60,8 @@ export function PurchaseFlowProvider({ children }: { children: ReactNode }) {
                 ? {
                     ...d,
                     approvedBy: state === "aprobada" ? "Líder de compras" : "—",
-                    reason: state === "aprobada" ? `${d.reason} · aprobada` : `${d.reason} · rechazada`,
+                    reason:
+                      state === "aprobada" ? `${d.reason} · aprobada` : `${d.reason} · rechazada`,
                     resultText:
                       state === "aprobada"
                         ? "Desvío aprobado por el líder. Compra autorizada; resultado en medición."
@@ -63,7 +73,14 @@ export function PurchaseFlowProvider({ children }: { children: ReactNode }) {
         }
       },
     };
-  }, [createdApprovals, createdDecisions, approvalState, setCreatedApprovals, setCreatedDecisions, setApprovalStateMap]);
+  }, [
+    createdApprovals,
+    createdDecisions,
+    approvalState,
+    setCreatedApprovals,
+    setCreatedDecisions,
+    setApprovalStateMap,
+  ]);
 
   return <PurchaseFlowContext.Provider value={value}>{children}</PurchaseFlowContext.Provider>;
 }

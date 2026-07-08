@@ -39,7 +39,9 @@ export function CollapsibleSection({
         className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-slate-50/70 rounded-xl transition-colors"
         aria-expanded={open}
       >
-        <IconChevronRight className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+        <IconChevronRight
+          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+        />
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
           {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}

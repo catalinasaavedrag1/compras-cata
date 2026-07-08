@@ -9,12 +9,7 @@ interface CardProps {
 
 export function Card({ children, className }: CardProps) {
   return (
-    <div
-      className={cn(
-        "bg-white border border-slate-200 rounded-xl shadow-card",
-        className
-      )}
-    >
+    <div className={cn("bg-white border border-slate-200 rounded-xl shadow-card", className)}>
       {children}
     </div>
   );
@@ -39,9 +34,7 @@ export function CardHeader({ title, description, action, className }: CardHeader
     >
       <div>
         <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-        {description && (
-          <p className="text-xs text-slate-500 mt-0.5">{description}</p>
-        )}
+        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
       </div>
       {action}
     </div>

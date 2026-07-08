@@ -32,10 +32,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
       <div
         ref={ref}
         role="dialog"
@@ -47,9 +44,7 @@ export function Modal({
         <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-semibold text-slate-800">{title}</h2>
-            {description && (
-              <p className="text-sm text-slate-500 mt-0.5">{description}</p>
-            )}
+            {description && <p className="text-sm text-slate-500 mt-0.5">{description}</p>}
           </div>
           <button
             onClick={onClose}
@@ -59,13 +54,9 @@ export function Modal({
             <IconClose />
           </button>
         </div>
-        <div className="overflow-y-auto scrollbar-thin px-6 py-5 flex-1">
-          {children}
-        </div>
+        <div className="overflow-y-auto scrollbar-thin px-6 py-5 flex-1">{children}</div>
         {footer && (
-          <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            {footer}
-          </div>
+          <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">{footer}</div>
         )}
       </div>
     </div>

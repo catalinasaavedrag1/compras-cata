@@ -38,7 +38,10 @@ export function CategoryDetailPage() {
   if (!category) {
     return (
       <div className="py-10">
-        <EmptyState title="Categoría no encontrada" action={<Button onClick={() => navigate("/categorias")}>Volver a categorías</Button>} />
+        <EmptyState
+          title="Categoría no encontrada"
+          action={<Button onClick={() => navigate("/categorias")}>Volver a categorías</Button>}
+        />
       </div>
     );
   }
@@ -47,7 +50,9 @@ export function CategoryDetailPage() {
   const catSuppliers = suppliers.filter((s) => s.categories.includes(category.name));
   const catRecs = recommendations.filter((r) => r.category === category.name);
   const catSkus = new Set(catProducts.map((p) => p.sku));
-  const catAlerts = alerts.filter((a) => a.relatedEntity === category.name || (a.relatedSku && catSkus.has(a.relatedSku)));
+  const catAlerts = alerts.filter(
+    (a) => a.relatedEntity === category.name || (a.relatedSku && catSkus.has(a.relatedSku))
+  );
   const redundantCount = analyzeCatalog(catProducts).candidateCount;
 
   return (
@@ -60,10 +65,36 @@ export function CategoryDetailPage() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Compra sugerida" value={formatCurrencyCompact(category.suggestedPurchase)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Ver reposición" onClick={() => setTab("reposicion")} active={tab === "reposicion"} />
-        <KpiCard title="SKUs en quiebre" value={formatNumber(category.stockoutSkus)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description={`${category.riskSkus} en riesgo`} />
-        <KpiCard title="Venta 30 días" value={formatCurrencyCompact(category.salesLast30Days)} tone="good" icon={<IconSales className="w-4 h-4" />} description={`margen ${formatPercent(category.averageMargin)}`} />
-        <KpiCard title="Inventario" value={formatCurrencyCompact(category.inventoryValue)} tone="neutral" icon={<IconProducts className="w-4 h-4" />} description={`${category.overstockSkus} sobrestock`} />
+        <KpiCard
+          title="Compra sugerida"
+          value={formatCurrencyCompact(category.suggestedPurchase)}
+          tone="info"
+          icon={<IconReplenish className="w-4 h-4" />}
+          description="Ver reposición"
+          onClick={() => setTab("reposicion")}
+          active={tab === "reposicion"}
+        />
+        <KpiCard
+          title="SKUs en quiebre"
+          value={formatNumber(category.stockoutSkus)}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description={`${category.riskSkus} en riesgo`}
+        />
+        <KpiCard
+          title="Venta 30 días"
+          value={formatCurrencyCompact(category.salesLast30Days)}
+          tone="good"
+          icon={<IconSales className="w-4 h-4" />}
+          description={`margen ${formatPercent(category.averageMargin)}`}
+        />
+        <KpiCard
+          title="Inventario"
+          value={formatCurrencyCompact(category.inventoryValue)}
+          tone="neutral"
+          icon={<IconProducts className="w-4 h-4" />}
+          description={`${category.overstockSkus} sobrestock`}
+        />
       </div>
 
       <Tabs
@@ -86,11 +117,18 @@ export function CategoryDetailPage() {
               <EmptyState title="Sin productos" description="Esta categoría no tiene SKUs." />
             ) : (
               catProducts.map((p) => (
-                <Link key={p.sku} to={`/productos/${p.sku}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                <Link
+                  key={p.sku}
+                  to={`/productos/${p.sku}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                >
                   <div className="min-w-0">
                     <span className="text-xs font-mono text-slate-400">{p.sku}</span>
                     <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
-                    <p className="text-xs text-slate-500">disp. {formatNumber(p.availableStock)} · vende {formatNumber(p.salesLast30Days)}/mes · margen {formatPercent(p.margin)}</p>
+                    <p className="text-xs text-slate-500">
+                      disp. {formatNumber(p.availableStock)} · vende{" "}
+                      {formatNumber(p.salesLast30Days)}/mes · margen {formatPercent(p.margin)}
+                    </p>
                   </div>
                   <StatusBadge kind="purchase" value={p.purchaseStatus} dot={false} />
                 </Link>
@@ -100,19 +138,30 @@ export function CategoryDetailPage() {
         </Card>
       )}
 
-      {tab === "optimizar" && <CatalogRedundancy products={catProducts} scopeLabel={category.name} />}
+      {tab === "optimizar" && (
+        <CatalogRedundancy products={catProducts} scopeLabel={category.name} />
+      )}
 
       {tab === "reposicion" && (
         <Card>
           <CardBody className="space-y-2">
             {catRecs.length === 0 ? (
-              <EmptyState title="Sin sugerencias" description="No hay reposición sugerida en esta categoría." />
+              <EmptyState
+                title="Sin sugerencias"
+                description="No hay reposición sugerida en esta categoría."
+              />
             ) : (
               catRecs.map((r) => (
-                <div key={r.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2"
+                >
                   <Link to={`/productos/${r.sku}`} className="min-w-0 hover:text-brand-700">
                     <p className="text-sm font-medium text-slate-800 truncate">{r.productName}</p>
-                    <p className="text-xs text-slate-500">{formatNumber(r.suggestedQuantity)} u. · {formatCurrency(r.suggestedPurchaseAmount)} · {r.supplierName}</p>
+                    <p className="text-xs text-slate-500">
+                      {formatNumber(r.suggestedQuantity)} u. ·{" "}
+                      {formatCurrency(r.suggestedPurchaseAmount)} · {r.supplierName}
+                    </p>
                   </Link>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <RecommendationBadge status={r.status} />
@@ -122,8 +171,17 @@ export function CategoryDetailPage() {
                         variant={hasItem(r.sku) ? "secondary" : "primary"}
                         disabled={hasItem(r.sku)}
                         onClick={() => {
-                          addItem({ sku: r.sku, productName: r.productName, supplierName: r.supplierName, quantity: r.suggestedQuantity, unitCost: r.unitCost });
-                          toast.success(`${r.productName} agregado al borrador de OC`, { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") });
+                          addItem({
+                            sku: r.sku,
+                            productName: r.productName,
+                            supplierName: r.supplierName,
+                            quantity: r.suggestedQuantity,
+                            unitCost: r.unitCost,
+                          });
+                          toast.success(`${r.productName} agregado al borrador de OC`, {
+                            label: "Ver borrador OC",
+                            onClick: () => navigate("/ordenes-compra"),
+                          });
                         }}
                       >
                         {hasItem(r.sku) ? "En OC" : "Agregar"}
@@ -144,10 +202,17 @@ export function CategoryDetailPage() {
               <EmptyState title="Sin proveedores" description="No hay proveedores asociados." />
             ) : (
               catSuppliers.map((s) => (
-                <Link key={s.id} to={`/proveedores/${s.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                <Link
+                  key={s.id}
+                  to={`/proveedores/${s.id}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">{s.name}</p>
-                    <p className="text-xs text-slate-500">cumple {formatPercent(s.deliveryCompliance, 0)} · lead {s.averageLeadTimeDays}d · {s.openPurchaseOrders} OC abiertas</p>
+                    <p className="text-xs text-slate-500">
+                      cumple {formatPercent(s.deliveryCompliance, 0)} · lead {s.averageLeadTimeDays}
+                      d · {s.openPurchaseOrders} OC abiertas
+                    </p>
                   </div>
                   <StatusBadge kind="supplier" value={s.status} dot={false} />
                 </Link>
@@ -160,9 +225,20 @@ export function CategoryDetailPage() {
       {tab === "alertas" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {catAlerts.length === 0 ? (
-            <Card><CardBody><EmptyState title="Sin alertas" description="Esta categoría no tiene alertas." /></CardBody></Card>
+            <Card>
+              <CardBody>
+                <EmptyState title="Sin alertas" description="Esta categoría no tiene alertas." />
+              </CardBody>
+            </Card>
           ) : (
-            catAlerts.map((a) => <AlertCard key={a.id} alert={a} compact entityTo={a.relatedSku ? `/productos/${a.relatedSku}` : undefined} />)
+            catAlerts.map((a) => (
+              <AlertCard
+                key={a.id}
+                alert={a}
+                compact
+                entityTo={a.relatedSku ? `/productos/${a.relatedSku}` : undefined}
+              />
+            ))
           )}
         </div>
       )}

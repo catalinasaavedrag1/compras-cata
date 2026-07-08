@@ -87,8 +87,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 42.6,
     priority: "high",
     status: "critical",
-    reason:
-      "Stock disponible cubre menos de 1 día frente a una venta de 64 unidades al mes.",
+    reason: "Stock disponible cubre menos de 1 día frente a una venta de 64 unidades al mes.",
     risk: "Quiebre en menos de 1 día. Producto de alto margen (42,6%) y alta rotación.",
   },
   {
@@ -115,8 +114,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 41.4,
     priority: "high",
     status: "critical",
-    reason:
-      "Solo quedan 1,7 días de cobertura y el lead time del proveedor es de 12 días.",
+    reason: "Solo quedan 1,7 días de cobertura y el lead time del proveedor es de 12 días.",
     risk: "Quiebre seguro antes de la próxima entrega. Producto de muy alta rotación.",
   },
   {
@@ -171,8 +169,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 28.1,
     priority: "high",
     status: "buy_now",
-    reason:
-      "Cobertura de 1,9 días y lead time de 11 días. Demanda estable en temporada agrícola.",
+    reason: "Cobertura de 1,9 días y lead time de 11 días. Demanda estable en temporada agrícola.",
     risk: "Quiebre antes de la entrega y pérdida de ventas de temporada.",
   },
   {
@@ -227,8 +224,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 33.4,
     priority: "high",
     status: "buy_now",
-    reason:
-      "Cobertura de 4 días con lead time de 15 días. Producto de muy alta rotación (19,8).",
+    reason: "Cobertura de 4 días con lead time de 15 días. Producto de muy alta rotación (19,8).",
     risk: "Quiebre seguro en consumible de venta diaria. Impacto directo en flujo de tienda.",
   },
   {
@@ -255,8 +251,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 30.6,
     priority: "high",
     status: "buy_now",
-    reason:
-      "Cobertura de 5,3 días. Producto de alta rotación bajo el punto de reposición (60).",
+    reason: "Cobertura de 5,3 días. Producto de alta rotación bajo el punto de reposición (60).",
     risk: "Riesgo de quiebre en tablero de alta venta usado en proyectos de construcción.",
   },
   {
@@ -283,8 +278,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 30.0,
     priority: "medium",
     status: "buy_now",
-    reason:
-      "Cobertura de 4 días con lead time de 12 días. Bajo el punto de reposición.",
+    reason: "Cobertura de 4 días con lead time de 12 días. Bajo el punto de reposición.",
     risk: "Quiebre probable en fijación de alta rotación antes de la próxima entrega.",
   },
   {
@@ -395,8 +389,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 32.6,
     priority: "low",
     status: "overstock",
-    reason:
-      "Inventario para 184 días. Stock (49) muy sobre el máximo (36) con baja rotación.",
+    reason: "Inventario para 184 días. Stock (49) muy sobre el máximo (36) con baja rotación.",
     risk: "Capital inmovilizado de $376.870. No comprar; revisar exhibición y precio.",
   },
   {
@@ -423,14 +416,13 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 40.2,
     priority: "low",
     status: "overstock",
-    reason:
-      "Cobertura de 84 días, sobre el máximo (420). Buena venta pero stock excesivo.",
+    reason: "Cobertura de 84 días, sobre el máximo (420). Buena venta pero stock excesivo.",
     risk: "Capital inmovilizado de $126.650 sobre el máximo. Pausar compra hasta normalizar.",
   },
   {
     id: "REC-016",
     sku: "GAS-005",
-    productName: "Llave de paso PVC 1/2\"",
+    productName: 'Llave de paso PVC 1/2"',
     category: "Gasfitería",
     brand: "Vinilit",
     supplierName: "FerrePro Chile",
@@ -451,8 +443,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 43.7,
     priority: "high",
     status: "critical",
-    reason:
-      "Stock disponible 0 y se venden 150 unidades al mes. El proveedor demora 12 días.",
+    reason: "Stock disponible 0 y se venden 150 unidades al mes. El proveedor demora 12 días.",
     risk: "Quiebre activo. Venta perdida estimada de $343.500 al mes mientras no llegue.",
   },
   {
@@ -479,8 +470,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 44.5,
     priority: "high",
     status: "critical",
-    reason:
-      "Cobertura de 5 días con lead time de 12. Se agota antes de que llegue la reposición.",
+    reason: "Cobertura de 5 días con lead time de 12. Se agota antes de que llegue la reposición.",
     risk: "Quiebre seguro en ~5 días. Producto de alta rotación y buen margen.",
   },
   {
@@ -507,8 +497,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 26.4,
     priority: "high",
     status: "critical",
-    reason:
-      "Disponible 12 con venta de 620/mes. Cobertura menor a 1 día en obra activa.",
+    reason: "Disponible 12 con venta de 620/mes. Cobertura menor a 1 día en obra activa.",
     risk: "Producto estructural de altísima rotación. Quiebre frena ventas de toda la obra gruesa.",
   },
   {
@@ -535,14 +524,13 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 31.7,
     priority: "high",
     status: "buy_now",
-    reason:
-      "Cobertura de 8 días, justo en el límite del lead time (7). Conviene comprar ahora.",
+    reason: "Cobertura de 8 días, justo en el límite del lead time (7). Conviene comprar ahora.",
     risk: "Si la venta sube, hay riesgo de quiebre. Tablero de buena rotación.",
   },
   {
     id: "REC-020",
     sku: "HER-004",
-    productName: "Esmeril angular Bosch 4.5\" 820W",
+    productName: 'Esmeril angular Bosch 4.5" 820W',
     category: "Herramientas eléctricas",
     brand: "Bosch",
     supplierName: "Herramientas Global",
@@ -563,14 +551,13 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 38.3,
     priority: "high",
     status: "buy_now",
-    reason:
-      "Cobertura de 15 días igual al lead time. Marca premium con margen sobre 38%.",
+    reason: "Cobertura de 15 días igual al lead time. Marca premium con margen sobre 38%.",
     risk: "Quiebre probable durante la reposición. Producto de ticket alto y buena demanda.",
   },
   {
     id: "REC-021",
     sku: "HER-005",
-    productName: "Sierra circular Makita 7-1/4\"",
+    productName: 'Sierra circular Makita 7-1/4"',
     category: "Herramientas eléctricas",
     brand: "Makita",
     supplierName: "Industrial del Sur",
@@ -591,8 +578,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 35.3,
     priority: "high",
     status: "critical",
-    reason:
-      "Cobertura de 8 días con lead time de 18. El proveedor además viene con atrasos.",
+    reason: "Cobertura de 8 días con lead time de 18. El proveedor además viene con atrasos.",
     risk: "Quiebre casi seguro. Evaluar proveedor alternativo por bajo cumplimiento de Industrial del Sur.",
   },
   {
@@ -647,8 +633,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 42.6,
     priority: "medium",
     status: "review",
-    reason:
-      "Cobertura de 21 días con lead time de 12. Revisar antes de que entre en riesgo.",
+    reason: "Cobertura de 21 días con lead time de 12. Revisar antes de que entre en riesgo.",
     risk: "Sin compra, riesgo de quiebre en ~3 semanas. Proveedor con cumplimiento bajo (71%).",
   },
   {
@@ -675,8 +660,7 @@ export const recommendations: PurchaseRecommendation[] = [
     margin: 36.0,
     priority: "low",
     status: "overstock",
-    reason:
-      "Cobertura de 133 días, muy sobre el máximo (160). Compra suspendida.",
+    reason: "Cobertura de 133 días, muy sobre el máximo (160). Compra suspendida.",
     risk: "Capital inmovilizado de ~$356.000 sobre el máximo. Evaluar liquidación o campaña.",
   },
 ];

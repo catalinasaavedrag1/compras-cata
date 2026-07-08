@@ -15,9 +15,7 @@ export function EmptyState({ title, description, icon, action }: EmptyStateProps
         {icon ?? <IconBox className="w-6 h-6" />}
       </div>
       <p className="text-sm font-semibold text-slate-700">{title}</p>
-      {description && (
-        <p className="text-xs text-slate-500 mt-1 max-w-sm">{description}</p>
-      )}
+      {description && <p className="text-xs text-slate-500 mt-1 max-w-sm">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

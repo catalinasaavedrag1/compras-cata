@@ -12,14 +12,7 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   placeholder?: string;
 }
 
-export function Select({
-  label,
-  options,
-  placeholder,
-  className,
-  id,
-  ...props
-}: SelectProps) {
+export function Select({ label, options, placeholder, className, id, ...props }: SelectProps) {
   const reactId = useId();
   const fieldId = id ?? reactId;
   return (

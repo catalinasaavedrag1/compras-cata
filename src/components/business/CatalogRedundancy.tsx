@@ -76,7 +76,8 @@ function GroupCard({
   group: ReturnType<typeof analyzeCatalog>["groups"][number];
   filter: RedundancyFilter;
 }) {
-  const keepers = filter === "reactivate" ? group.keepers.filter((k) => k.reactivate) : group.keepers;
+  const keepers =
+    filter === "reactivate" ? group.keepers.filter((k) => k.reactivate) : group.keepers;
   const candidates =
     filter === "all"
       ? group.candidates
@@ -105,7 +106,9 @@ function GroupCard({
         {/* Surtido sugerido: uno por gama */}
         {keepers.length > 0 && (
           <>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Conservar (uno por gama)</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Conservar (uno por gama)
+            </p>
             {keepers.map((k) => (
               <Link
                 key={k.product.sku}
@@ -116,7 +119,9 @@ function GroupCard({
                   <span className="text-xs font-mono text-slate-400">{k.product.sku}</span>
                   <p className="text-sm font-medium text-slate-800 truncate">{k.product.name}</p>
                   <p className="text-xs text-slate-500">
-                    gama {TIER_LABEL[k.segment]} · vende {formatNumber(k.product.salesLast30Days)}/mes · rota {formatNumber(k.product.rotation)}× · margen {formatPercent(k.product.margin, 0)}
+                    gama {TIER_LABEL[k.segment]} · vende {formatNumber(k.product.salesLast30Days)}
+                    /mes · rota {formatNumber(k.product.rotation)}× · margen{" "}
+                    {formatPercent(k.product.margin, 0)}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -133,7 +138,9 @@ function GroupCard({
         {/* Redundantes: sobran en su gama */}
         {candidates.length > 0 && (
           <>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 pt-0.5">Sobran</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 pt-0.5">
+              Sobran
+            </p>
             {candidates.map((c) => (
               <Link
                 key={c.product.sku}
@@ -147,7 +154,9 @@ function GroupCard({
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
                   <Badge tone={actionTone[c.action]}>{ACTION_LABEL[c.action]}</Badge>
-                  <span className="text-xs text-slate-500">{formatCurrencyCompact(c.tiedCapital)}</span>
+                  <span className="text-xs text-slate-500">
+                    {formatCurrencyCompact(c.tiedCapital)}
+                  </span>
                 </div>
               </Link>
             ))}
@@ -164,7 +173,11 @@ function GroupCard({
  * exportar la lista y lanzar una campaña de liquidación con los SKUs con stock.
  * Reutilizable en la página global y en la pestaña del detalle de categoría.
  */
-export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: CatalogRedundancyProps) {
+export function CatalogRedundancy({
+  products,
+  showSummary = true,
+  scopeLabel,
+}: CatalogRedundancyProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const [, setCampaigns] = useLocalStorage<CreatedCampaign[]>("compras:campaigns", []);
@@ -205,7 +218,11 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
   });
 
   const exportRows: ExportRow[] = analysis.groups.flatMap((g) =>
-    g.candidates.map((candidate) => ({ candidate, category: g.category, subcategory: g.subcategory }))
+    g.candidates.map((candidate) => ({
+      candidate,
+      category: g.category,
+      subcategory: g.subcategory,
+    }))
   );
 
   // Líneas para la campaña de liquidación: redundantes con stock disponible.
@@ -265,9 +282,10 @@ export function CatalogRedundancy({ products, showSummary = true, scopeLabel }: 
       )}
 
       <HelpNote variant="tip" title="¿Qué es “redundante”?">
-        Cuando dentro del mismo tipo de producto y <strong>gama de precio</strong> (económica, media, premium)
-        hay varias opciones, basta con la <strong>mejor por venta, rotación y margen</strong>. Las demás de esa
-        gama sobran: se sugiere <strong>liquidar</strong> (con stock) o <strong>descontinuar</strong> (sin ventas).
+        Cuando dentro del mismo tipo de producto y <strong>gama de precio</strong> (económica,
+        media, premium) hay varias opciones, basta con la{" "}
+        <strong>mejor por venta, rotación y margen</strong>. Las demás de esa gama sobran: se
+        sugiere <strong>liquidar</strong> (con stock) o <strong>descontinuar</strong> (sin ventas).
         Si la mejor está marcada “no comprar”, se sugiere <strong>reactivarla</strong>.
       </HelpNote>
 

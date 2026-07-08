@@ -13,6 +13,8 @@ import {
   IconCheck,
   IconBulb,
   IconSignal,
+  IconChat,
+  IconDownload,
 } from "../ui/icons";
 import type { Role } from "../../context/RoleContext";
 
@@ -68,7 +70,13 @@ export const compradorModules: NavModule[] = [
     end: true,
     hint: "Qué hacer hoy: acciones críticas, tu día y tus categorías",
     children: [
-      { to: "/", label: "Inicio", icon: IconDashboard, end: true, hint: "Qué hacer hoy: acciones críticas, tu día y tus categorías" },
+      {
+        to: "/",
+        label: "Inicio",
+        icon: IconDashboard,
+        end: true,
+        hint: "Qué hacer hoy: acciones críticas, tu día y tus categorías",
+      },
     ],
   },
   {
@@ -78,8 +86,18 @@ export const compradorModules: NavModule[] = [
     to: "/reposicion",
     hint: "Qué comprar, cuánto y por qué — priorizado por riesgo de quiebre",
     children: [
-      { to: "/reposicion", label: "Reposición sugerida", icon: IconReplenish, hint: "Qué comprar, cuánto y por qué — priorizado por riesgo de quiebre" },
-      { to: "/reglas", label: "Reglas de compra", icon: IconRules, hint: "Parámetros del cálculo de la compra sugerida" },
+      {
+        to: "/reposicion",
+        label: "Reposición sugerida",
+        icon: IconReplenish,
+        hint: "Qué comprar, cuánto y por qué — priorizado por riesgo de quiebre",
+      },
+      {
+        to: "/reglas",
+        label: "Reglas de compra",
+        icon: IconRules,
+        hint: "Parámetros del cálculo de la compra sugerida",
+      },
     ],
   },
   {
@@ -89,9 +107,24 @@ export const compradorModules: NavModule[] = [
     to: "/campanas",
     hint: "Descuentos, anticipación al peak y venta no capturada",
     children: [
-      { to: "/campanas", label: "Campañas", icon: IconCampaign, hint: "Productos en descuento, presupuesto y canales" },
-      { to: "/anticipacion", label: "Anticipación de campañas", icon: IconBulb, hint: "Comprar antes del peak, liquidar y detectar crecimiento por canal" },
-      { to: "/venta-no-capturada", label: "Venta no capturada", icon: IconBulb, hint: "Productos que vendían, quedaron sin stock y no se recompraron" },
+      {
+        to: "/campanas",
+        label: "Campañas",
+        icon: IconCampaign,
+        hint: "Productos en descuento, presupuesto y canales",
+      },
+      {
+        to: "/anticipacion",
+        label: "Anticipación de campañas",
+        icon: IconBulb,
+        hint: "Comprar antes del peak, liquidar y detectar crecimiento por canal",
+      },
+      {
+        to: "/venta-no-capturada",
+        label: "Venta no capturada",
+        icon: IconBulb,
+        hint: "Productos que vendían, quedaron sin stock y no se recompraron",
+      },
     ],
   },
   {
@@ -101,9 +134,30 @@ export const compradorModules: NavModule[] = [
     to: "/productos",
     hint: "Productos, categorías y racionalización del surtido",
     children: [
-      { to: "/productos", label: "Productos", icon: IconProducts, hint: "Stock, margen, rotación y estado del surtido" },
-      { to: "/categorias", label: "Categorías", icon: IconCategories, hint: "Salud comercial por categoría" },
-      { to: "/surtido-redundante", label: "Surtido redundante", icon: IconBulb, hint: "Productos repetidos dentro de una misma subcategoría que puedes racionalizar" },
+      {
+        to: "/productos",
+        label: "Productos",
+        icon: IconProducts,
+        hint: "Stock, margen, rotación y estado del surtido",
+      },
+      {
+        to: "/categorias",
+        label: "Categorías",
+        icon: IconCategories,
+        hint: "Salud comercial por categoría",
+      },
+      {
+        to: "/surtido-redundante",
+        label: "Surtido redundante",
+        icon: IconBulb,
+        hint: "Productos repetidos dentro de una misma subcategoría que puedes racionalizar",
+      },
+      {
+        to: "/alzas-precio",
+        label: "Alzas de precio",
+        icon: IconSales,
+        hint: "Nuevas listas de precio del proveedor: alzas, impacto en margen y aprobación",
+      },
     ],
   },
   {
@@ -113,7 +167,12 @@ export const compradorModules: NavModule[] = [
     to: "/proveedores",
     hint: "Cumplimiento, lead time y monto pendiente",
     children: [
-      { to: "/proveedores", label: "Proveedores", icon: IconSuppliers, hint: "Cumplimiento, lead time y monto pendiente — para decidir si seguir comprando" },
+      {
+        to: "/proveedores",
+        label: "Proveedores",
+        icon: IconSuppliers,
+        hint: "Cumplimiento, lead time y monto pendiente — para decidir si seguir comprando",
+      },
     ],
   },
   {
@@ -124,10 +183,43 @@ export const compradorModules: NavModule[] = [
     hint: "OC, recepciones, aprobaciones y aprendizaje de compra",
     badgeKeys: ["aprobaciones"],
     children: [
-      { to: "/ordenes-compra", label: "Órdenes de compra", icon: IconOrders, hint: "Seguimiento de OC y creación desde el borrador" },
-      { to: "/recepciones", label: "Recepciones", icon: IconInventory, hint: "Qué viene en camino, qué llegó y cómo llegó" },
-      { to: "/aprobaciones", label: "Aprobaciones", icon: IconCheck, hint: "Compras fuera de criterio que requieren aprobación y justificación", badge: "aprobaciones" },
-      { to: "/aprendizaje", label: "Aprendizaje de compra", icon: IconBulb, hint: "¿Se compró corto, saludable o de más? Sugerido vs comprado y su resultado" },
+      {
+        to: "/cotizaciones",
+        label: "Cotizaciones",
+        icon: IconChat,
+        hint: "Solicita y compara cotizaciones (RFQ) y conviértelas en OC",
+      },
+      {
+        to: "/ordenes-compra",
+        label: "Órdenes de compra",
+        icon: IconOrders,
+        hint: "Seguimiento de OC y creación desde el borrador",
+      },
+      {
+        to: "/recepciones",
+        label: "Recepciones",
+        icon: IconInventory,
+        hint: "Qué viene en camino, qué llegó y cómo llegó",
+      },
+      {
+        to: "/aprobaciones",
+        label: "Aprobaciones",
+        icon: IconCheck,
+        hint: "Compras fuera de criterio que requieren aprobación y justificación",
+        badge: "aprobaciones",
+      },
+      {
+        to: "/aprendizaje",
+        label: "Aprendizaje de compra",
+        icon: IconBulb,
+        hint: "¿Se compró corto, saludable o de más? Sugerido vs comprado y su resultado",
+      },
+      {
+        to: "/documentos",
+        label: "Documentos",
+        icon: IconDownload,
+        hint: "Repositorio central: cotizaciones, OC, guías, facturas, listas y contratos",
+      },
     ],
   },
   {
@@ -138,8 +230,20 @@ export const compradorModules: NavModule[] = [
     hint: "Alertas del sistema y señales del terreno",
     badgeKeys: ["alertas", "senales"],
     children: [
-      { to: "/alertas", label: "Alertas comerciales", icon: IconAlerts, hint: "Problemas que requieren atención del comprador", badge: "alertas" },
-      { to: "/senales-ventas", label: "Señales de ventas", icon: IconSignal, hint: "Lo que ventas detecta en el terreno: quiebres, demanda y oportunidades", badge: "senales" },
+      {
+        to: "/alertas",
+        label: "Alertas comerciales",
+        icon: IconAlerts,
+        hint: "Problemas que requieren atención del comprador",
+        badge: "alertas",
+      },
+      {
+        to: "/senales-ventas",
+        label: "Señales de ventas",
+        icon: IconSignal,
+        hint: "Lo que ventas detecta en el terreno: quiebres, demanda y oportunidades",
+        badge: "senales",
+      },
     ],
   },
   {
@@ -149,9 +253,42 @@ export const compradorModules: NavModule[] = [
     to: "/inventario",
     hint: "Inventario, ventas y margen por canal — cada corte enlaza a su acción",
     children: [
-      { to: "/inventario", label: "Inventario", icon: IconInventory, hint: "Capital inmovilizado, sobrestock y quiebres" },
-      { to: "/ventas", label: "Ventas", icon: IconSales, hint: "Qué se vende, qué crece y qué cae" },
-      { to: "/margen-canal", label: "Margen por canal", icon: IconSales, hint: "Precio y margen por marketplace, web y tienda" },
+      {
+        to: "/analisis-compra",
+        label: "Ranking & liquidación",
+        icon: IconSales,
+        hint: "Top productos, proveedores y marcas; y qué liquidar o descontinuar",
+      },
+      {
+        to: "/inventario",
+        label: "Inventario",
+        icon: IconInventory,
+        hint: "Capital inmovilizado, sobrestock y quiebres",
+      },
+      {
+        to: "/ventas",
+        label: "Ventas",
+        icon: IconSales,
+        hint: "Qué se vende, qué crece y qué cae",
+      },
+      {
+        to: "/margen-canal",
+        label: "Margen por canal",
+        icon: IconSales,
+        hint: "Precio y margen por marketplace, web y tienda",
+      },
+      {
+        to: "/presupuesto",
+        label: "Presupuesto",
+        icon: IconRules,
+        hint: "Presupuesto por categoría: comprometido, recibido, disponible y proyección",
+      },
+      {
+        to: "/reportes",
+        label: "Reportes",
+        icon: IconDashboard,
+        hint: "Reportes consolidados de compras, OC, rotación, márgenes y proveedores",
+      },
     ],
   },
   {
@@ -161,7 +298,12 @@ export const compradorModules: NavModule[] = [
     to: "/mi-desempeno",
     hint: "Tu score, metas del mes y foco de hoy",
     children: [
-      { to: "/mi-desempeno", label: "Mi desempeño", icon: IconBulb, hint: "Tu score, metas del mes y foco de hoy" },
+      {
+        to: "/mi-desempeno",
+        label: "Mi desempeño",
+        icon: IconBulb,
+        hint: "Tu score, metas del mes y foco de hoy",
+      },
     ],
   },
 ];
@@ -179,8 +321,20 @@ export const liderExtraModules: NavModule[] = [
     hint: "Cómo está funcionando el área de compras hoy",
     badgeKeys: ["equipoAlertas"],
     children: [
-      { to: "/equipo", label: "Panel del equipo", icon: IconDashboard, end: true, hint: "Cómo está funcionando el área de compras hoy" },
-      { to: "/equipo/alertas", label: "Alertas del equipo", icon: IconAlerts, hint: "Riesgos del equipo priorizados", badge: "equipoAlertas" },
+      {
+        to: "/equipo",
+        label: "Panel del equipo",
+        icon: IconDashboard,
+        end: true,
+        hint: "Cómo está funcionando el área de compras hoy",
+      },
+      {
+        to: "/equipo/alertas",
+        label: "Alertas del equipo",
+        icon: IconAlerts,
+        hint: "Riesgos del equipo priorizados",
+        badge: "equipoAlertas",
+      },
     ],
   },
   {
@@ -190,10 +344,25 @@ export const liderExtraModules: NavModule[] = [
     to: "/equipo/compradores",
     hint: "Compradores, competencia, metas y carga del equipo",
     children: [
-      { to: "/equipo/compradores", label: "Compradores", icon: IconSuppliers, hint: "Ficha y desempeño por comprador" },
-      { to: "/equipo/ranking", label: "Competencia", icon: IconSales, hint: "Ranking general, rankings por dimensión y reconocimientos del mes" },
+      {
+        to: "/equipo/compradores",
+        label: "Compradores",
+        icon: IconSuppliers,
+        hint: "Ficha y desempeño por comprador",
+      },
+      {
+        to: "/equipo/ranking",
+        label: "Competencia",
+        icon: IconSales,
+        hint: "Ranking general, rankings por dimensión y reconocimientos del mes",
+      },
       { to: "/equipo/metas", label: "Metas", icon: IconCheck, hint: "OKRs por comprador" },
-      { to: "/equipo/carga", label: "Carga & reasignación", icon: IconRules, hint: "Equilibrar la carga del equipo" },
+      {
+        to: "/equipo/carga",
+        label: "Carga & reasignación",
+        icon: IconRules,
+        hint: "Equilibrar la carga del equipo",
+      },
     ],
   },
 ];

@@ -19,15 +19,9 @@ function escapeCell(value: string | number): string {
   return s;
 }
 
-export function exportToCsv<T>(
-  filename: string,
-  rows: T[],
-  columns: CsvColumn<T>[]
-): void {
+export function exportToCsv<T>(filename: string, rows: T[], columns: CsvColumn<T>[]): void {
   const header = columns.map((c) => escapeCell(c.label)).join(";");
-  const body = rows
-    .map((row) => columns.map((c) => escapeCell(c.value(row))).join(";"))
-    .join("\n");
+  const body = rows.map((row) => columns.map((c) => escapeCell(c.value(row))).join(";")).join("\n");
   const csv = `${header}\n${body}`;
 
   // BOM para que Excel detecte UTF-8 (acentos, ñ, $).

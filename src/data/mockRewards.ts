@@ -20,7 +20,22 @@ export const REWARD_CRITERIA: { value: RewardCriterion; label: string }[] = [
 ];
 
 export const defaultRewards: Reward[] = [
-  { id: "r1", criterion: "general", title: "Campeón de la temporada", reward: "Bono $150.000 + día libre" },
-  { id: "r2", criterion: "mejora", title: "Mayor recuperación", reward: "Reconocimiento en reunión + $50.000" },
-  { id: "r3", criterion: "quiebres", title: "Disponibilidad impecable", reward: "Gift card $40.000" },
+  {
+    id: "r1",
+    criterion: "general",
+    title: "Campeón de la temporada",
+    reward: "Bono $150.000 + día libre",
+  },
+  {
+    id: "r2",
+    criterion: "mejora",
+    title: "Mayor recuperación",
+    reward: "Reconocimiento en reunión + $50.000",
+  },
+  {
+    id: "r3",
+    criterion: "quiebres",
+    title: "Disponibilidad impecable",
+    reward: "Gift card $40.000",
+  },
 ];

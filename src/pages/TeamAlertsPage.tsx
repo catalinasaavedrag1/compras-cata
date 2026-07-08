@@ -41,7 +41,8 @@ export function TeamAlertsPage() {
   const [sel, setSel] = useState<Buyer | null>(null);
 
   const list = [...leaderAlerts].sort(
-    (x, y) => ({ high: 0, medium: 1, low: 2 }[x.severity] - { high: 0, medium: 1, low: 2 }[y.severity])
+    (x, y) =>
+      ({ high: 0, medium: 1, low: 2 })[x.severity] - { high: 0, medium: 1, low: 2 }[y.severity]
   );
   const count = (s: string) => leaderAlerts.filter((a) => a.severity === s).length;
 
@@ -68,21 +69,32 @@ export function TeamAlertsPage() {
       />
 
       <div className="flex flex-wrap gap-2.5 mb-4">
-        <Badge tone="red" dot>{count("high")} de alta prioridad</Badge>
-        <Badge tone="amber" dot>{count("medium")} media</Badge>
-        <Badge tone="slate" dot>{count("low")} baja</Badge>
+        <Badge tone="red" dot>
+          {count("high")} de alta prioridad
+        </Badge>
+        <Badge tone="amber" dot>
+          {count("medium")} media
+        </Badge>
+        <Badge tone="slate" dot>
+          {count("low")} baja
+        </Badge>
       </div>
 
       <div className="space-y-3">
         {list.map((a) => {
           const sev = SEV[a.severity];
           return (
-            <Card key={a.id} className="p-4 flex gap-4 items-start" >
-              <div className="self-stretch w-1 rounded-full flex-shrink-0" style={{ background: sev.accent }} />
+            <Card key={a.id} className="p-4 flex gap-4 items-start">
+              <div
+                className="self-stretch w-1 rounded-full flex-shrink-0"
+                style={{ background: sev.accent }}
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <Badge tone={sev.tone}>Severidad {sev.label}</Badge>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{TYPE_LABEL[a.type]}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    {TYPE_LABEL[a.type]}
+                  </span>
                   <span className="text-xs text-slate-300">·</span>
                   <span className="text-xs font-medium text-slate-500">{a.buyer ?? "Área"}</span>
                 </div>
@@ -90,12 +102,22 @@ export function TeamAlertsPage() {
                 <p className="text-sm text-slate-500 mt-1 leading-snug">{a.detail}</p>
                 <div className="flex items-start gap-2 mt-2.5 bg-amber-50 rounded-lg px-3 py-2">
                   <IconAlerts className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <span className="text-xs text-amber-800 leading-snug"><b className="font-semibold">Por qué importa:</b> {IMPACT[a.type]}</span>
+                  <span className="text-xs text-amber-800 leading-snug">
+                    <b className="font-semibold">Por qué importa:</b> {IMPACT[a.type]}
+                  </span>
                 </div>
               </div>
               <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Acción</span>
-                <Button size="sm" onClick={() => handle(a)} icon={<IconArrowRight className="w-3.5 h-3.5" />}>{a.action}</Button>
+                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">
+                  Acción
+                </span>
+                <Button
+                  size="sm"
+                  onClick={() => handle(a)}
+                  icon={<IconArrowRight className="w-3.5 h-3.5" />}
+                >
+                  {a.action}
+                </Button>
               </div>
             </Card>
           );

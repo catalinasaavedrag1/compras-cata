@@ -12,12 +12,7 @@ import type { BadgeTone } from "../ui/Badge";
 //  para que la vista sea consistente y entendible por usuarios no técnicos.
 // ============================================================================
 
-export type SignalGroup =
-  | "Quiebre"
-  | "Demanda"
-  | "Sugerencia"
-  | "Precio"
-  | "Liquidación";
+export type SignalGroup = "Quiebre" | "Demanda" | "Sugerencia" | "Precio" | "Liquidación";
 
 export interface SignalTypeMeta {
   label: string; // nombre completo
@@ -125,10 +120,7 @@ export const SIGNAL_STATUS: Record<SignalStatus, SignalStatusMeta> = {
   resolved: { label: "Resuelto", tone: "neutral" },
 };
 
-export const SIGNAL_PRIORITY: Record<
-  SignalPriority,
-  { label: string; tone: BadgeTone }
-> = {
+export const SIGNAL_PRIORITY: Record<SignalPriority, { label: string; tone: BadgeTone }> = {
   high: { label: "Alta", tone: "red" },
   medium: { label: "Media", tone: "amber" },
   low: { label: "Baja", tone: "neutral" },
@@ -138,11 +130,7 @@ export const SIGNAL_PRIORITY: Record<
 export const STOCKOUT_TYPES: SignalType[] = ["stockout", "asked_no_stock"];
 
 /** Tipos que representan presión de demanda. */
-export const DEMAND_TYPES: SignalType[] = [
-  "high_demand",
-  "unexpected_demand",
-  "restock",
-];
+export const DEMAND_TYPES: SignalType[] = ["high_demand", "unexpected_demand", "restock"];
 
 /**
  * Lógica de prioridad visible y explicable:

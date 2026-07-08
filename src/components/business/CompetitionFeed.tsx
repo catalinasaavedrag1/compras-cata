@@ -24,15 +24,28 @@ export function CompetitionFeed({ items, meId }: { items: FeedItem[]; meId?: str
         const cfg = KIND_CFG[it.kind];
         const isMe = it.buyerId === meId;
         return (
-          <div key={it.id} className={`flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 ${isMe ? "bg-brand-50/50" : ""}`}>
-            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${b ? BUYER_TONE_AV[b.tone] : "bg-slate-100 text-slate-500"}`}>{b?.initials ?? "—"}</span>
+          <div
+            key={it.id}
+            className={`flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 ${isMe ? "bg-brand-50/50" : ""}`}
+          >
+            <span
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${b ? BUYER_TONE_AV[b.tone] : "bg-slate-100 text-slate-500"}`}
+            >
+              {b?.initials ?? "—"}
+            </span>
             <span className="flex-1 min-w-0">
               <span className="block text-sm text-slate-700 leading-snug">
                 <b className="font-semibold text-slate-800">{isMe ? "Tú" : b?.name}</b> {it.text}
               </span>
             </span>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] flex-shrink-0 ${cfg.bg} ${cfg.fg}`}>{cfg.icon}</span>
-            <span className="text-[11px] text-slate-400 flex-shrink-0 w-12 text-right">{it.time}</span>
+            <span
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] flex-shrink-0 ${cfg.bg} ${cfg.fg}`}
+            >
+              {cfg.icon}
+            </span>
+            <span className="text-[11px] text-slate-400 flex-shrink-0 w-12 text-right">
+              {it.time}
+            </span>
           </div>
         );
       })}

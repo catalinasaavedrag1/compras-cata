@@ -73,7 +73,13 @@ export function KpiCard({
         )}
       </div>
       <div className="flex items-baseline gap-2 flex-wrap">
-        <span className={cn(compact ? "text-xl" : "text-2xl", "font-semibold tracking-tight", toneValue[tone])}>
+        <span
+          className={cn(
+            compact ? "text-xl" : "text-2xl",
+            "font-semibold tracking-tight",
+            toneValue[tone]
+          )}
+        >
           {value}
         </span>
         {hasDelta && (

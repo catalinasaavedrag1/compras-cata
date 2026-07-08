@@ -61,3 +61,14 @@ export function formatDays(value: number): string {
   if (!Number.isFinite(value)) return "—";
   return value === 1 ? "1 día" : `${formatNumber(value)} días`;
 }
+
+/**
+ * Etiqueta combinada de producto: "Cemento Polpaico 25 kg - 001001016".
+ * Úsala donde solo se mostraría el código SKU "pelado" para que el comprador
+ * vea de qué producto se trata. Donde ya se muestra el nombre junto al código
+ * no hace falta (evita duplicar el nombre).
+ */
+export function productLabel(name: string | undefined, sku: string | undefined): string {
+  if (name && sku) return `${name} - ${sku}`;
+  return name || sku || "—";
+}

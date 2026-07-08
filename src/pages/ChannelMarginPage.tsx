@@ -81,13 +81,18 @@ export function ChannelMarginPage() {
   }, [scope, buyer]);
 
   const scopeLabel =
-    scope === "todos" ? "Todos los compradores" : scope === "mias" ? `Mis categorías (${buyer})` : `Comprador ${scope}`;
+    scope === "todos"
+      ? "Todos los compradores"
+      : scope === "mias"
+        ? `Mis categorías (${buyer})`
+        : `Comprador ${scope}`;
 
   // Agrupar por SKU
   const allGroups = useMemo<SkuGroup[]>(() => {
     const map = new Map<string, ChannelMargin[]>();
     for (const c of scoped) {
-      if (query.trim() && !`${c.sku} ${c.productName}`.toLowerCase().includes(query.toLowerCase())) continue;
+      if (query.trim() && !`${c.sku} ${c.productName}`.toLowerCase().includes(query.toLowerCase()))
+        continue;
       if (category && c.category !== category) continue;
       if (supplier && c.supplierName !== supplier) continue;
       const arr = map.get(c.sku) ?? [];
@@ -154,9 +159,16 @@ export function ChannelMarginPage() {
   const lowWeb = scoped.filter((c) => c.status === "low" && c.channel === "web").length;
   const lowStore = scoped.filter((c) => c.status === "low" && c.channel === "store").length;
 
-  const setFilter = (e: string, ch: string) => { setEstado(e); setChannel(ch); };
+  const setFilter = (e: string, ch: string) => {
+    setEstado(e);
+    setChannel(ch);
+  };
   const clearFilters = () => {
-    setQuery(""); setChannel(""); setEstado(""); setCategory(""); setSupplier("");
+    setQuery("");
+    setChannel("");
+    setEstado("");
+    setCategory("");
+    setSupplier("");
     if (withCommission) toggleCommission();
     if (withDiscount) toggleDiscount();
   };
@@ -179,7 +191,10 @@ export function ChannelMarginPage() {
               { label: "Comisión", value: (c) => c.commission },
               { label: "Margen %", value: (c) => c.marginPct },
               { label: "Objetivo %", value: (c) => c.targetMarginPct },
-              { label: "Diferencia pts", value: (c) => Math.round((c.marginPct - c.targetMarginPct) * 10) / 10 },
+              {
+                label: "Diferencia pts",
+                value: (c) => Math.round((c.marginPct - c.targetMarginPct) * 10) / 10,
+              },
               { label: "Precio sugerido", value: (c) => c.suggestedPrice },
               { label: "Estado", value: (c) => MARGIN_STATUS[c.status].label },
             ]}
@@ -197,7 +212,9 @@ export function ChannelMarginPage() {
             options={[
               { value: "mias", label: `Mis categorías (${buyer})` },
               { value: "todos", label: "Todos los compradores" },
-              ...buyers.filter((b) => b !== buyer).map((b) => ({ value: b, label: `Comprador: ${b}` })),
+              ...buyers
+                .filter((b) => b !== buyer)
+                .map((b) => ({ value: b, label: `Comprador: ${b}` })),
             ]}
           />
         </div>
@@ -216,26 +233,117 @@ export function ChannelMarginPage() {
           summary={`${groups.length} productos · ${negative} con margen negativo · ${low} bajo margen`}
           onClear={clearFilters}
           selects={[
-            { key: "canal", placeholder: "Canal", value: channel, onChange: setChannel, options: Object.entries(CHANNEL_LABELS).map(([value, label]) => ({ value, label })) },
-            { key: "estado", placeholder: "Estado margen", value: estado, onChange: setEstado, options: Object.entries(MARGIN_STATUS).map(([value, cfg]) => ({ value, label: cfg.label })) },
-            { key: "cat", placeholder: "Categoría", value: category, onChange: setCategory, options: uniqueValues(channelMargins, (c) => c.category).map((c) => ({ value: c, label: c })) },
-            { key: "prov", placeholder: "Proveedor", value: supplier, onChange: setSupplier, options: uniqueValues(channelMargins.filter((c) => c.supplierName), (c) => c.supplierName).map((c) => ({ value: c, label: c })) },
+            {
+              key: "canal",
+              placeholder: "Canal",
+              value: channel,
+              onChange: setChannel,
+              options: Object.entries(CHANNEL_LABELS).map(([value, label]) => ({ value, label })),
+            },
+            {
+              key: "estado",
+              placeholder: "Estado margen",
+              value: estado,
+              onChange: setEstado,
+              options: Object.entries(MARGIN_STATUS).map(([value, cfg]) => ({
+                value,
+                label: cfg.label,
+              })),
+            },
+            {
+              key: "cat",
+              placeholder: "Categoría",
+              value: category,
+              onChange: setCategory,
+              options: uniqueValues(channelMargins, (c) => c.category).map((c) => ({
+                value: c,
+                label: c,
+              })),
+            },
+            {
+              key: "prov",
+              placeholder: "Proveedor",
+              value: supplier,
+              onChange: setSupplier,
+              options: uniqueValues(
+                channelMargins.filter((c) => c.supplierName),
+                (c) => c.supplierName
+              ).map((c) => ({ value: c, label: c })),
+            },
           ]}
           toggles={[
-            { key: "comision", label: "Con comisión", active: withCommission, onToggle: toggleCommission },
-            { key: "descuento", label: "Con descuento", active: withDiscount, onToggle: toggleDiscount },
+            {
+              key: "comision",
+              label: "Con comisión",
+              active: withCommission,
+              onToggle: toggleCommission,
+            },
+            {
+              key: "descuento",
+              label: "Con descuento",
+              active: withDiscount,
+              onToggle: toggleDiscount,
+            },
           ]}
         />
       </div>
 
       {/* KPIs cliqueables (solo escritorio; en móvil se usan las pestañas compactas) */}
       <div className="hidden md:grid md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
-        <KpiCard title="Bajo margen" value={formatNumber(low)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} active={estado === "low" && !channel} onClick={() => setFilter("low", "")} description="Filtrar" />
-        <KpiCard title="Margen negativo" value={formatNumber(negative)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} active={estado === "negative"} onClick={() => setFilter("negative", "")} description="Filtrar" />
-        <KpiCard title="Sobre marginados" value={formatNumber(over)} tone="warn" icon={<IconBox className="w-4 h-4" />} active={estado === "over"} onClick={() => setFilter("over", "")} description="Filtrar" />
-        <KpiCard title="Bajo margen · Marketplace" value={formatNumber(lowMkt)} tone="warn" icon={<IconSales className="w-4 h-4" />} active={estado === "low" && channel === "marketplace"} onClick={() => setFilter("low", "marketplace")} description="Filtrar" />
-        <KpiCard title="Bajo margen · Web" value={formatNumber(lowWeb)} tone="warn" icon={<IconSales className="w-4 h-4" />} active={estado === "low" && channel === "web"} onClick={() => setFilter("low", "web")} description="Filtrar" />
-        <KpiCard title="Bajo margen · Tienda" value={formatNumber(lowStore)} tone="warn" icon={<IconSales className="w-4 h-4" />} active={estado === "low" && channel === "store"} onClick={() => setFilter("low", "store")} description="Filtrar" />
+        <KpiCard
+          title="Bajo margen"
+          value={formatNumber(low)}
+          tone="warn"
+          icon={<IconAlerts className="w-4 h-4" />}
+          active={estado === "low" && !channel}
+          onClick={() => setFilter("low", "")}
+          description="Filtrar"
+        />
+        <KpiCard
+          title="Margen negativo"
+          value={formatNumber(negative)}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+          active={estado === "negative"}
+          onClick={() => setFilter("negative", "")}
+          description="Filtrar"
+        />
+        <KpiCard
+          title="Sobre marginados"
+          value={formatNumber(over)}
+          tone="warn"
+          icon={<IconBox className="w-4 h-4" />}
+          active={estado === "over"}
+          onClick={() => setFilter("over", "")}
+          description="Filtrar"
+        />
+        <KpiCard
+          title="Bajo margen · Marketplace"
+          value={formatNumber(lowMkt)}
+          tone="warn"
+          icon={<IconSales className="w-4 h-4" />}
+          active={estado === "low" && channel === "marketplace"}
+          onClick={() => setFilter("low", "marketplace")}
+          description="Filtrar"
+        />
+        <KpiCard
+          title="Bajo margen · Web"
+          value={formatNumber(lowWeb)}
+          tone="warn"
+          icon={<IconSales className="w-4 h-4" />}
+          active={estado === "low" && channel === "web"}
+          onClick={() => setFilter("low", "web")}
+          description="Filtrar"
+        />
+        <KpiCard
+          title="Bajo margen · Tienda"
+          value={formatNumber(lowStore)}
+          tone="warn"
+          icon={<IconSales className="w-4 h-4" />}
+          active={estado === "low" && channel === "store"}
+          onClick={() => setFilter("low", "store")}
+          description="Filtrar"
+        />
       </div>
 
       {/* Tabs por estado general del SKU */}
@@ -253,8 +361,9 @@ export function ChannelMarginPage() {
       />
 
       <HelpNote className="mb-4">
-        Cada tarjeta es un producto con sus 3 canales <b>lado a lado</b>. Verde = mejor margen, rojo = peor.
-        Cuando un canal está bajo el objetivo se muestra el <b>precio sugerido</b> y la acción.
+        Cada tarjeta es un producto con sus 3 canales <b>lado a lado</b>. Verde = mejor margen, rojo
+        = peor. Cuando un canal está bajo el objetivo se muestra el <b>precio sugerido</b> y la
+        acción.
       </HelpNote>
 
       {groups.length === 0 ? (
@@ -270,7 +379,9 @@ export function ChannelMarginPage() {
               key={g.sku}
               group={g}
               onOpen={() => navigate(`/productos/${g.sku}?tab=margen`)}
-              onTask={() => toast.success(`Tarea de revisión de margen creada para ${g.productName}`)}
+              onTask={() =>
+                toast.success(`Tarea de revisión de margen creada para ${g.productName}`)
+              }
             />
           ))}
         </div>
@@ -279,7 +390,15 @@ export function ChannelMarginPage() {
   );
 }
 
-function SkuCard({ group, onOpen, onTask }: { group: SkuGroup; onOpen: () => void; onTask: () => void }) {
+function SkuCard({
+  group,
+  onOpen,
+  onTask,
+}: {
+  group: SkuGroup;
+  onOpen: () => void;
+  onTask: () => void;
+}) {
   const gen = GENERAL_STATUS[group.general];
   const worst = [...group.present].sort((a, b) => a.marginPct - b.marginPct)[0];
   const worstDiff = Math.round((worst.marginPct - worst.targetMarginPct) * 10) / 10;
@@ -295,16 +414,44 @@ function SkuCard({ group, onOpen, onTask }: { group: SkuGroup; onOpen: () => voi
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-mono text-slate-400">{group.sku}</span>
-              <Badge tone={gen.tone} dot>{gen.label}</Badge>
+              <Badge tone={gen.tone} dot>
+                {gen.label}
+              </Badge>
             </div>
-            <Link to={productPath(group.sku)} className="font-semibold text-slate-800 leading-snug hover:text-brand-700 hover:underline block">{group.productName}</Link>
+            <Link
+              to={productPath(group.sku)}
+              className="font-semibold text-slate-800 leading-snug hover:text-brand-700 hover:underline block"
+            >
+              {group.productName}
+            </Link>
             <p className="text-xs text-slate-500">
-              <Link to={categoryPath(group.category)} className="hover:text-brand-700 hover:underline">{group.category}</Link> · {group.supplierName ? <Link to={supplierPath(group.supplierName)} className="hover:text-brand-700 hover:underline">{group.supplierName}</Link> : "Sin proveedor"} · objetivo {formatPercent(group.target, 0)} · {group.buyer}
+              <Link
+                to={categoryPath(group.category)}
+                className="hover:text-brand-700 hover:underline"
+              >
+                {group.category}
+              </Link>{" "}
+              ·{" "}
+              {group.supplierName ? (
+                <Link
+                  to={supplierPath(group.supplierName)}
+                  className="hover:text-brand-700 hover:underline"
+                >
+                  {group.supplierName}
+                </Link>
+              ) : (
+                "Sin proveedor"
+              )}{" "}
+              · objetivo {formatPercent(group.target, 0)} · {group.buyer}
             </p>
           </div>
           <div className="flex gap-2 flex-shrink-0">
-            <Button size="sm" variant="secondary" onClick={onTask}>Crear tarea</Button>
-            <Button size="sm" onClick={onOpen}>Ver detalle</Button>
+            <Button size="sm" variant="secondary" onClick={onTask}>
+              Crear tarea
+            </Button>
+            <Button size="sm" onClick={onOpen}>
+              Ver detalle
+            </Button>
           </div>
         </div>
 
@@ -315,14 +462,25 @@ function SkuCard({ group, onOpen, onTask }: { group: SkuGroup; onOpen: () => voi
 
         {/* Resumen comparativo */}
         <p className="text-xs text-slate-500 mb-2.5">
-          Precio {formatCurrency(group.minPrice)}–{formatCurrency(group.maxPrice)} · margen {formatPercent(group.minMargin)}–{formatPercent(group.maxMargin)}
-          {group.maxPrice > group.minPrice && <> · dif. {formatCurrency(group.maxPrice - group.minPrice)} entre canales</>}
+          Precio {formatCurrency(group.minPrice)}–{formatCurrency(group.maxPrice)} · margen{" "}
+          {formatPercent(group.minMargin)}–{formatPercent(group.maxMargin)}
+          {group.maxPrice > group.minPrice && (
+            <> · dif. {formatCurrency(group.maxPrice - group.minPrice)} entre canales</>
+          )}
         </p>
 
         {/* Canales lado a lado */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {group.channels.map((c, i) => {
-            if (!c) return <div key={i} className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-300">Sin canal</div>;
+            if (!c)
+              return (
+                <div
+                  key={i}
+                  className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-300"
+                >
+                  Sin canal
+                </div>
+              );
             const diff = Math.round((c.marginPct - c.targetMarginPct) * 10) / 10;
             const isBest = c.marginPct === group.maxMargin && group.maxMargin !== group.minMargin;
             const isWorst = c.marginPct === group.minMargin && group.maxMargin !== group.minMargin;
@@ -331,25 +489,46 @@ function SkuCard({ group, onOpen, onTask }: { group: SkuGroup; onOpen: () => voi
               <div
                 key={i}
                 className={`rounded-lg border p-2.5 ${
-                  isBest ? "border-emerald-200 bg-emerald-50/60" : isWorst ? "border-rose-200 bg-rose-50/60" : "border-slate-200 bg-slate-50"
+                  isBest
+                    ? "border-emerald-200 bg-emerald-50/60"
+                    : isWorst
+                      ? "border-rose-200 bg-rose-50/60"
+                      : "border-slate-200 bg-slate-50"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-xs font-semibold text-slate-700">{CHANNEL_LABELS[c.channel]}</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {CHANNEL_LABELS[c.channel]}
+                  </span>
                   <Badge tone={cfg.tone}>{cfg.label}</Badge>
                 </div>
-                <p className="text-lg font-semibold text-slate-900 leading-tight">{formatCurrency(c.finalPrice)}</p>
+                <p className="text-lg font-semibold text-slate-900 leading-tight">
+                  {formatCurrency(c.finalPrice)}
+                </p>
                 <div className="flex items-baseline gap-2 mt-0.5">
-                  <span className={`text-sm font-semibold ${c.marginPct < 0 ? "text-rose-600" : c.status === "low" ? "text-amber-600" : "text-slate-700"}`}>
+                  <span
+                    className={`text-sm font-semibold ${c.marginPct < 0 ? "text-rose-600" : c.status === "low" ? "text-amber-600" : "text-slate-700"}`}
+                  >
                     {formatPercent(c.marginPct)}
                   </span>
                   <span className={`text-xs ${diff < 0 ? "text-rose-500" : "text-emerald-600"}`}>
-                    {diff >= 0 ? "+" : ""}{diff.toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pts
+                    {diff >= 0 ? "+" : ""}
+                    {diff.toLocaleString("es-CL", {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}{" "}
+                    pts
                   </span>
                 </div>
-                {c.commission > 0 && <p className="text-xs text-slate-400 mt-0.5">comisión {formatCurrency(c.commission)}</p>}
+                {c.commission > 0 && (
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    comisión {formatCurrency(c.commission)}
+                  </p>
+                )}
                 {(c.status === "low" || c.status === "negative") && (
-                  <p className="text-xs text-brand-700 mt-1">Sugerido: <b>{formatCurrency(c.suggestedPrice)}</b></p>
+                  <p className="text-xs text-brand-700 mt-1">
+                    Sugerido: <b>{formatCurrency(c.suggestedPrice)}</b>
+                  </p>
                 )}
               </div>
             );
@@ -360,7 +539,10 @@ function SkuCard({ group, onOpen, onTask }: { group: SkuGroup; onOpen: () => voi
         {group.general !== "ok" && (
           <div className="mt-2.5 flex gap-2 rounded-lg bg-brand-50/60 border border-brand-100 px-3 py-2">
             <IconAlerts className="w-4 h-4 text-brand-500 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-slate-700"><span className="font-medium">Acción: </span>{group.conclusion}</p>
+            <p className="text-sm text-slate-700">
+              <span className="font-medium">Acción: </span>
+              {group.conclusion}
+            </p>
           </div>
         )}
       </div>

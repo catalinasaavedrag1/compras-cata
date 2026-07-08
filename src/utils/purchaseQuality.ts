@@ -11,7 +11,10 @@ import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
 
 export type PurchaseClass = "corta" | "saludable" | "alta" | "sobrecompra" | "sin_venta";
 
-export const PURCHASE_CLASS: Record<PurchaseClass, { label: string; tone: "red" | "green" | "amber" | "violet" | "neutral" }> = {
+export const PURCHASE_CLASS: Record<
+  PurchaseClass,
+  { label: string; tone: "red" | "green" | "amber" | "violet" | "neutral" }
+> = {
   corta: { label: "Compra corta", tone: "red" },
   saludable: { label: "Saludable", tone: "green" },
   alta: { label: "Compra alta", tone: "amber" },

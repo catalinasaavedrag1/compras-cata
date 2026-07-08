@@ -92,8 +92,20 @@ export const receptions: Reception[] = [
       { sku: "HER-003", productName: "Disco corte metal 4 1/2", expected: 90, received: 90 },
       { sku: "HER-002", productName: "Sierra circular Makita 7 1/4", expected: 40, received: 40 },
       { sku: "HER-004", productName: "Esmeril angular Bosch 4.5", expected: 40, received: 40 },
-      { sku: "HER-006", productName: "Atornillador inalámbrico DeWalt 12V", expected: 50, received: 0, issue: "No despachado por el proveedor" },
-      { sku: "SEG-002", productName: "Casco de seguridad ABS", expected: 30, received: 0, issue: "No despachado por el proveedor" },
+      {
+        sku: "HER-006",
+        productName: "Atornillador inalámbrico DeWalt 12V",
+        expected: 50,
+        received: 0,
+        issue: "No despachado por el proveedor",
+      },
+      {
+        sku: "SEG-002",
+        productName: "Casco de seguridad ABS",
+        expected: 30,
+        received: 0,
+        issue: "No despachado por el proveedor",
+      },
     ],
   },
   {
@@ -127,7 +139,13 @@ export const receptions: Reception[] = [
     qualityOk: false,
     qualityNote: "12 días de atraso. Sin fecha confirmada del proveedor.",
     items: [
-      { sku: "HER-002", productName: "Sierra circular Makita 7 1/4", expected: 36, received: 0, issue: "No despachado" },
+      {
+        sku: "HER-002",
+        productName: "Sierra circular Makita 7 1/4",
+        expected: 36,
+        received: 0,
+        issue: "No despachado",
+      },
     ],
   },
   {
@@ -161,7 +179,13 @@ export const receptions: Reception[] = [
     qualityOk: false,
     qualityNote: "15 ampolletas llegaron quebradas. Coordinar nota de crédito.",
     items: [
-      { sku: "ELE-002", productName: "Ampolleta LED 12W", expected: 200, received: 185, issue: "15 unidades quebradas" },
+      {
+        sku: "ELE-002",
+        productName: "Ampolleta LED 12W",
+        expected: 200,
+        received: 185,
+        issue: "15 unidades quebradas",
+      },
       { sku: "ELE-004", productName: "Cinta aisladora negra", expected: 100, received: 100 },
     ],
   },
@@ -216,7 +240,13 @@ export const receptions: Reception[] = [
     qualityOk: false,
     qualityNote: "Fertilizante llegó con humedad en 8 sacos. Revisar antes de venta.",
     items: [
-      { sku: "AGR-001", productName: "Fertilizante agrícola NPK 25 kg", expected: 180, received: 180, issue: "8 sacos con humedad" },
+      {
+        sku: "AGR-001",
+        productName: "Fertilizante agrícola NPK 25 kg",
+        expected: 180,
+        received: 180,
+        issue: "8 sacos con humedad",
+      },
     ],
   },
   {
@@ -253,8 +283,20 @@ export const receptions: Reception[] = [
       { sku: "CON-001", productName: "Cemento Polpaico 25 kg", expected: 500, received: 500 },
       { sku: "MAD-001", productName: "Plancha OSB 9,5 mm", expected: 140, received: 140 },
       { sku: "CON-003", productName: "Fierro estriado 8 mm x 6 m", expected: 120, received: 120 },
-      { sku: "MAD-003", productName: "Terciado estructural 15 mm", expected: 60, received: 0, issue: "No despachado por el proveedor" },
-      { sku: "CON-004", productName: "Arena gruesa saco 25 kg", expected: 160, received: 0, issue: "No despachado por el proveedor" },
+      {
+        sku: "MAD-003",
+        productName: "Terciado estructural 15 mm",
+        expected: 60,
+        received: 0,
+        issue: "No despachado por el proveedor",
+      },
+      {
+        sku: "CON-004",
+        productName: "Arena gruesa saco 25 kg",
+        expected: 160,
+        received: 0,
+        issue: "No despachado por el proveedor",
+      },
     ],
   },
 ];

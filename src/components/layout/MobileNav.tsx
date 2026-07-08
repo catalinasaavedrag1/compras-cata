@@ -1,18 +1,13 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { navGroupsFor } from "./navItems";
-import { Brand } from "./Sidebar";
+import { Brand } from "./Brand";
 import { cn } from "../../utils/cn";
 import { Input } from "../ui/Input";
 import { useRole } from "../../context/RoleContext";
 import { IconClose, IconSearch } from "../ui/icons";
 import { useNavBadges } from "./useNavBadges";
-
-const PILL: Record<string, string> = {
-  red: "bg-rose-100 text-rose-700",
-  amber: "bg-amber-100 text-amber-700",
-  blue: "bg-brand-100 text-brand-700",
-};
+import { PILL_TONE as PILL } from "../../utils/tone";
 
 interface MobileNavProps {
   open: boolean;
@@ -69,37 +64,42 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
                   const b = item.badge ? badges[item.badge] : undefined;
                   const showBadge = !!b && b.count > 0;
                   return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-brand-50 text-brand-700"
-                          : "text-slate-600 hover:bg-slate-100"
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <item.icon
-                          className={cn(
-                            "w-5 h-5",
-                            isActive ? "text-brand-600" : "text-slate-400"
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      onClick={onClose}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-brand-50 text-brand-700"
+                            : "text-slate-600 hover:bg-slate-100"
+                        )
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <item.icon
+                            className={cn(
+                              "w-5 h-5",
+                              isActive ? "text-brand-600" : "text-slate-400"
+                            )}
+                          />
+                          {item.label}
+                          {showBadge && (
+                            <span
+                              className={cn(
+                                "ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 min-w-[20px] text-center",
+                                PILL[b!.tone] ?? "bg-slate-100 text-slate-600"
+                              )}
+                            >
+                              {b!.count > 99 ? "99+" : b!.count}
+                            </span>
                           )}
-                        />
-                        {item.label}
-                        {showBadge && (
-                          <span className={cn("ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 min-w-[20px] text-center", PILL[b!.tone] ?? "bg-slate-100 text-slate-600")}>
-                            {b!.count > 99 ? "99+" : b!.count}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </NavLink>
+                        </>
+                      )}
+                    </NavLink>
                   );
                 })}
               </div>

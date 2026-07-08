@@ -3,27 +3,11 @@
 //  Todo el dominio de negocio (productos, proveedores, OC, alertas, etc.)
 // ============================================================================
 
-export type ProductStatus =
-  | "active"
-  | "new"
-  | "discontinued"
-  | "no_sales"
-  | "seasonal"
-  | "blocked";
+export type ProductStatus = "active" | "new" | "discontinued" | "no_sales" | "seasonal" | "blocked";
 
-export type PurchaseStatus =
-  | "buy"
-  | "do_not_buy"
-  | "review"
-  | "on_demand"
-  | "overstock";
+export type PurchaseStatus = "buy" | "do_not_buy" | "review" | "on_demand" | "overstock";
 
-export type RecommendationStatus =
-  | "critical"
-  | "buy_now"
-  | "review"
-  | "normal"
-  | "overstock";
+export type RecommendationStatus = "critical" | "buy_now" | "review" | "normal" | "overstock";
 
 export type Priority = "high" | "medium" | "low";
 
@@ -44,19 +28,9 @@ export type AlertSeverity = "high" | "medium" | "low";
 
 export type AlertStatus = "new" | "in_review" | "resolved" | "ignored";
 
-export type SupplierStatus =
-  | "active"
-  | "review"
-  | "delayed"
-  | "blocked"
-  | "inactive";
+export type SupplierStatus = "active" | "review" | "delayed" | "blocked" | "inactive";
 
-export type CategoryStatus =
-  | "healthy"
-  | "review"
-  | "critical"
-  | "overstock"
-  | "low_rotation";
+export type CategoryStatus = "healthy" | "review" | "critical" | "overstock" | "low_rotation";
 
 export type AlertType =
   | "stockout"
@@ -111,6 +85,24 @@ export interface Product {
   productStatus: ProductStatus;
   purchaseStatus: PurchaseStatus;
   stockByLocation: StockByLocation[];
+  // -------------------------------------------------------------------------
+  //  Catálogo del proveedor (opcional para no romper datos existentes)
+  // -------------------------------------------------------------------------
+  codigoProveedor?: string; // código del producto en el catálogo del proveedor
+  codigoBarras?: string; // EAN-13 / código de barras
+  unidadCompra?: string; // unidad en que se compra (ej. "pallet", "caja")
+  unidadVenta?: string; // unidad en que se vende (ej. "saco", "unidad")
+  multiploCompra?: number; // múltiplo / cantidad por unidad de compra
+  costoAnterior?: number; // costo anterior (para mostrar el delta)
+  descuentoVigentePct?: number; // descuento vigente del proveedor %
+  equivalencias?: ProductEquivalence[]; // mismo producto en proveedores alternativos
+}
+
+/** Equivalencia: el mismo producto ofrecido por un proveedor alternativo. */
+export interface ProductEquivalence {
+  sku: string; // código del equivalente (del proveedor alternativo)
+  supplierName: string;
+  costo: number;
 }
 
 export interface PurchaseRecommendation {
@@ -141,6 +133,27 @@ export interface PurchaseRecommendation {
   risk: string;
 }
 
+/** Contacto de una de las áreas del proveedor (comercial, logística, cobranza). */
+export interface SupplierContact {
+  nombre: string;
+  email: string;
+  telefono: string;
+}
+
+/** Documento tributario / habilitante del proveedor (vigencia incluida). */
+export interface SupplierDocument {
+  tipo: string; // "Inicio de actividades", "Boletín comercial", "Certificado SII", etc.
+  numero: string;
+  vigente: boolean;
+  vence?: string; // fecha ISO de vencimiento (opcional)
+}
+
+/** Acuerdo comercial marco vigente con el proveedor. */
+export interface SupplierAgreementSummary {
+  titulo: string;
+  detalle: string;
+}
+
 export interface Supplier {
   id: string;
   name: string;
@@ -154,6 +167,19 @@ export interface Supplier {
   purchasedAmountLast90Days: number;
   pendingAmount: number;
   status: SupplierStatus;
+  // -------------------------------------------------------------------------
+  //  Maestro del proveedor (opcional para no romper datos existentes)
+  // -------------------------------------------------------------------------
+  contactoComercial?: SupplierContact;
+  contactoLogistica?: SupplierContact;
+  contactoCobranza?: SupplierContact;
+  condicionPago?: string; // ej. "30 días fecha factura"
+  plazoEntregaDias?: number; // plazo de entrega comprometido (puede diferir del lead time real)
+  minimoCompra?: number; // mínimo de compra (CLP)
+  minimoCompraTipo?: "monto" | "unidades"; // cómo interpretar minimoCompra
+  marcas?: string[]; // marcas que representa / distribuye
+  documentosTributarios?: SupplierDocument[];
+  acuerdosComerciales?: SupplierAgreementSummary[];
 }
 
 export interface PurchaseOrderLine {

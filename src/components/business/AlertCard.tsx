@@ -33,12 +33,7 @@ export function AlertCard({
 }: AlertCardProps) {
   return (
     <div className="relative bg-white border border-slate-200 rounded-xl shadow-card overflow-hidden">
-      <span
-        className={cn(
-          "absolute left-0 top-0 bottom-0 w-1",
-          severityBar[alert.severity]
-        )}
-      />
+      <span className={cn("absolute left-0 top-0 bottom-0 w-1", severityBar[alert.severity])} />
       <div className="pl-4 pr-4 py-3.5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
@@ -54,7 +49,10 @@ export function AlertCard({
         </div>
 
         {entityTo ? (
-          <Link to={entityTo} className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:text-brand-800 hover:underline">
+          <Link
+            to={entityTo}
+            className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+          >
             {alert.relatedEntity}
           </Link>
         ) : (
@@ -79,31 +77,27 @@ export function AlertCard({
         )}
 
         <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-xs text-slate-400">
-            Responsable: {alert.responsible}
-          </span>
-          {(onReview || onResolve) &&
-            alert.status !== "resolved" &&
-            alert.status !== "ignored" && (
-              <div className="flex gap-2">
-                {onReview && alert.status === "new" && (
-                  <button
-                    onClick={() => onReview(alert.id)}
-                    className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                  >
-                    Marcar en revisión
-                  </button>
-                )}
-                {onResolve && (
-                  <button
-                    onClick={() => onResolve(alert.id)}
-                    className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
-                  >
-                    Marcar resuelta
-                  </button>
-                )}
-              </div>
-            )}
+          <span className="text-xs text-slate-400">Responsable: {alert.responsible}</span>
+          {(onReview || onResolve) && alert.status !== "resolved" && alert.status !== "ignored" && (
+            <div className="flex gap-2">
+              {onReview && alert.status === "new" && (
+                <button
+                  onClick={() => onReview(alert.id)}
+                  className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                >
+                  Marcar en revisión
+                </button>
+              )}
+              {onResolve && (
+                <button
+                  onClick={() => onResolve(alert.id)}
+                  className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                >
+                  Marcar resuelta
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

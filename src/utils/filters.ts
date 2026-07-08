@@ -2,11 +2,7 @@
 //  Filtros reutilizables para productos, recomendaciones y alertas
 // ============================================================================
 
-import type {
-  CommercialAlert,
-  Product,
-  PurchaseRecommendation,
-} from "../types/purchasing";
+import type { CommercialAlert, Product, PurchaseRecommendation } from "../types/purchasing";
 
 function matchesText(haystack: string[], query: string): boolean {
   if (!query.trim()) return true;
@@ -27,10 +23,7 @@ export interface ProductFilters {
   noSales?: boolean;
 }
 
-export function filterProducts(
-  products: Product[],
-  f: ProductFilters
-): Product[] {
+export function filterProducts(products: Product[], f: ProductFilters): Product[] {
   return products.filter((p) => {
     if (!matchesText([p.sku, p.name, p.brand], f.query ?? "")) return false;
     if (f.category && p.category !== f.category) return false;
@@ -66,16 +59,14 @@ export function filterRecommendations(
   f: RecommendationFilters
 ): PurchaseRecommendation[] {
   return recs.filter((r) => {
-    if (!matchesText([r.sku, r.productName, r.brand], f.query ?? ""))
-      return false;
+    if (!matchesText([r.sku, r.productName, r.brand], f.query ?? "")) return false;
     if (f.category && r.category !== f.category) return false;
     if (f.supplier && r.supplierName !== f.supplier) return false;
     if (f.brand && r.brand !== f.brand) return false;
     if (f.status && r.status !== f.status) return false;
     if (f.priority && r.priority !== f.priority) return false;
     if (f.stockout && r.availableStock > 0) return false;
-    if (f.stockoutRisk && r.status !== "critical" && r.status !== "buy_now")
-      return false;
+    if (f.stockoutRisk && r.status !== "critical" && r.status !== "buy_now") return false;
     if (f.overstock && r.status !== "overstock") return false;
     if (f.lowMargin && r.margin >= 20) return false;
     if (f.highRotation && r.rotation < 8) return false;
@@ -91,10 +82,7 @@ export interface AlertFilters {
   status?: string;
 }
 
-export function filterAlerts(
-  alerts: CommercialAlert[],
-  f: AlertFilters
-): CommercialAlert[] {
+export function filterAlerts(alerts: CommercialAlert[], f: AlertFilters): CommercialAlert[] {
   return alerts.filter((a) => {
     if (!matchesText([a.relatedEntity, a.description, a.relatedSku ?? ""], f.query ?? ""))
       return false;

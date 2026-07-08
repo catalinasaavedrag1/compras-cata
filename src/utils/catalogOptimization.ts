@@ -82,11 +82,7 @@ export interface CatalogAnalysis {
  * realmente conviene conservar, no el que esté activo por inercia.
  */
 function better(a: Product, b: Product): number {
-  return (
-    b.salesLast30Days - a.salesLast30Days ||
-    b.rotation - a.rotation ||
-    b.margin - a.margin
-  );
+  return b.salesLast30Days - a.salesLast30Days || b.rotation - a.rotation || b.margin - a.margin;
 }
 
 /** El mejor de su gama, pero marcado "no comprar" o descontinuado. */
@@ -105,8 +101,10 @@ function tierOf(price: number, min: number, max: number): PriceTier {
 
 function buildReason(p: Product, keeper: Product, segment: PriceTier, share: number): string {
   const gama = TIER_LABEL[segment];
-  if (p.productStatus === "discontinued") return `Descontinuado; duplica la gama ${gama} (“${keeper.name}”)`;
-  if (p.productStatus === "no_sales") return `Sin ventas; duplica la gama ${gama} (“${keeper.name}”)`;
+  if (p.productStatus === "discontinued")
+    return `Descontinuado; duplica la gama ${gama} (“${keeper.name}”)`;
+  if (p.productStatus === "no_sales")
+    return `Sin ventas; duplica la gama ${gama} (“${keeper.name}”)`;
   const pct = Math.round(share * 100);
   return `Gama ${gama} ya cubierta por “${keeper.name}” · vende ${formatNumber(p.salesLast30Days)}/mes (${pct}% del referente)`;
 }
@@ -194,7 +192,10 @@ export function analyzeCatalog(products: Product[]): CatalogAnalysis {
 
   const candidateCount = groups.reduce((n, g) => n + g.candidates.length, 0);
   const curatedCount = groups.reduce((n, g) => n + g.keepers.length, 0);
-  const reactivateCount = groups.reduce((n, g) => n + g.keepers.filter((k) => k.reactivate).length, 0);
+  const reactivateCount = groups.reduce(
+    (n, g) => n + g.keepers.filter((k) => k.reactivate).length,
+    0
+  );
   const freeableCapital = groups.reduce((s, g) => s + g.freeableCapital, 0);
   const totalSkus = products.length;
   return {
@@ -246,7 +247,12 @@ export function skuOptimizationStatus(sku: string, products: Product[]): SkuOpti
     }
     const keep = g.keepers.find((k) => k.reactivate && k.product.sku === sku);
     if (keep) {
-      return { kind: "reactivate", category: g.category, subcategory: g.subcategory, segment: keep.segment };
+      return {
+        kind: "reactivate",
+        category: g.category,
+        subcategory: g.subcategory,
+        segment: keep.segment,
+      };
     }
   }
   return { kind: "none" };

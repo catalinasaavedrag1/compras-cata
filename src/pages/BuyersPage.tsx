@@ -27,25 +27,50 @@ export function BuyersPage() {
               className="text-left bg-white border border-slate-200 rounded-xl shadow-card p-4 flex flex-col gap-3 transition-colors hover:border-brand-300"
             >
               <div className="flex items-center gap-3">
-                <span className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${BUYER_TONE_AV[b.tone]}`}>{b.initials}</span>
+                <span
+                  className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${BUYER_TONE_AV[b.tone]}`}
+                >
+                  {b.initials}
+                </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[15px] font-semibold text-slate-800">{b.name}</p>
                   <p className="text-xs text-slate-400 truncate">{b.categories.join(" · ")}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-2xl font-bold leading-none" style={{ color: scoreColor(b.score) }}>{b.score}</p>
-                  <p className="text-[11px] font-semibold" style={{ color: trendColor(b.trend) }}>{trendText(b.trend)}</p>
+                  <p
+                    className="text-2xl font-bold leading-none"
+                    style={{ color: scoreColor(b.score) }}
+                  >
+                    {b.score}
+                  </p>
+                  <p className="text-[11px] font-semibold" style={{ color: trendColor(b.trend) }}>
+                    {trendText(b.trend)}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={leagueOf(b.score).league.tone}>Nivel {leagueOf(b.score).league.name}</Badge>
+                <Badge tone={leagueOf(b.score).league.tone}>
+                  Nivel {leagueOf(b.score).league.name}
+                </Badge>
                 <Badge tone={wl.tone}>Carga {wl.label}</Badge>
               </div>
               <div className="grid grid-cols-4 gap-2 border-t border-slate-100 pt-3">
-                <div><p className="text-base font-semibold text-slate-800">{b.fillRate}%</p><p className="text-[10.5px] text-slate-400">Fill Rate</p></div>
-                <div><p className="text-base font-semibold text-rose-700">{b.stockouts}</p><p className="text-[10.5px] text-slate-400">Quiebres</p></div>
-                <div><p className="text-base font-semibold text-amber-700">{b.pending}</p><p className="text-[10.5px] text-slate-400">Pendientes</p></div>
-                <div><p className="text-base font-semibold text-rose-600">{b.alerts}</p><p className="text-[10.5px] text-slate-400">Alertas</p></div>
+                <div>
+                  <p className="text-base font-semibold text-slate-800">{b.fillRate}%</p>
+                  <p className="text-[10.5px] text-slate-400">Fill Rate</p>
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-rose-700">{b.stockouts}</p>
+                  <p className="text-[10.5px] text-slate-400">Quiebres</p>
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-amber-700">{b.pending}</p>
+                  <p className="text-[10.5px] text-slate-400">Pendientes</p>
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-rose-600">{b.alerts}</p>
+                  <p className="text-[10.5px] text-slate-400">Alertas</p>
+                </div>
               </div>
             </button>
           );

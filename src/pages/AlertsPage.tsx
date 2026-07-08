@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Link, useNavigate } from "react-router-dom";
 import { FilterBar } from "../components/business/FilterBar";
+import { inRange, type IsoRange } from "../utils/dateRange";
 import { KpiCard } from "../components/business/KpiCard";
 import { Tabs } from "../components/ui/Tabs";
 import { Card, CardBody } from "../components/ui/Card";
@@ -46,30 +47,37 @@ export function AlertsPage() {
   const [type, setType] = useState("");
   const [severity, setSeverity] = useState("");
   const [responsible, setResponsible] = useState("");
+  const [dates, setDates] = useState<IsoRange>({ from: "", to: "" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileDetail, setMobileDetail] = useState(false);
 
   const alerts = useMemo(
     () =>
-      seedAlerts.map((a) =>
-        statusOverrides[a.id] ? { ...a, status: statusOverrides[a.id] } : a
-      ),
+      seedAlerts.map((a) => (statusOverrides[a.id] ? { ...a, status: statusOverrides[a.id] } : a)),
     [statusOverrides]
   );
 
   const setStatus = (id: string, status: AlertStatus) => {
     setStatusOverrides((prev) => ({ ...prev, [id]: status }));
-    toast.success(status === "resolved" ? "Alerta marcada como resuelta" : "Alerta marcada en revisión");
+    toast.success(
+      status === "resolved" ? "Alerta marcada como resuelta" : "Alerta marcada en revisión"
+    );
   };
 
   // Filtrado por la barra de filtros (sin la pestaña): controla KPIs y conteos
   const byFilters = useMemo(
-    () => filterAlerts(alerts, { query, type, severity }).filter((a) => !responsible || a.responsible === responsible),
-    [alerts, query, type, severity, responsible]
+    () =>
+      filterAlerts(alerts, { query, type, severity })
+        .filter((a) => !responsible || a.responsible === responsible)
+        .filter((a) => inRange(a.date, dates)),
+    [alerts, query, type, severity, responsible, dates]
   );
 
   const responsibles = useMemo(
-    () => Array.from(new Set(seedAlerts.map((a) => a.responsible))).sort((x, y) => x.localeCompare(y, "es")),
+    () =>
+      Array.from(new Set(seedAlerts.map((a) => a.responsible))).sort((x, y) =>
+        x.localeCompare(y, "es")
+      ),
     []
   );
 
@@ -92,7 +100,9 @@ export function AlertsPage() {
     return [...base].sort((a, b) => order[a.severity] - order[b.severity]);
   }, [byFilters, tab]);
 
-  const highCount = byFilters.filter((a) => a.severity === "high" && (a.status === "new" || a.status === "in_review")).length;
+  const highCount = byFilters.filter(
+    (a) => a.severity === "high" && (a.status === "new" || a.status === "in_review")
+  ).length;
 
   const selected = filtered.find((a) => a.id === selectedId) ?? filtered[0];
 
@@ -114,7 +124,10 @@ export function AlertsPage() {
             quantity: rec.suggestedQuantity,
             unitCost: rec.unitCost,
           });
-          toast.success(`${rec.productName} agregado al borrador de OC`, { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") });
+          toast.success(`${rec.productName} agregado al borrador de OC`, {
+            label: "Ver borrador OC",
+            onClick: () => navigate("/ordenes-compra"),
+          });
         },
       };
     }
@@ -144,7 +157,14 @@ export function AlertsPage() {
           searchPlaceholder="Buscar por producto, proveedor o SKU"
           resultCount={byFilters.length}
           summary={`${byFilters.length} alerta${byFilters.length === 1 ? "" : "s"} · ${highCount} alta severidad · ${counts.in_review} en revisión`}
-          onClear={() => { setQuery(""); setType(""); setSeverity(""); setResponsible(""); }}
+          onClear={() => {
+            setQuery("");
+            setType("");
+            setSeverity("");
+            setResponsible("");
+            setDates({ from: "", to: "" });
+          }}
+          dateRange={{ value: dates, onChange: setDates, label: "Fecha de alerta" }}
           selects={[
             {
               key: "severity",
@@ -162,7 +182,10 @@ export function AlertsPage() {
               placeholder: "Tipo de alerta",
               value: type,
               onChange: setType,
-              options: Object.entries(ALERT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+              options: Object.entries(ALERT_TYPE_LABELS).map(([value, label]) => ({
+                value,
+                label,
+              })),
             },
             {
               key: "responsible",
@@ -176,10 +199,45 @@ export function AlertsPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Alertas activas" value={formatNumber(counts.active)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} description="Ver activas" active={tab === "active"} onClick={() => setTab("active")} />
-        <KpiCard title="Severidad alta" value={formatNumber(highCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Filtrar alta" active={severity === "high"} onClick={() => { setSeverity("high"); setTab("active"); }} />
-        <KpiCard title="En revisión" value={formatNumber(counts.in_review)} tone="info" icon={<IconAlerts className="w-4 h-4" />} description="Ver en revisión" active={tab === "in_review"} onClick={() => setTab("in_review")} />
-        <KpiCard title="Resueltas" value={formatNumber(counts.resolved)} tone="good" icon={<IconAlerts className="w-4 h-4" />} description="Ver resueltas" active={tab === "resolved"} onClick={() => setTab("resolved")} />
+        <KpiCard
+          title="Alertas activas"
+          value={formatNumber(counts.active)}
+          tone="warn"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Ver activas"
+          active={tab === "active"}
+          onClick={() => setTab("active")}
+        />
+        <KpiCard
+          title="Severidad alta"
+          value={formatNumber(highCount)}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Filtrar alta"
+          active={severity === "high"}
+          onClick={() => {
+            setSeverity("high");
+            setTab("active");
+          }}
+        />
+        <KpiCard
+          title="En revisión"
+          value={formatNumber(counts.in_review)}
+          tone="info"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Ver en revisión"
+          active={tab === "in_review"}
+          onClick={() => setTab("in_review")}
+        />
+        <KpiCard
+          title="Resueltas"
+          value={formatNumber(counts.resolved)}
+          tone="good"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Ver resueltas"
+          active={tab === "resolved"}
+          onClick={() => setTab("resolved")}
+        />
       </div>
 
       <div className="mb-4">
@@ -201,7 +259,13 @@ export function AlertsPage() {
                   ? "Todo está en orden por ahora. Revisa otra pestaña o continúa con la reposición."
                   : "No hay alertas que coincidan con los filtros seleccionados."
               }
-              action={tab === "active" ? <Button variant="secondary" onClick={() => navigate("/reposicion")}>Ir a reposición</Button> : undefined}
+              action={
+                tab === "active" ? (
+                  <Button variant="secondary" onClick={() => navigate("/reposicion")}>
+                    Ir a reposición
+                  </Button>
+                ) : undefined
+              }
             />
           </CardBody>
         </Card>
@@ -211,7 +275,9 @@ export function AlertsPage() {
           <div className="space-y-3 lg:max-h-[72vh] lg:overflow-y-auto no-scrollbar lg:pr-1">
             {groupByTime(filtered).map((bucket) => (
               <div key={bucket.key}>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-1 mb-1.5">{bucket.label}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-1 mb-1.5">
+                  {bucket.label}
+                </p>
                 <div className="space-y-1.5">
                   {bucket.items.map((a) => (
                     <AlertRow
@@ -219,7 +285,10 @@ export function AlertsPage() {
                       alert={a}
                       selected={selected?.id === a.id}
                       action={actionForAlert(a)}
-                      onClick={() => { setSelectedId(a.id); setMobileDetail(true); }}
+                      onClick={() => {
+                        setSelectedId(a.id);
+                        setMobileDetail(true);
+                      }}
                     />
                   ))}
                 </div>
@@ -241,7 +310,11 @@ export function AlertsPage() {
       )}
 
       {/* Detalle móvil en drawer */}
-      <Drawer open={mobileDetail && !!selected} onClose={() => setMobileDetail(false)} title="Detalle de alerta">
+      <Drawer
+        open={mobileDetail && !!selected}
+        onClose={() => setMobileDetail(false)}
+        title="Detalle de alerta"
+      >
         {selected && (
           <AlertDetail
             alert={selected}
@@ -277,7 +350,8 @@ const TYPE_GROUP: Record<AlertType, { label: string; tone: BadgeTone }> = {
 /** Agrupa alertas por antigüedad (Hoy / Ayer / Esta semana / Anteriores). */
 function groupByTime(items: (typeof seedAlerts)[number][]) {
   const today = new Date(`${TODAY_ISO}T00:00:00`).getTime();
-  const daysAgo = (iso: string) => Math.round((today - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
+  const daysAgo = (iso: string) =>
+    Math.round((today - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
   const buckets: { key: string; label: string; items: (typeof seedAlerts)[number][] }[] = [
     { key: "hoy", label: "Hoy", items: [] },
     { key: "ayer", label: "Ayer", items: [] },
@@ -322,13 +396,23 @@ function AlertRow({
         <div className="flex-1" />
         <span className="text-xs text-slate-400 flex-shrink-0">{formatDate(alert.date)}</span>
       </div>
-      <p className={cn("text-sm truncate", unread ? "font-semibold text-slate-900" : "font-medium text-slate-700")}>{alert.relatedEntity}</p>
+      <p
+        className={cn(
+          "text-sm truncate",
+          unread ? "font-semibold text-slate-900" : "font-medium text-slate-700"
+        )}
+      >
+        {alert.relatedEntity}
+      </p>
       <p className="text-xs text-slate-500 line-clamp-2">{alert.description}</p>
       <div className="flex items-center gap-2 mt-1.5">
         <StatusBadge kind="alert" value={alert.status} dot={false} />
         {action && (
           <button
-            onClick={(e) => { e.stopPropagation(); action.onClick(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              action.onClick();
+            }}
             disabled={action.disabled}
             className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:text-slate-400"
           >
@@ -356,14 +440,21 @@ function AlertDetail({
       <div className="p-4 lg:sticky lg:top-20">
         <div className="flex items-center gap-2 flex-wrap mb-2">
           <SeverityBadge severity={alert.severity} />
-          <span className="text-xs font-medium text-slate-500">{ALERT_TYPE_LABELS[alert.type]}</span>
+          <span className="text-xs font-medium text-slate-500">
+            {ALERT_TYPE_LABELS[alert.type]}
+          </span>
           <div className="flex-1" />
           <StatusBadge kind="alert" value={alert.status} dot={false} />
           <span className="text-xs text-slate-400">{formatDate(alert.date)}</span>
         </div>
 
         {alert.relatedSku ? (
-          <Link to={`/productos/${alert.relatedSku}`} className="text-lg font-semibold text-brand-700 hover:underline">{alert.relatedEntity}</Link>
+          <Link
+            to={`/productos/${alert.relatedSku}`}
+            className="text-lg font-semibold text-brand-700 hover:underline"
+          >
+            {alert.relatedEntity}
+          </Link>
         ) : (
           <h3 className="text-lg font-semibold text-slate-900">{alert.relatedEntity}</h3>
         )}
@@ -376,18 +467,41 @@ function AlertDetail({
 
         <div className="flex flex-wrap gap-2 mt-3">
           {primaryAction && (
-            <Button size="sm" disabled={primaryAction.disabled} onClick={primaryAction.onClick}>{primaryAction.label}</Button>
+            <Button size="sm" disabled={primaryAction.disabled} onClick={primaryAction.onClick}>
+              {primaryAction.label}
+            </Button>
           )}
-          {alert.status === "new" && <Button size="sm" variant="secondary" onClick={onReview}>Marcar en revisión</Button>}
-          {alert.status !== "resolved" && alert.status !== "ignored" && <Button size="sm" variant="secondary" onClick={onResolve}>Marcar resuelta</Button>}
+          {alert.status === "new" && (
+            <Button size="sm" variant="secondary" onClick={onReview}>
+              Marcar en revisión
+            </Button>
+          )}
+          {alert.status !== "resolved" && alert.status !== "ignored" && (
+            <Button size="sm" variant="secondary" onClick={onResolve}>
+              Marcar resuelta
+            </Button>
+          )}
         </div>
 
         <div className="mt-4 pt-3 border-t border-slate-100">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Detalle</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
+            Detalle
+          </p>
           <div className="space-y-1 text-sm">
-            <div className="flex justify-between gap-2"><span className="text-slate-500">Responsable</span><span className="text-slate-700">{alert.responsible}</span></div>
-            <div className="flex justify-between gap-2"><span className="text-slate-500">Fecha</span><span className="text-slate-700">{formatDate(alert.date)}</span></div>
-            {alert.relatedSku && <div className="flex justify-between gap-2"><span className="text-slate-500">SKU</span><span className="font-mono text-slate-700">{alert.relatedSku}</span></div>}
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-500">Responsable</span>
+              <span className="text-slate-700">{alert.responsible}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-500">Fecha</span>
+              <span className="text-slate-700">{formatDate(alert.date)}</span>
+            </div>
+            {alert.relatedSku && (
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">SKU</span>
+                <span className="font-mono text-slate-700">{alert.relatedSku}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

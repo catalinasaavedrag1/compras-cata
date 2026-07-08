@@ -1,4 +1,5 @@
 import type { Buyer } from "../types/team";
+import { hashString as hashStr } from "./hash";
 
 // ============================================================================
 //  Atribución de causa de los problemas del comprador (sección 14 del spec).
@@ -6,12 +7,6 @@ import type { Buyer } from "../types/team";
 //  culpa del comprador. Separa los quiebres en causa comprador / proveedor /
 //  demanda de forma determinista (frontend) para una evaluación justa.
 // ============================================================================
-
-function hashStr(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
 
 export interface CauseSlice {
   key: "comprador" | "proveedor" | "demanda";
@@ -30,9 +25,21 @@ export interface BuyerAttribution {
 }
 
 const SLICE_META = {
-  comprador: { label: "Tu decisión", tone: "red" as const, desc: "Compró poco, tarde o no repuso a tiempo" },
-  proveedor: { label: "Proveedor", tone: "amber" as const, desc: "No despachó, entregó parcial o subió el costo" },
-  demanda: { label: "Demanda", tone: "blue" as const, desc: "Venta inesperada, campaña o licitación no planificada" },
+  comprador: {
+    label: "Tu decisión",
+    tone: "red" as const,
+    desc: "Compró poco, tarde o no repuso a tiempo",
+  },
+  proveedor: {
+    label: "Proveedor",
+    tone: "amber" as const,
+    desc: "No despachó, entregó parcial o subió el costo",
+  },
+  demanda: {
+    label: "Demanda",
+    tone: "blue" as const,
+    desc: "Venta inesperada, campaña o licitación no planificada",
+  },
 };
 
 export function buyerAttribution(buyer: Buyer): BuyerAttribution {
@@ -49,7 +56,8 @@ export function buyerAttribution(buyer: Buyer): BuyerAttribution {
     return {
       total: 0,
       slices,
-      fairNote: "Sin quiebres este período. Excelente disponibilidad — mantén el ritmo de reposición.",
+      fairNote:
+        "Sin quiebres este período. Excelente disponibilidad — mantén el ritmo de reposición.",
       scoreAdjust: 0,
     };
   }
@@ -66,10 +74,20 @@ export function buyerAttribution(buyer: Buyer): BuyerAttribution {
 
   // Porcentajes con método del resto mayor (Hamilton) para que sumen 100.
   const counts = { comprador, proveedor, demanda };
-  const raw = { comprador: (comprador / total) * 100, proveedor: (proveedor / total) * 100, demanda: (demanda / total) * 100 };
-  const floors = { comprador: Math.floor(raw.comprador), proveedor: Math.floor(raw.proveedor), demanda: Math.floor(raw.demanda) };
+  const raw = {
+    comprador: (comprador / total) * 100,
+    proveedor: (proveedor / total) * 100,
+    demanda: (demanda / total) * 100,
+  };
+  const floors = {
+    comprador: Math.floor(raw.comprador),
+    proveedor: Math.floor(raw.proveedor),
+    demanda: Math.floor(raw.demanda),
+  };
   let remainder = 100 - (floors.comprador + floors.proveedor + floors.demanda);
-  const byFrac = (Object.keys(raw) as (keyof typeof raw)[]).sort((a, b) => (raw[b] - floors[b]) - (raw[a] - floors[a]));
+  const byFrac = (Object.keys(raw) as (keyof typeof raw)[]).sort(
+    (a, b) => raw[b] - floors[b] - (raw[a] - floors[a])
+  );
   const pctMap = { ...floors };
   for (const k of byFrac) {
     if (remainder <= 0) break;

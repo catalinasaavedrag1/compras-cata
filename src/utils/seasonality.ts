@@ -1,4 +1,5 @@
 import { products } from "../data/mockProducts";
+import { hashString as hashStr } from "./hash";
 import { getSupplierByName } from "../data/mockSuppliers";
 import { supplierFulfillment } from "./supplierPerf";
 
@@ -113,12 +114,6 @@ export interface SupplierSeasonality {
   skuSeasonality: SkuSeason[];
 }
 
-function hashStr(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
-
 // Perfil estacional por SKU: parte del perfil de su categoría con amplitud y
 // desfase deterministas según el SKU, para que no todos se vean idénticos.
 function skuProfile(sku: string, category: string): number[] {
@@ -140,9 +135,10 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
   const prods = products.filter((p) => p.supplierName === name);
   const baseSales = prods.reduce((a, p) => a + p.salesLast30Days * p.price, 0) || 1;
   const baseUnits = prods.reduce((a, p) => a + p.salesLast30Days, 0) || 1;
-  const baseMargin = prods.reduce((a, p) => a + p.salesLast30Days * (p.price - p.cost), 0) / baseSales * 100 || 30;
+  const baseMargin =
+    (prods.reduce((a, p) => a + p.salesLast30Days * (p.price - p.cost), 0) / baseSales) * 100 || 30;
   const perf = supplierFulfillment(name);
-  const fill = perf.arrivedOrders > 0 ? perf.fillRate : sup?.deliveryCompliance ?? 90;
+  const fill = perf.arrivedOrders > 0 ? perf.fillRate : (sup?.deliveryCompliance ?? 90);
   const leadTime = sup?.averageLeadTimeDays ?? 10;
   const profile = profileFor(prods[0]?.category ?? sup?.categories[0] ?? "");
   const avgMult = profile.reduce((a, b) => a + b, 0) / 12;
@@ -156,7 +152,10 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
   for (let i = 0; i < 24; i++) {
     ymList.unshift({ y, m });
     m--;
-    if (m < 0) { m = 11; y--; }
+    if (m < 0) {
+      m = 11;
+      y--;
+    }
   }
 
   const series: MonthPoint[] = ymList.map(({ y, m }) => {
@@ -166,10 +165,24 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
     const units = Math.round(sales / (baseSales / baseUnits));
     const peak = mult >= avgMult * 1.1;
     const monthFill = peak ? Math.max(60, Math.round(fill - 10)) : Math.round(fill);
-    const stockouts = peak ? Math.max(1, Math.round((mult - 1) * 14 * (1 - fill / 100))) : mult > avgMult ? 1 : 0;
+    const stockouts = peak
+      ? Math.max(1, Math.round((mult - 1) * 14 * (1 - fill / 100)))
+      : mult > avgMult
+        ? 1
+        : 0;
     const lost = stockouts > 0 ? Math.round(sales * (1 - monthFill / 100) * 0.25) : 0;
     const margin = Math.round(baseMargin + (mult - avgMult) * 8);
-    return { ym: `${y}-${String(m + 1).padStart(2, "0")}`, label: `${MABBR[m]} ${String(y).slice(2)}`, monthIdx: m, sales, units, margin, stockouts, fill: monthFill, lost };
+    return {
+      ym: `${y}-${String(m + 1).padStart(2, "0")}`,
+      label: `${MABBR[m]} ${String(y).slice(2)}`,
+      monthIdx: m,
+      sales,
+      units,
+      margin,
+      stockouts,
+      fill: monthFill,
+      lost,
+    };
   });
 
   const last12 = series.slice(12);
@@ -180,7 +193,9 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
   const quiebres12 = last12.reduce((a, p) => a + p.stockouts, 0);
   const lost12 = last12.reduce((a, p) => a + p.lost, 0);
   const marginAvg = Math.round(last12.reduce((a, p) => a + p.margin, 0) / 12);
-  const sobrestock = prods.filter((p) => p.purchaseStatus === "overstock").reduce((a, p) => a + p.availableStock * p.cost, 0);
+  const sobrestock = prods
+    .filter((p) => p.purchaseStatus === "overstock")
+    .reduce((a, p) => a + p.availableStock * p.cost, 0);
 
   // Score de temporada
   const clamp = (n: number) => Math.max(0, Math.min(100, n));
@@ -188,19 +203,29 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
   const margenScore = clamp((marginAvg / 35) * 100);
   const invScore = clamp(100 - quiebres12 * 2);
   const postScore = sobrestock > 0 ? 70 : 90;
-  const score = Math.round(0.4 * ventaScore + 0.2 * margenScore + 0.2 * fill + 0.1 * invScore + 0.1 * postScore);
+  const score = Math.round(
+    0.4 * ventaScore + 0.2 * margenScore + 0.2 * fill + 0.1 * invScore + 0.1 * postScore
+  );
 
   // Clasificación
   const ratio = peakMult / avgMult;
   const risky = fill < 85 && quiebres12 >= 8;
-  const base = ratio >= 1.3 ? "Estacional fuerte" : ratio >= 1.12 ? "Estacional suave" : "Permanente";
+  const base =
+    ratio >= 1.3 ? "Estacional fuerte" : ratio >= 1.12 ? "Estacional suave" : "Permanente";
   const classification = {
     label: base + (risky ? " · riesgo de quiebre" : ""),
-    tone: (risky ? "red" : ratio >= 1.3 ? "violet" : ratio >= 1.12 ? "blue" : "slate") as "violet" | "blue" | "slate" | "red",
+    tone: (risky ? "red" : ratio >= 1.3 ? "violet" : ratio >= 1.12 ? "blue" : "slate") as
+      | "violet"
+      | "blue"
+      | "slate"
+      | "red",
     risky,
   };
 
-  const peakMonths = profile.map((v, i) => ({ v, i })).filter((x) => x.v >= avgMult * 1.12).map((x) => MABBR[x.i]);
+  const peakMonths = profile
+    .map((v, i) => ({ v, i }))
+    .filter((x) => x.v >= avgMult * 1.12)
+    .map((x) => MABBR[x.i]);
 
   // Pre-temporada: próximo mes en que el perfil ENTRA en temporada alta
   // (umbral relativo al promedio, no al peak) dentro de los próximos 6 meses.
@@ -226,10 +251,21 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
     .map((p) => {
       const type = ratio >= 1.3 ? "Estacional" : ratio >= 1.12 ? "Extendida" : "Permanente";
       const action =
-        p.purchaseStatus === "overstock" ? "Liquidar postemporada" :
-        fill < 90 ? "Asegurar stock / despacho" :
-        ratio >= 1.12 ? "Reforzar antes de temporada" : "Mantener stock base";
-      return { sku: p.sku, name: p.name, sales: p.salesLast30Days * p.price, margin: p.margin, type, action };
+        p.purchaseStatus === "overstock"
+          ? "Liquidar postemporada"
+          : fill < 90
+            ? "Asegurar stock / despacho"
+            : ratio >= 1.12
+              ? "Reforzar antes de temporada"
+              : "Mantener stock base";
+      return {
+        sku: p.sku,
+        name: p.name,
+        sales: p.salesLast30Days * p.price,
+        margin: p.margin,
+        type,
+        action,
+      };
     });
 
   // Comparación año contra año (mismo mes en cada año disponible)
@@ -274,7 +310,16 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
         tone = "slate";
         insight = `Venta pareja todo el año (peak leve en ${MABBR[peakIdx]}). Mantén stock base permanente y negocia volumen anual.`;
       }
-      return { sku: p.sku, name: p.name, type, tone, peakMonth: MABBR[peakIdx], inSeasonPct, seasonMonths, insight };
+      return {
+        sku: p.sku,
+        name: p.name,
+        type,
+        tone,
+        peakMonth: MABBR[peakIdx],
+        inSeasonPct,
+        seasonMonths,
+        insight,
+      };
     });
 
   const peakStr = peakMonths.length ? peakMonths.join(", ") : "todo el año";
@@ -284,5 +329,25 @@ export function supplierSeasonality(name: string): SupplierSeasonality {
       ? `Venta estable todo el año. Conviene mantener stock base permanente y negociar volumen anual con despacho continuo en lugar de grandes compras puntuales.`
       : `Temporada marcada en ${peakStr}. Compra anticipada y asegura stock antes del peak; en postemporada, liquida lentos con apoyo del proveedor.`;
 
-  return { series, ventaActual, ventaPrev, varPct, marginAvg, quiebres12, lost12, fill, leadTime, sobrestock, score, classification, peakMonths, preSeason, recommendation, topProducts, years, yoyByMonth, skuSeasonality };
+  return {
+    series,
+    ventaActual,
+    ventaPrev,
+    varPct,
+    marginAvg,
+    quiebres12,
+    lost12,
+    fill,
+    leadTime,
+    sobrestock,
+    score,
+    classification,
+    peakMonths,
+    preSeason,
+    recommendation,
+    topProducts,
+    years,
+    yoyByMonth,
+    skuSeasonality,
+  };
 }

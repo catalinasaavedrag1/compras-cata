@@ -8,25 +8,29 @@ import { StatusBadge } from "../components/business/StatusBadge";
 import { Tabs } from "../components/ui/Tabs";
 import { Button } from "../components/ui/Button";
 import { Drawer } from "../components/ui/Drawer";
-import { Modal } from "../components/ui/Modal";
 import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
+import { DateRangePicker } from "../components/ui/DateRangePicker";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
-import { IconPlus, IconReplenish, IconOrders } from "../components/ui/icons";
+import { IconPlus, IconReplenish, IconOrders, IconSearch, IconClose } from "../components/ui/icons";
 import { purchaseOrders as mockPOs } from "../data/mockPurchaseOrders";
 import { useCollection } from "../context/DataContext";
 import { apiCreate, backendEnabled } from "../services/apiClient";
 import { recommendations } from "../data/mockRecommendations";
-import { getProductBySku } from "../data/mockProducts";
+import { getProductBySku, products as allProducts } from "../data/mockProducts";
+import { OcDetailModal } from "./PurchaseOrdersSections";
+import { lineNet, type OcDraftItem } from "../context/OcDraftContext";
 import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
 import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
-import { coverageDays } from "../utils/calculations";
+import { coverageDays, addDaysISO } from "../utils/calculations";
+import { inRange, type IsoRange } from "../utils/dateRange";
 import { TODAY_ISO } from "../utils/constants";
 import type { ApprovalCriterion } from "../data/mockApprovals";
 import { useLocalStorage } from "../utils/useLocalStorage";
@@ -46,9 +50,38 @@ const TABS = [
   { value: "received", label: "Recibidas" },
 ];
 
+const WAREHOUSES = [
+  "Centro de Distribución",
+  "Bodega Santiago",
+  "Bodega Norte",
+  "Bodega Sur",
+  "Tienda Central",
+];
+const PAYMENT_TERMS = [
+  "Contado",
+  "15 días fecha factura",
+  "30 días fecha factura",
+  "60 días fecha factura",
+  "90 días fecha factura",
+];
+
 export function PurchaseOrdersPage() {
   const navigate = useNavigate();
-  const { items, count, totalAmount, updateQuantity, removeItem, clear, addItem, hasItem } = useOcDraft();
+  const {
+    items,
+    count,
+    subtotal,
+    discountAmount,
+    totalAmount,
+    meta,
+    setMeta,
+    updateQuantity,
+    updateItem,
+    removeItem,
+    clear,
+    addItem,
+    hasItem,
+  } = useOcDraft();
   const toast = useToast();
   const { addApproval, addDecision, approvals, approvalState } = usePurchaseFlow();
   const { buyer } = useBuyer();
@@ -65,7 +98,9 @@ export function PurchaseOrdersPage() {
   >("compras:po-status", {});
 
   const [tab, setTab] = useState("all");
+  const [dates, setDates] = useState<IsoRange>({ from: "", to: "" });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [prodSearch, setProdSearch] = useState("");
   const [detail, setDetail] = useState<PurchaseOrder | null>(null);
   const [createdNumber, setCreatedNumber] = useState<string | null>(null);
 
@@ -109,38 +144,51 @@ export function PurchaseOrdersPage() {
     }
   };
 
+  // Conjunto acotado por el rango de fechas (por fecha de creación de la OC).
+  const visible = useMemo(() => orders.filter((o) => inRange(o.createdAt, dates)), [orders, dates]);
+
   const counts = useMemo(() => {
-    const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received", "with_difference"];
+    const open: PurchaseOrderStatus[] = [
+      "sent",
+      "confirmed",
+      "partially_received",
+      "with_difference",
+    ];
     return {
-      all: orders.length,
-      draft: orders.filter((o) => o.status === "draft").length,
-      open: orders.filter((o) => open.includes(o.status)).length,
-      delayed: orders.filter((o) => o.status === "delayed").length,
-      received: orders.filter((o) => o.status === "received" || o.status === "closed").length,
+      all: visible.length,
+      draft: visible.filter((o) => o.status === "draft").length,
+      open: visible.filter((o) => open.includes(o.status)).length,
+      delayed: visible.filter((o) => o.status === "delayed").length,
+      received: visible.filter((o) => o.status === "received" || o.status === "closed").length,
     };
-  }, [orders]);
+  }, [visible]);
 
   const filtered = useMemo(() => {
-    const open: PurchaseOrderStatus[] = ["sent", "confirmed", "partially_received", "with_difference"];
+    const open: PurchaseOrderStatus[] = [
+      "sent",
+      "confirmed",
+      "partially_received",
+      "with_difference",
+    ];
     switch (tab) {
       case "draft":
-        return orders.filter((o) => o.status === "draft");
+        return visible.filter((o) => o.status === "draft");
       case "open":
-        return orders.filter((o) => open.includes(o.status));
+        return visible.filter((o) => open.includes(o.status));
       case "delayed":
-        return orders.filter((o) => o.status === "delayed");
+        return visible.filter((o) => o.status === "delayed");
       case "received":
-        return orders.filter((o) => o.status === "received" || o.status === "closed");
+        return visible.filter((o) => o.status === "received" || o.status === "closed");
       default:
-        return orders;
+        return visible;
     }
-  }, [orders, tab]);
+  }, [visible, tab]);
 
-  const totalOpenAmount = orders
+  const totalOpenAmount = visible
     .filter((o) => !["received", "cancelled"].includes(o.status))
     .reduce((a, o) => a + o.totalAmount, 0);
-  const delayedCount = orders.filter((o) => o.status === "delayed").length;
-  const draftCount = orders.filter((o) => o.status === "draft").length;
+  const delayedCount = visible.filter((o) => o.status === "delayed").length;
+  const draftCount = visible.filter((o) => o.status === "draft").length;
 
   const markAsSent = (id: string) => {
     setStatusOverrides((prev) => ({ ...prev, [id]: "sent" }));
@@ -153,100 +201,178 @@ export function PurchaseOrdersPage() {
     (r) => r.suggestedQuantity > 0 && !hasItem(r.sku)
   );
 
+  // Líneas del borrador agrupadas por proveedor (una OC no mezcla proveedores).
+  const supplierGroups = useMemo(() => {
+    const m = new Map<string, OcDraftItem[]>();
+    items.forEach((it) => {
+      const arr = m.get(it.supplierName) ?? [];
+      arr.push(it);
+      m.set(it.supplierName, arr);
+    });
+    return [...m.entries()];
+  }, [items]);
+
+  // Búsqueda de cualquier producto para agregar al borrador.
+  const searchResults = useMemo(() => {
+    const q = prodSearch.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return allProducts
+      .filter((p) => `${p.sku} ${p.name} ${p.brand}`.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [prodSearch]);
+
+  const addProduct = (sku: string) => {
+    const p = getProductBySku(sku);
+    if (!p) return;
+    const rec = recommendations.find((r) => r.sku === sku);
+    addItem({
+      sku: p.sku,
+      productName: p.name,
+      supplierName: p.supplierName || "Sin proveedor",
+      quantity:
+        rec?.suggestedQuantity && rec.suggestedQuantity > 0
+          ? rec.suggestedQuantity
+          : Math.max(1, p.minStock ?? 1),
+      unitCost: p.cost,
+      discountPct: p.descuentoVigentePct,
+    });
+    toast.success(`${p.name} agregado al borrador`);
+    setProdSearch("");
+  };
+
   const createOrder = () => {
     if (count === 0) return;
-    const num = `OC-2026-${String(143 + createdOrders.length).padStart(4, "0")}`;
     const buyerName = role === "lider" ? "Catalina Saavedra" : buyer;
+    const expected = meta.expectedDate || addDaysISO(TODAY_ISO, 7);
 
-    // Cerrar el ciclo: por cada línea, evaluar desvío vs sugerido y criterio.
+    // Una orden de compra por proveedor (una OC no mezcla proveedores).
+    const groups = new Map<string, OcDraftItem[]>();
+    items.forEach((i) => {
+      const arr = groups.get(i.supplierName) ?? [];
+      arr.push(i);
+      groups.set(i.supplierName, arr);
+    });
+
+    const created: PurchaseOrder[] = [];
     let approvalsCreated = 0;
-    items.forEach((i, idx) => {
-      const rec = recommendations.find((r) => r.sku === i.sku);
-      const p = getProductBySku(i.sku);
-      const suggested = rec?.suggestedQuantity ?? i.quantity;
-      const diff = i.quantity - suggested;
-      const diffPct = suggested > 0 ? Math.abs(diff / suggested) : i.quantity > 0 ? 1 : 0;
+    let seq = 0;
 
-      const rule = p ? resolveRuleForProduct(p, purchaseRules) : null;
-      const objetivo = rule?.targetInventoryDays ?? 45;
-      const coverAfter = p && p.salesLast30Days > 0 ? coverageDays(p.availableStock + i.quantity, p.salesLast30Days) : 0;
-      const margin = p ? p.margin : 100;
-      const minMargin = rule?.minMargin ?? 0;
-      const lineAmount = i.quantity * i.unitCost;
+    groups.forEach((groupItems, supplierName) => {
+      const num = `OC-2026-${String(143 + createdOrders.length + seq).padStart(4, "0")}`;
+      seq++;
+      let orderApprovals = 0;
 
-      const criteria: ApprovalCriterion[] = [];
-      if (suggested === 0 || diffPct > 0.2) criteria.push("desvio_sugerido");
-      if (lineAmount >= 5000000) criteria.push("monto_alto");
-      if (coverAfter > objetivo * 1.3) criteria.push("cobertura_excesiva");
-      if (margin < minMargin) criteria.push("margen_bajo");
+      groupItems.forEach((i, idx) => {
+        const rec = recommendations.find((r) => r.sku === i.sku);
+        const p = getProductBySku(i.sku);
+        const suggested = rec?.suggestedQuantity ?? i.quantity;
+        const diff = i.quantity - suggested;
+        const diffPct = suggested > 0 ? Math.abs(diff / suggested) : i.quantity > 0 ? 1 : 0;
 
-      addDecision({
-        id: `DEC-${num}-${idx}`,
-        date: TODAY_ISO,
-        sku: i.sku,
-        productName: i.productName,
-        supplierName: i.supplierName,
-        buyerName,
-        approvedBy: criteria.length > 0 ? "Pendiente" : "—",
-        suggestedQty: suggested,
-        purchasedQty: i.quantity,
-        unitCost: i.unitCost,
-        reason: criteria.length > 0 ? `Desvío vs sugerido en ${num}` : `Compra alineada al sugerido (${num})`,
-        resultDays: 0,
-        outcome: "pendiente",
-        resultText: `Compra recién creada en ${num}. Resultado en medición.`,
-        learning: "—",
-      });
+        const rule = p ? resolveRuleForProduct(p, purchaseRules) : null;
+        const objetivo = rule?.targetInventoryDays ?? 45;
+        const coverAfter =
+          p && p.salesLast30Days > 0
+            ? coverageDays(p.availableStock + i.quantity, p.salesLast30Days)
+            : 0;
+        const margin = p ? p.margin : 100;
+        const minMargin = rule?.minMargin ?? 0;
+        const lineAmount = lineNet(i);
 
-      if (criteria.length > 0) {
-        approvalsCreated++;
-        addApproval({
-          id: `APR-${num}-${idx}`,
+        const criteria: ApprovalCriterion[] = [];
+        if (suggested === 0 || diffPct > 0.2) criteria.push("desvio_sugerido");
+        if (lineAmount >= 5000000) criteria.push("monto_alto");
+        if (coverAfter > objetivo * 1.3) criteria.push("cobertura_excesiva");
+        if (margin < minMargin) criteria.push("margen_bajo");
+
+        addDecision({
+          id: `DEC-${num}-${idx}`,
           date: TODAY_ISO,
           sku: i.sku,
           productName: i.productName,
           supplierName: i.supplierName,
           buyerName,
+          approvedBy: criteria.length > 0 ? "Pendiente" : "—",
           suggestedQty: suggested,
-          requestedQty: i.quantity,
+          purchasedQty: i.quantity,
           unitCost: i.unitCost,
-          amount: lineAmount,
-          coberturaResultante: Math.round(coverAfter),
-          coberturaObjetivo: objetivo,
-          margin: Math.round(margin),
-          minMargin,
-          criteria,
-          justification: "Pendiente de justificar por el comprador",
+          reason:
+            criteria.length > 0
+              ? `Desvío vs sugerido en ${num}`
+              : `Compra alineada al sugerido (${num})`,
+          resultDays: 0,
+          outcome: "pendiente",
+          resultText: `Compra recién creada en ${num}. Resultado en medición.`,
+          learning: "—",
         });
-      }
+
+        if (criteria.length > 0) {
+          orderApprovals++;
+          approvalsCreated++;
+          addApproval({
+            id: `APR-${num}-${idx}`,
+            date: TODAY_ISO,
+            sku: i.sku,
+            productName: i.productName,
+            supplierName: i.supplierName,
+            buyerName,
+            suggestedQty: suggested,
+            requestedQty: i.quantity,
+            unitCost: i.unitCost,
+            amount: lineAmount,
+            coberturaResultante: Math.round(coverAfter),
+            coberturaObjetivo: objetivo,
+            margin: Math.round(margin),
+            minMargin,
+            criteria,
+            justification: "Pendiente de justificar por el comprador",
+          });
+        }
+      });
+
+      const grossGroup = groupItems.reduce((a, i) => a + i.quantity * i.unitCost, 0);
+      const netGroup = groupItems.reduce((a, i) => a + lineNet(i), 0);
+      const effDisc = grossGroup > 0 ? Math.round(((grossGroup - netGroup) / grossGroup) * 100) : 0;
+
+      const newOrder: PurchaseOrder = {
+        id: `PO-${num}`,
+        number: num,
+        supplierName,
+        createdAt: TODAY_ISO,
+        expectedDate: expected,
+        status: orderApprovals > 0 ? "pending_approval" : "draft",
+        totalAmount: netGroup,
+        skuCount: groupItems.length,
+        destinationWarehouse: meta.destinationWarehouse,
+        paymentTerms: meta.paymentTerms,
+        comments: meta.notes || undefined,
+        discountPct: effDisc || undefined,
+        buyerName,
+        delayedDays: 0,
+        lines: groupItems.map((i) => ({
+          sku: i.sku,
+          productName: i.productName,
+          quantity: i.quantity,
+          unitCost: i.unitCost,
+        })),
+      };
+      created.push(newOrder);
+      if (backendEnabled) apiCreate("purchase-orders", newOrder).catch(() => {});
     });
 
-    const newOrder: PurchaseOrder = {
-      id: `PO-${num}`,
-      number: num,
-      supplierName: items[0]?.supplierName || "Varios proveedores",
-      createdAt: TODAY_ISO,
-      expectedDate: "2026-07-05",
-      status: approvalsCreated > 0 ? "pending_approval" : "draft",
-      totalAmount,
-      skuCount: count,
-      destinationWarehouse: "Centro de Distribución",
-      buyerName,
-      delayedDays: 0,
-      lines: items.map((i) => ({ sku: i.sku, productName: i.productName, quantity: i.quantity, unitCost: i.unitCost })),
-    };
-    setCreatedOrders((prev) => [newOrder, ...prev]);
-    // Persistir en el backend si está conectado (best-effort, no bloquea la UI)
-    if (backendEnabled) apiCreate("purchase-orders", newOrder).catch(() => {});
-
-    setCreatedNumber(num);
+    setCreatedOrders((prev) => [...created, ...prev]);
+    const numbers = created.map((o) => o.number).join(", ");
+    setCreatedNumber(numbers);
     clear();
     setDrawerOpen(false);
     setTab("draft");
+    const n = created.length;
     toast.success(
-      `Borrador ${num} creado con ${newOrder.skuCount} producto${newOrder.skuCount === 1 ? "" : "s"}` +
-        (approvalsCreated > 0 ? ` · ${approvalsCreated} requiere${approvalsCreated === 1 ? "" : "n"} aprobación` : ""),
-      approvalsCreated > 0 ? { label: "Ver aprobaciones", onClick: () => navigate("/aprobaciones") } : undefined
+      `${n} borrador${n === 1 ? "" : "es"} creado${n === 1 ? "" : "s"} (${numbers})` +
+        (approvalsCreated > 0 ? ` · ${approvalsCreated} línea(s) requieren aprobación` : ""),
+      approvalsCreated > 0
+        ? { label: "Ver aprobaciones", onClick: () => navigate("/aprobaciones") }
+        : undefined
     );
   };
 
@@ -261,7 +387,19 @@ export function PurchaseOrdersPage() {
         </div>
       ),
     },
-    { key: "supplier", header: "Proveedor", render: (o) => <Link to={supplierPath(o.supplierName)} className="text-sm text-slate-700 hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{o.supplierName}</Link> },
+    {
+      key: "supplier",
+      header: "Proveedor",
+      render: (o) => (
+        <Link
+          to={supplierPath(o.supplierName)}
+          className="text-sm text-slate-700 hover:text-brand-700 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {o.supplierName}
+        </Link>
+      ),
+    },
     {
       key: "dates",
       header: "Creación / Esperada",
@@ -273,21 +411,43 @@ export function PurchaseOrdersPage() {
         </div>
       ),
     },
-    { key: "skus", header: "SKUs", align: "right", hideOnMobile: true, render: (o) => formatNumber(o.skuCount) },
-    { key: "warehouse", header: "Bodega destino", hideOnMobile: true, render: (o) => <span className="text-sm text-slate-600">{o.destinationWarehouse}</span> },
+    {
+      key: "skus",
+      header: "SKUs",
+      align: "right",
+      hideOnMobile: true,
+      render: (o) => formatNumber(o.skuCount),
+    },
+    {
+      key: "warehouse",
+      header: "Bodega destino",
+      hideOnMobile: true,
+      render: (o) => <span className="text-sm text-slate-600">{o.destinationWarehouse}</span>,
+    },
     {
       key: "amount",
       header: "Monto total",
       align: "right",
-      render: (o) => <span className="font-semibold text-slate-900">{formatCurrency(o.totalAmount)}</span>,
+      render: (o) => (
+        <span className="font-semibold text-slate-900">{formatCurrency(o.totalAmount)}</span>
+      ),
     },
     {
       key: "delay",
       header: "Atraso",
       align: "center",
-      render: (o) => (o.delayedDays > 0 ? <Badge tone="red">{o.delayedDays} d</Badge> : <span className="text-slate-300">—</span>),
+      render: (o) =>
+        o.delayedDays > 0 ? (
+          <Badge tone="red">{o.delayedDays} d</Badge>
+        ) : (
+          <span className="text-slate-300">—</span>
+        ),
     },
-    { key: "status", header: "Estado", render: (o) => <StatusBadge kind="purchaseOrder" value={o.status} /> },
+    {
+      key: "status",
+      header: "Estado",
+      render: (o) => <StatusBadge kind="purchaseOrder" value={o.status} />,
+    },
     {
       key: "actions",
       header: "",
@@ -312,7 +472,7 @@ export function PurchaseOrdersPage() {
         description="Seguimiento de OC y creación desde sugerencias."
         action={
           <Button onClick={() => setDrawerOpen(true)} icon={<IconPlus className="w-4 h-4" />}>
-            Crear OC desde sugerencias
+            Nuevo borrador de OC
             {count > 0 && (
               <span className="ml-1 rounded-full bg-white/20 px-1.5 text-xs">{count}</span>
             )}
@@ -323,33 +483,74 @@ export function PurchaseOrdersPage() {
       {createdNumber && (
         <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-center justify-between gap-3">
           <p className="text-sm text-emerald-800">
-            Borrador <span className="font-semibold">{createdNumber}</span> creado correctamente. Puedes revisarlo en la pestaña Borradores.
+            Borrador <span className="font-semibold">{createdNumber}</span> creado correctamente.
+            Puedes revisarlo en la pestaña Borradores.
           </p>
-          <button onClick={() => setCreatedNumber(null)} className="text-xs font-medium text-emerald-700 hover:text-emerald-900">
+          <button
+            onClick={() => setCreatedNumber(null)}
+            className="text-xs font-medium text-emerald-700 hover:text-emerald-900"
+          >
             Cerrar
           </button>
         </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Monto en curso" value={formatCurrencyCompact(totalOpenAmount)} tone="info" icon={<IconOrders className="w-4 h-4" />} description="Ver en curso" active={tab === "open"} onClick={() => setTab("open")} />
-        <KpiCard title="Atrasadas" value={formatNumber(delayedCount)} tone="bad" icon={<IconReplenish className="w-4 h-4" />} description="Ver atrasadas" active={tab === "delayed"} onClick={() => setTab("delayed")} />
-        <KpiCard title="Borradores" value={formatNumber(draftCount)} tone="warn" icon={<IconPlus className="w-4 h-4" />} description="Ver borradores" active={tab === "draft"} onClick={() => setTab("draft")} />
-        <KpiCard title="Total OC" value={formatNumber(orders.length)} tone="neutral" icon={<IconOrders className="w-4 h-4" />} description="Ver todas" active={tab === "all"} onClick={() => setTab("all")} />
+        <KpiCard
+          title="Monto en curso"
+          value={formatCurrencyCompact(totalOpenAmount)}
+          tone="info"
+          icon={<IconOrders className="w-4 h-4" />}
+          description="Ver en curso"
+          active={tab === "open"}
+          onClick={() => setTab("open")}
+        />
+        <KpiCard
+          title="Atrasadas"
+          value={formatNumber(delayedCount)}
+          tone="bad"
+          icon={<IconReplenish className="w-4 h-4" />}
+          description="Ver atrasadas"
+          active={tab === "delayed"}
+          onClick={() => setTab("delayed")}
+        />
+        <KpiCard
+          title="Borradores"
+          value={formatNumber(draftCount)}
+          tone="warn"
+          icon={<IconPlus className="w-4 h-4" />}
+          description="Ver borradores"
+          active={tab === "draft"}
+          onClick={() => setTab("draft")}
+        />
+        <KpiCard
+          title="Total OC"
+          value={formatNumber(visible.length)}
+          tone="neutral"
+          icon={<IconOrders className="w-4 h-4" />}
+          description="Ver todas"
+          active={tab === "all"}
+          onClick={() => setTab("all")}
+        />
       </div>
 
       <HelpNote className="mb-4">
-        Una OC pasa por: <b>borrador → enviada → confirmada → recibida</b>. Las <b>atrasadas</b> (rojo)
-        superaron su fecha esperada y pueden provocar quiebre: priorízalas. Crea nuevas OC desde las
-        sugerencias de reposición con el botón de arriba.
+        Una OC pasa por: <b>borrador → enviada → confirmada → recibida</b>. Las <b>atrasadas</b>{" "}
+        (rojo) superaron su fecha esperada y pueden provocar quiebre: priorízalas. Crea nuevas OC
+        desde las sugerencias de reposición con el botón de arriba.
       </HelpNote>
 
-      <div className="mb-3">
-        <Tabs
-          tabs={TABS.map((t) => ({ ...t, count: counts[t.value as keyof typeof counts] }))}
-          value={tab}
-          onChange={setTab}
-        />
+      <div className="mb-3 flex flex-col sm:flex-row sm:items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <Tabs
+            tabs={TABS.map((t) => ({ ...t, count: counts[t.value as keyof typeof counts] }))}
+            value={tab}
+            onChange={setTab}
+          />
+        </div>
+        <div className="sm:w-60 flex-shrink-0">
+          <DateRangePicker value={dates} onChange={setDates} placeholder="Fecha de creación" />
+        </div>
       </div>
 
       <Card>
@@ -363,242 +564,308 @@ export function PurchaseOrdersPage() {
             tab === "delayed"
               ? "No hay órdenes de compra atrasadas. Todas están dentro de su fecha esperada de entrega."
               : tab === "draft"
-              ? "No tienes borradores. Crea uno desde las sugerencias de reposición."
-              : "No hay órdenes de compra en esta vista."
+                ? "No tienes borradores. Crea uno desde las sugerencias de reposición."
+                : "No hay órdenes de compra en esta vista."
           }
           mobileCard={(o) => (
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800">{o.number}</p>
-                  <p className="text-xs text-slate-400">{o.supplierName} · {o.buyerName}</p>
+                  <p className="text-xs text-slate-400">
+                    {o.supplierName} · {o.buyerName}
+                  </p>
                 </div>
                 <StatusBadge kind="purchaseOrder" value={o.status} dot={false} />
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                <div><p className="text-xs text-slate-400">Esperada</p><p className="text-slate-700">{formatDate(o.expectedDate)}</p></div>
-                <div><p className="text-xs text-slate-400">SKUs</p><p className="text-slate-700">{formatNumber(o.skuCount)}</p></div>
-                <div><p className="text-xs text-slate-400">Monto</p><p className="text-slate-700">{formatCurrencyCompact(o.totalAmount)}</p></div>
+                <div>
+                  <p className="text-xs text-slate-400">Esperada</p>
+                  <p className="text-slate-700">{formatDate(o.expectedDate)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">SKUs</p>
+                  <p className="text-slate-700">{formatNumber(o.skuCount)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Monto</p>
+                  <p className="text-slate-700">{formatCurrencyCompact(o.totalAmount)}</p>
+                </div>
               </div>
             </div>
           )}
         />
       </Card>
 
-      {/* Drawer crear OC desde sugerencias */}
+      {/* Editor del borrador de orden de compra */}
       <Drawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title="Crear OC desde sugerencias"
-        description="Revisa los productos del borrador, ajusta cantidades y genera la orden."
+        title="Borrador de orden de compra"
+        description="Agrega productos, ajusta cantidad, costo y descuento, completa los datos y genera la OC."
         footer={
           <>
             <Button variant="secondary" onClick={() => setDrawerOpen(false)}>
               Cerrar
             </Button>
             <Button onClick={createOrder} disabled={count === 0}>
-              Crear borrador ({formatCurrency(totalAmount)})
+              {supplierGroups.length > 1 ? `Crear ${supplierGroups.length} OC` : "Crear borrador"} ·{" "}
+              {formatCurrency(totalAmount)}
             </Button>
           </>
         }
       >
-        {count === 0 ? (
-          <EmptyState
-            title="El borrador está vacío"
-            description="Agrega productos desde la página de Reposición sugerida o desde las sugerencias de abajo."
-            action={<Button onClick={() => { setDrawerOpen(false); navigate("/reposicion"); }}>Ir a reposición</Button>}
-          />
-        ) : (
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-              Productos en el borrador ({count})
+        <div className="space-y-4">
+          {/* Buscar y agregar cualquier producto */}
+          <div>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">
+              Agregar productos
             </p>
-            {items.map((it) => (
-              <div key={it.sku} className="rounded-lg border border-slate-200 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="text-xs font-mono text-slate-400">{it.sku}</span>
-                    <p className="text-sm font-medium text-slate-800">{it.productName}</p>
-                    <p className="text-xs text-slate-500">{it.supplierName}</p>
-                  </div>
-                  <button onClick={() => removeItem(it.sku)} className="text-xs text-rose-500 hover:text-rose-700">
-                    Quitar
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-3 mt-2">
-                  <div className="w-28">
-                    <Input
-                      type="number"
-                      min={0}
-                      aria-label={`Cantidad de ${it.productName}`}
-                      value={it.quantity}
-                      onChange={(e) => updateQuantity(it.sku, Number(e.target.value))}
+            <Input
+              icon={<IconSearch className="w-4 h-4" />}
+              placeholder="Buscar producto por nombre o SKU…"
+              value={prodSearch}
+              onChange={(e) => setProdSearch(e.target.value)}
+            />
+            {prodSearch.trim().length >= 2 && (
+              <div className="mt-1.5 rounded-lg border border-slate-200 divide-y divide-slate-50 max-h-56 overflow-y-auto">
+                {searchResults.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-slate-400">Sin coincidencias.</p>
+                ) : (
+                  searchResults.map((p) => {
+                    const added = hasItem(p.sku);
+                    return (
+                      <button
+                        key={p.sku}
+                        disabled={added}
+                        onClick={() => addProduct(p.sku)}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-60 disabled:cursor-default"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-slate-800 truncate">
+                            {p.name}
+                          </span>
+                          <span className="block text-xs text-slate-400">
+                            {p.sku} · {p.supplierName || "Sin proveedor"} · {formatCurrency(p.cost)}
+                          </span>
+                        </span>
+                        <span
+                          className={`text-xs font-semibold flex-shrink-0 ${added ? "text-slate-400" : "text-brand-600"}`}
+                        >
+                          {added ? "En borrador" : "Agregar"}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          {count === 0 ? (
+            <EmptyState
+              title="El borrador está vacío"
+              description="Busca un producto arriba, o agrégalos desde Reposición sugerida o las sugerencias de abajo."
+              action={
+                <Button
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    navigate("/reposicion");
+                  }}
+                >
+                  Ir a reposición
+                </Button>
+              }
+            />
+          ) : (
+            <>
+              {/* Datos de cabecera de la orden */}
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2.5">
+                  Datos de la orden
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Select
+                    label="Bodega destino"
+                    value={meta.destinationWarehouse}
+                    onChange={(e) => setMeta({ destinationWarehouse: e.target.value })}
+                    options={WAREHOUSES.map((w) => ({ value: w, label: w }))}
+                  />
+                  <Select
+                    label="Condición de pago"
+                    value={meta.paymentTerms}
+                    onChange={(e) => setMeta({ paymentTerms: e.target.value })}
+                    options={PAYMENT_TERMS.map((t) => ({ value: t, label: t }))}
+                  />
+                  <Input
+                    label="Fecha esperada"
+                    type="date"
+                    value={meta.expectedDate}
+                    onChange={(e) => setMeta({ expectedDate: e.target.value })}
+                  />
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Observaciones
+                    </label>
+                    <textarea
+                      value={meta.notes}
+                      onChange={(e) => setMeta({ notes: e.target.value })}
+                      rows={2}
+                      placeholder="Notas para el proveedor o internas…"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
                     />
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {formatCurrency(it.quantity * it.unitCost)}
-                  </span>
                 </div>
               </div>
-            ))}
-            <div className="flex justify-between items-center rounded-lg bg-slate-50 px-3 py-2.5">
-              <span className="text-sm font-medium text-slate-600">Total estimado</span>
-              <span className="text-base font-semibold text-slate-900">{formatCurrency(totalAmount)}</span>
-            </div>
-          </div>
-        )}
 
-        {pendingSuggestions.length > 0 && (
-          <div className="mt-6">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-              Sugerencias para agregar
-            </p>
-            <div className="space-y-2">
-              {pendingSuggestions.slice(0, 6).map((r) => (
-                <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{r.productName}</p>
-                    <p className="text-xs text-slate-500">
-                      {formatNumber(r.suggestedQuantity)} u. · {formatCurrency(r.suggestedPurchaseAmount)}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    icon={<IconPlus className="w-3.5 h-3.5" />}
-                    onClick={() => {
-                      addItem({
-                        sku: r.sku,
-                        productName: r.productName,
-                        supplierName: r.supplierName,
-                        quantity: r.suggestedQuantity,
-                        unitCost: r.unitCost,
-                      });
-                      toast.success(`${r.productName} agregado al borrador`);
-                    }}
+              {/* Líneas agrupadas por proveedor */}
+              {supplierGroups.map(([supplierName, groupItems]) => {
+                const net = groupItems.reduce((a, i) => a + lineNet(i), 0);
+                return (
+                  <div
+                    key={supplierName}
+                    className="rounded-lg border border-slate-200 overflow-hidden"
                   >
-                    Agregar
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </Drawer>
-
-      {/* Modal detalle OC */}
-      <Modal
-        open={!!detail}
-        onClose={closeDetail}
-        title={detail?.number ?? ""}
-        description={detail ? `${detail.supplierName} · ${detail.destinationWarehouse}` : ""}
-        footer={
-          detail && (
-            <>
-              <Button variant="secondary" onClick={closeDetail}>
-                Cerrar
-              </Button>
-              {detail.status === "pending_approval" && (
-                <Button variant="primary" onClick={() => navigate("/aprobaciones")}>Ver aprobaciones</Button>
-              )}
-              {(detail.status === "draft" || detail.status === "approved" || detail.status === "confirmed") && (
-                <Button onClick={() => markAsSent(detail.id)}>Marcar como enviada</Button>
-              )}
-            </>
-          )
-        }
-      >
-        {detail && (
-          <div className="space-y-4">
-            {detail.status === "pending_approval" && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-                ⏳ Esta orden tiene líneas fuera de criterio y <b>requiere aprobación</b> antes de enviarse al proveedor. Apruébalas en Aprobaciones.
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <DetailField label="Estado" value={<StatusBadge kind="purchaseOrder" value={detail.status} />} />
-              <DetailField label="Comprador" value={detail.buyerName} />
-              <DetailField label="Creación" value={formatDate(detail.createdAt)} />
-              <DetailField label="Fecha esperada" value={formatDate(detail.expectedDate)} />
-              {detail.confirmedDate && <DetailField label="Confirmada proveedor" value={formatDate(detail.confirmedDate)} />}
-              <DetailField label="Monto total" value={<span className="font-semibold">{formatCurrency(detail.totalAmount)}</span>} />
-              <DetailField label="N° de SKUs" value={formatNumber(detail.skuCount)} />
-              {detail.discountPct != null && <DetailField label="Descuento" value={`${detail.discountPct}%`} />}
-              {detail.paymentTerms && <DetailField label="Pago" value={detail.paymentTerms} />}
-            </div>
-
-            {detail.comments && (
-              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <span className="text-xs text-slate-400">Comentarios: </span>{detail.comments}
-              </div>
-            )}
-            {detail.documents && detail.documents.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">Documentos</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {detail.documents.map((d) => (
-                    <span key={d} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">📎 {d}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {detail.lines && detail.lines.length > 0 ? (() => {
-              const hasReception = detail.lines.some((l) => l.receivedQty != null);
-              return (
-                <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-                    {hasReception ? "Productos y diferencias de recepción" : "Productos"}
-                  </p>
-                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-                    {detail.lines.map((l) => {
-                      const diff = l.receivedQty != null ? l.receivedQty - l.quantity : null;
-                      return (
-                        <div key={l.sku} className="flex items-center justify-between gap-2 px-3 py-2">
-                          <div className="min-w-0">
-                            <span className="text-xs font-mono text-slate-400">{l.sku}</span>
-                            <p className="text-sm text-slate-700 truncate">{l.productName}</p>
+                    <div className="flex items-center justify-between gap-2 bg-slate-50 px-3 py-2 border-b border-slate-100">
+                      <span className="text-sm font-semibold text-slate-800 truncate">
+                        {supplierName}
+                      </span>
+                      <span className="text-xs text-slate-500 flex-shrink-0">
+                        {groupItems.length} línea{groupItems.length === 1 ? "" : "s"} ·{" "}
+                        <b className="text-slate-700">{formatCurrency(net)}</b>
+                      </span>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                      {groupItems.map((it) => (
+                        <div key={it.sku} className="px-3 py-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-slate-800 truncate">
+                                {it.productName}
+                              </p>
+                              <p className="text-xs text-slate-400 font-mono">{it.sku}</p>
+                            </div>
+                            <button
+                              onClick={() => removeItem(it.sku)}
+                              aria-label={`Quitar ${it.productName}`}
+                              className="text-slate-300 hover:text-rose-600 flex-shrink-0"
+                            >
+                              <IconClose className="w-4 h-4" />
+                            </button>
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            {hasReception ? (
-                              <>
-                                <p className="text-sm text-slate-700">
-                                  Pedido {formatNumber(l.quantity)} · Recibido <b>{formatNumber(l.receivedQty ?? 0)}</b>
-                                </p>
-                                <p className={`text-xs font-medium ${diff != null && diff < 0 ? "text-rose-600" : "text-emerald-600"}`}>
-                                  {diff != null && diff < 0 ? `Faltan ${formatNumber(-diff)}` : "Completo"}
-                                </p>
-                              </>
-                            ) : (
-                              <>
-                                <p className="text-sm font-medium text-slate-800">{formatNumber(l.quantity)} u.</p>
-                                <p className="text-xs text-slate-400">{formatCurrency(l.unitCost)} c/u</p>
-                              </>
-                            )}
+                          <div className="grid grid-cols-3 gap-2 mt-2">
+                            <label className="block text-[11px] text-slate-500">
+                              Cantidad
+                              <Input
+                                type="number"
+                                min={0}
+                                value={it.quantity}
+                                onChange={(e) => updateQuantity(it.sku, Number(e.target.value))}
+                              />
+                            </label>
+                            <label className="block text-[11px] text-slate-500">
+                              Costo unit.
+                              <Input
+                                type="number"
+                                min={0}
+                                value={it.unitCost}
+                                onChange={(e) =>
+                                  updateItem(it.sku, {
+                                    unitCost: Math.max(0, Number(e.target.value)),
+                                  })
+                                }
+                              />
+                            </label>
+                            <label className="block text-[11px] text-slate-500">
+                              Desc. %
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={it.discountPct ?? 0}
+                                onChange={(e) =>
+                                  updateItem(it.sku, {
+                                    discountPct: Math.max(0, Math.min(100, Number(e.target.value))),
+                                  })
+                                }
+                              />
+                            </label>
+                          </div>
+                          <div className="flex justify-end items-baseline gap-2 mt-1.5 text-sm">
+                            <span className="text-xs text-slate-400">Total línea</span>
+                            <span className="font-semibold text-slate-900">
+                              {formatCurrency(lineNet(it))}
+                            </span>
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })() : (
-              <p className="text-sm text-slate-400">
-                El detalle de líneas de esta orden no está disponible en la demo.
-              </p>
-            )}
-          </div>
-        )}
-      </Modal>
-    </div>
-  );
-}
+                );
+              })}
 
-function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <div className="text-sm text-slate-800 mt-0.5">{value}</div>
+              {/* Totales */}
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Subtotal</span>
+                  <span className="text-slate-700">{formatCurrency(subtotal)}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Descuento</span>
+                    <span className="text-emerald-600">− {formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                  <span className="text-sm font-medium text-slate-600">Total</span>
+                  <span className="text-base font-semibold text-slate-900">
+                    {formatCurrency(totalAmount)}
+                  </span>
+                </div>
+                {supplierGroups.length > 1 && (
+                  <p className="text-[11px] text-slate-400 pt-0.5">
+                    Se generarán {supplierGroups.length} órdenes (una por proveedor).
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
+          {pendingSuggestions.length > 0 && (
+            <div className="pt-1">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+                Sugerencias para agregar
+              </p>
+              <div className="space-y-2">
+                {pendingSuggestions.slice(0, 6).map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">{r.productName}</p>
+                      <p className="text-xs text-slate-500">
+                        {r.supplierName} · {formatNumber(r.suggestedQuantity)} u. ·{" "}
+                        {formatCurrency(r.suggestedPurchaseAmount)}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<IconPlus className="w-3.5 h-3.5" />}
+                      onClick={() => addProduct(r.sku)}
+                    >
+                      Agregar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Drawer>
+
+      <OcDetailModal detail={detail} onClose={closeDetail} onMarkSent={markAsSent} />
     </div>
   );
 }

@@ -25,7 +25,10 @@ export interface PurchaseDecision {
   learning: string;
 }
 
-export const OUTCOME_META: Record<DecisionOutcome, { label: string; tone: "green" | "violet" | "red" | "neutral" }> = {
+export const OUTCOME_META: Record<
+  DecisionOutcome,
+  { label: string; tone: "green" | "violet" | "red" | "neutral" }
+> = {
   bueno: { label: "Compró bien", tone: "green" },
   sobrestock: { label: "Sobrecompró", tone: "violet" },
   corto: { label: "Compró corto", tone: "red" },
@@ -47,8 +50,10 @@ export const purchaseDecisions: PurchaseDecision[] = [
     reason: "Descuento por volumen del proveedor (−12%)",
     resultDays: 90,
     outcome: "sobrestock",
-    resultText: "90 días después quedaron 380 u. sin vender; capital inmovilizado ~$2,5M al pasar la temporada de jardín.",
-    learning: "Negociar el descuento sin obligar a comprar tan alto, o exigir devolución/campaña de liquidación post-temporada.",
+    resultText:
+      "90 días después quedaron 380 u. sin vender; capital inmovilizado ~$2,5M al pasar la temporada de jardín.",
+    learning:
+      "Negociar el descuento sin obligar a comprar tan alto, o exigir devolución/campaña de liquidación post-temporada.",
   },
   {
     id: "DEC-002",
@@ -65,7 +70,8 @@ export const purchaseDecisions: PurchaseDecision[] = [
     resultDays: 8,
     outcome: "corto",
     resultText: "Quiebre 8 días después; venta perdida estimada ~$2,8M y reclamos de tienda.",
-    learning: "En productos de alta rotación no recortar bajo el sugerido por caja: el costo del quiebre supera el ahorro.",
+    learning:
+      "En productos de alta rotación no recortar bajo el sugerido por caja: el costo del quiebre supera el ahorro.",
   },
   {
     id: "DEC-003",
@@ -81,8 +87,10 @@ export const purchaseDecisions: PurchaseDecision[] = [
     reason: "Ajuste por campaña Cyber herramientas",
     resultDays: 60,
     outcome: "bueno",
-    resultText: "Cobertura saludable durante la campaña, sin quiebre y sin sobrestock; margen sostenido en 38%.",
-    learning: "Comprar dentro del rango objetivo + pequeño colchón para campañas funciona bien con este proveedor.",
+    resultText:
+      "Cobertura saludable durante la campaña, sin quiebre y sin sobrestock; margen sostenido en 38%.",
+    learning:
+      "Comprar dentro del rango objetivo + pequeño colchón para campañas funciona bien con este proveedor.",
   },
   {
     id: "DEC-004",
@@ -98,8 +106,10 @@ export const purchaseDecisions: PurchaseDecision[] = [
     reason: "Sin desvío: se compró el sugerido",
     resultDays: 30,
     outcome: "corto",
-    resultText: "Igual hubo quiebre: el proveedor despachó solo 180 de 240 (fill 75%). Causa: proveedor, no la decisión de compra.",
-    learning: "El sugerido fue correcto; el problema fue el fill rate del proveedor. Exigir 95% o asegurar proveedor alternativo.",
+    resultText:
+      "Igual hubo quiebre: el proveedor despachó solo 180 de 240 (fill 75%). Causa: proveedor, no la decisión de compra.",
+    learning:
+      "El sugerido fue correcto; el problema fue el fill rate del proveedor. Exigir 95% o asegurar proveedor alternativo.",
   },
   {
     id: "DEC-005",
@@ -132,7 +142,8 @@ export const purchaseDecisions: PurchaseDecision[] = [
     reason: "Pre-temporada de jardín + alza de costo anunciada",
     resultDays: 0,
     outcome: "pendiente",
-    resultText: "Compra reciente, resultado en medición. Se justificó por temporada y alza de costo.",
+    resultText:
+      "Compra reciente, resultado en medición. Se justificó por temporada y alza de costo.",
     learning: "—",
   },
 ];

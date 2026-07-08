@@ -1,14 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../../utils/cn";
 
-export type BadgeTone =
-  | "neutral"
-  | "blue"
-  | "green"
-  | "amber"
-  | "red"
-  | "violet"
-  | "slate";
+export type BadgeTone = "neutral" | "blue" | "green" | "amber" | "red" | "violet" | "slate";
 
 interface BadgeProps {
   tone?: BadgeTone;

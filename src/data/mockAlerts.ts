@@ -25,8 +25,7 @@ export const alerts: CommercialAlert[] = [
     severity: "high",
     relatedEntity: "Cemento Polpaico 25 kg",
     relatedSku: "CON-001",
-    description:
-      "SKU CON-001 con stock disponible 6 y venta de 540/mes. Cobertura menor a 1 día.",
+    description: "SKU CON-001 con stock disponible 6 y venta de 540/mes. Cobertura menor a 1 día.",
     recommendation:
       "Comprar 700 unidades a Proveedor Andes. Es el producto más vendido de Construcción.",
     date: "2026-06-24",
@@ -41,8 +40,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "ELE-001",
     description:
       "SKU ELE-001 cubre solo 2,2 días de venta y el proveedor demora 6 días en entregar.",
-    recommendation:
-      "Generar OC por 96 unidades a Distribuidora Maule antes de 48 horas.",
+    recommendation: "Generar OC por 96 unidades a Distribuidora Maule antes de 48 horas.",
     date: "2026-06-24",
     responsible: "Andrea Muñoz",
     status: "new",
@@ -66,8 +64,7 @@ export const alerts: CommercialAlert[] = [
     severity: "medium",
     relatedEntity: "Guantes de seguridad anticorte",
     relatedSku: "SEG-001",
-    description:
-      "SKU SEG-001 tiene 416 días de inventario. Stock 305 contra venta de 22/mes.",
+    description: "SKU SEG-001 tiene 416 días de inventario. Stock 305 contra venta de 22/mes.",
     recommendation:
       "No comprar. Evaluar promoción o redistribución. Capital inmovilizado: $511.190.",
     date: "2026-06-22",
@@ -80,10 +77,8 @@ export const alerts: CommercialAlert[] = [
     severity: "medium",
     relatedEntity: "Herbicida jardín concentrado 1 L",
     relatedSku: "JAR-002",
-    description:
-      "SKU JAR-002 sin ventas en 30 días y solo 6 unidades en 90 días. Stock 58.",
-    recommendation:
-      "Stock muerto. Revisar con jefatura comercial si se descontinúa o se liquida.",
+    description: "SKU JAR-002 sin ventas en 30 días y solo 6 unidades en 90 días. Stock 58.",
+    recommendation: "Stock muerto. Revisar con jefatura comercial si se descontinúa o se liquida.",
     date: "2026-06-21",
     responsible: "María González",
     status: "new",
@@ -94,10 +89,8 @@ export const alerts: CommercialAlert[] = [
     severity: "medium",
     relatedEntity: "Esmalte sintético negro 1/4 galón",
     relatedSku: "PIN-002",
-    description:
-      "SKU PIN-002 con margen 21,9%, bajo el mínimo esperado de 25% para Pinturas.",
-    recommendation:
-      "Revisar costo con Pinturas Nacionales o ajustar precio de venta.",
+    description: "SKU PIN-002 con margen 21,9%, bajo el mínimo esperado de 25% para Pinturas.",
+    recommendation: "Revisar costo con Pinturas Nacionales o ajustar precio de venta.",
     date: "2026-06-20",
     responsible: "María González",
     status: "in_review",
@@ -108,8 +101,7 @@ export const alerts: CommercialAlert[] = [
     severity: "high",
     relatedEntity: "Adhesivo montaje fuerte 300 ml",
     relatedSku: "CON-002",
-    description:
-      "SKU CON-002 no tiene proveedor asignado y mantiene venta activa (38/mes).",
+    description: "SKU CON-002 no tiene proveedor asignado y mantiene venta activa (38/mes).",
     recommendation:
       "Asignar proveedor para poder generar reposición. Sin proveedor no se puede comprar.",
     date: "2026-06-20",
@@ -122,10 +114,8 @@ export const alerts: CommercialAlert[] = [
     severity: "medium",
     relatedEntity: "Adhesivo montaje fuerte 300 ml",
     relatedSku: "CON-002",
-    description:
-      "El costo de CON-002 no se actualiza desde el 01/02/2026 (más de 4 meses).",
-    recommendation:
-      "Solicitar lista de precios vigente al proveedor antes de comprar.",
+    description: "El costo de CON-002 no se actualiza desde el 01/02/2026 (más de 4 meses).",
+    recommendation: "Solicitar lista de precios vigente al proveedor antes de comprar.",
     date: "2026-06-19",
     responsible: "Catalina Saavedra",
     status: "new",
@@ -135,8 +125,7 @@ export const alerts: CommercialAlert[] = [
     type: "po_delayed",
     severity: "high",
     relatedEntity: "OC-2026-0133 · Industrial del Sur",
-    description:
-      "Orden de compra con 22 días de atraso sobre la fecha esperada (02/06/2026).",
+    description: "Orden de compra con 22 días de atraso sobre la fecha esperada (02/06/2026).",
     recommendation:
       "Escalar con el proveedor. Productos comprometidos para Centro de Distribución.",
     date: "2026-06-24",
@@ -151,8 +140,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "GAS-004",
     description:
       "Venta de GAS-004 subió 28% sobre el promedio histórico. Cobertura cayó a 1,7 días.",
-    recommendation:
-      "Adelantar reposición de 155 unidades y revisar punto de reposición al alza.",
+    recommendation: "Adelantar reposición de 155 unidades y revisar punto de reposición al alza.",
     date: "2026-06-23",
     responsible: "Juan Pérez",
     status: "new",
@@ -164,8 +152,7 @@ export const alerts: CommercialAlert[] = [
     relatedEntity: "Construcción",
     description:
       "La compra sugerida de Construcción supera $18.700.000 este mes por reposición de cemento y OSB.",
-    recommendation:
-      "Validar presupuesto de la categoría antes de confirmar las órdenes de compra.",
+    recommendation: "Validar presupuesto de la categoría antes de confirmar las órdenes de compra.",
     date: "2026-06-22",
     responsible: "Catalina Saavedra",
     status: "in_review",
@@ -176,10 +163,8 @@ export const alerts: CommercialAlert[] = [
     severity: "low",
     relatedEntity: "Malla raschel 80%",
     relatedSku: "JAR-001",
-    description:
-      "SKU JAR-001 (temporada) con solo 3 ventas en 30 días y 400 días de inventario.",
-    recommendation:
-      "Producto estacional fuera de temporada. No reponer hasta primavera.",
+    description: "SKU JAR-001 (temporada) con solo 3 ventas en 30 días y 400 días de inventario.",
+    recommendation: "Producto estacional fuera de temporada. No reponer hasta primavera.",
     date: "2026-06-18",
     responsible: "María González",
     status: "ignored",
@@ -190,10 +175,8 @@ export const alerts: CommercialAlert[] = [
     severity: "low",
     relatedEntity: "Ampolleta LED 12W luz fría",
     relatedSku: "ELE-002",
-    description:
-      "SKU ELE-002 con 84 días de inventario, sobre el máximo (420 unidades).",
-    recommendation:
-      "Pausar compra hasta normalizar stock. Buena venta pero exceso de inventario.",
+    description: "SKU ELE-002 con 84 días de inventario, sobre el máximo (420 unidades).",
+    recommendation: "Pausar compra hasta normalizar stock. Buena venta pero exceso de inventario.",
     date: "2026-06-17",
     responsible: "Andrea Muñoz",
     status: "resolved",
@@ -206,8 +189,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "ELE-001",
     description:
       "El costo de ELE-001 subió de $30.490 a $32.990 (+8,2%), reduciendo el margen a 26,7%.",
-    recommendation:
-      "Evaluar ajuste de precio de venta para proteger el margen objetivo.",
+    recommendation: "Evaluar ajuste de precio de venta para proteger el margen objetivo.",
     date: "2026-06-15",
     responsible: "Andrea Muñoz",
     status: "in_review",
@@ -216,7 +198,7 @@ export const alerts: CommercialAlert[] = [
     id: "ALR-016",
     type: "stockout",
     severity: "high",
-    relatedEntity: "Llave de paso PVC 1/2\"",
+    relatedEntity: 'Llave de paso PVC 1/2"',
     relatedSku: "GAS-005",
     description:
       "GAS-005 con stock disponible 0 y venta de 150/mes. Quiebre activo en las 3 ubicaciones.",
@@ -232,8 +214,7 @@ export const alerts: CommercialAlert[] = [
     severity: "high",
     relatedEntity: "Fierro estriado 8 mm x 6 m",
     relatedSku: "CON-003",
-    description:
-      "CON-003 con disponible 12 y venta de 620/mes. Cobertura menor a 1 día.",
+    description: "CON-003 con disponible 12 y venta de 620/mes. Cobertura menor a 1 día.",
     recommendation:
       "Comprar 580 unidades a Proveedor Andes. Producto estructural de altísima rotación.",
     date: "2026-06-24",
@@ -247,8 +228,7 @@ export const alerts: CommercialAlert[] = [
     relatedEntity: "Industrial del Sur",
     description:
       "Industrial del Sur con cumplimiento 62% y lead time real de 18 días. Afecta a HER-005 en riesgo de quiebre.",
-    recommendation:
-      "Evaluar proveedor alternativo para SKUs críticos de Herramientas eléctricas.",
+    recommendation: "Evaluar proveedor alternativo para SKUs críticos de Herramientas eléctricas.",
     date: "2026-06-23",
     responsible: "Felipe Rojas",
     status: "in_review",
@@ -261,8 +241,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "FER-006",
     description:
       "FER-006 con cobertura de 5 días y lead time de 12. Se agota antes de la reposición.",
-    recommendation:
-      "Comprar 160 unidades a FerrePro Chile. Alta rotación y margen sobre 44%.",
+    recommendation: "Comprar 160 unidades a FerrePro Chile. Alta rotación y margen sobre 44%.",
     date: "2026-06-23",
     responsible: "Juan Pérez",
     status: "new",
@@ -275,8 +254,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "PIN-003",
     description:
       "PIN-003 con cobertura de 133 días, muy sobre el máximo (160 u.). Capital inmovilizado ~$356.000.",
-    recommendation:
-      "Pausar compra y evaluar campaña o liquidación para mover el exceso.",
+    recommendation: "Pausar compra y evaluar campaña o liquidación para mover el exceso.",
     date: "2026-06-22",
     responsible: "María González",
     status: "new",
@@ -289,8 +267,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "SEG-002",
     description:
       "SEG-002 con rotación 1,6 al año y cobertura de 250 días. Stock prácticamente detenido.",
-    recommendation:
-      "Evaluar descontinuar o liquidar. No se sugiere compra.",
+    recommendation: "Evaluar descontinuar o liquidar. No se sugiere compra.",
     date: "2026-06-20",
     responsible: "Felipe Rojas",
     status: "new",
@@ -303,8 +280,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "CON-003",
     description:
       "CON-003 con margen de 26,4%, bajo el objetivo de 28% de la categoría Construcción.",
-    recommendation:
-      "Renegociar costo con Proveedor Andes o revisar precio de venta.",
+    recommendation: "Renegociar costo con Proveedor Andes o revisar precio de venta.",
     date: "2026-06-19",
     responsible: "Catalina Saavedra",
     status: "in_review",
@@ -315,10 +291,8 @@ export const alerts: CommercialAlert[] = [
     severity: "low",
     relatedEntity: "Tornillo autoperforante 8x1/2 caja 100u",
     relatedSku: "FER-004",
-    description:
-      "El costo de FER-004 no se actualiza desde el 15/02/2026 (más de 4 meses).",
-    recommendation:
-      "Solicitar lista de precios vigente a FerrePro Chile y actualizar el costo.",
+    description: "El costo de FER-004 no se actualiza desde el 15/02/2026 (más de 4 meses).",
+    recommendation: "Solicitar lista de precios vigente a FerrePro Chile y actualizar el costo.",
     date: "2026-06-18",
     responsible: "Juan Pérez",
     status: "new",
@@ -331,8 +305,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "JAR-003",
     description:
       "JAR-003 vendía de forma estable y dejó de comprarse hace meses; quedó sin stock. La categoría Jardín siguió vendiendo, así que no es falta de demanda. Impacto: venta no capturada cada mes que sigue sin reponerse.",
-    recommendation:
-      "Reponer stock base. Ver detalle en Oportunidades no capturadas.",
+    recommendation: "Reponer stock base. Ver detalle en Oportunidades no capturadas.",
     date: "2026-06-25",
     responsible: "María González",
     status: "new",
@@ -359,8 +332,7 @@ export const alerts: CommercialAlert[] = [
     relatedSku: "JAR-004",
     description:
       "JAR-004 no registra compra en los últimos meses pese a venta histórica y categoría en crecimiento. Impacto: se está dejando de vender mientras no se repone.",
-    recommendation:
-      "Reactivar compra base. Ver detalle en Oportunidades no capturadas.",
+    recommendation: "Reactivar compra base. Ver detalle en Oportunidades no capturadas.",
     date: "2026-06-24",
     responsible: "María González",
     status: "new",

@@ -37,7 +37,10 @@ export function NotificationCenter() {
           <IconArrowRight className="w-5 h-5 rotate-180" />
         </button>
         <p className="flex-1 min-w-0 text-sm font-semibold text-slate-800">
-          Notificaciones {unreadCount > 0 && <span className="text-slate-400 font-normal">({unreadCount} sin leer)</span>}
+          Notificaciones{" "}
+          {unreadCount > 0 && (
+            <span className="text-slate-400 font-normal">({unreadCount} sin leer)</span>
+          )}
         </p>
         {unreadCount > 0 && (
           <button
@@ -68,11 +71,17 @@ export function NotificationCenter() {
               <span className={cn("absolute left-0 top-0 bottom-0 w-1", toneBar[n.tone])} />
               <span className="min-w-0 flex-1 pl-1">
                 <span className="flex items-center gap-2">
-                  {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />}
+                  {!n.read && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />
+                  )}
                   <span className="text-sm font-medium text-slate-800 truncate">{n.title}</span>
                 </span>
-                <span className="block text-xs text-slate-500 mt-0.5 leading-snug line-clamp-2">{n.message}</span>
-                <span className="block text-[11px] text-slate-400 mt-0.5">{formatDate(n.date)}</span>
+                <span className="block text-xs text-slate-500 mt-0.5 leading-snug line-clamp-2">
+                  {n.message}
+                </span>
+                <span className="block text-[11px] text-slate-400 mt-0.5">
+                  {formatDate(n.date)}
+                </span>
               </span>
             </button>
           ))

@@ -74,7 +74,18 @@ export function ProductsPage() {
       result = result.filter((p) => p.availableStock <= 0);
     }
     return result;
-  }, [allProducts, query, category, subcategory, brand, supplier, productStatus, purchaseStatus, toggles, outOfStock]);
+  }, [
+    allProducts,
+    query,
+    category,
+    subcategory,
+    brand,
+    supplier,
+    productStatus,
+    purchaseStatus,
+    toggles,
+    outOfStock,
+  ]);
 
   const clearFilters = () => {
     setQuery("");
@@ -104,7 +115,16 @@ export function ProductsPage() {
             <span className="text-xs text-slate-400">{p.brand}</span>
           </div>
           <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
-          <p className="text-xs text-slate-500"><Link to={categoryPath(p.category)} className="hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{p.category}</Link> · {p.subcategory}</p>
+          <p className="text-xs text-slate-500">
+            <Link
+              to={categoryPath(p.category)}
+              className="hover:text-brand-700 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {p.category}
+            </Link>{" "}
+            · {p.subcategory}
+          </p>
         </div>
       ),
     },
@@ -173,7 +193,15 @@ export function ProductsPage() {
         if (!date) return <span className="text-slate-300">—</span>;
         const cover = coverageDays(p.availableStock, p.salesLast30Days);
         return (
-          <span className={cover <= p.supplierLeadTimeDays ? "text-rose-600 font-medium" : cover <= p.supplierLeadTimeDays * 2 ? "text-amber-600" : "text-slate-600"}>
+          <span
+            className={
+              cover <= p.supplierLeadTimeDays
+                ? "text-rose-600 font-medium"
+                : cover <= p.supplierLeadTimeDays * 2
+                  ? "text-amber-600"
+                  : "text-slate-600"
+            }
+          >
             {formatDate(date)}
           </span>
         );
@@ -227,10 +255,46 @@ export function ProductsPage() {
           summary={`${filtered.length} productos · ${filtered.filter((p) => p.availableStock <= 0).length} sin stock · ${lowMarginCount} margen bajo · ${noSupplierCount} sin proveedor`}
           onClear={clearFilters}
           selects={[
-            { key: "cat", placeholder: "Categoría", value: category, onChange: setCategory, options: uniqueValues(allProducts, (p) => p.category).map((c) => ({ value: c, label: c })) },
-            { key: "sub", placeholder: "Subcategoría", value: subcategory, onChange: setSubcategory, options: uniqueValues(allProducts, (p) => p.subcategory).map((c) => ({ value: c, label: c })) },
-            { key: "brand", placeholder: "Marca", value: brand, onChange: setBrand, options: uniqueValues(allProducts, (p) => p.brand).map((c) => ({ value: c, label: c })) },
-            { key: "sup", placeholder: "Proveedor", value: supplier, onChange: setSupplier, options: uniqueValues(allProducts.filter((p) => p.supplierName), (p) => p.supplierName).map((c) => ({ value: c, label: c })) },
+            {
+              key: "cat",
+              placeholder: "Categoría",
+              value: category,
+              onChange: setCategory,
+              options: uniqueValues(allProducts, (p) => p.category).map((c) => ({
+                value: c,
+                label: c,
+              })),
+            },
+            {
+              key: "sub",
+              placeholder: "Subcategoría",
+              value: subcategory,
+              onChange: setSubcategory,
+              options: uniqueValues(allProducts, (p) => p.subcategory).map((c) => ({
+                value: c,
+                label: c,
+              })),
+            },
+            {
+              key: "brand",
+              placeholder: "Marca",
+              value: brand,
+              onChange: setBrand,
+              options: uniqueValues(allProducts, (p) => p.brand).map((c) => ({
+                value: c,
+                label: c,
+              })),
+            },
+            {
+              key: "sup",
+              placeholder: "Proveedor",
+              value: supplier,
+              onChange: setSupplier,
+              options: uniqueValues(
+                allProducts.filter((p) => p.supplierName),
+                (p) => p.supplierName
+              ).map((c) => ({ value: c, label: c })),
+            },
             {
               key: "pstatus",
               placeholder: "Estado comercial",
@@ -260,20 +324,75 @@ export function ProductsPage() {
             },
           ]}
           toggles={[
-            { key: "outOfStock", label: "Sin stock", active: outOfStock, onToggle: toggleOutOfStock },
-            { key: "lowMargin", label: "Margen bajo", active: toggles.lowMargin, onToggle: () => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin })) },
-            { key: "noSupplier", label: "Sin proveedor", active: toggles.noSupplier, onToggle: () => setToggles((t) => ({ ...t, noSupplier: !t.noSupplier })) },
-            { key: "noSales", label: "Sin venta", active: toggles.noSales, onToggle: () => setToggles((t) => ({ ...t, noSales: !t.noSales })) },
-            { key: "outdated", label: "Sin costo actualizado", active: toggles.outdatedCost, onToggle: () => setToggles((t) => ({ ...t, outdatedCost: !t.outdatedCost })) },
+            {
+              key: "outOfStock",
+              label: "Sin stock",
+              active: outOfStock,
+              onToggle: toggleOutOfStock,
+            },
+            {
+              key: "lowMargin",
+              label: "Margen bajo",
+              active: toggles.lowMargin,
+              onToggle: () => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin })),
+            },
+            {
+              key: "noSupplier",
+              label: "Sin proveedor",
+              active: toggles.noSupplier,
+              onToggle: () => setToggles((t) => ({ ...t, noSupplier: !t.noSupplier })),
+            },
+            {
+              key: "noSales",
+              label: "Sin venta",
+              active: toggles.noSales,
+              onToggle: () => setToggles((t) => ({ ...t, noSales: !t.noSales })),
+            },
+            {
+              key: "outdated",
+              label: "Sin costo actualizado",
+              active: toggles.outdatedCost,
+              onToggle: () => setToggles((t) => ({ ...t, outdatedCost: !t.outdatedCost })),
+            },
           ]}
         />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="SKUs en vista" value={formatNumber(filtered.length)} tone="info" icon={<IconProducts className="w-4 h-4" />} description="Según filtros" />
-        <KpiCard title="Margen bajo (<25%)" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconSales className="w-4 h-4" />} description="Filtrar" active={toggles.lowMargin} onClick={() => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin }))} />
-        <KpiCard title="Sin proveedor" value={formatNumber(noSupplierCount)} tone={noSupplierCount ? "bad" : "good"} icon={<IconSuppliers className="w-4 h-4" />} description="Filtrar" active={toggles.noSupplier} onClick={() => setToggles((t) => ({ ...t, noSupplier: !t.noSupplier }))} />
-        <KpiCard title="Sin venta (30d)" value={formatNumber(noSalesCount)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} description="Filtrar" active={toggles.noSales} onClick={() => setToggles((t) => ({ ...t, noSales: !t.noSales }))} />
+        <KpiCard
+          title="SKUs en vista"
+          value={formatNumber(filtered.length)}
+          tone="info"
+          icon={<IconProducts className="w-4 h-4" />}
+          description="Según filtros"
+        />
+        <KpiCard
+          title="Margen bajo (<25%)"
+          value={formatNumber(lowMarginCount)}
+          tone="warn"
+          icon={<IconSales className="w-4 h-4" />}
+          description="Filtrar"
+          active={toggles.lowMargin}
+          onClick={() => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin }))}
+        />
+        <KpiCard
+          title="Sin proveedor"
+          value={formatNumber(noSupplierCount)}
+          tone={noSupplierCount ? "bad" : "good"}
+          icon={<IconSuppliers className="w-4 h-4" />}
+          description="Filtrar"
+          active={toggles.noSupplier}
+          onClick={() => setToggles((t) => ({ ...t, noSupplier: !t.noSupplier }))}
+        />
+        <KpiCard
+          title="Sin venta (30d)"
+          value={formatNumber(noSalesCount)}
+          tone="warn"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Filtrar"
+          active={toggles.noSales}
+          onClick={() => setToggles((t) => ({ ...t, noSales: !t.noSales }))}
+        />
       </div>
 
       <Card>
@@ -288,14 +407,22 @@ export function ProductsPage() {
                 <div className="min-w-0">
                   <span className="text-xs font-mono text-slate-400">{p.sku}</span>
                   <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
-                  <p className="text-xs text-slate-500">{p.category} · {p.brand}</p>
+                  <p className="text-xs text-slate-500">
+                    {p.category} · {p.brand}
+                  </p>
                 </div>
                 <StatusBadge kind="purchase" value={p.purchaseStatus} dot={false} />
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
                 <div>
                   <p className="text-xs text-slate-400">Stock disp.</p>
-                  <p className={p.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(p.availableStock)}</p>
+                  <p
+                    className={
+                      p.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"
+                    }
+                  >
+                    {formatNumber(p.availableStock)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Venta mes</p>
@@ -303,7 +430,9 @@ export function ProductsPage() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Margen</p>
-                  <p className={p.margin < 25 ? "text-amber-600 font-medium" : "text-slate-700"}>{formatPercent(p.margin)}</p>
+                  <p className={p.margin < 25 ? "text-amber-600 font-medium" : "text-slate-700"}>
+                    {formatPercent(p.margin)}
+                  </p>
                 </div>
               </div>
             </div>

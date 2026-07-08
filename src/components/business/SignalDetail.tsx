@@ -14,17 +14,8 @@ import {
   IconArrowRight,
 } from "../ui/icons";
 import { cn } from "../../utils/cn";
-import {
-  formatCurrency,
-  formatNumber,
-  formatPercent,
-} from "../../utils/formatters";
-import {
-  SIGNAL_TYPE,
-  SIGNAL_STATUS,
-  SIGNAL_PRIORITY,
-  SIGNAL_CHANNEL,
-} from "./signalLabels";
+import { formatCurrency, formatNumber, formatPercent } from "../../utils/formatters";
+import { SIGNAL_TYPE, SIGNAL_STATUS, SIGNAL_PRIORITY, SIGNAL_CHANNEL } from "./signalLabels";
 import { useSignals } from "../../context/SignalsContext";
 import { useBuyer } from "../../context/BuyerContext";
 import { useOcDraft } from "../../context/OcDraftContext";
@@ -81,7 +72,12 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
       ? ((signal.targetPrice - signal.quotedCost) / signal.targetPrice) * 100
       : null;
   const hasRequestData =
-    signal.customerName || signal.requestedQty || signal.requiredDate || signal.targetPrice || signal.suggestedSupplier || signal.quotedCost;
+    signal.customerName ||
+    signal.requestedQty ||
+    signal.requiredDate ||
+    signal.targetPrice ||
+    signal.suggestedSupplier ||
+    signal.quotedCost;
 
   const meta = SIGNAL_TYPE[signal.type];
   const status = SIGNAL_STATUS[signal.status];
@@ -130,15 +126,16 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
 
   // Flujo de la solicitud: solicitado → en revisión → consultando proveedor →
   // cotizado → esperando cliente → aprobado → comprado → resuelto.
-  const STEP: Partial<Record<SalesSignal["status"], { to: SalesSignal["status"]; label: string }>> = {
-    new: { to: "in_review", label: "Marcar en revisión" },
-    in_review: { to: "sourcing", label: "Consultar proveedor" },
-    sourcing: { to: "quoted", label: "Registrar cotización" },
-    quoted: { to: "awaiting_customer", label: "Esperar respuesta cliente" },
-    awaiting_customer: { to: "accepted", label: "Aprobar" },
-    accepted: { to: "purchased", label: "Marcar comprado" },
-    purchased: { to: "resolved", label: "Marcar resuelto" },
-  };
+  const STEP: Partial<Record<SalesSignal["status"], { to: SalesSignal["status"]; label: string }>> =
+    {
+      new: { to: "in_review", label: "Marcar en revisión" },
+      in_review: { to: "sourcing", label: "Consultar proveedor" },
+      sourcing: { to: "quoted", label: "Registrar cotización" },
+      quoted: { to: "awaiting_customer", label: "Esperar respuesta cliente" },
+      awaiting_customer: { to: "accepted", label: "Aprobar" },
+      accepted: { to: "purchased", label: "Marcar comprado" },
+      purchased: { to: "resolved", label: "Marcar resuelto" },
+    };
   const step = STEP[signal.status];
   const advance = () => {
     if (!step) return;
@@ -220,8 +217,8 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
             )}
             <p className="text-xs text-slate-500 mt-0.5">
               {signal.category}
-              {signal.brand ? ` · ${signal.brand}` : ""} ·{" "}
-              {SIGNAL_CHANNEL[signal.channel]} · {signal.store}
+              {signal.brand ? ` · ${signal.brand}` : ""} · {SIGNAL_CHANNEL[signal.channel]} ·{" "}
+              {signal.store}
             </p>
           </div>
           <MoreActions actions={moreActions} />
@@ -230,9 +227,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
         {/* Motivo del reporte */}
         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-slate-500">
-              Reportado por {signal.reportedBy}
-            </p>
+            <p className="text-xs font-medium text-slate-500">Reportado por {signal.reportedBy}</p>
             <span className="text-xs text-slate-400">{fmtDateTime(signal.date)}</span>
           </div>
           <p className="text-sm text-slate-700 mt-1">{signal.comment}</p>
@@ -241,44 +236,104 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
         {/* Solicitud de compra (datos formales) */}
         <div className="mt-3 rounded-lg border border-slate-200 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2 mb-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Solicitud de compra</p>
-            <button type="button" onClick={() => setEditReq((v) => !v)} className="text-xs font-medium text-brand-600 hover:text-brand-700">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Solicitud de compra
+            </p>
+            <button
+              type="button"
+              onClick={() => setEditReq((v) => !v)}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700"
+            >
               {editReq ? "Cancelar" : hasRequestData ? "Editar" : "Completar"}
             </button>
           </div>
 
           {editReq ? (
             <div className="grid grid-cols-2 gap-2">
-              <ReqInput label="Cliente" value={reqDraft.customerName} onChange={(v) => setReqDraft({ ...reqDraft, customerName: v })} placeholder="Ej: Constructora Andes" />
-              <ReqInput label="Cantidad" type="number" value={reqDraft.requestedQty} onChange={(v) => setReqDraft({ ...reqDraft, requestedQty: v })} placeholder="0" />
-              <ReqInput label="Fecha requerida" type="date" value={reqDraft.requiredDate} onChange={(v) => setReqDraft({ ...reqDraft, requiredDate: v })} />
-              <ReqInput label="Precio objetivo" type="number" value={reqDraft.targetPrice} onChange={(v) => setReqDraft({ ...reqDraft, targetPrice: v })} placeholder="CLP" />
-              <ReqInput label="Proveedor sugerido" value={reqDraft.suggestedSupplier} onChange={(v) => setReqDraft({ ...reqDraft, suggestedSupplier: v })} placeholder="Opcional" />
-              <ReqInput label="Costo cotizado" type="number" value={reqDraft.quotedCost} onChange={(v) => setReqDraft({ ...reqDraft, quotedCost: v })} placeholder="CLP" />
+              <ReqInput
+                label="Cliente"
+                value={reqDraft.customerName}
+                onChange={(v) => setReqDraft({ ...reqDraft, customerName: v })}
+                placeholder="Ej: Constructora Andes"
+              />
+              <ReqInput
+                label="Cantidad"
+                type="number"
+                value={reqDraft.requestedQty}
+                onChange={(v) => setReqDraft({ ...reqDraft, requestedQty: v })}
+                placeholder="0"
+              />
+              <ReqInput
+                label="Fecha requerida"
+                type="date"
+                value={reqDraft.requiredDate}
+                onChange={(v) => setReqDraft({ ...reqDraft, requiredDate: v })}
+              />
+              <ReqInput
+                label="Precio objetivo"
+                type="number"
+                value={reqDraft.targetPrice}
+                onChange={(v) => setReqDraft({ ...reqDraft, targetPrice: v })}
+                placeholder="CLP"
+              />
+              <ReqInput
+                label="Proveedor sugerido"
+                value={reqDraft.suggestedSupplier}
+                onChange={(v) => setReqDraft({ ...reqDraft, suggestedSupplier: v })}
+                placeholder="Opcional"
+              />
+              <ReqInput
+                label="Costo cotizado"
+                type="number"
+                value={reqDraft.quotedCost}
+                onChange={(v) => setReqDraft({ ...reqDraft, quotedCost: v })}
+                placeholder="CLP"
+              />
               <div className="col-span-2 flex gap-2 mt-1">
-                <Button size="sm" onClick={saveReq}>Guardar</Button>
-                <Button size="sm" variant="secondary" onClick={() => setEditReq(false)}>Cancelar</Button>
+                <Button size="sm" onClick={saveReq}>
+                  Guardar
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setEditReq(false)}>
+                  Cancelar
+                </Button>
               </div>
             </div>
           ) : hasRequestData ? (
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
               {signal.customerName && <ReqField label="Cliente" value={signal.customerName} />}
-              {signal.requestedQty != null && <ReqField label="Cantidad" value={`${formatNumber(signal.requestedQty)} u.`} />}
-              {signal.requiredDate && <ReqField label="Fecha requerida" value={fmtDate(signal.requiredDate)} />}
-              {signal.targetPrice != null && <ReqField label="Precio objetivo" value={formatCurrency(signal.targetPrice)} />}
-              {signal.suggestedSupplier && <ReqField label="Proveedor sugerido" value={signal.suggestedSupplier} />}
-              {signal.quotedCost != null && <ReqField label="Costo cotizado" value={formatCurrency(signal.quotedCost)} />}
-              {expectedMargin != null && <ReqField label="Margen esperado" value={formatPercent(expectedMargin, 0)} tone={expectedMargin < 20 ? "bad" : "good"} />}
+              {signal.requestedQty != null && (
+                <ReqField label="Cantidad" value={`${formatNumber(signal.requestedQty)} u.`} />
+              )}
+              {signal.requiredDate && (
+                <ReqField label="Fecha requerida" value={fmtDate(signal.requiredDate)} />
+              )}
+              {signal.targetPrice != null && (
+                <ReqField label="Precio objetivo" value={formatCurrency(signal.targetPrice)} />
+              )}
+              {signal.suggestedSupplier && (
+                <ReqField label="Proveedor sugerido" value={signal.suggestedSupplier} />
+              )}
+              {signal.quotedCost != null && (
+                <ReqField label="Costo cotizado" value={formatCurrency(signal.quotedCost)} />
+              )}
+              {expectedMargin != null && (
+                <ReqField
+                  label="Margen esperado"
+                  value={formatPercent(expectedMargin, 0)}
+                  tone={expectedMargin < 20 ? "bad" : "good"}
+                />
+              )}
             </div>
           ) : (
-            <p className="text-xs text-slate-400">Aún sin datos formales. Completa cliente, cantidad, fecha y precio objetivo para gestionarla como solicitud de compra.</p>
+            <p className="text-xs text-slate-400">
+              Aún sin datos formales. Completa cliente, cantidad, fecha y precio objetivo para
+              gestionarla como solicitud de compra.
+            </p>
           )}
         </div>
 
         {/* Evidencia */}
-        {(signal.customersAsking ||
-          signal.estimatedLostSale ||
-          signal.evidenceNote) && (
+        {(signal.customersAsking || signal.estimatedLostSale || signal.evidenceNote) && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {signal.customersAsking ? (
               <Badge tone="blue">
@@ -287,25 +342,17 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
               </Badge>
             ) : null}
             {signal.estimatedLostSale ? (
-              <Badge tone="red">
-                Venta perdida ~{formatCurrency(signal.estimatedLostSale)}
-              </Badge>
+              <Badge tone="red">Venta perdida ~{formatCurrency(signal.estimatedLostSale)}</Badge>
             ) : null}
-            {signal.evidenceNote ? (
-              <Badge tone="neutral">{signal.evidenceNote}</Badge>
-            ) : null}
+            {signal.evidenceNote ? <Badge tone="neutral">{signal.evidenceNote}</Badge> : null}
           </div>
         )}
 
         {/* Acción recomendada por ventas */}
         {signal.recommendedAction && (
           <div className="mt-3 rounded-lg bg-brand-50/70 border border-brand-100 px-3 py-2.5">
-            <p className="text-xs font-medium text-brand-700">
-              Acción recomendada por ventas
-            </p>
-            <p className="text-sm text-slate-700 mt-0.5">
-              {signal.recommendedAction}
-            </p>
+            <p className="text-xs font-medium text-brand-700">Acción recomendada por ventas</p>
+            <p className="text-sm text-slate-700 mt-0.5">{signal.recommendedAction}</p>
           </div>
         )}
 
@@ -315,11 +362,19 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
             Datos de apoyo para decidir
           </p>
           <div className="grid grid-cols-3 gap-2">
-            <Stat label="Stock disp." value={formatNumber(signal.support.stock)} tone={signal.support.stock <= 0 ? "bad" : "neutral"} />
+            <Stat
+              label="Stock disp."
+              value={formatNumber(signal.support.stock)}
+              tone={signal.support.stock <= 0 ? "bad" : "neutral"}
+            />
             <Stat label="Venta 30d" value={formatNumber(signal.support.sales30)} />
             <Stat label="Rotación" value={`${formatNumber(signal.support.rotation)}x`} />
             <Stat label="Margen" value={formatPercent(signal.support.marginPct, 0)} />
-            <Stat label="Quiebres 30d" value={formatNumber(signal.support.stockoutEvents30)} tone={signal.support.stockoutEvents30 > 0 ? "warn" : "neutral"} />
+            <Stat
+              label="Quiebres 30d"
+              value={formatNumber(signal.support.stockoutEvents30)}
+              tone={signal.support.stockoutEvents30 > 0 ? "warn" : "neutral"}
+            />
             <Stat
               label="Tiendas afect."
               value={formatNumber(signal.support.affectedStores.length)}
@@ -342,8 +397,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
               to={`/productos/${signal.sku}`}
               className="mt-2 inline-flex items-center gap-0.5 text-xs font-medium text-brand-600 hover:text-brand-700"
             >
-              Ver ficha completa del producto{" "}
-              <IconChevronRight className="w-3.5 h-3.5" />
+              Ver ficha completa del producto <IconChevronRight className="w-3.5 h-3.5" />
             </Link>
           )}
         </div>
@@ -371,7 +425,12 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-100"
             />
             <div className="flex gap-2 mt-2">
-              <Button size="sm" variant="danger" onClick={doReject} disabled={rejectReason.trim().length < 3}>
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={doReject}
+                disabled={rejectReason.trim().length < 3}
+              >
                 Confirmar rechazo
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setRejecting(false)}>
@@ -392,12 +451,22 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
               </Button>
             )}
             {step && isOpen && (
-              <Button size="sm" variant="secondary" icon={<IconCheck className="w-4 h-4" />} onClick={advance}>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<IconCheck className="w-4 h-4" />}
+                onClick={advance}
+              >
                 {step.label}
               </Button>
             )}
             {isOpen && (
-              <Button size="sm" variant="secondary" icon={<IconClose className="w-4 h-4" />} onClick={() => setRejecting(true)}>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<IconClose className="w-4 h-4" />}
+                onClick={() => setRejecting(true)}
+              >
                 Rechazar
               </Button>
             )}
@@ -417,9 +486,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
               <option key={b}>{b}</option>
             ))}
           </select>
-          {signal.assignedBuyer === buyer && (
-            <Badge tone="violet">Para mí</Badge>
-          )}
+          {signal.assignedBuyer === buyer && <Badge tone="violet">Para mí</Badge>}
         </div>
 
         {/* Conversación comprador ↔ vendedor */}
@@ -468,7 +535,12 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
               placeholder={`Responder como ${buyer}…`}
               className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
             />
-            <Button size="sm" onClick={send} disabled={!draft.trim()} icon={<IconArrowRight className="w-4 h-4" />}>
+            <Button
+              size="sm"
+              onClick={send}
+              disabled={!draft.trim()}
+              icon={<IconArrowRight className="w-4 h-4" />}
+            >
               Enviar
             </Button>
           </div>
@@ -505,7 +577,8 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
 }
 
 function ReqField({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
-  const c = tone === "bad" ? "text-rose-600" : tone === "good" ? "text-emerald-700" : "text-slate-800";
+  const c =
+    tone === "bad" ? "text-rose-600" : tone === "good" ? "text-emerald-700" : "text-slate-800";
   return (
     <div className="flex flex-col">
       <span className="text-[11px] text-slate-400">{label}</span>
@@ -557,9 +630,7 @@ function Stat({
   }[tone];
   return (
     <div className="rounded-lg border border-slate-200 px-2.5 py-2">
-      <p className={cn("text-base font-semibold leading-none", toneClass)}>
-        {value}
-      </p>
+      <p className={cn("text-base font-semibold leading-none", toneClass)}>{value}</p>
       <p className="text-[11px] text-slate-500 mt-1 leading-tight">{label}</p>
     </div>
   );

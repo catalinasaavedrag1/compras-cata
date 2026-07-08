@@ -14,7 +14,8 @@ export const purchaseOrders: PurchaseOrder[] = [
     buyerName: "Catalina Saavedra",
     delayedDays: 0,
     paymentTerms: "30 días",
-    comments: "OC cerrada. Quedó como ejemplo de calidad de compra: una línea corta y una sobrecompra.",
+    comments:
+      "OC cerrada. Quedó como ejemplo de calidad de compra: una línea corta y una sobrecompra.",
     lines: [
       // Compra corta: cemento de alta rotación con cantidad insuficiente
       { sku: "CON-001", productName: "Cemento Polpaico 25 kg", quantity: 120, unitCost: 4290 },
@@ -61,9 +62,27 @@ export const purchaseOrders: PurchaseOrder[] = [
     comments: "Recepción con diferencias: el proveedor despachó parcial. Reordenar lo faltante.",
     documents: ["Guía_despacho_FP.pdf"],
     lines: [
-      { sku: "GAS-001", productName: "Tubería PVC sanitaria 110 mm", quantity: 300, unitCost: 5490, receivedQty: 240 },
-      { sku: "FER-001", productName: "Tornillo volcanita 6x1", quantity: 110, unitCost: 6990, receivedQty: 110 },
-      { sku: "FER-004", productName: "Tornillo autoperforante 8x1/2 caja 100u", quantity: 50, unitCost: 4990, receivedQty: 20 },
+      {
+        sku: "GAS-001",
+        productName: "Tubería PVC sanitaria 110 mm",
+        quantity: 300,
+        unitCost: 5490,
+        receivedQty: 240,
+      },
+      {
+        sku: "FER-001",
+        productName: "Tornillo volcanita 6x1",
+        quantity: 110,
+        unitCost: 6990,
+        receivedQty: 110,
+      },
+      {
+        sku: "FER-004",
+        productName: "Tornillo autoperforante 8x1/2 caja 100u",
+        quantity: 50,
+        unitCost: 4990,
+        receivedQty: 20,
+      },
     ],
   },
   {
@@ -79,8 +98,18 @@ export const purchaseOrders: PurchaseOrder[] = [
     buyerName: "Felipe Rojas",
     delayedDays: 12,
     lines: [
-      { sku: "HER-002", productName: "Sierra circular Makita 7 1/4", quantity: 22, unitCost: 58990 },
-      { sku: "SEG-001", productName: "Guantes de seguridad anticorte", quantity: 60, unitCost: 3290 },
+      {
+        sku: "HER-002",
+        productName: "Sierra circular Makita 7 1/4",
+        quantity: 22,
+        unitCost: 58990,
+      },
+      {
+        sku: "SEG-001",
+        productName: "Guantes de seguridad anticorte",
+        quantity: 60,
+        unitCost: 3290,
+      },
     ],
   },
   {
@@ -96,7 +125,12 @@ export const purchaseOrders: PurchaseOrder[] = [
     buyerName: "Juan Pérez",
     delayedDays: 2,
     lines: [
-      { sku: "GAS-001", productName: "Tubería PVC sanitaria 110 mm", quantity: 240, unitCost: 5490 },
+      {
+        sku: "GAS-001",
+        productName: "Tubería PVC sanitaria 110 mm",
+        quantity: 240,
+        unitCost: 5490,
+      },
       { sku: "FER-001", productName: "Tornillo volcanita 6x1", quantity: 110, unitCost: 6990 },
     ],
   },
@@ -169,7 +203,12 @@ export const purchaseOrders: PurchaseOrder[] = [
     buyerName: "Andrea Muñoz",
     delayedDays: 0,
     lines: [
-      { sku: "AGR-001", productName: "Fertilizante agrícola NPK 25 kg", quantity: 100, unitCost: 22990 },
+      {
+        sku: "AGR-001",
+        productName: "Fertilizante agrícola NPK 25 kg",
+        quantity: 100,
+        unitCost: 22990,
+      },
     ],
   },
   {

@@ -30,9 +30,7 @@ export function BarList({ items }: BarListProps) {
         <div key={item.label}>
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-sm text-slate-600 truncate">{item.label}</span>
-            <span className="text-sm font-medium text-slate-800 flex-shrink-0">
-              {item.display}
-            </span>
+            <span className="text-sm font-medium text-slate-800 flex-shrink-0">{item.display}</span>
           </div>
           <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
             <div

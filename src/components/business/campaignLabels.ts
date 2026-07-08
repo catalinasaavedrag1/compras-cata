@@ -52,7 +52,8 @@ export const CAMPAIGN_STATUS: Record<CampaignOpportunityStatus, StatusConfig> = 
   liquidate: {
     label: "Liquidar",
     tone: "violet",
-    description: "Sobrestock o baja rotación. Conviene empujar comercialmente para liberar capital.",
+    description:
+      "Sobrestock o baja rotación. Conviene empujar comercialmente para liberar capital.",
   },
   boost: {
     label: "Potenciar",
@@ -100,9 +101,10 @@ export const PROMO_CHANNEL_LABELS: Record<PromoChannel, string> = {
   tiktok: "TikTok Ads",
 };
 
-export const PROMO_CHANNELS = Object.entries(PROMO_CHANNEL_LABELS).map(
-  ([value, label]) => ({ value: value as PromoChannel, label })
-);
+export const PROMO_CHANNELS = Object.entries(PROMO_CHANNEL_LABELS).map(([value, label]) => ({
+  value: value as PromoChannel,
+  label,
+}));
 
 export const CREATED_CAMPAIGN_STATUS: Record<
   CreatedCampaignStatus,

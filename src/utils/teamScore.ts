@@ -113,7 +113,11 @@ export const LEAGUES: League[] = [
   { name: "Leyenda", min: 95, max: 100, tone: "green", color: "#059669" },
 ];
 
-export function leagueOf(score: number): { league: League; next: League | null; ptsToNext: number } {
+export function leagueOf(score: number): {
+  league: League;
+  next: League | null;
+  ptsToNext: number;
+} {
   const idx = LEAGUES.findIndex((l) => score >= l.min && score <= l.max);
   const i = idx < 0 ? 0 : idx;
   const next = i < LEAGUES.length - 1 ? LEAGUES[i + 1] : null;
@@ -153,10 +157,33 @@ export interface RankingDef {
 
 /** Rankings específicos del spec (margen, quiebres, rotación, recuperación, sobrestock). */
 export const RANKING_DEFS: RankingDef[] = [
-  { key: "margen", title: "Mejor margen bruto", valueText: (b) => `${b.margin.toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`, sortValue: (b) => b.margin },
-  { key: "quiebres", title: "Menor tasa de quiebres", valueText: (b) => `${stockoutRate(b).toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`, sortValue: (b) => stockoutRate(b), asc: true },
-  { key: "rotacion", title: "Mayor rotación saludable", valueText: (b) => `${b.rotation.toLocaleString("es-CL", { maximumFractionDigits: 1 })}x`, sortValue: (b) => b.rotation },
-  { key: "recuperacion", title: "Mayor mejora vs mes anterior", valueText: (b) => `${recovery(b) > 0 ? "+" : ""}${recovery(b)} pts`, sortValue: (b) => recovery(b) },
+  {
+    key: "margen",
+    title: "Mejor margen bruto",
+    valueText: (b) =>
+      `${b.margin.toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+    sortValue: (b) => b.margin,
+  },
+  {
+    key: "quiebres",
+    title: "Menor tasa de quiebres",
+    valueText: (b) =>
+      `${stockoutRate(b).toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+    sortValue: (b) => stockoutRate(b),
+    asc: true,
+  },
+  {
+    key: "rotacion",
+    title: "Mayor rotación saludable",
+    valueText: (b) => `${b.rotation.toLocaleString("es-CL", { maximumFractionDigits: 1 })}x`,
+    sortValue: (b) => b.rotation,
+  },
+  {
+    key: "recuperacion",
+    title: "Mayor mejora vs mes anterior",
+    valueText: (b) => `${recovery(b) > 0 ? "+" : ""}${recovery(b)} pts`,
+    sortValue: (b) => recovery(b),
+  },
 ];
 
 export interface Badge {
@@ -171,15 +198,59 @@ export function badgesOf(buyers: Buyer[]): Badge[] {
   if (!buyers.length) return [];
   const best = (fn: (b: Buyer) => number, asc = false): Buyer =>
     [...buyers].sort((a, b) => (asc ? fn(a) - fn(b) : fn(b) - fn(a)))[0];
-  const f1 = (n: number) => n.toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const f1 = (n: number) =>
+    n.toLocaleString("es-CL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   const defs: { key: string; label: string; winner: Buyer; valueText: string }[] = [
-    (() => { const w = best((b) => b.margin); return { key: "margen", label: "Mejor margen", winner: w, valueText: `${f1(w.margin)}%` }; })(),
-    (() => { const w = best((b) => stockoutRate(b), true); return { key: "quiebres", label: "Menos quiebres", winner: w, valueText: `${f1(stockoutRate(w))}%` }; })(),
-    (() => { const w = best((b) => b.rotation); return { key: "rotacion", label: "Mejor rotación", winner: w, valueText: `${w.rotation.toLocaleString("es-CL", { maximumFractionDigits: 1 })}x` }; })(),
-    (() => { const w = best((b) => recovery(b)); return { key: "mejora", label: "Mayor mejora", winner: w, valueText: `${recovery(w) > 0 ? "+" : ""}${recovery(w)} pts` }; })(),
-    (() => { const w = best((b) => b.overstock, true); return { key: "sobrestock", label: "Mejor sobrestock", winner: w, valueText: `${w.overstock} SKUs` }; })(),
-    (() => { const w = best((b) => b.savings); return { key: "ahorro", label: "Mejor negociador", winner: w, valueText: `$${(w.savings / 1e6).toLocaleString("es-CL", { maximumFractionDigits: 1 })}M` }; })(),
+    (() => {
+      const w = best((b) => b.margin);
+      return { key: "margen", label: "Mejor margen", winner: w, valueText: `${f1(w.margin)}%` };
+    })(),
+    (() => {
+      const w = best((b) => stockoutRate(b), true);
+      return {
+        key: "quiebres",
+        label: "Menos quiebres",
+        winner: w,
+        valueText: `${f1(stockoutRate(w))}%`,
+      };
+    })(),
+    (() => {
+      const w = best((b) => b.rotation);
+      return {
+        key: "rotacion",
+        label: "Mejor rotación",
+        winner: w,
+        valueText: `${w.rotation.toLocaleString("es-CL", { maximumFractionDigits: 1 })}x`,
+      };
+    })(),
+    (() => {
+      const w = best((b) => recovery(b));
+      return {
+        key: "mejora",
+        label: "Mayor mejora",
+        winner: w,
+        valueText: `${recovery(w) > 0 ? "+" : ""}${recovery(w)} pts`,
+      };
+    })(),
+    (() => {
+      const w = best((b) => b.overstock, true);
+      return {
+        key: "sobrestock",
+        label: "Mejor sobrestock",
+        winner: w,
+        valueText: `${w.overstock} SKUs`,
+      };
+    })(),
+    (() => {
+      const w = best((b) => b.savings);
+      return {
+        key: "ahorro",
+        label: "Mejor negociador",
+        winner: w,
+        valueText: `$${(w.savings / 1e6).toLocaleString("es-CL", { maximumFractionDigits: 1 })}M`,
+      };
+    })(),
   ];
   return defs;
 }
@@ -195,7 +266,12 @@ export function daysToClose(toISO: string): number {
 
 export type SeasonMove = "ascenso" | "descenso" | "mantiene";
 
-export function seasonStatus(b: Buyer): { move: SeasonMove; from: League; to: League; delta: number } {
+export function seasonStatus(b: Buyer): {
+  move: SeasonMove;
+  from: League;
+  to: League;
+  delta: number;
+} {
   const to = leagueOf(b.score).league;
   const from = leagueOf(b.prevSeasonScore).league;
   const delta = LEAGUES.indexOf(to) - LEAGUES.indexOf(from);
@@ -203,7 +279,10 @@ export function seasonStatus(b: Buyer): { move: SeasonMove; from: League; to: Le
   return { move, from, to, delta };
 }
 
-export const SEASON_MOVE_CFG: Record<SeasonMove, { label: string; tone: BadgeTone; arrow: string }> = {
+export const SEASON_MOVE_CFG: Record<
+  SeasonMove,
+  { label: string; tone: BadgeTone; arrow: string }
+> = {
   ascenso: { label: "Ascenso", tone: "green", arrow: "▲" },
   descenso: { label: "Descenso", tone: "red", arrow: "▼" },
   mantiene: { label: "Mantiene", tone: "slate", arrow: "=" },
@@ -254,12 +333,18 @@ export function winnerByCriterion(
   const pick = (fn: (b: Buyer) => number, asc = false) =>
     [...all].sort((a, b) => (asc ? fn(a) - fn(b) : fn(b) - fn(a)))[0];
   switch (criterion) {
-    case "general": return pick((b) => b.score);
-    case "mejora": return pick((b) => recovery(b));
-    case "quiebres": return pick((b) => stockoutRate(b), true);
-    case "margen": return pick((b) => b.margin);
-    case "rotacion": return pick((b) => b.rotation);
-    default: return all[0];
+    case "general":
+      return pick((b) => b.score);
+    case "mejora":
+      return pick((b) => recovery(b));
+    case "quiebres":
+      return pick((b) => stockoutRate(b), true);
+    case "margen":
+      return pick((b) => b.margin);
+    case "rotacion":
+      return pick((b) => b.rotation);
+    default:
+      return all[0];
   }
 }
 

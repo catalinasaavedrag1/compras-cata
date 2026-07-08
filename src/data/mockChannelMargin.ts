@@ -1,8 +1,4 @@
-import type {
-  ChannelMargin,
-  MarginChannelKey,
-  MarginStatus,
-} from "../types/purchasing";
+import type { ChannelMargin, MarginChannelKey, MarginStatus } from "../types/purchasing";
 import { products } from "./mockProducts";
 import { categories } from "./mockCategories";
 
@@ -46,10 +42,12 @@ function causeFor(
   commission: number,
   discount: number
 ): string {
-  if (status === "negative") return "El costo más comisión supera el precio final. Pérdida por venta.";
+  if (status === "negative")
+    return "El costo más comisión supera el precio final. Pérdida por venta.";
   if (status === "over") return "Precio alto frente al costo. Puede estar poco competitivo.";
   if (status === "low") {
-    if (channel === "marketplace" && commission > 0) return "La comisión del marketplace reduce el margen.";
+    if (channel === "marketplace" && commission > 0)
+      return "La comisión del marketplace reduce el margen.";
     if (discount > 0) return "El descuento activo deja el margen bajo el objetivo.";
     return "El precio de venta es bajo frente al costo.";
   }
@@ -59,7 +57,9 @@ function causeFor(
 function actionFor(channel: MarginChannelKey, status: MarginStatus): string {
   if (status === "negative") return "Subir precio o frenar la venta en este canal.";
   if (status === "low")
-    return channel === "marketplace" ? "Revisar precio o comisión en marketplace." : "Revisar precio o descuento.";
+    return channel === "marketplace"
+      ? "Revisar precio o comisión en marketplace."
+      : "Revisar precio o descuento.";
   if (status === "over") return "Revisar competitividad: precio sobre el objetivo.";
   return "Mantener.";
 }
@@ -105,13 +105,36 @@ function build(
 
 // SKUs representativos del catálogo
 const SELECTED = [
-  "HER-001", "HER-002", "HER-003", "CON-001", "MAD-001",
-  "ELE-001", "ELE-002", "GAS-002", "FER-003", "PIN-001",
-  "PIN-002", "JAR-003", "SEG-001", "ELE-003",
+  "HER-001",
+  "HER-002",
+  "HER-003",
+  "CON-001",
+  "MAD-001",
+  "ELE-001",
+  "ELE-002",
+  "GAS-002",
+  "FER-003",
+  "PIN-001",
+  "PIN-002",
+  "JAR-003",
+  "SEG-001",
+  "ELE-003",
   // Nuevos SKUs del catálogo ampliado
-  "CON-003", "MAD-003", "FER-005", "FER-006", "GAS-006",
-  "HER-004", "HER-005", "HER-006", "PIN-003", "PIN-004",
-  "ELE-005", "ELE-006", "JAR-006", "SEG-002", "AGR-002",
+  "CON-003",
+  "MAD-003",
+  "FER-005",
+  "FER-006",
+  "GAS-006",
+  "HER-004",
+  "HER-005",
+  "HER-006",
+  "PIN-003",
+  "PIN-004",
+  "ELE-005",
+  "ELE-006",
+  "JAR-006",
+  "SEG-002",
+  "AGR-002",
 ];
 
 const TARGET_BY_CATEGORY: Record<string, number> = {
@@ -149,7 +172,18 @@ export const channelMargins: ChannelMargin[] = SELECTED.flatMap((sku) => {
   const stockStore = p.availableStock - stockMkt - stockWeb;
 
   return [
-    build(sku, "marketplace", mktPrice, p.cost, target, mktCommission, mktDiscount, splitMkt, stockMkt, p),
+    build(
+      sku,
+      "marketplace",
+      mktPrice,
+      p.cost,
+      target,
+      mktCommission,
+      mktDiscount,
+      splitMkt,
+      stockMkt,
+      p
+    ),
     build(sku, "web", webPrice, p.cost, target, 0, webDiscount, splitWeb, stockWeb, p),
     build(sku, "store", storePrice, p.cost, target, 0, 0, splitStore, stockStore, p),
   ];

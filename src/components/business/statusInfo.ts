@@ -16,12 +16,14 @@ export interface StateMeaning {
 export const recommendationMeaning: Record<RecommendationStatus, StateMeaning> = {
   critical: {
     label: "Crítico",
-    description: "Sin stock disponible o con riesgo inmediato de quiebre. Requiere comprar de inmediato.",
+    description:
+      "Sin stock disponible o con riesgo inmediato de quiebre. Requiere comprar de inmediato.",
     tone: "red",
   },
   buy_now: {
     label: "Comprar ahora",
-    description: "Stock bajo considerando las ventas recientes y los días de entrega del proveedor.",
+    description:
+      "Stock bajo considerando las ventas recientes y los días de entrega del proveedor.",
     tone: "amber",
   },
   review: {

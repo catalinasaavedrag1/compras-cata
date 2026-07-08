@@ -541,8 +541,7 @@ export const signals: SalesSignal[] = [
     store: BALMACEDA,
     reportedBy: "Sebastián Reyes",
     date: "2026-06-19T12:10:00",
-    comment:
-      "El NPK 25 kg no se está moviendo en Balmaceda, lleva tiempo en bodega.",
+    comment: "El NPK 25 kg no se está moviendo en Balmaceda, lleva tiempo en bodega.",
     recommendedAction: "¿Liquidar o mandar a otra tienda?",
     rejectionReason:
       "Es producto de temporada agrícola, repunta en agosto. Mantener stock por ahora.",
@@ -724,7 +723,7 @@ export const signals: SalesSignal[] = [
         role: "seller",
         author: "Sebastián Reyes",
         date: "2026-06-24T10:50:00",
-        text: "Comprador, el clavo de 2\" siempre se acaba, deberíamos pedir más por vez.",
+        text: 'Comprador, el clavo de 2" siempre se acaba, deberíamos pedir más por vez.',
       },
       {
         id: "m2",

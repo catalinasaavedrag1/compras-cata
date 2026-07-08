@@ -89,14 +89,16 @@ export function CampaignOpportunitiesPage() {
       if (status && o.status !== status) return false;
       if (category && o.category !== category) return false;
       if (supplier && o.supplierName !== supplier) return false;
-      if (toggles.risk && o.status !== "stockout_risk" && o.status !== "buy_before_campaign") return false;
+      if (toggles.risk && o.status !== "stockout_risk" && o.status !== "buy_before_campaign")
+        return false;
       if (toggles.growth && o.opportunityType !== "accelerated_growth") return false;
       if (toggles.liquidation && o.status !== "liquidate") return false;
       if (toggles.lowMargin && o.margin >= 25) return false;
       return true;
     });
     return [...result].sort(
-      (a, b) => STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] || a.daysToCampaign - b.daysToCampaign
+      (a, b) =>
+        STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] || a.daysToCampaign - b.daysToCampaign
     );
   }, [query, channel, type, status, category, supplier, toggles]);
 
@@ -108,7 +110,10 @@ export function CampaignOpportunitiesPage() {
 
   // Campañas próximas (agrupadas)
   const upcoming = useMemo(() => {
-    const map = new Map<string, { name: string; days: number; date: string; count: number; channels: Set<string> }>();
+    const map = new Map<
+      string,
+      { name: string; days: number; date: string; count: number; channels: Set<string> }
+    >();
     for (const o of all) {
       const e = map.get(o.campaignName);
       if (e) {
@@ -136,7 +141,14 @@ export function CampaignOpportunitiesPage() {
   const bySupplier = useMemo(() => {
     const map = new Map<
       string,
-      { supplier: string; items: CampaignOpportunity[]; units: number; amount: number; minDays: number; leadTime: number }
+      {
+        supplier: string;
+        items: CampaignOpportunity[];
+        units: number;
+        amount: number;
+        minDays: number;
+        leadTime: number;
+      }
     >();
     for (const o of all) {
       if (o.suggestedPurchaseQuantity <= 0) continue;
@@ -170,11 +182,19 @@ export function CampaignOpportunitiesPage() {
     let added = 0;
     for (const o of group.items) {
       if (hasItem(o.sku)) continue;
-      addItem({ sku: o.sku, productName: o.productName, supplierName: o.supplierName, quantity: o.suggestedPurchaseQuantity, unitCost: o.unitCost });
+      addItem({
+        sku: o.sku,
+        productName: o.productName,
+        supplierName: o.supplierName,
+        quantity: o.suggestedPurchaseQuantity,
+        unitCost: o.unitCost,
+      });
       added++;
     }
     toast.success(
-      added > 0 ? `${added} producto${added === 1 ? "" : "s"} de ${group.supplier} agregado${added === 1 ? "" : "s"} al borrador de OC` : `Ya estaban en el borrador`,
+      added > 0
+        ? `${added} producto${added === 1 ? "" : "s"} de ${group.supplier} agregado${added === 1 ? "" : "s"} al borrador de OC`
+        : `Ya estaban en el borrador`,
       { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") }
     );
   };
@@ -188,7 +208,10 @@ export function CampaignOpportunitiesPage() {
         quantity: o.suggestedPurchaseQuantity,
         unitCost: o.unitCost,
       });
-      toast.success(`${o.productName} agregado al borrador de OC`, { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") });
+      toast.success(`${o.productName} agregado al borrador de OC`, {
+        label: "Ver borrador OC",
+        onClick: () => navigate("/ordenes-compra"),
+      });
       return;
     }
     if (o.actionLabel === "Revisar proveedor") return navigate("/proveedores");
@@ -201,7 +224,9 @@ export function CampaignOpportunitiesPage() {
     setCreatedCampaigns((prev) => [c, ...prev]);
     setBuilderOpen(false);
     setView("campanas");
-    toast.success(`Campaña "${c.name}" creada con ${c.products.length} producto${c.products.length === 1 ? "" : "s"}`);
+    toast.success(
+      `Campaña "${c.name}" creada con ${c.products.length} producto${c.products.length === 1 ? "" : "s"}`
+    );
   };
 
   const deleteCampaign = (id: string) => {
@@ -220,7 +245,12 @@ export function CampaignOpportunitiesPage() {
     );
 
   const clearFilters = () => {
-    setQuery(""); setChannel(""); setType(""); setStatus(""); setCategory(""); setSupplier("");
+    setQuery("");
+    setChannel("");
+    setType("");
+    setStatus("");
+    setCategory("");
+    setSupplier("");
     setToggles({ risk: false, growth: false, liquidation: false, lowMargin: false });
   };
 
@@ -236,15 +266,45 @@ export function CampaignOpportunitiesPage() {
             <span className="text-xs font-mono text-slate-400">{o.sku}</span>
             <span className="text-xs text-slate-400">{o.brand}</span>
           </div>
-          <Link to={productPath(o.sku)} className="font-medium text-slate-800 leading-snug hover:text-brand-700 hover:underline block" onClick={(e) => e.stopPropagation()}>{o.productName}</Link>
-          <p className="text-xs text-slate-500"><Link to={categoryPath(o.category)} className="hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{o.category}</Link> · {o.supplierName ? <Link to={supplierPath(o.supplierName)} className="hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{o.supplierName}</Link> : "Sin proveedor"}</p>
+          <Link
+            to={productPath(o.sku)}
+            className="font-medium text-slate-800 leading-snug hover:text-brand-700 hover:underline block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {o.productName}
+          </Link>
+          <p className="text-xs text-slate-500">
+            <Link
+              to={categoryPath(o.category)}
+              className="hover:text-brand-700 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {o.category}
+            </Link>{" "}
+            ·{" "}
+            {o.supplierName ? (
+              <Link
+                to={supplierPath(o.supplierName)}
+                className="hover:text-brand-700 hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {o.supplierName}
+              </Link>
+            ) : (
+              "Sin proveedor"
+            )}
+          </p>
         </div>
       ),
     },
     {
       key: "type",
       header: "Oportunidad",
-      render: (o) => <Badge tone={TYPE_TONE[o.opportunityType]}>{OPPORTUNITY_TYPE_LABELS[o.opportunityType]}</Badge>,
+      render: (o) => (
+        <Badge tone={TYPE_TONE[o.opportunityType]}>
+          {OPPORTUNITY_TYPE_LABELS[o.opportunityType]}
+        </Badge>
+      ),
     },
     {
       key: "campaign",
@@ -305,7 +365,9 @@ export function CampaignOpportunitiesPage() {
       header: "Venta est. campaña",
       align: "right",
       hideOnMobile: true,
-      render: (o) => <span className="text-slate-700">{formatNumber(o.estimatedCampaignSales)} u.</span>,
+      render: (o) => (
+        <span className="text-slate-700">{formatNumber(o.estimatedCampaignSales)} u.</span>
+      ),
     },
     {
       key: "gap",
@@ -329,8 +391,12 @@ export function CampaignOpportunitiesPage() {
       render: (o) =>
         o.suggestedPurchaseQuantity > 0 ? (
           <div className="text-sm">
-            <p className="font-semibold text-slate-900">{formatNumber(o.suggestedPurchaseQuantity)} u.</p>
-            <p className="text-xs text-slate-400">{formatCurrency(o.suggestedPurchaseQuantity * o.unitCost)}</p>
+            <p className="font-semibold text-slate-900">
+              {formatNumber(o.suggestedPurchaseQuantity)} u.
+            </p>
+            <p className="text-xs text-slate-400">
+              {formatCurrency(o.suggestedPurchaseQuantity * o.unitCost)}
+            </p>
           </div>
         ) : (
           <span className="text-slate-300">—</span>
@@ -352,7 +418,11 @@ export function CampaignOpportunitiesPage() {
     {
       key: "status",
       header: "Estado",
-      render: (o) => <Badge tone={CAMPAIGN_STATUS[o.status].tone} dot>{CAMPAIGN_STATUS[o.status].label}</Badge>,
+      render: (o) => (
+        <Badge tone={CAMPAIGN_STATUS[o.status].tone} dot>
+          {CAMPAIGN_STATUS[o.status].label}
+        </Badge>
+      ),
     },
     {
       key: "reason",
@@ -382,7 +452,13 @@ export function CampaignOpportunitiesPage() {
                 e.stopPropagation();
                 handleAction(o);
               }}
-              icon={added || gestionado ? <IconCheck className="w-3.5 h-3.5" /> : isOc ? <IconPlus className="w-3.5 h-3.5" /> : undefined}
+              icon={
+                added || gestionado ? (
+                  <IconCheck className="w-3.5 h-3.5" />
+                ) : isOc ? (
+                  <IconPlus className="w-3.5 h-3.5" />
+                ) : undefined
+              }
             >
               {added ? "En OC" : gestionado ? "Gestionado" : o.actionLabel}
             </Button>
@@ -440,7 +516,12 @@ export function CampaignOpportunitiesPage() {
       {/* Plantillas rápidas de campaña */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="text-xs font-medium text-slate-500">Plantillas rápidas:</span>
-        {["Cyber herramientas", "Especial construcción", "Liquidación stock lento", "Campaña jardín primavera"].map((t) => (
+        {[
+          "Cyber herramientas",
+          "Especial construcción",
+          "Liquidación stock lento",
+          "Campaña jardín primavera",
+        ].map((t) => (
           <button
             key={t}
             onClick={() => openBuilder(t)}
@@ -469,124 +550,281 @@ export function CampaignOpportunitiesPage() {
           onAddToOc={(sku) => navigate(`/productos/${sku}`)}
         />
       ) : (
-      <>
-      {/* Campañas próximas (chips compactos) */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-3 pb-0.5">
-        <span className="text-xs font-medium text-slate-500 flex-shrink-0">Próximas:</span>
-        {upcoming.map((c) => (
-          <span key={c.name} className="whitespace-nowrap flex-shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-600">
-            {c.name} · {c.count} SKU · <span className={c.days <= 7 ? "text-rose-600 font-medium" : "text-amber-600"}>en {formatDays(c.days)}</span>
-          </span>
-        ))}
-      </div>
+        <>
+          {/* Campañas próximas (chips compactos) */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-3 pb-0.5">
+            <span className="text-xs font-medium text-slate-500 flex-shrink-0">Próximas:</span>
+            {upcoming.map((c) => (
+              <span
+                key={c.name}
+                className="whitespace-nowrap flex-shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-600"
+              >
+                {c.name} · {c.count} SKU ·{" "}
+                <span className={c.days <= 7 ? "text-rose-600 font-medium" : "text-amber-600"}>
+                  en {formatDays(c.days)}
+                </span>
+              </span>
+            ))}
+          </div>
 
-      {/* KPIs compactos (escritorio), cliqueables → filtran */}
-      <div className="hidden md:grid md:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Riesgo de quiebre" value={formatNumber(stockoutRisk)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Campaña sin stock" active={status === "stockout_risk"} onClick={() => setStatus(status === "stockout_risk" ? "" : "stockout_risk")} />
-        <KpiCard title="Comprar antes" value={formatNumber(buyBefore)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Abastecer evento" active={status === "buy_before_campaign"} onClick={() => setStatus(status === "buy_before_campaign" ? "" : "buy_before_campaign")} />
-        <KpiCard title="Sugeridos para liquidar" value={formatNumber(toLiquidateList.length)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Sobrestock" active={status === "liquidate"} onClick={() => setStatus(status === "liquidate" ? "" : "liquidate")} />
-        <KpiCard title="Compra sugerida campañas" value={formatCurrencyCompact(suggestedBuyTotal)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Total a comprar" />
-      </div>
+          {/* KPIs compactos (escritorio), cliqueables → filtran */}
+          <div className="hidden md:grid md:grid-cols-4 gap-3 mb-4">
+            <KpiCard
+              title="Riesgo de quiebre"
+              value={formatNumber(stockoutRisk)}
+              tone="bad"
+              icon={<IconAlerts className="w-4 h-4" />}
+              description="Campaña sin stock"
+              active={status === "stockout_risk"}
+              onClick={() => setStatus(status === "stockout_risk" ? "" : "stockout_risk")}
+            />
+            <KpiCard
+              title="Comprar antes"
+              value={formatNumber(buyBefore)}
+              tone="warn"
+              icon={<IconReplenish className="w-4 h-4" />}
+              description="Abastecer evento"
+              active={status === "buy_before_campaign"}
+              onClick={() =>
+                setStatus(status === "buy_before_campaign" ? "" : "buy_before_campaign")
+              }
+            />
+            <KpiCard
+              title="Sugeridos para liquidar"
+              value={formatNumber(toLiquidateList.length)}
+              tone="warn"
+              icon={<IconBox className="w-4 h-4" />}
+              description="Sobrestock"
+              active={status === "liquidate"}
+              onClick={() => setStatus(status === "liquidate" ? "" : "liquidate")}
+            />
+            <KpiCard
+              title="Compra sugerida campañas"
+              value={formatCurrencyCompact(suggestedBuyTotal)}
+              tone="info"
+              icon={<IconReplenish className="w-4 h-4" />}
+              description="Total a comprar"
+            />
+          </div>
 
-      {/* Consolidación de OC por proveedor para las campañas */}
-      {bySupplier.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader
-            title={`OC a generar por proveedor (${ocCount})`}
-            description={`Consolida las compras de campaña en una OC por proveedor.${criticalLeadCount > 0 ? ` ${criticalLeadCount} con lead time crítico: no alcanza a llegar antes de la campaña.` : ""}`}
-          />
-          <CardBody className="space-y-2">
-            {bySupplier.map((g) => {
-              const critical = g.leadTime >= g.minDays;
-              return (
-                <div key={g.supplier} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Link to={supplierPath(g.supplier)} className="text-sm font-medium text-slate-800 truncate hover:text-brand-700 hover:underline">{g.supplier}</Link>
-                      <Badge tone={critical ? "red" : "green"}>{critical ? `Lead ${formatDays(g.leadTime)} ≥ ${formatDays(g.minDays)} a campaña` : `Lead ${formatDays(g.leadTime)} OK`}</Badge>
+          {/* Consolidación de OC por proveedor para las campañas */}
+          {bySupplier.length > 0 && (
+            <Card className="mb-4">
+              <CardHeader
+                title={`OC a generar por proveedor (${ocCount})`}
+                description={`Consolida las compras de campaña en una OC por proveedor.${criticalLeadCount > 0 ? ` ${criticalLeadCount} con lead time crítico: no alcanza a llegar antes de la campaña.` : ""}`}
+              />
+              <CardBody className="space-y-2">
+                {bySupplier.map((g) => {
+                  const critical = g.leadTime >= g.minDays;
+                  return (
+                    <div
+                      key={g.supplier}
+                      className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={supplierPath(g.supplier)}
+                            className="text-sm font-medium text-slate-800 truncate hover:text-brand-700 hover:underline"
+                          >
+                            {g.supplier}
+                          </Link>
+                          <Badge tone={critical ? "red" : "green"}>
+                            {critical
+                              ? `Lead ${formatDays(g.leadTime)} ≥ ${formatDays(g.minDays)} a campaña`
+                              : `Lead ${formatDays(g.leadTime)} OK`}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {g.items.length} SKU · {formatNumber(g.units)} u. ·{" "}
+                          {formatCurrencyCompact(g.amount)} · campaña en {formatDays(g.minDays)}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={critical ? "primary" : "secondary"}
+                        icon={<IconPlus className="w-4 h-4" />}
+                        onClick={() => createSupplierOc(g)}
+                      >
+                        Crear OC
+                      </Button>
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">{g.items.length} SKU · {formatNumber(g.units)} u. · {formatCurrencyCompact(g.amount)} · campaña en {formatDays(g.minDays)}</p>
-                  </div>
-                  <Button size="sm" variant={critical ? "primary" : "secondary"} icon={<IconPlus className="w-4 h-4" />} onClick={() => createSupplierOc(g)}>
-                    Crear OC
-                  </Button>
-                </div>
-              );
-            })}
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Foco por estado (reduce el listado con un clic) */}
-      <Tabs
-        className="mb-4"
-        value={status || "all"}
-        onChange={(v) => setStatus(v === "all" ? "" : v)}
-        tabs={[
-          { value: "all", label: "Todos", count: all.length },
-          { value: "buy_before_campaign", label: "Comprar antes", count: buyBefore },
-          { value: "stockout_risk", label: "Riesgo de quiebre", count: stockoutRisk },
-          { value: "liquidate", label: "Liquidar", count: toLiquidateList.length },
-          { value: "boost", label: "Potenciar", count: all.filter((o) => o.status === "boost").length },
-          { value: "not_recommended", label: "No recomendado", count: all.filter((o) => o.status === "not_recommended").length },
-        ]}
-      />
-
-      {/* Tabla principal */}
-      <div id="tabla" className="mb-4">
-        <FilterBar
-          searchValue={query}
-          onSearchChange={setQuery}
-          searchPlaceholder="Buscar por SKU, producto o campaña"
-          resultCount={filtered.length}
-          onClear={clearFilters}
-          selects={[
-            { key: "channel", placeholder: "Canal", value: channel, onChange: setChannel, options: Object.entries(CHANNEL_LABELS).map(([value, label]) => ({ value, label })) },
-            { key: "type", placeholder: "Tipo de oportunidad", value: type, onChange: setType, options: Object.entries(OPPORTUNITY_TYPE_LABELS).map(([value, label]) => ({ value, label })) },
-            { key: "status", placeholder: "Estado", value: status, onChange: setStatus, options: Object.entries(CAMPAIGN_STATUS).map(([value, cfg]) => ({ value, label: cfg.label })) },
-            { key: "cat", placeholder: "Categoría", value: category, onChange: setCategory, options: uniqueValues(all, (o) => o.category).map((c) => ({ value: c, label: c })) },
-            { key: "sup", placeholder: "Proveedor", value: supplier, onChange: setSupplier, options: uniqueValues(all.filter((o) => o.supplierName), (o) => o.supplierName).map((c) => ({ value: c, label: c })) },
-          ]}
-          toggles={[
-            { key: "risk", label: "Riesgo de quiebre", active: toggles.risk, onToggle: () => setToggles((t) => ({ ...t, risk: !t.risk })) },
-            { key: "growth", label: "Crecimiento acelerado", active: toggles.growth, onToggle: () => setToggles((t) => ({ ...t, growth: !t.growth })) },
-            { key: "liq", label: "Sobrestock / liquidar", active: toggles.liquidation, onToggle: () => setToggles((t) => ({ ...t, liquidation: !t.liquidation })) },
-            { key: "lm", label: "Margen bajo", active: toggles.lowMargin, onToggle: () => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin })) },
-          ]}
-        />
-      </div>
-
-      <Card>
-        <DataTable
-          columns={columns}
-          data={filtered}
-          rowKey={(o) => o.id}
-          onRowClick={(o) => navigate(`/productos/${o.sku}`)}
-          sort={sort}
-          onSortChange={handleSort}
-          rowClassName={(o) => (o.status === "stockout_risk" ? "bg-rose-50/40" : undefined)}
-          emptyMessage="No hay oportunidades que coincidan con los filtros."
-          mobileCard={(o) => (
-            <div>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{o.sku}</span>
-                  <p className="font-medium text-slate-800 leading-snug">{o.productName}</p>
-                  <p className="text-xs text-slate-500">{CHANNEL_LABELS[o.channel]} · {o.campaignName} · en {formatDays(o.daysToCampaign)}</p>
-                </div>
-                <Badge tone={CAMPAIGN_STATUS[o.status].tone} dot>{CAMPAIGN_STATUS[o.status].label}</Badge>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                <div><p className="text-xs text-slate-400">Stock</p><p className={o.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(o.availableStock)}</p></div>
-                <div><p className="text-xs text-slate-400">Brecha</p><p className={o.stockGap > 0 ? "text-rose-600" : "text-emerald-600"}>{o.stockGap > 0 ? `-${formatNumber(o.stockGap)}` : "OK"}</p></div>
-                <div><p className="text-xs text-slate-400">Sugerido</p><p className="font-semibold text-slate-900">{o.suggestedPurchaseQuantity > 0 ? `${formatNumber(o.suggestedPurchaseQuantity)} u.` : "—"}</p></div>
-              </div>
-              <p className="text-xs text-slate-500 mt-1.5">{o.recommendation}</p>
-            </div>
+                  );
+                })}
+              </CardBody>
+            </Card>
           )}
-        />
-      </Card>
-      </>
+
+          {/* Foco por estado (reduce el listado con un clic) */}
+          <Tabs
+            className="mb-4"
+            value={status || "all"}
+            onChange={(v) => setStatus(v === "all" ? "" : v)}
+            tabs={[
+              { value: "all", label: "Todos", count: all.length },
+              { value: "buy_before_campaign", label: "Comprar antes", count: buyBefore },
+              { value: "stockout_risk", label: "Riesgo de quiebre", count: stockoutRisk },
+              { value: "liquidate", label: "Liquidar", count: toLiquidateList.length },
+              {
+                value: "boost",
+                label: "Potenciar",
+                count: all.filter((o) => o.status === "boost").length,
+              },
+              {
+                value: "not_recommended",
+                label: "No recomendado",
+                count: all.filter((o) => o.status === "not_recommended").length,
+              },
+            ]}
+          />
+
+          {/* Tabla principal */}
+          <div id="tabla" className="mb-4">
+            <FilterBar
+              searchValue={query}
+              onSearchChange={setQuery}
+              searchPlaceholder="Buscar por SKU, producto o campaña"
+              resultCount={filtered.length}
+              onClear={clearFilters}
+              selects={[
+                {
+                  key: "channel",
+                  placeholder: "Canal",
+                  value: channel,
+                  onChange: setChannel,
+                  options: Object.entries(CHANNEL_LABELS).map(([value, label]) => ({
+                    value,
+                    label,
+                  })),
+                },
+                {
+                  key: "type",
+                  placeholder: "Tipo de oportunidad",
+                  value: type,
+                  onChange: setType,
+                  options: Object.entries(OPPORTUNITY_TYPE_LABELS).map(([value, label]) => ({
+                    value,
+                    label,
+                  })),
+                },
+                {
+                  key: "status",
+                  placeholder: "Estado",
+                  value: status,
+                  onChange: setStatus,
+                  options: Object.entries(CAMPAIGN_STATUS).map(([value, cfg]) => ({
+                    value,
+                    label: cfg.label,
+                  })),
+                },
+                {
+                  key: "cat",
+                  placeholder: "Categoría",
+                  value: category,
+                  onChange: setCategory,
+                  options: uniqueValues(all, (o) => o.category).map((c) => ({
+                    value: c,
+                    label: c,
+                  })),
+                },
+                {
+                  key: "sup",
+                  placeholder: "Proveedor",
+                  value: supplier,
+                  onChange: setSupplier,
+                  options: uniqueValues(
+                    all.filter((o) => o.supplierName),
+                    (o) => o.supplierName
+                  ).map((c) => ({ value: c, label: c })),
+                },
+              ]}
+              toggles={[
+                {
+                  key: "risk",
+                  label: "Riesgo de quiebre",
+                  active: toggles.risk,
+                  onToggle: () => setToggles((t) => ({ ...t, risk: !t.risk })),
+                },
+                {
+                  key: "growth",
+                  label: "Crecimiento acelerado",
+                  active: toggles.growth,
+                  onToggle: () => setToggles((t) => ({ ...t, growth: !t.growth })),
+                },
+                {
+                  key: "liq",
+                  label: "Sobrestock / liquidar",
+                  active: toggles.liquidation,
+                  onToggle: () => setToggles((t) => ({ ...t, liquidation: !t.liquidation })),
+                },
+                {
+                  key: "lm",
+                  label: "Margen bajo",
+                  active: toggles.lowMargin,
+                  onToggle: () => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin })),
+                },
+              ]}
+            />
+          </div>
+
+          <Card>
+            <DataTable
+              columns={columns}
+              data={filtered}
+              rowKey={(o) => o.id}
+              onRowClick={(o) => navigate(`/productos/${o.sku}`)}
+              sort={sort}
+              onSortChange={handleSort}
+              rowClassName={(o) => (o.status === "stockout_risk" ? "bg-rose-50/40" : undefined)}
+              emptyMessage="No hay oportunidades que coincidan con los filtros."
+              mobileCard={(o) => (
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-xs font-mono text-slate-400">{o.sku}</span>
+                      <p className="font-medium text-slate-800 leading-snug">{o.productName}</p>
+                      <p className="text-xs text-slate-500">
+                        {CHANNEL_LABELS[o.channel]} · {o.campaignName} · en{" "}
+                        {formatDays(o.daysToCampaign)}
+                      </p>
+                    </div>
+                    <Badge tone={CAMPAIGN_STATUS[o.status].tone} dot>
+                      {CAMPAIGN_STATUS[o.status].label}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                    <div>
+                      <p className="text-xs text-slate-400">Stock</p>
+                      <p
+                        className={
+                          o.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"
+                        }
+                      >
+                        {formatNumber(o.availableStock)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Brecha</p>
+                      <p className={o.stockGap > 0 ? "text-rose-600" : "text-emerald-600"}>
+                        {o.stockGap > 0 ? `-${formatNumber(o.stockGap)}` : "OK"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Sugerido</p>
+                      <p className="font-semibold text-slate-900">
+                        {o.suggestedPurchaseQuantity > 0
+                          ? `${formatNumber(o.suggestedPurchaseQuantity)} u.`
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5">{o.recommendation}</p>
+                </div>
+              )}
+            />
+          </Card>
+        </>
       )}
 
       <CampaignBuilderModal
@@ -641,7 +879,11 @@ function CreatedCampaignsView({
             icon={<IconCampaign className="w-6 h-6" />}
             title="Aún no has creado campañas"
             description="Crea una campaña (ej. Cyber), elige los canales (web, marketplace, Google Ads, Meta…) y sube los productos que estarán con descuento."
-            action={<Button onClick={onCreate} icon={<IconPlus className="w-4 h-4" />}>Crear campaña</Button>}
+            action={
+              <Button onClick={onCreate} icon={<IconPlus className="w-4 h-4" />}>
+                Crear campaña
+              </Button>
+            }
           />
         </CardBody>
       </Card>
@@ -651,8 +893,8 @@ function CreatedCampaignsView({
   return (
     <div className="space-y-4">
       <HelpNote variant="tip">
-        Estas son tus campañas. Revisa los productos con <b>stock bajo</b> antes de lanzarlas y agrégalos a
-        una orden de compra para no quebrar durante el evento.
+        Estas son tus campañas. Revisa los productos con <b>stock bajo</b> antes de lanzarlas y
+        agrégalos a una orden de compra para no quebrar durante el evento.
       </HelpNote>
       {campaigns.map((c) => {
         const lowStock = c.products.filter((p) => p.availableStock <= 5).length;
@@ -682,7 +924,9 @@ function CreatedCampaignsView({
             <CardBody>
               <div className="flex flex-wrap gap-1.5 mb-3">
                 {c.channels.map((ch) => (
-                  <Badge key={ch} tone="blue">{PROMO_CHANNEL_LABELS[ch]}</Badge>
+                  <Badge key={ch} tone="blue">
+                    {PROMO_CHANNEL_LABELS[ch]}
+                  </Badge>
                 ))}
                 {lowStock > 0 && (
                   <Badge tone="red">{lowStock} con stock bajo — revisa compra</Badge>
@@ -696,13 +940,19 @@ function CreatedCampaignsView({
                       <p className="text-sm font-medium text-slate-800 truncate">{p.productName}</p>
                       <p className="text-xs text-slate-500">
                         Stock {formatNumber(p.availableStock)}
-                        {p.availableStock <= 5 && <span className="text-rose-500 font-medium"> · stock bajo</span>}
+                        {p.availableStock <= 5 && (
+                          <span className="text-rose-500 font-medium"> · stock bajo</span>
+                        )}
                       </p>
                     </div>
                     <Badge tone="amber">-{p.discountPct}%</Badge>
                     <div className="text-right w-28">
-                      <p className="text-xs text-slate-400 line-through">{formatCurrency(p.basePrice)}</p>
-                      <p className="text-sm font-semibold text-emerald-600">{formatCurrency(p.campaignPrice)}</p>
+                      <p className="text-xs text-slate-400 line-through">
+                        {formatCurrency(p.basePrice)}
+                      </p>
+                      <p className="text-sm font-semibold text-emerald-600">
+                        {formatCurrency(p.campaignPrice)}
+                      </p>
                     </div>
                     <button
                       onClick={() => onAddToOc(p.sku)}
@@ -720,4 +970,3 @@ function CreatedCampaignsView({
     </div>
   );
 }
-

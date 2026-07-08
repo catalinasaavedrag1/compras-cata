@@ -6,11 +6,9 @@ import { Card } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
 import { FilterBar } from "../components/business/FilterBar";
-import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Select } from "../components/ui/Select";
-import { Input } from "../components/ui/Input";
 import { Drawer } from "../components/ui/Drawer";
 import { DataTable, type Column } from "../components/ui/Table";
 import { useUrlState } from "../utils/useUrlState";
@@ -30,6 +28,16 @@ import type { Reception, ReceptionItem } from "../types/purchasing";
 
 const ARRIVING: Reception["status"][] = ["in_transit", "scheduled"];
 const ARRIVED: Reception["status"][] = ["received", "partial", "with_issues"];
+
+/** Nombre legible de cada vista (las KPIs son el selector; esto da contexto). */
+const VIEW_LABELS: Record<string, string> = {
+  undelivered: "No despachado",
+  arriving: "Por llegar",
+  delayed: "Atrasadas",
+  issues: "Con problemas",
+  received: "Recibidas",
+  all: "Todas las recepciones",
+};
 
 function lineStatus(it: ReceptionItem): { label: string; tone: "green" | "amber" | "red" } {
   if (it.received >= it.expected) return { label: "Completo", tone: "green" };
@@ -53,7 +61,8 @@ export function ReceptionsPage() {
   const [scopeRaw, setScope] = useUrlState("alcance", isLeader ? "todos" : "mias");
   // Un comprador solo ve sus propias recepciones; el alcance de equipo es del líder.
   const scope = isLeader ? scopeRaw : "mias";
-  const [tab, setTab] = useUrlState("tab", "arriving");
+  // El líder aterriza en "No despachado" (su vista accionable: responsables + proveedores que no cumplieron).
+  const [tab, setTab] = useUrlState("tab", isLeader ? "undelivered" : "arriving");
   const [query, setQuery] = useUrlState("q");
   const [supplier, setSupplier] = useUrlState("prov");
   const [from, setFrom] = useUrlState("desde");
@@ -88,7 +97,11 @@ export function ReceptionsPage() {
   const byFilters = useMemo(
     () =>
       scoped.filter((r) => {
-        if (query.trim() && !`${r.poNumber} ${r.supplierName} ${r.buyer}`.toLowerCase().includes(query.toLowerCase())) return false;
+        if (
+          query.trim() &&
+          !`${r.poNumber} ${r.supplierName} ${r.buyer}`.toLowerCase().includes(query.toLowerCase())
+        )
+          return false;
         if (supplier && r.supplierName !== supplier) return false;
         if (from && refDate(r) < from) return false;
         if (to && refDate(r) > to) return false;
@@ -101,7 +114,11 @@ export function ReceptionsPage() {
     () =>
       byFilters
         .filter((r) => ARRIVED.includes(r.status))
-        .flatMap((r) => (r.items ?? []).filter((it) => it.received < it.expected).map((it) => ({ r, it, missing: it.expected - it.received })))
+        .flatMap((r) =>
+          (r.items ?? [])
+            .filter((it) => it.received < it.expected)
+            .map((it) => ({ r, it, missing: it.expected - it.received }))
+        )
         .sort((a, b) => b.missing - a.missing),
     [byFilters]
   );
@@ -141,13 +158,21 @@ export function ReceptionsPage() {
     let base = byFilters;
     if (tab === "arriving") base = base.filter((r) => ARRIVING.includes(r.status));
     else if (tab === "received") base = base.filter((r) => r.status === "received");
-    else if (tab === "issues") base = base.filter((r) => r.status === "with_issues" || r.status === "partial");
+    else if (tab === "issues")
+      base = base.filter((r) => r.status === "with_issues" || r.status === "partial");
     else if (tab === "delayed") base = base.filter((r) => r.status === "delayed");
     return [...base].sort((a, b) => (a.expectedDate < b.expectedDate ? -1 : 1));
   }, [byFilters, tab]);
 
-  const scopeLabel = scope === "todos" ? "Todos los compradores" : scope === "mias" ? `Mis recepciones (${buyer})` : `Comprador ${scope}`;
-  const pct = (r: Reception) => (r.unitsExpected > 0 ? Math.round((r.unitsReceived / r.unitsExpected) * 100) : 0);
+  const scopeLabel =
+    scope === "todos"
+      ? "Todos los compradores"
+      : scope === "mias"
+        ? `Mis recepciones (${buyer})`
+        : `Comprador ${scope}`;
+  const resultCount = tab === "undelivered" ? counts.undelivered : filtered.length;
+  const pct = (r: Reception) =>
+    r.unitsExpected > 0 ? Math.round((r.unitsReceived / r.unitsExpected) * 100) : 0;
   const missingOf = (r: Reception) => (r.items ?? []).filter((it) => it.received < it.expected);
 
   const reorder = (sku: string, name: string, supplierName: string, missing: number) => {
@@ -170,7 +195,13 @@ export function ReceptionsPage() {
       render: (r) => (
         <div className="min-w-[160px]">
           <p className="font-medium text-slate-800">{r.poNumber}</p>
-          <Link to={supplierPath(r.supplierName)} className="text-xs text-slate-500 hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{r.supplierName}</Link>
+          <Link
+            to={supplierPath(r.supplierName)}
+            className="text-xs text-slate-500 hover:text-brand-700 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {r.supplierName}
+          </Link>
           <p className="text-xs text-slate-400">{scope === "todos" ? r.buyer : r.warehouse}</p>
         </div>
       ),
@@ -182,7 +213,9 @@ export function ReceptionsPage() {
       render: (r) => (
         <div className="text-sm">
           <p className="text-slate-700">{formatDate(r.expectedDate)}</p>
-          <p className="text-xs text-slate-400">{r.receivedDate ? `recibida ${formatDate(r.receivedDate)}` : "pendiente"}</p>
+          <p className="text-xs text-slate-400">
+            {r.receivedDate ? `recibida ${formatDate(r.receivedDate)}` : "pendiente"}
+          </p>
         </div>
       ),
     },
@@ -195,12 +228,19 @@ export function ReceptionsPage() {
         const miss = missingOf(r);
         return (
           <div className="text-sm min-w-[110px]">
-            <p className="font-medium text-slate-800">{formatNumber(r.unitsReceived)}/{formatNumber(r.unitsExpected)} u.</p>
+            <p className="font-medium text-slate-800">
+              {formatNumber(r.unitsReceived)}/{formatNumber(r.unitsExpected)} u.
+            </p>
             <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden mt-1">
-              <div className={`h-full rounded-full ${p >= 100 ? "bg-emerald-500" : p > 0 ? "bg-amber-500" : "bg-slate-300"}`} style={{ width: `${Math.max(3, p)}%` }} />
+              <div
+                className={`h-full rounded-full ${p >= 100 ? "bg-emerald-500" : p > 0 ? "bg-amber-500" : "bg-slate-300"}`}
+                style={{ width: `${Math.max(3, p)}%` }}
+              />
             </div>
             {miss.length > 0 && ARRIVED.includes(r.status) && (
-              <p className="text-[11px] text-rose-600 mt-1">{miss.length} SKU{miss.length === 1 ? "" : "s"} sin despachar</p>
+              <p className="text-[11px] text-rose-600 mt-1">
+                {miss.length} SKU{miss.length === 1 ? "" : "s"} sin despachar
+              </p>
             )}
           </div>
         );
@@ -209,93 +249,193 @@ export function ReceptionsPage() {
     {
       key: "quality",
       header: "Calidad",
-      render: (r) => (r.qualityOk ? <Badge tone="green" dot>Conforme</Badge> : <Badge tone="red" dot>Con observación</Badge>),
+      render: (r) =>
+        r.qualityOk ? (
+          <Badge tone="green" dot>
+            Conforme
+          </Badge>
+        ) : (
+          <Badge tone="red" dot>
+            Con observación
+          </Badge>
+        ),
     },
-    { key: "status", header: "Estado", render: (r) => <Badge tone={RECEPTION_STATUS[r.status].tone} dot>{RECEPTION_STATUS[r.status].label}</Badge> },
-    { key: "action", header: "", render: () => <span className="text-xs font-medium text-brand-600">Ver detalle →</span> },
+    {
+      key: "status",
+      header: "Estado",
+      render: (r) => (
+        <Badge tone={RECEPTION_STATUS[r.status].tone} dot>
+          {RECEPTION_STATUS[r.status].label}
+        </Badge>
+      ),
+    },
+    {
+      key: "action",
+      header: "",
+      render: () => <span className="text-xs font-medium text-brand-600">Ver detalle →</span>,
+    },
   ];
 
   return (
     <div>
       <PageHeader
         title="Recepciones"
-        description={isLeader
-          ? "Qué llegó, qué SKUs no despachó cada proveedor y qué encargado de compra debe reordenarlos. Visión global del equipo."
-          : "Qué viene en camino, qué llegó y qué SKUs el proveedor no despachó para que no se queden sin reponer."}
+        description={
+          isLeader
+            ? "Qué llegó, qué SKUs no despachó cada proveedor y qué encargado de compra debe reordenarlos. Visión global del equipo."
+            : "Qué viene en camino, qué llegó y qué SKUs el proveedor no despachó para que no se queden sin reponer."
+        }
       />
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
-        {isLeader && (
-          <div className="sm:w-72">
-            <Select
-              label="Viendo"
-              value={scope}
-              onChange={(e) => setScope(e.target.value)}
-              options={[
-                { value: "todos", label: "Todo el equipo" },
-                { value: "mias", label: `Mis recepciones (${buyer})` },
-                ...buyers.filter((b) => b !== buyer).map((b) => ({ value: b, label: `Comprador: ${b}` })),
-              ]}
-            />
-          </div>
-        )}
-        <div className="sm:w-40">
-          <Input label="Desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+      {isLeader && (
+        <div className="mb-3 sm:w-72">
+          <Select
+            label="Viendo"
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            options={[
+              { value: "todos", label: "Todo el equipo" },
+              { value: "mias", label: `Mis recepciones (${buyer})` },
+              ...buyers
+                .filter((b) => b !== buyer)
+                .map((b) => ({ value: b, label: `Comprador: ${b}` })),
+            ]}
+          />
         </div>
-        <div className="sm:w-40">
-          <Input label="Hasta" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-        {(from || to) && (
-          <button onClick={() => { setFrom(""); setTo(""); }} className="text-xs font-medium text-brand-600 hover:text-brand-700 sm:self-end sm:pb-2.5">Limpiar fechas</button>
-        )}
-        <span className="text-xs text-slate-500 sm:self-end sm:pb-2">Alcance: <b className="text-slate-700">{scopeLabel}</b></span>
-      </div>
+      )}
 
       <div className="mb-4">
         <FilterBar
           searchValue={query}
           onSearchChange={setQuery}
           searchPlaceholder="Buscar OC, proveedor o comprador"
-          resultCount={tab === "undelivered" ? undeliveredLines.length : filtered.length}
+          resultCount={resultCount}
           summary={`${counts.undelivered} SKUs sin despachar · ${counts.arriving} por llegar · ${counts.delayed} atrasadas`}
-          onClear={() => { setQuery(""); setSupplier(""); setFrom(""); setTo(""); }}
+          onClear={() => {
+            setQuery("");
+            setSupplier("");
+            setFrom("");
+            setTo("");
+          }}
+          dateRange={{
+            value: { from, to },
+            onChange: (r) => {
+              setFrom(r.from);
+              setTo(r.to);
+            },
+            label: "Esperada / recibida",
+          }}
           selects={[
-            { key: "prov", placeholder: "Proveedor", value: supplier, onChange: setSupplier, options: uniqueValues(receptions, (r) => r.supplierName).map((s) => ({ value: s, label: s })) },
+            {
+              key: "prov",
+              placeholder: "Proveedor",
+              value: supplier,
+              onChange: setSupplier,
+              options: uniqueValues(receptions, (r) => r.supplierName).map((s) => ({
+                value: s,
+                label: s,
+              })),
+            },
           ]}
         />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <KpiCard title="No despachado" value={formatNumber(counts.undelivered)} tone="bad" icon={<IconBox className="w-4 h-4" />} description="SKUs que el proveedor no envió" active={tab === "undelivered"} onClick={() => setTab("undelivered")} />
-        <KpiCard title="Por llegar" value={formatNumber(counts.arriving)} tone="info" icon={<IconClock className="w-4 h-4" />} description="En tránsito o programadas" active={tab === "arriving"} onClick={() => setTab("arriving")} />
-        <KpiCard title="Atrasadas" value={formatNumber(counts.delayed)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Debieron llegar" active={tab === "delayed"} onClick={() => setTab("delayed")} />
-        <KpiCard title="Con problemas" value={formatNumber(counts.issues)} tone="warn" icon={<IconAlerts className="w-4 h-4" />} description="Parcial o con calidad" active={tab === "issues"} onClick={() => setTab("issues")} />
-        <KpiCard title="Recibidas" value={formatNumber(counts.received)} tone="good" icon={<IconCheck className="w-4 h-4" />} description="Conformes" active={tab === "received"} onClick={() => setTab("received")} />
+        <KpiCard
+          title="No despachado"
+          value={formatNumber(counts.undelivered)}
+          tone="bad"
+          icon={<IconBox className="w-4 h-4" />}
+          description="SKUs que el proveedor no envió"
+          active={tab === "undelivered"}
+          onClick={() => setTab("undelivered")}
+        />
+        <KpiCard
+          title="Por llegar"
+          value={formatNumber(counts.arriving)}
+          tone="info"
+          icon={<IconClock className="w-4 h-4" />}
+          description="En tránsito o programadas"
+          active={tab === "arriving"}
+          onClick={() => setTab("arriving")}
+        />
+        <KpiCard
+          title="Atrasadas"
+          value={formatNumber(counts.delayed)}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Debieron llegar"
+          active={tab === "delayed"}
+          onClick={() => setTab("delayed")}
+        />
+        <KpiCard
+          title="Con problemas"
+          value={formatNumber(counts.issues)}
+          tone="warn"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Parcial o con calidad"
+          active={tab === "issues"}
+          onClick={() => setTab("issues")}
+        />
+        <KpiCard
+          title="Recibidas"
+          value={formatNumber(counts.received)}
+          tone="good"
+          icon={<IconCheck className="w-4 h-4" />}
+          description="Conformes"
+          active={tab === "received"}
+          onClick={() => setTab("received")}
+        />
       </div>
 
-      <Tabs
-        className="mb-4"
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { value: "undelivered", label: "No despachado", count: counts.undelivered },
-          { value: "arriving", label: "Por llegar", count: counts.arriving },
-          { value: "delayed", label: "Atrasadas", count: counts.delayed },
-          { value: "issues", label: "Con problemas", count: counts.issues },
-          { value: "received", label: "Recibidas", count: counts.received },
-          { value: "all", label: "Todas", count: counts.all },
-        ]}
-      />
+      {/* Vista activa: las KPIs de arriba son el selector. Esta línea da contexto
+          (qué estás viendo y cuántos) y la salida a "Todas" — sin duplicar la navegación. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-4 text-sm">
+        <span className="text-slate-500">Mostrando</span>
+        <span className="font-semibold text-slate-800">
+          {VIEW_LABELS[tab] ?? "Todas las recepciones"}
+        </span>
+        <span className="text-slate-300">·</span>
+        <span className="text-slate-600">
+          {formatNumber(resultCount)}{" "}
+          {tab === "undelivered"
+            ? resultCount === 1
+              ? "SKU sin despachar"
+              : "SKUs sin despachar"
+            : resultCount === 1
+              ? "recepción"
+              : "recepciones"}
+        </span>
+        {isLeader && (
+          <>
+            <span className="text-slate-300">·</span>
+            <span className="text-slate-600">{scopeLabel}</span>
+          </>
+        )}
+        {tab !== "all" && (
+          <button
+            onClick={() => setTab("all")}
+            className="ml-1 text-xs font-medium text-brand-600 hover:text-brand-700"
+          >
+            Ver todas
+          </button>
+        )}
+      </div>
 
       {tab === "undelivered" ? (
         <>
           <HelpNote className="mb-4">
-            Lo que <b>pediste pero el proveedor no despachó</b>. Reordénalo aquí para que no quede como "ya comprado" y termine en quiebre.
+            Lo que <b>pediste pero el proveedor no despachó</b>. Reordénalo aquí para que no quede
+            como "ya comprado" y termine en quiebre.
             {isLeader && " Abajo ves qué encargado de compra es responsable de reponer cada caso."}
           </HelpNote>
 
           {undeliveredLines.length === 0 ? (
-            <Card><div className="p-8 text-center text-sm text-slate-500">Sin SKUs pendientes por despachar. 🎉</div></Card>
+            <Card>
+              <div className="p-8 text-center text-sm text-slate-500">
+                Sin SKUs pendientes por despachar. 🎉
+              </div>
+            </Card>
           ) : (
             <>
               {/* Responsables de reordenar (vista global / líder) */}
@@ -314,13 +454,26 @@ export function ReceptionsPage() {
                         <div className="flex items-center gap-3">
                           <span className="flex-1 text-sm font-medium text-slate-800">{bName}</span>
                           <Badge tone="red">{lines.length} por reordenar</Badge>
-                          <button onClick={() => setScope(bName === buyer ? "mias" : bName)} className="text-xs font-medium text-brand-600 hover:text-brand-700">Ver</button>
+                          <button
+                            onClick={() => setScope(bName === buyer ? "mias" : bName)}
+                            className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                          >
+                            Ver
+                          </button>
                         </div>
                         <ul className="mt-1.5 space-y-1">
                           {lines.map(({ r, it, missing }) => (
-                            <li key={`${r.id}-${it.sku}`} className="flex items-center justify-between gap-2 text-xs">
-                              <span className="min-w-0 truncate text-slate-600"><b className="font-medium text-slate-800">{it.productName}</b> <span className="text-slate-400">· {r.supplierName}</span></span>
-                              <span className="text-rose-600 font-medium flex-shrink-0">faltan {formatNumber(missing)}</span>
+                            <li
+                              key={`${r.id}-${it.sku}`}
+                              className="flex items-center justify-between gap-2 text-xs"
+                            >
+                              <span className="min-w-0 truncate text-slate-600">
+                                <b className="font-medium text-slate-800">{it.productName}</b>{" "}
+                                <span className="text-slate-400">· {r.supplierName}</span>
+                              </span>
+                              <span className="text-rose-600 font-medium flex-shrink-0">
+                                faltan {formatNumber(missing)}
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -339,30 +492,59 @@ export function ReceptionsPage() {
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 border-b border-slate-100">
                         <p className="text-sm font-semibold text-slate-800">{sup}</p>
                         <Badge tone={perf.tone}>{perf.ratingLabel}</Badge>
-                        <span className="text-xs text-slate-500">Despacho <b className="text-slate-700">{perf.fillRate}%</b></span>
-                        {perf.compliance !== null && <span className="text-xs text-slate-500">A tiempo <b className="text-slate-700">{perf.compliance}%</b></span>}
+                        <span className="text-xs text-slate-500">
+                          Despacho <b className="text-slate-700">{perf.fillRate}%</b>
+                        </span>
+                        {perf.compliance !== null && (
+                          <span className="text-xs text-slate-500">
+                            A tiempo <b className="text-slate-700">{perf.compliance}%</b>
+                          </span>
+                        )}
                         <span className="flex-1" />
-                        <span className="text-xs font-semibold text-rose-600">{lines.length} SKU{lines.length === 1 ? "" : "s"} sin despachar</span>
+                        <span className="text-xs font-semibold text-rose-600">
+                          {lines.length} SKU{lines.length === 1 ? "" : "s"} sin despachar
+                        </span>
                       </div>
                       <div className="divide-y divide-slate-50">
                         {lines.map(({ r, it, missing }) => {
                           const st = lineStatus(it);
                           return (
-                            <div key={`${r.id}-${it.sku}`} className="flex items-center gap-3 px-4 py-3">
+                            <div
+                              key={`${r.id}-${it.sku}`}
+                              className="flex items-center gap-3 px-4 py-3"
+                            >
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-xs font-mono text-slate-400">{it.sku}</span>
                                   <Badge tone={st.tone}>{st.label}</Badge>
-                                  {scope === "todos" && <span className="text-[11px] text-slate-500">resp. <b className="text-slate-700">{r.buyer}</b></span>}
+                                  {scope === "todos" && (
+                                    <span className="text-[11px] text-slate-500">
+                                      resp. <b className="text-slate-700">{r.buyer}</b>
+                                    </span>
+                                  )}
                                 </div>
-                                <p className="text-sm font-medium text-slate-800 truncate">{it.productName}</p>
+                                <p className="text-sm font-medium text-slate-800 truncate">
+                                  {it.productName}
+                                </p>
                                 <p className="text-xs text-slate-500">{r.poNumber}</p>
                               </div>
                               <div className="text-right text-sm flex-shrink-0">
-                                <p className="text-slate-700">{formatNumber(it.received)}/{formatNumber(it.expected)} u.</p>
-                                <p className="text-xs font-semibold text-rose-600">faltan {formatNumber(missing)}</p>
+                                <p className="text-slate-700">
+                                  {formatNumber(it.received)}/{formatNumber(it.expected)} u.
+                                </p>
+                                <p className="text-xs font-semibold text-rose-600">
+                                  faltan {formatNumber(missing)}
+                                </p>
                               </div>
-                              <Button size="sm" variant={hasItem(it.sku) ? "secondary" : "primary"} disabled={hasItem(it.sku)} icon={<IconPlus className="w-3.5 h-3.5" />} onClick={() => reorder(it.sku, it.productName, r.supplierName, missing)}>
+                              <Button
+                                size="sm"
+                                variant={hasItem(it.sku) ? "secondary" : "primary"}
+                                disabled={hasItem(it.sku)}
+                                icon={<IconPlus className="w-3.5 h-3.5" />}
+                                onClick={() =>
+                                  reorder(it.sku, it.productName, r.supplierName, missing)
+                                }
+                              >
                                 {hasItem(it.sku) ? "En OC" : "Reordenar"}
                               </Button>
                             </div>
@@ -379,7 +561,9 @@ export function ReceptionsPage() {
       ) : (
         <>
           <HelpNote className="mb-4">
-            La barra de <b>recepción</b> muestra cuánto llegó vs lo pedido. Toca una recepción para ver el <b>detalle por producto</b>, el rendimiento del proveedor y reordenar lo no despachado.
+            La barra de <b>recepción</b> muestra cuánto llegó vs lo pedido. Toca una recepción para
+            ver el <b>detalle por producto</b>, el rendimiento del proveedor y reordenar lo no
+            despachado.
           </HelpNote>
           <Card>
             <DataTable
@@ -387,7 +571,11 @@ export function ReceptionsPage() {
               data={filtered}
               rowKey={(r) => r.id}
               onRowClick={(r) => setDetail(r)}
-              rowClassName={(r) => (r.status === "delayed" || r.status === "with_issues" || r.status === "partial" ? "bg-rose-50/40" : undefined)}
+              rowClassName={(r) =>
+                r.status === "delayed" || r.status === "with_issues" || r.status === "partial"
+                  ? "bg-rose-50/40"
+                  : undefined
+              }
               emptyMessage="No hay recepciones en esta vista."
               mobileCard={(r) => {
                 const p = pct(r);
@@ -397,17 +585,35 @@ export function ReceptionsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-medium text-slate-800">{r.poNumber}</p>
-                        <p className="text-xs text-slate-500">{r.supplierName} · {scope === "todos" ? r.buyer : r.warehouse}</p>
+                        <p className="text-xs text-slate-500">
+                          {r.supplierName} · {scope === "todos" ? r.buyer : r.warehouse}
+                        </p>
                       </div>
-                      <Badge tone={RECEPTION_STATUS[r.status].tone} dot>{RECEPTION_STATUS[r.status].label}</Badge>
+                      <Badge tone={RECEPTION_STATUS[r.status].tone} dot>
+                        {RECEPTION_STATUS[r.status].label}
+                      </Badge>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                      <div><p className="text-xs text-slate-400">Esperada</p><p className="text-slate-700">{formatDate(r.expectedDate)}</p></div>
-                      <div><p className="text-xs text-slate-400">Recepción</p><p className="text-slate-700">{formatPercent(p, 0)}</p></div>
-                      <div><p className="text-xs text-slate-400">Calidad</p><p className={r.qualityOk ? "text-emerald-600" : "text-rose-600"}>{r.qualityOk ? "Conforme" : "Observada"}</p></div>
+                      <div>
+                        <p className="text-xs text-slate-400">Esperada</p>
+                        <p className="text-slate-700">{formatDate(r.expectedDate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400">Recepción</p>
+                        <p className="text-slate-700">{formatPercent(p, 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400">Calidad</p>
+                        <p className={r.qualityOk ? "text-emerald-600" : "text-rose-600"}>
+                          {r.qualityOk ? "Conforme" : "Observada"}
+                        </p>
+                      </div>
                     </div>
                     {miss.length > 0 && ARRIVED.includes(r.status) && (
-                      <p className="text-xs text-rose-600 mt-1.5 font-medium">{miss.length} SKU{miss.length === 1 ? "" : "s"} sin despachar · toca para ver</p>
+                      <p className="text-xs text-rose-600 mt-1.5 font-medium">
+                        {miss.length} SKU{miss.length === 1 ? "" : "s"} sin despachar · toca para
+                        ver
+                      </p>
                     )}
                   </div>
                 );
@@ -425,7 +631,15 @@ export function ReceptionsPage() {
         description={detail ? `${detail.supplierName} · resp. ${detail.buyer}` : ""}
         footer={
           detail && missingOf(detail).length > 0 ? (
-            <Button icon={<IconPlus className="w-4 h-4" />} onClick={() => { missingOf(detail).forEach((it) => reorder(it.sku, it.productName, detail.supplierName, it.expected - it.received)); closeDetail(); }}>
+            <Button
+              icon={<IconPlus className="w-4 h-4" />}
+              onClick={() => {
+                missingOf(detail).forEach((it) =>
+                  reorder(it.sku, it.productName, detail.supplierName, it.expected - it.received)
+                );
+                closeDetail();
+              }}
+            >
               Reordenar todo lo no despachado
             </Button>
           ) : undefined
@@ -458,42 +672,84 @@ function ReceptionDetail({
       const limite = Math.max(7, p.supplierLeadTimeDays);
       return { sku: it.sku, name: it.productName, cover, atRisk: cover <= limite };
     })
-    .filter((x): x is { sku: string; name: string; cover: number; atRisk: boolean } => x !== null && x.atRisk)
+    .filter(
+      (x): x is { sku: string; name: string; cover: number; atRisk: boolean } =>
+        x !== null && x.atRisk
+    )
     .sort((a, b) => a.cover - b.cover);
 
   return (
     <div className="space-y-4">
       {impacted.length > 0 && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-800">
-          ⚠ <b>Impacto:</b> esta recepción {RECEPTION_STATUS[detail.status].label.toLowerCase()} deja {impacted.length} SKU bajo cobertura mínima. El más urgente: <b>{impacted[0].name}</b>, quiebre estimado en ~{Math.max(0, Math.round(impacted[0].cover))} días. Reordena lo faltante o busca proveedor alternativo.
+          ⚠ <b>Impacto:</b> esta recepción {RECEPTION_STATUS[detail.status].label.toLowerCase()}{" "}
+          deja {impacted.length} SKU bajo cobertura mínima. El más urgente:{" "}
+          <b>{impacted[0].name}</b>, quiebre estimado en ~
+          {Math.max(0, Math.round(impacted[0].cover))} días. Reordena lo faltante o busca proveedor
+          alternativo.
         </div>
       )}
       <div className="grid grid-cols-3 gap-3">
-        <div><p className="text-xs text-slate-400">Esperada</p><p className="text-sm font-medium text-slate-800">{formatDate(detail.expectedDate)}</p></div>
-        <div><p className="text-xs text-slate-400">Recibida</p><p className="text-sm font-medium text-slate-800">{detail.receivedDate ? formatDate(detail.receivedDate) : "Pendiente"}</p></div>
-        <div><p className="text-xs text-slate-400">Estado</p><Badge tone={RECEPTION_STATUS[detail.status].tone} dot>{RECEPTION_STATUS[detail.status].label}</Badge></div>
+        <div>
+          <p className="text-xs text-slate-400">Esperada</p>
+          <p className="text-sm font-medium text-slate-800">{formatDate(detail.expectedDate)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-400">Recibida</p>
+          <p className="text-sm font-medium text-slate-800">
+            {detail.receivedDate ? formatDate(detail.receivedDate) : "Pendiente"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-400">Estado</p>
+          <Badge tone={RECEPTION_STATUS[detail.status].tone} dot>
+            {RECEPTION_STATUS[detail.status].label}
+          </Badge>
+        </div>
       </div>
 
       {/* Rendimiento del proveedor */}
       <div className="rounded-lg border border-slate-200 p-3">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <p className="text-xs font-semibold text-slate-700">Rendimiento del proveedor — {detail.supplierName}</p>
+          <p className="text-xs font-semibold text-slate-700">
+            Rendimiento del proveedor — {detail.supplierName}
+          </p>
           <Badge tone={perf.tone}>{perf.ratingLabel}</Badge>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center">
-          <div><p className="text-lg font-bold text-slate-800">{perf.fillRate}%</p><p className="text-[10.5px] text-slate-400">Despacho completo</p></div>
-          <div><p className="text-lg font-bold text-slate-800">{perf.compliance !== null ? `${perf.compliance}%` : "—"}</p><p className="text-[10.5px] text-slate-400">Entrega a tiempo</p></div>
-          <div><p className="text-lg font-bold text-rose-600">{perf.undeliveredSkus}</p><p className="text-[10.5px] text-slate-400">SKUs sin despachar (hist.)</p></div>
+          <div>
+            <p className="text-lg font-bold text-slate-800">{perf.fillRate}%</p>
+            <p className="text-[10.5px] text-slate-400">Despacho completo</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-slate-800">
+              {perf.compliance !== null ? `${perf.compliance}%` : "—"}
+            </p>
+            <p className="text-[10.5px] text-slate-400">Entrega a tiempo</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-rose-600">{perf.undeliveredSkus}</p>
+            <p className="text-[10.5px] text-slate-400">SKUs sin despachar (hist.)</p>
+          </div>
         </div>
         {perf.tone !== "green" && (
-          <p className="text-[11px] text-amber-700 mt-2">⚠ Este proveedor no cumple siempre: despachó el {perf.fillRate}% de lo pedido en {perf.arrivedOrders} recepciones. Considera proveedor alternativo para SKUs críticos.</p>
+          <p className="text-[11px] text-amber-700 mt-2">
+            ⚠ Este proveedor no cumple siempre: despachó el {perf.fillRate}% de lo pedido en{" "}
+            {perf.arrivedOrders} recepciones. Considera proveedor alternativo para SKUs críticos.
+          </p>
         )}
       </div>
 
-      {detail.qualityNote && <p className="text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2">{detail.qualityNote}</p>}
+      {detail.qualityNote && (
+        <p className="text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
+          {detail.qualityNote}
+        </p>
+      )}
 
       <div>
-        <p className="text-xs font-semibold text-slate-700 mb-2">Detalle por producto ({(detail.items ?? []).length})</p>
+        <p className="text-xs font-semibold text-slate-700 mb-2">
+          Detalle por producto ({(detail.items ?? []).length})
+        </p>
         {(detail.items ?? []).length === 0 ? (
           <p className="text-sm text-slate-400">Esta recepción no tiene desglose por SKU.</p>
         ) : (
@@ -502,29 +758,64 @@ function ReceptionDetail({
               const st = lineStatus(it);
               const missing = it.expected - it.received;
               return (
-                <div key={it.sku} className={`rounded-lg border px-3 py-2.5 ${missing > 0 ? "border-rose-200 bg-rose-50/40" : "border-slate-200"}`}>
+                <div
+                  key={it.sku}
+                  className={`rounded-lg border px-3 py-2.5 ${missing > 0 ? "border-rose-200 bg-rose-50/40" : "border-slate-200"}`}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <Link to={productPath(it.sku)} className="text-sm font-medium text-slate-800 leading-snug hover:text-brand-700 hover:underline block">{it.productName}</Link>
+                      <Link
+                        to={productPath(it.sku)}
+                        className="text-sm font-medium text-slate-800 leading-snug hover:text-brand-700 hover:underline block"
+                      >
+                        {it.productName}
+                      </Link>
                       <p className="text-xs text-slate-400 font-mono">{it.sku}</p>
                     </div>
                     <Badge tone={st.tone}>{st.label}</Badge>
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-sm">
-                    <span className="text-slate-500">Pedido <b className="text-slate-800">{formatNumber(it.expected)}</b></span>
-                    <span className="text-slate-500">Recibido <b className="text-slate-800">{formatNumber(it.received)}</b></span>
-                    {missing > 0 && <span className="text-rose-600 font-semibold">Faltan {formatNumber(missing)}</span>}
+                    <span className="text-slate-500">
+                      Pedido <b className="text-slate-800">{formatNumber(it.expected)}</b>
+                    </span>
+                    <span className="text-slate-500">
+                      Recibido <b className="text-slate-800">{formatNumber(it.received)}</b>
+                    </span>
+                    {missing > 0 && (
+                      <span className="text-rose-600 font-semibold">
+                        Faltan {formatNumber(missing)}
+                      </span>
+                    )}
                   </div>
                   {it.issue && <p className="text-xs text-rose-600 mt-1">⚠ {it.issue}</p>}
-                  {missing > 0 && (() => {
-                    const p = getProductBySku(it.sku);
-                    if (!p || p.salesLast30Days <= 0) return null;
-                    const cover = coverageDays(p.availableStock, p.salesLast30Days);
-                    return <p className="text-[11px] text-slate-500 mt-1">Stock actual cubre ~{Math.max(0, Math.round(cover))} días (vende {formatNumber(p.salesLast30Days)}/mes){cover <= Math.max(7, p.supplierLeadTimeDays) && <span className="text-rose-600 font-medium"> · riesgo de quiebre</span>}.</p>;
-                  })()}
+                  {missing > 0 &&
+                    (() => {
+                      const p = getProductBySku(it.sku);
+                      if (!p || p.salesLast30Days <= 0) return null;
+                      const cover = coverageDays(p.availableStock, p.salesLast30Days);
+                      return (
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Stock actual cubre ~{Math.max(0, Math.round(cover))} días (vende{" "}
+                          {formatNumber(p.salesLast30Days)}/mes)
+                          {cover <= Math.max(7, p.supplierLeadTimeDays) && (
+                            <span className="text-rose-600 font-medium"> · riesgo de quiebre</span>
+                          )}
+                          .
+                        </p>
+                      );
+                    })()}
                   {missing > 0 && (
-                    <Button size="sm" className="mt-2" variant={hasItem(it.sku) ? "secondary" : "primary"} disabled={hasItem(it.sku)} icon={<IconPlus className="w-3.5 h-3.5" />} onClick={() => reorder(it.sku, it.productName, detail.supplierName, missing)}>
-                      {hasItem(it.sku) ? "En borrador de OC" : `Reordenar ${formatNumber(missing)} u.`}
+                    <Button
+                      size="sm"
+                      className="mt-2"
+                      variant={hasItem(it.sku) ? "secondary" : "primary"}
+                      disabled={hasItem(it.sku)}
+                      icon={<IconPlus className="w-3.5 h-3.5" />}
+                      onClick={() => reorder(it.sku, it.productName, detail.supplierName, missing)}
+                    >
+                      {hasItem(it.sku)
+                        ? "En borrador de OC"
+                        : `Reordenar ${formatNumber(missing)} u.`}
                     </Button>
                   )}
                 </div>

@@ -21,7 +21,9 @@ export function useNavBadges(): Record<NavBadgeKey, NavBadge> {
   const { signals } = useSignals();
 
   return useMemo(() => {
-    const alertasCriticas = alerts.filter((a) => a.severity === "high" && a.status !== "resolved").length;
+    const alertasCriticas = alerts.filter(
+      (a) => a.severity === "high" && a.status !== "resolved"
+    ).length;
     const senalesNuevas = signals.filter((s) => s.status === "new").length;
     const equipoAlertasAltas = leaderAlerts.filter((a) => a.severity === "high").length;
     return {

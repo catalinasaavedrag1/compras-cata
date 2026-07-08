@@ -16,7 +16,14 @@ import { Tabs } from "../components/ui/Tabs";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
-import { IconReplenish, IconAlerts, IconBox, IconPlus, IconClose, IconInfo } from "../components/ui/icons";
+import {
+  IconReplenish,
+  IconAlerts,
+  IconBox,
+  IconPlus,
+  IconClose,
+  IconInfo,
+} from "../components/ui/icons";
 import { recommendations as allRecs } from "../data/mockRecommendations";
 import { suppliers } from "../data/mockSuppliers";
 import { monthlyPurchaseBudget } from "../data/mockRules";
@@ -61,10 +68,7 @@ export function ReplenishmentPage() {
     "compras:rec-overrides",
     {}
   );
-  const [ignoredIds, setIgnoredIds] = useLocalStorage<string[]>(
-    "compras:rec-ignored",
-    []
-  );
+  const [ignoredIds, setIgnoredIds] = useLocalStorage<string[]>("compras:rec-ignored", []);
 
   // Estado de UI
   const [selected, setSelected] = useState<string[]>([]);
@@ -87,10 +91,7 @@ export function ReplenishmentPage() {
     [overrides]
   );
 
-  const visible = useMemo(
-    () => recs.filter((r) => !ignoredIds.includes(r.id)),
-    [recs, ignoredIds]
-  );
+  const visible = useMemo(() => recs.filter((r) => !ignoredIds.includes(r.id)), [recs, ignoredIds]);
 
   const filtered = useMemo(() => {
     let result = filterRecommendations(visible, {
@@ -102,7 +103,8 @@ export function ReplenishmentPage() {
       ...toggles,
     });
     // Foco rápido (segmentos): reduce la tabla a lo que el comprador quiere ver
-    if (foco === "urgent") result = result.filter((r) => r.status === "critical" || r.status === "buy_now");
+    if (foco === "urgent")
+      result = result.filter((r) => r.status === "critical" || r.status === "buy_now");
     else if (foco === "review") result = result.filter((r) => r.status === "review");
     else if (foco === "overstock") result = result.filter((r) => r.status === "overstock");
     // Orden por defecto: lo más urgente primero (estado, luego prioridad, luego monto)
@@ -131,13 +133,15 @@ export function ReplenishmentPage() {
   const budgetUsedPct = (totalSuggested / monthlyPurchaseBudget) * 100;
   const overBudget = totalSuggested > monthlyPurchaseBudget;
   const budgetTone = overBudget ? "bad" : budgetUsedPct > 80 ? "warn" : "good";
-  const budgetBar = overBudget ? "bg-rose-500" : budgetUsedPct > 80 ? "bg-amber-500" : "bg-emerald-500";
+  const budgetBar = overBudget
+    ? "bg-rose-500"
+    : budgetUsedPct > 80
+      ? "bg-amber-500"
+      : "bg-emerald-500";
 
   // Selección
   const toggleRow = (id: string) =>
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const toggleAll = (keys: string[]) =>
     setSelected((prev) => (keys.every((k) => prev.includes(k)) ? [] : keys));
 
@@ -160,7 +164,9 @@ export function ReplenishmentPage() {
       toAdd.length > 0
         ? `${toAdd.length} producto${toAdd.length === 1 ? "" : "s"} agregado${toAdd.length === 1 ? "" : "s"} al borrador de OC`
         : "Esos productos ya estaban en el borrador de OC",
-      toAdd.length > 0 ? { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") } : undefined
+      toAdd.length > 0
+        ? { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") }
+        : undefined
     );
   };
 
@@ -185,7 +191,9 @@ export function ReplenishmentPage() {
 
   const ignoreSelected = () => {
     setIgnoredIds((prev) => Array.from(new Set([...prev, ...selected])));
-    toast.info(`${selected.length} sugerencia${selected.length === 1 ? "" : "s"} ignorada${selected.length === 1 ? "" : "s"}`);
+    toast.info(
+      `${selected.length} sugerencia${selected.length === 1 ? "" : "s"} ignorada${selected.length === 1 ? "" : "s"}`
+    );
     setSelected([]);
   };
 
@@ -217,14 +225,15 @@ export function ReplenishmentPage() {
       quantity: r.suggestedQuantity,
       unitCost: r.unitCost,
     });
-    toast.success(`${r.productName} agregado al borrador de OC`, { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") });
+    toast.success(`${r.productName} agregado al borrador de OC`, {
+      label: "Ver borrador OC",
+      onClick: () => navigate("/ordenes-compra"),
+    });
   };
 
   const handleSort = (key: string) =>
     setSort((prev) =>
-      prev.key === key
-        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: "desc" }
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
     );
 
   const clearFilters = () => {
@@ -263,7 +272,13 @@ export function ReplenishmentPage() {
       hideOnMobile: true,
       render: (r) => (
         <div className="text-sm">
-          <Link to={supplierPath(r.supplierName)} className="text-slate-700 hover:text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{r.supplierName}</Link>
+          <Link
+            to={supplierPath(r.supplierName)}
+            className="text-slate-700 hover:text-brand-700 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {r.supplierName}
+          </Link>
           <p className="text-xs text-slate-400">Lead time {r.supplierLeadTimeDays} d</p>
         </div>
       ),
@@ -456,7 +471,10 @@ export function ReplenishmentPage() {
                 { label: "Motivo", value: (r) => r.reason },
               ]}
             />
-            <Button onClick={() => navigate("/ordenes-compra")} icon={<IconReplenish className="w-4 h-4" />}>
+            <Button
+              onClick={() => navigate("/ordenes-compra")}
+              icon={<IconReplenish className="w-4 h-4" />}
+            >
               Ir a órdenes de compra
             </Button>
           </div>
@@ -484,7 +502,9 @@ export function ReplenishmentPage() {
                   ? `Excede el presupuesto en ${formatCurrency(totalSuggested - monthlyPurchaseBudget)}`
                   : `Disponible: ${formatCurrency(monthlyPurchaseBudget - totalSuggested)}`}
               </span>
-              <span className="font-medium text-slate-600">{formatPercent(budgetUsedPct, 0)} usado</span>
+              <span className="font-medium text-slate-600">
+                {formatPercent(budgetUsedPct, 0)} usado
+              </span>
             </div>
             <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
               <div
@@ -493,29 +513,75 @@ export function ReplenishmentPage() {
               />
             </div>
             <p className="text-xs text-slate-400 mt-1.5">
-              Suma de la reposición recomendada vigente (excluye sugerencias ignoradas). Ajusta cantidades para encajar en presupuesto.
+              Suma de la reposición recomendada vigente (excluye sugerencias ignoradas). Ajusta
+              cantidades para encajar en presupuesto.
             </p>
           </div>
           <Badge tone={budgetTone === "bad" ? "red" : budgetTone === "warn" ? "amber" : "green"}>
-            {overBudget ? "Sobre presupuesto" : budgetUsedPct > 80 ? "Cerca del límite" : "Dentro de presupuesto"}
+            {overBudget
+              ? "Sobre presupuesto"
+              : budgetUsedPct > 80
+                ? "Cerca del límite"
+                : "Dentro de presupuesto"}
           </Badge>
         </div>
       </Card>
 
       {/* Cards resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-        <KpiCard title="Compra sugerida total" value={formatCurrencyCompact(totalSuggested)} tone="info" icon={<IconReplenish className="w-4 h-4" />} description="Ver urgentes" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
-        <KpiCard title="SKUs críticos" value={formatNumber(criticalCount)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Comprar de inmediato" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
-        <KpiCard title="Para comprar ahora" value={formatNumber(buyNowCount)} tone="warn" icon={<IconReplenish className="w-4 h-4" />} description="Stock bajo vs lead time" active={foco === "urgent"} onClick={() => setFoco("urgent")} />
-        <KpiCard title="Con sobrestock" value={formatNumber(overstockCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="No conviene comprar" active={foco === "overstock"} onClick={() => setFoco("overstock")} />
-        <KpiCard title="Con margen bajo" value={formatNumber(lowMarginCount)} tone="warn" icon={<IconBox className="w-4 h-4" />} description="Margen menor a 25%" active={toggles.lowMargin} onClick={() => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin }))} />
+        <KpiCard
+          title="Compra sugerida total"
+          value={formatCurrencyCompact(totalSuggested)}
+          tone="info"
+          icon={<IconReplenish className="w-4 h-4" />}
+          description="Ver urgentes"
+          active={foco === "urgent"}
+          onClick={() => setFoco("urgent")}
+        />
+        <KpiCard
+          title="SKUs críticos"
+          value={formatNumber(criticalCount)}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Comprar de inmediato"
+          active={foco === "urgent"}
+          onClick={() => setFoco("urgent")}
+        />
+        <KpiCard
+          title="Para comprar ahora"
+          value={formatNumber(buyNowCount)}
+          tone="warn"
+          icon={<IconReplenish className="w-4 h-4" />}
+          description="Stock bajo vs lead time"
+          active={foco === "urgent"}
+          onClick={() => setFoco("urgent")}
+        />
+        <KpiCard
+          title="Con sobrestock"
+          value={formatNumber(overstockCount)}
+          tone="warn"
+          icon={<IconBox className="w-4 h-4" />}
+          description="No conviene comprar"
+          active={foco === "overstock"}
+          onClick={() => setFoco("overstock")}
+        />
+        <KpiCard
+          title="Con margen bajo"
+          value={formatNumber(lowMarginCount)}
+          tone="warn"
+          icon={<IconBox className="w-4 h-4" />}
+          description="Margen menor a 25%"
+          active={toggles.lowMargin}
+          onClick={() => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin }))}
+        />
       </div>
 
       {/* Ayuda breve + leyenda de estados (colapsable) */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1">
           <IconInfo className="w-3.5 h-3.5 text-slate-400" />
-          La cantidad sugerida cubre lead time + días objetivo. <b className="font-medium text-slate-600">"para ~N días"</b> = cobertura tras comprar.
+          La cantidad sugerida cubre lead time + días objetivo.{" "}
+          <b className="font-medium text-slate-600">"para ~N días"</b> = cobertura tras comprar.
         </span>
         {overstockSavings > 0 && (
           <span className="text-emerald-700">
@@ -535,7 +601,11 @@ export function ReplenishmentPage() {
           tabs={[
             { value: "all", label: "Todos", count: visible.length },
             { value: "urgent", label: "Comprar ahora", count: urgentRecs.length },
-            { value: "review", label: "Revisar", count: visible.filter((r) => r.status === "review").length },
+            {
+              value: "review",
+              label: "Revisar",
+              count: visible.filter((r) => r.status === "review").length,
+            },
             { value: "overstock", label: "Sobrestock", count: overstockCount },
           ]}
         />
@@ -559,7 +629,10 @@ export function ReplenishmentPage() {
               placeholder: "Categoría",
               value: category,
               onChange: setCategory,
-              options: uniqueValues(allRecs, (r) => r.category).map((c) => ({ value: c, label: c })),
+              options: uniqueValues(allRecs, (r) => r.category).map((c) => ({
+                value: c,
+                label: c,
+              })),
             },
             {
               key: "sup",
@@ -594,12 +667,42 @@ export function ReplenishmentPage() {
             },
           ]}
           toggles={[
-            { key: "stockout", label: "Con quiebre", active: toggles.stockout, onToggle: () => setToggles((t) => ({ ...t, stockout: !t.stockout })) },
-            { key: "risk", label: "Riesgo de quiebre", active: toggles.stockoutRisk, onToggle: () => setToggles((t) => ({ ...t, stockoutRisk: !t.stockoutRisk })) },
-            { key: "overstock", label: "Sobrestock", active: toggles.overstock, onToggle: () => setToggles((t) => ({ ...t, overstock: !t.overstock })) },
-            { key: "lowMargin", label: "Margen bajo", active: toggles.lowMargin, onToggle: () => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin })) },
-            { key: "highRot", label: "Alta rotación", active: toggles.highRotation, onToggle: () => setToggles((t) => ({ ...t, highRotation: !t.highRotation })) },
-            { key: "lowRot", label: "Baja rotación", active: toggles.lowRotation, onToggle: () => setToggles((t) => ({ ...t, lowRotation: !t.lowRotation })) },
+            {
+              key: "stockout",
+              label: "Con quiebre",
+              active: toggles.stockout,
+              onToggle: () => setToggles((t) => ({ ...t, stockout: !t.stockout })),
+            },
+            {
+              key: "risk",
+              label: "Riesgo de quiebre",
+              active: toggles.stockoutRisk,
+              onToggle: () => setToggles((t) => ({ ...t, stockoutRisk: !t.stockoutRisk })),
+            },
+            {
+              key: "overstock",
+              label: "Sobrestock",
+              active: toggles.overstock,
+              onToggle: () => setToggles((t) => ({ ...t, overstock: !t.overstock })),
+            },
+            {
+              key: "lowMargin",
+              label: "Margen bajo",
+              active: toggles.lowMargin,
+              onToggle: () => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin })),
+            },
+            {
+              key: "highRot",
+              label: "Alta rotación",
+              active: toggles.highRotation,
+              onToggle: () => setToggles((t) => ({ ...t, highRotation: !t.highRotation })),
+            },
+            {
+              key: "lowRot",
+              label: "Baja rotación",
+              active: toggles.lowRotation,
+              onToggle: () => setToggles((t) => ({ ...t, lowRotation: !t.lowRotation })),
+            },
           ]}
         />
       </div>
@@ -607,7 +710,10 @@ export function ReplenishmentPage() {
       {ignoredIds.length > 0 && (
         <div className="flex items-center gap-2 mb-3 text-xs text-slate-500">
           <Badge tone="neutral">{ignoredIds.length} sugerencia(s) ignorada(s)</Badge>
-          <button onClick={() => setIgnoredIds([])} className="font-medium text-brand-600 hover:text-brand-700">
+          <button
+            onClick={() => setIgnoredIds([])}
+            className="font-medium text-brand-600 hover:text-brand-700"
+          >
             Restaurar
           </button>
         </div>
@@ -617,7 +723,8 @@ export function ReplenishmentPage() {
       {selected.length > 0 && (
         <div className="sticky top-[68px] z-20 mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-600 px-4 py-2.5 text-white shadow-lg">
           <span className="text-sm font-medium">
-            {selected.length} seleccionado{selected.length === 1 ? "" : "s"} · {formatCurrency(selectedTotal)}
+            {selected.length} seleccionado{selected.length === 1 ? "" : "s"} ·{" "}
+            {formatCurrency(selectedTotal)}
           </span>
           <div className="flex-1" />
           <button
@@ -662,22 +769,34 @@ export function ReplenishmentPage() {
                 <div className="min-w-0">
                   <span className="text-xs font-mono text-slate-400">{r.sku}</span>
                   <p className="font-medium text-slate-800 leading-snug">{r.productName}</p>
-                  <p className="text-xs text-slate-500">{r.category} · {r.supplierName}</p>
+                  <p className="text-xs text-slate-500">
+                    {r.category} · {r.supplierName}
+                  </p>
                 </div>
                 <RecommendationBadge status={r.status} />
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
                 <div>
                   <p className="text-xs text-slate-400">Stock disp.</p>
-                  <p className={r.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatNumber(r.availableStock)}</p>
+                  <p
+                    className={
+                      r.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"
+                    }
+                  >
+                    {formatNumber(r.availableStock)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Sugerido</p>
-                  <p className="font-semibold text-slate-900">{formatNumber(r.suggestedQuantity)} u.</p>
+                  <p className="font-semibold text-slate-900">
+                    {formatNumber(r.suggestedQuantity)} u.
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Compra</p>
-                  <p className="font-semibold text-slate-900">{formatCurrency(r.suggestedPurchaseAmount)}</p>
+                  <p className="font-semibold text-slate-900">
+                    {formatCurrency(r.suggestedPurchaseAmount)}
+                  </p>
                 </div>
               </div>
               <p className={cn("text-xs mt-1.5 leading-snug font-medium", coverageToneText(r))}>
@@ -775,8 +894,7 @@ function CoverageCell({ rec }: { rec: PurchaseRecommendation }) {
     return <span className="text-xs text-slate-400">sin venta</span>;
   }
 
-  const tone =
-    cover <= lead ? "rose" : cover <= lead * 2 ? "amber" : "emerald";
+  const tone = cover <= lead ? "rose" : cover <= lead * 2 ? "amber" : "emerald";
   const toneText = { rose: "text-rose-600", amber: "text-amber-600", emerald: "text-emerald-600" };
   const toneBar = { rose: "bg-rose-500", amber: "bg-amber-500", emerald: "bg-emerald-500" };
   // Escala visual sobre 60 días
@@ -788,7 +906,10 @@ function CoverageCell({ rec }: { rec: PurchaseRecommendation }) {
         {cover >= 999 ? "+999" : formatNumber(cover)} d
       </span>
       <div className="h-1.5 w-16 rounded-full bg-slate-100 overflow-hidden">
-        <div className={`h-full rounded-full ${toneBar[tone]}`} style={{ width: `${Math.max(4, pct)}%` }} />
+        <div
+          className={`h-full rounded-full ${toneBar[tone]}`}
+          style={{ width: `${Math.max(4, pct)}%` }}
+        />
       </div>
     </div>
   );

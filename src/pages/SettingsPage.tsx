@@ -15,7 +15,13 @@ import { useToast } from "../context/ToastContext";
 import { purchaseRules as seedRules, specialRules } from "../data/mockRules";
 import { products } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
-import { formatCurrencyCompact, formatDate, formatDays, formatNumber, formatPercent } from "../utils/formatters";
+import {
+  formatCurrencyCompact,
+  formatDate,
+  formatDays,
+  formatNumber,
+  formatPercent,
+} from "../utils/formatters";
 import { IconRules, IconAlerts, IconArrowRight } from "../components/ui/icons";
 import { cn } from "../utils/cn";
 import type { PurchaseRule } from "../types/purchasing";
@@ -58,16 +64,22 @@ const SCOPE_TYPE: Record<PurchaseRule["scopeType"], { label: string; tone: Badge
 
 function affectedProductsOf(r: PurchaseRule) {
   switch (r.scopeType) {
-    case "supplier": return products.filter((p) => p.supplierName === r.scopeValue);
-    case "brand": return products.filter((p) => p.brand === r.scopeValue);
-    case "category": return products.filter((p) => p.category === r.scopeValue);
-    default: return products; // global y canal aplican a todo el surtido
+    case "supplier":
+      return products.filter((p) => p.supplierName === r.scopeValue);
+    case "brand":
+      return products.filter((p) => p.brand === r.scopeValue);
+    case "category":
+      return products.filter((p) => p.category === r.scopeValue);
+    default:
+      return products; // global y canal aplican a todo el surtido
   }
 }
 const affectedCount = (r: PurchaseRule) => affectedProductsOf(r).length;
 const affectedPurchase = (r: PurchaseRule) => {
   const skus = new Set(affectedProductsOf(r).map((p) => p.sku));
-  return recommendations.filter((rec) => skus.has(rec.sku)).reduce((a, rec) => a + rec.suggestedPurchaseAmount, 0);
+  return recommendations
+    .filter((rec) => skus.has(rec.sku))
+    .reduce((a, rec) => a + rec.suggestedPurchaseAmount, 0);
 };
 
 export function SettingsPage() {
@@ -90,7 +102,8 @@ export function SettingsPage() {
   const baseTargetDays = global?.targetInventoryDays ?? diasProm;
   const baseByCat = useMemo(() => {
     const m = new Map<string, number>();
-    for (const rec of recommendations) m.set(rec.category, (m.get(rec.category) ?? 0) + rec.suggestedPurchaseAmount);
+    for (const rec of recommendations)
+      m.set(rec.category, (m.get(rec.category) ?? 0) + rec.suggestedPurchaseAmount);
     return m;
   }, []);
   const leadByCat = useMemo(() => {
@@ -128,7 +141,8 @@ export function SettingsPage() {
     .filter((x) => (scopeFilter === "all" ? true : x.r.scopeType === scopeFilter))
     .filter((x) => (onlyAlerts ? x.health !== "ok" : true));
   const alerts = withHealth.filter((x) => x.health !== "ok");
-  const scopeCount = (t: string) => (t === "all" ? rules.length : rules.filter((r) => r.scopeType === t).length);
+  const scopeCount = (t: string) =>
+    t === "all" ? rules.length : rules.filter((r) => r.scopeType === t).length;
 
   const vsGlobal = (r: PurchaseRule) => {
     if (!global || isGlobal(r)) return null;
@@ -145,7 +159,9 @@ export function SettingsPage() {
         <div className="min-w-[150px]">
           {r.scopeType === "category" || r.scopeType === "supplier" ? (
             <Link
-              to={r.scopeType === "category" ? categoryPath(r.scopeValue) : supplierPath(r.scopeValue)}
+              to={
+                r.scopeType === "category" ? categoryPath(r.scopeValue) : supplierPath(r.scopeValue)
+              }
               className="font-medium text-slate-800 hover:text-brand-700 hover:underline"
             >
               {r.scope}
@@ -160,10 +176,33 @@ export function SettingsPage() {
         </div>
       ),
     },
-    { key: "dias", header: "Días obj.", align: "right", render: ({ r }) => formatDays(r.targetInventoryDays) },
-    { key: "stock", header: "Stock mín/máx", align: "right", hideOnMobile: true, render: ({ r }) => `${formatNumber(r.minStock)} / ${formatNumber(r.maxStock)}` },
-    { key: "margin", header: "Margen mín.", align: "right", hideOnMobile: true, render: ({ r }) => formatPercent(r.minMargin, 0) },
-    { key: "lead", header: "Lead time", align: "right", hideOnMobile: true, render: ({ r }) => formatDays(r.leadTimeDays) },
+    {
+      key: "dias",
+      header: "Días obj.",
+      align: "right",
+      render: ({ r }) => formatDays(r.targetInventoryDays),
+    },
+    {
+      key: "stock",
+      header: "Stock mín/máx",
+      align: "right",
+      hideOnMobile: true,
+      render: ({ r }) => `${formatNumber(r.minStock)} / ${formatNumber(r.maxStock)}`,
+    },
+    {
+      key: "margin",
+      header: "Margen mín.",
+      align: "right",
+      hideOnMobile: true,
+      render: ({ r }) => formatPercent(r.minMargin, 0),
+    },
+    {
+      key: "lead",
+      header: "Lead time",
+      align: "right",
+      hideOnMobile: true,
+      render: ({ r }) => formatDays(r.leadTimeDays),
+    },
     {
       key: "impact",
       header: "Impacto",
@@ -175,9 +214,42 @@ export function SettingsPage() {
         </div>
       ),
     },
-    { key: "updated", header: "Modificada", align: "right", hideOnMobile: true, render: ({ r }) => <span className="text-xs text-slate-500">{r.updatedAt ? formatDate(r.updatedAt) : "—"}</span> },
-    { key: "health", header: "Estado", render: ({ health }) => <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge> },
-    { key: "action", header: "", render: ({ r }) => <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar</Button> },
+    {
+      key: "updated",
+      header: "Modificada",
+      align: "right",
+      hideOnMobile: true,
+      render: ({ r }) => (
+        <span className="text-xs text-slate-500">
+          {r.updatedAt ? formatDate(r.updatedAt) : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "health",
+      header: "Estado",
+      render: ({ health }) => (
+        <Badge tone={HEALTH[health].tone} dot>
+          {HEALTH[health].label}
+        </Badge>
+      ),
+    },
+    {
+      key: "action",
+      header: "",
+      render: ({ r }) => (
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditing(r);
+          }}
+        >
+          Editar
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -189,10 +261,34 @@ export function SettingsPage() {
 
       {/* Resumen KPI */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Con regla propia" value={formatNumber(propias)} tone="info" icon={<IconRules className="w-4 h-4" />} description={`+ 1 regla global`} />
-        <KpiCard title="Requieren revisión" value={formatNumber(conAlerta)} tone={conAlerta ? "bad" : "good"} icon={<IconAlerts className="w-4 h-4" />} description="Filtrar" active={onlyAlerts} onClick={() => setOnlyAlerts((v) => !v)} />
-        <KpiCard title="Días objetivo prom." value={formatDays(diasProm)} tone="neutral" icon={<IconRules className="w-4 h-4" />} />
-        <KpiCard title="Lead time prom." value={formatDays(leadProm)} tone="neutral" icon={<IconRules className="w-4 h-4" />} />
+        <KpiCard
+          title="Con regla propia"
+          value={formatNumber(propias)}
+          tone="info"
+          icon={<IconRules className="w-4 h-4" />}
+          description={`+ 1 regla global`}
+        />
+        <KpiCard
+          title="Requieren revisión"
+          value={formatNumber(conAlerta)}
+          tone={conAlerta ? "bad" : "good"}
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Filtrar"
+          active={onlyAlerts}
+          onClick={() => setOnlyAlerts((v) => !v)}
+        />
+        <KpiCard
+          title="Días objetivo prom."
+          value={formatDays(diasProm)}
+          tone="neutral"
+          icon={<IconRules className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Lead time prom."
+          value={formatDays(leadProm)}
+          tone="neutral"
+          icon={<IconRules className="w-4 h-4" />}
+        />
       </div>
 
       {/* Simulador de días objetivo: ve el impacto en la compra sugerida antes de aplicar */}
@@ -217,7 +313,9 @@ export function SettingsPage() {
                     onClick={() => setSimDays(d)}
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
-                      simDays === d ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      simDays === d
+                        ? "bg-white text-brand-700 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
                     )}
                   >
                     {d === baseTargetDays ? `${d} d · actual` : `${d} días`}
@@ -227,39 +325,56 @@ export function SettingsPage() {
             </div>
             <div className="ml-auto text-right">
               <p className="text-xs text-slate-400">Compra sugerida proyectada</p>
-              <p className="text-xl font-bold text-slate-900">{formatCurrencyCompact(projection.projTotal)}</p>
+              <p className="text-xl font-bold text-slate-900">
+                {formatCurrencyCompact(projection.projTotal)}
+              </p>
               <p
                 className={cn(
                   "text-xs font-semibold",
-                  projection.delta > 0 ? "text-rose-600" : projection.delta < 0 ? "text-emerald-600" : "text-slate-400"
+                  projection.delta > 0
+                    ? "text-rose-600"
+                    : projection.delta < 0
+                      ? "text-emerald-600"
+                      : "text-slate-400"
                 )}
               >
-                {projection.delta >= 0 ? "+" : ""}{formatCurrencyCompact(projection.delta)} vs actual
+                {projection.delta >= 0 ? "+" : ""}
+                {formatCurrencyCompact(projection.delta)} vs actual
               </p>
             </div>
           </div>
 
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Impacto por categoría</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+            Impacto por categoría
+          </p>
           <div className="space-y-1.5">
             {projection.rows.slice(0, 6).map((r) => (
               <div key={r.cat} className="flex items-center gap-2.5 text-sm">
                 <span className="w-36 sm:w-44 truncate text-slate-700">{r.cat}</span>
                 <span className="text-slate-400 tabular-nums">{formatCurrencyCompact(r.base)}</span>
                 <IconArrowRight className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
-                <span className="font-medium text-slate-800 tabular-nums">{formatCurrencyCompact(r.proj)}</span>
+                <span className="font-medium text-slate-800 tabular-nums">
+                  {formatCurrencyCompact(r.proj)}
+                </span>
                 <span
                   className={cn(
                     "ml-auto text-xs font-semibold tabular-nums",
-                    r.delta > 0 ? "text-rose-600" : r.delta < 0 ? "text-emerald-600" : "text-slate-400"
+                    r.delta > 0
+                      ? "text-rose-600"
+                      : r.delta < 0
+                        ? "text-emerald-600"
+                        : "text-slate-400"
                   )}
                 >
-                  {r.delta >= 0 ? "+" : ""}{formatCurrencyCompact(r.delta)}
+                  {r.delta >= 0 ? "+" : ""}
+                  {formatCurrencyCompact(r.delta)}
                 </span>
               </div>
             ))}
           </div>
           <p className="text-xs text-slate-500 mt-3">
-            Subir los días objetivo aumenta la cobertura y, con ella, la compra sugerida del mes. Revisa el presupuesto antes de aplicar.
+            Subir los días objetivo aumenta la cobertura y, con ella, la compra sugerida del mes.
+            Revisa el presupuesto antes de aplicar.
           </p>
         </CardBody>
       </Card>
@@ -267,11 +382,20 @@ export function SettingsPage() {
       {/* Alertas de configuración */}
       {alerts.length > 0 && (
         <Card className="mb-4">
-          <CardHeader title="Qué reglas revisar" description="Configuraciones que pueden afectar la compra sugerida" />
+          <CardHeader
+            title="Qué reglas revisar"
+            description="Configuraciones que pueden afectar la compra sugerida"
+          />
           <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {alerts.map(({ r, health }) => (
-              <button key={r.id} onClick={() => setEditing(r)} className="flex items-center gap-3 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-left hover:border-brand-300">
-                <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge>
+              <button
+                key={r.id}
+                onClick={() => setEditing(r)}
+                className="flex items-center gap-3 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-left hover:border-brand-300"
+              >
+                <Badge tone={HEALTH[health].tone} dot>
+                  {HEALTH[health].label}
+                </Badge>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium text-slate-800">{r.scope}</span>
                   <span className="block text-xs text-slate-500">{reasonFor[health]}</span>
@@ -302,7 +426,10 @@ export function SettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader title="Reglas" description="Precedencia: proveedor › marca › categoría › global" />
+            <CardHeader
+              title="Reglas"
+              description="Precedencia: proveedor › marca › categoría › global"
+            />
             <DataTable
               columns={columns}
               data={visible}
@@ -315,19 +442,49 @@ export function SettingsPage() {
                     <div className="min-w-0">
                       <p className="font-medium text-slate-800">{r.scope}</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <Badge tone={SCOPE_TYPE[r.scopeType].tone}>{SCOPE_TYPE[r.scopeType].label}</Badge>
-                        {vsGlobal(r) && <span className="text-xs text-amber-600">{vsGlobal(r)}</span>}
+                        <Badge tone={SCOPE_TYPE[r.scopeType].tone}>
+                          {SCOPE_TYPE[r.scopeType].label}
+                        </Badge>
+                        {vsGlobal(r) && (
+                          <span className="text-xs text-amber-600">{vsGlobal(r)}</span>
+                        )}
                       </div>
                     </div>
-                    <Badge tone={HEALTH[health].tone} dot>{HEALTH[health].label}</Badge>
+                    <Badge tone={HEALTH[health].tone} dot>
+                      {HEALTH[health].label}
+                    </Badge>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                    <div><p className="text-xs text-slate-400">Días obj.</p><p className="text-slate-700">{formatDays(r.targetInventoryDays)}</p></div>
-                    <div><p className="text-xs text-slate-400">Mín/Máx</p><p className="text-slate-700">{formatNumber(r.minStock)}/{formatNumber(r.maxStock)}</p></div>
-                    <div><p className="text-xs text-slate-400">Lead</p><p className="text-slate-700">{formatDays(r.leadTimeDays)}</p></div>
+                    <div>
+                      <p className="text-xs text-slate-400">Días obj.</p>
+                      <p className="text-slate-700">{formatDays(r.targetInventoryDays)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Mín/Máx</p>
+                      <p className="text-slate-700">
+                        {formatNumber(r.minStock)}/{formatNumber(r.maxStock)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Lead</p>
+                      <p className="text-slate-700">{formatDays(r.leadTimeDays)}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">{affectedCount(r)} SKU · {formatCurrencyCompact(affectedPurchase(r))} compra sugerida</p>
-                  <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar regla</Button>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {affectedCount(r)} SKU · {formatCurrencyCompact(affectedPurchase(r))} compra
+                    sugerida
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="mt-2 w-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditing(r);
+                    }}
+                  >
+                    Editar regla
+                  </Button>
                 </div>
               )}
             />
@@ -339,9 +496,15 @@ export function SettingsPage() {
             <CardHeader title="Cómo se calcula" />
             <CardBody>
               <div className="rounded-lg bg-slate-50 p-3 mb-2">
-                <p className="text-sm text-slate-700 font-mono leading-snug">Cantidad = venta diaria × (lead time + días objetivo) − stock disponible</p>
+                <p className="text-sm text-slate-700 font-mono leading-snug">
+                  Cantidad = venta diaria × (lead time + días objetivo) − stock disponible
+                </p>
               </div>
-              <p className="text-xs text-slate-500">Acotada por stock mín/máx. Se ajusta por margen, temporada, sobrestock, baja rotación y proveedor atrasado. Solo se sugiere comprar si hay riesgo de quiebre o necesidad real.</p>
+              <p className="text-xs text-slate-500">
+                Acotada por stock mín/máx. Se ajusta por margen, temporada, sobrestock, baja
+                rotación y proveedor atrasado. Solo se sugiere comprar si hay riesgo de quiebre o
+                necesidad real.
+              </p>
             </CardBody>
           </Card>
           <Card>
@@ -350,7 +513,9 @@ export function SettingsPage() {
               {specialRules.map((s) => (
                 <div key={s.title} className="rounded-lg border border-slate-200 p-2.5">
                   <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <Badge tone="blue" dot>{s.title}</Badge>
+                    <Badge tone="blue" dot>
+                      {s.title}
+                    </Badge>
                     <Badge tone="green">Activa</Badge>
                   </div>
                   <p className="text-xs text-slate-600">{s.description}</p>
@@ -365,7 +530,13 @@ export function SettingsPage() {
         rule={editing}
         onClose={() => setEditing(null)}
         onSave={(updated) => {
-          setRules((prev) => prev.map((x) => (x.id === updated.id ? { ...updated, updatedAt: "2026-06-24", updatedBy: "Catalina Saavedra" } : x)));
+          setRules((prev) =>
+            prev.map((x) =>
+              x.id === updated.id
+                ? { ...updated, updatedAt: "2026-06-24", updatedBy: "Catalina Saavedra" }
+                : x
+            )
+          );
           setEditing(null);
           toast.success(`Regla de ${updated.scope} actualizada`);
         }}
@@ -378,14 +549,26 @@ export function SettingsPage() {
 function affectedProductsLink(r: PurchaseRule): string {
   const v = r.scopeValue ?? r.scope;
   switch (r.scopeType) {
-    case "category": return `/productos?cat=${encodeURIComponent(v)}`;
-    case "supplier": return `/productos?prov=${encodeURIComponent(v)}`;
-    case "brand": return `/productos?marca=${encodeURIComponent(v)}`;
-    default: return "/productos"; // global y channel: ProductsPage no filtra por canal
+    case "category":
+      return `/productos?cat=${encodeURIComponent(v)}`;
+    case "supplier":
+      return `/productos?prov=${encodeURIComponent(v)}`;
+    case "brand":
+      return `/productos?marca=${encodeURIComponent(v)}`;
+    default:
+      return "/productos"; // global y channel: ProductsPage no filtra por canal
   }
 }
 
-function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; onClose: () => void; onSave: (r: PurchaseRule) => void }) {
+function RuleEditDrawer({
+  rule,
+  onClose,
+  onSave,
+}: {
+  rule: PurchaseRule | null;
+  onClose: () => void;
+  onSave: (r: PurchaseRule) => void;
+}) {
   const [draft, setDraft] = useState<PurchaseRule | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   if (rule && (!draft || draft.id !== rule.id)) setDraft({ ...rule });
@@ -397,86 +580,162 @@ function RuleEditDrawer({ rule, onClose, onSave }: { rule: PurchaseRule | null; 
 
   const set = (k: keyof PurchaseRule, v: number) => setDraft({ ...draft, [k]: v });
   const errors: string[] = [];
-  if (draft.maxStock > 0 && draft.maxStock < draft.minStock) errors.push("El stock máximo no puede ser menor que el mínimo.");
+  if (draft.maxStock > 0 && draft.maxStock < draft.minStock)
+    errors.push("El stock máximo no puede ser menor que el mínimo.");
   if (draft.targetInventoryDays <= 0) errors.push("Los días objetivo deben ser mayores a 0.");
-  if (draft.minMargin < 0 || draft.minMargin > 80) errors.push("El margen mínimo debe estar entre 0 y 80%.");
+  if (draft.minMargin < 0 || draft.minMargin > 80)
+    errors.push("El margen mínimo debe estar entre 0 y 80%.");
 
   const warnings: string[] = [];
   if (draft.targetInventoryDays >= 55) warnings.push("Días objetivo altos: riesgo de sobrestock.");
-  if (draft.targetInventoryDays > 0 && draft.targetInventoryDays <= 20) warnings.push("Días objetivo bajos: riesgo de quiebre.");
+  if (draft.targetInventoryDays > 0 && draft.targetInventoryDays <= 20)
+    warnings.push("Días objetivo bajos: riesgo de quiebre.");
   if (draft.leadTimeDays >= 15) warnings.push("Lead time alto: comprar con más anticipación.");
 
   const affected = affectedCount(draft);
-  const deltaPct = rule.targetInventoryDays > 0 ? Math.round((draft.targetInventoryDays / rule.targetInventoryDays - 1) * 100) : 0;
+  const deltaPct =
+    rule.targetInventoryDays > 0
+      ? Math.round((draft.targetInventoryDays / rule.targetInventoryDays - 1) * 100)
+      : 0;
 
   return (
     <>
-    <Drawer
-      open={!!rule}
-      onClose={guardedClose}
-      title={`Editar regla · ${rule.scope}`}
-      description={rule.updatedAt ? `Última modificación: ${formatDate(rule.updatedAt)} · ${rule.updatedBy ?? ""}` : "Ajusta los parámetros y ve el impacto."}
-      footer={
-        <>
-          <Button variant="secondary" onClick={guardedClose}>Cancelar</Button>
-          <Button disabled={errors.length > 0 || !dirty} onClick={() => onSave(draft)}>{dirty ? "Guardar cambios" : "Sin cambios"}</Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {errors.length > 0 && (
-          <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700 space-y-0.5">
-            {errors.map((e) => <p key={e}>⚠ {e}</p>)}
+      <Drawer
+        open={!!rule}
+        onClose={guardedClose}
+        title={`Editar regla · ${rule.scope}`}
+        description={
+          rule.updatedAt
+            ? `Última modificación: ${formatDate(rule.updatedAt)} · ${rule.updatedBy ?? ""}`
+            : "Ajusta los parámetros y ve el impacto."
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={guardedClose}>
+              Cancelar
+            </Button>
+            <Button disabled={errors.length > 0 || !dirty} onClick={() => onSave(draft)}>
+              {dirty ? "Guardar cambios" : "Sin cambios"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {errors.length > 0 && (
+            <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-700 space-y-0.5">
+              {errors.map((e) => (
+                <p key={e}>⚠ {e}</p>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Días objetivo"
+              type="number"
+              min={0}
+              value={draft.targetInventoryDays}
+              onChange={(e) => set("targetInventoryDays", Number(e.target.value))}
+            />
+            <Input
+              label="Lead time (días)"
+              type="number"
+              min={0}
+              value={draft.leadTimeDays}
+              onChange={(e) => set("leadTimeDays", Number(e.target.value))}
+            />
+            <Input
+              label="Stock mínimo"
+              type="number"
+              min={0}
+              value={draft.minStock}
+              onChange={(e) => set("minStock", Number(e.target.value))}
+            />
+            <Input
+              label="Stock máximo"
+              type="number"
+              min={0}
+              value={draft.maxStock}
+              onChange={(e) => set("maxStock", Number(e.target.value))}
+            />
+            <Input
+              label="Margen mínimo (%)"
+              type="number"
+              min={0}
+              value={draft.minMargin}
+              onChange={(e) => set("minMargin", Number(e.target.value))}
+            />
           </div>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Días objetivo" type="number" min={0} value={draft.targetInventoryDays} onChange={(e) => set("targetInventoryDays", Number(e.target.value))} />
-          <Input label="Lead time (días)" type="number" min={0} value={draft.leadTimeDays} onChange={(e) => set("leadTimeDays", Number(e.target.value))} />
-          <Input label="Stock mínimo" type="number" min={0} value={draft.minStock} onChange={(e) => set("minStock", Number(e.target.value))} />
-          <Input label="Stock máximo" type="number" min={0} value={draft.maxStock} onChange={(e) => set("maxStock", Number(e.target.value))} />
-          <Input label="Margen mínimo (%)" type="number" min={0} value={draft.minMargin} onChange={(e) => set("minMargin", Number(e.target.value))} />
-        </div>
 
-        {warnings.length > 0 && (
-          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800 space-y-0.5">
-            {warnings.map((w) => <p key={w}>{w}</p>)}
+          {warnings.length > 0 && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800 space-y-0.5">
+              {warnings.map((w) => (
+                <p key={w}>{w}</p>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-slate-200 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+              Impacto estimado
+            </p>
+            <div className="space-y-1 text-sm">
+              <Row label="SKU afectados" value={`${affected}`} />
+              <Row
+                label="Cambio en compra sugerida"
+                value={`${deltaPct >= 0 ? "+" : ""}${deltaPct}%`}
+                tone={deltaPct > 0 ? "bad" : deltaPct < 0 ? "good" : undefined}
+              />
+              <Row
+                label="Riesgo"
+                value={
+                  deltaPct > 15
+                    ? "Más capital / sobrestock"
+                    : deltaPct < -15
+                      ? "Posible quiebre"
+                      : "Bajo"
+                }
+              />
+            </div>
           </div>
-        )}
 
-        <div className="rounded-lg border border-slate-200 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Impacto estimado</p>
-          <div className="space-y-1 text-sm">
-            <Row label="SKU afectados" value={`${affected}`} />
-            <Row label="Cambio en compra sugerida" value={`${deltaPct >= 0 ? "+" : ""}${deltaPct}%`} tone={deltaPct > 0 ? "bad" : deltaPct < 0 ? "good" : undefined} />
-            <Row label="Riesgo" value={deltaPct > 15 ? "Más capital / sobrestock" : deltaPct < -15 ? "Posible quiebre" : "Bajo"} />
+          <div className="flex items-center justify-between">
+            <Link
+              to={affectedProductsLink(draft)}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700"
+              onClick={onClose}
+            >
+              Ver productos afectados
+            </Link>
+            <button
+              onClick={() => setDraft({ ...seedRules.find((s) => s.id === rule.id)! })}
+              className="text-xs text-slate-500 hover:text-slate-700"
+            >
+              Restaurar valores
+            </button>
           </div>
         </div>
+      </Drawer>
 
-        <div className="flex items-center justify-between">
-          <Link to={affectedProductsLink(draft)} className="text-xs font-medium text-brand-600 hover:text-brand-700" onClick={onClose}>
-            Ver productos afectados
-          </Link>
-          <button onClick={() => setDraft({ ...seedRules.find((s) => s.id === rule.id)! })} className="text-xs text-slate-500 hover:text-slate-700">Restaurar valores</button>
-        </div>
-      </div>
-    </Drawer>
-
-    <ConfirmModal
-      open={confirmDiscard}
-      title="Descartar cambios"
-      message="Tienes cambios sin guardar en esta regla. Si sales ahora se perderán."
-      confirmLabel="Descartar cambios"
-      cancelLabel="Seguir editando"
-      danger
-      onCancel={() => setConfirmDiscard(false)}
-      onConfirm={() => { setConfirmDiscard(false); onClose(); }}
-    />
+      <ConfirmModal
+        open={confirmDiscard}
+        title="Descartar cambios"
+        message="Tienes cambios sin guardar en esta regla. Si sales ahora se perderán."
+        confirmLabel="Descartar cambios"
+        cancelLabel="Seguir editando"
+        danger
+        onCancel={() => setConfirmDiscard(false)}
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          onClose();
+        }}
+      />
     </>
   );
 }
 
 function Row({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
-  const cls = tone === "bad" ? "text-rose-600" : tone === "good" ? "text-emerald-600" : "text-slate-800";
+  const cls =
+    tone === "bad" ? "text-rose-600" : tone === "good" ? "text-emerald-600" : "text-slate-800";
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-slate-500">{label}</span>

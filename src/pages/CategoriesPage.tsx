@@ -131,9 +131,10 @@ export function CategoriesPage() {
       />
 
       <HelpNote className="mb-4">
-        Empieza por las tarjetas de la izquierda: muestran las <b>categorías críticas</b> (más quiebres
-        y riesgo). En la columna Quiebre/Riesgo/Sobrestock, los números rojo/ámbar/violeta resumen cuántos
-        SKUs requieren acción en cada categoría. Cada fila enlaza directo a su acción: <b>Reposición</b> o <b>Surtido</b>.
+        Empieza por las tarjetas de la izquierda: muestran las <b>categorías críticas</b> (más
+        quiebres y riesgo). En la columna Quiebre/Riesgo/Sobrestock, los números rojo/ámbar/violeta
+        resumen cuántos SKUs requieren acción en cada categoría. Cada fila enlaza directo a su
+        acción: <b>Reposición</b> o <b>Surtido</b>.
       </HelpNote>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
@@ -200,10 +201,23 @@ export function CategoriesPage() {
                 {c.riskSkus > 0 && <Badge tone="amber">{c.riskSkus} riesgo</Badge>}
                 {c.overstockSkus > 0 && <Badge tone="violet">{c.overstockSkus} sobre</Badge>}
               </div>
-              <p className="text-xs text-slate-500 mt-1.5">{formatCurrencyCompact(c.salesLast30Days)} venta · compra sug. {formatCurrencyCompact(c.suggestedPurchase)}</p>
+              <p className="text-xs text-slate-500 mt-1.5">
+                {formatCurrencyCompact(c.salesLast30Days)} venta · compra sug.{" "}
+                {formatCurrencyCompact(c.suggestedPurchase)}
+              </p>
               <div className="flex items-center gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
-                <Link to={`/reposicion?cat=${encodeURIComponent(c.name)}`} className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50">Reposición</Link>
-                <Link to={`/surtido-redundante?cat=${encodeURIComponent(c.name)}`} className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">Surtido</Link>
+                <Link
+                  to={`/reposicion?cat=${encodeURIComponent(c.name)}`}
+                  className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50"
+                >
+                  Reposición
+                </Link>
+                <Link
+                  to={`/surtido-redundante?cat=${encodeURIComponent(c.name)}`}
+                  className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Surtido
+                </Link>
               </div>
             </div>
           )}
@@ -220,7 +234,12 @@ function RankCard({
 }: {
   title: string;
   subtitle: string;
-  items: { label: string; value: number; display: string; tone: "red" | "green" | "amber" | "violet" }[];
+  items: {
+    label: string;
+    value: number;
+    display: string;
+    tone: "red" | "green" | "amber" | "violet";
+  }[];
 }) {
   return (
     <Card>

@@ -9,7 +9,13 @@ export interface MoreAction {
 }
 
 /** Menú compacto "Más acciones" para acciones secundarias (exportar, etc.). */
-export function MoreActions({ actions, label = "Más acciones" }: { actions: MoreAction[]; label?: string }) {
+export function MoreActions({
+  actions,
+  label = "Más acciones",
+}: {
+  actions: MoreAction[];
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -19,10 +25,15 @@ export function MoreActions({ actions, label = "Más acciones" }: { actions: Mor
     const onDown = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   if (actions.length === 0) return null;
@@ -40,12 +51,18 @@ export function MoreActions({ actions, label = "Más acciones" }: { actions: Mor
         <IconDots className="w-5 h-5" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 mt-1 w-52 rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden z-40 py-1">
+        <div
+          role="menu"
+          className="absolute right-0 mt-1 w-52 rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden z-40 py-1"
+        >
           {actions.map((a) => (
             <button
               key={a.label}
               role="menuitem"
-              onClick={() => { a.onClick(); setOpen(false); }}
+              onClick={() => {
+                a.onClick();
+                setOpen(false);
+              }}
               className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 ${a.danger ? "text-rose-600" : "text-slate-700"}`}
             >
               {a.icon}

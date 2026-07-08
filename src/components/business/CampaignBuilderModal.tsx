@@ -8,11 +8,7 @@ import { cn } from "../../utils/cn";
 import { formatCurrency, formatNumber } from "../../utils/formatters";
 import { products as allProducts } from "../../data/mockProducts";
 import { PROMO_CHANNELS } from "./campaignLabels";
-import type {
-  CampaignProductLine,
-  CreatedCampaign,
-  PromoChannel,
-} from "../../types/purchasing";
+import type { CampaignProductLine, CreatedCampaign, PromoChannel } from "../../types/purchasing";
 
 interface Props {
   open: boolean;
@@ -152,13 +148,29 @@ export function CampaignBuilderModal({
         {/* Datos básicos */}
         <div className="grid sm:grid-cols-3 gap-3">
           <div className="sm:col-span-3">
-            <Input label="Nombre de la campaña" placeholder="Ej. Cyber herramientas" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              label="Nombre de la campaña"
+              placeholder="Ej. Cyber herramientas"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
-          <Input label="Fecha inicio" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          <Input label="Fecha término" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <Input
+            label="Fecha inicio"
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+          <Input
+            label="Fecha término"
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
           <div className="flex items-end">
             <p className="text-xs text-slate-500">
-              La campaña queda <b>{startDate > todayISO ? "programada" : "activa"}</b> según la fecha de inicio.
+              La campaña queda <b>{startDate > todayISO ? "programada" : "activa"}</b> según la
+              fecha de inicio.
             </p>
           </div>
         </div>
@@ -206,8 +218,12 @@ export function CampaignBuilderModal({
                     className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50"
                   >
                     <span className="min-w-0">
-                      <span className="block text-sm font-medium text-slate-800 truncate">{p.name}</span>
-                      <span className="block text-xs text-slate-500">{p.sku} · {formatCurrency(p.price)} · stock {formatNumber(p.availableStock)}</span>
+                      <span className="block text-sm font-medium text-slate-800 truncate">
+                        {p.name}
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        {p.sku} · {formatCurrency(p.price)} · stock {formatNumber(p.availableStock)}
+                      </span>
                     </span>
                     <IconPlus className="w-4 h-4 text-brand-500 flex-shrink-0" />
                   </button>
@@ -219,7 +235,9 @@ export function CampaignBuilderModal({
           {lines.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-300 py-6 text-center">
               <IconBox className="w-6 h-6 text-slate-300 mx-auto mb-1" />
-              <p className="text-sm text-slate-500">Busca productos arriba y agrégalos con su descuento.</p>
+              <p className="text-sm text-slate-500">
+                Busca productos arriba y agrégalos con su descuento.
+              </p>
             </div>
           ) : (
             <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
@@ -230,7 +248,9 @@ export function CampaignBuilderModal({
                     <p className="text-sm font-medium text-slate-800 truncate">{l.productName}</p>
                     <p className="text-xs text-slate-500">
                       Stock {formatNumber(l.availableStock)}
-                      {l.availableStock <= 5 && <span className="text-rose-500 font-medium"> · stock bajo</span>}
+                      {l.availableStock <= 5 && (
+                        <span className="text-rose-500 font-medium"> · stock bajo</span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -245,10 +265,18 @@ export function CampaignBuilderModal({
                     <span className="text-xs text-slate-400">% dcto</span>
                   </div>
                   <div className="text-right w-28">
-                    <p className="text-xs text-slate-400 line-through">{formatCurrency(l.basePrice)}</p>
-                    <p className="text-sm font-semibold text-emerald-600">{formatCurrency(l.campaignPrice)}</p>
+                    <p className="text-xs text-slate-400 line-through">
+                      {formatCurrency(l.basePrice)}
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-600">
+                      {formatCurrency(l.campaignPrice)}
+                    </p>
                   </div>
-                  <button onClick={() => removeLine(l.sku)} className="text-slate-400 hover:text-rose-600" aria-label="Quitar">
+                  <button
+                    onClick={() => removeLine(l.sku)}
+                    className="text-slate-400 hover:text-rose-600"
+                    aria-label="Quitar"
+                  >
                     <IconClose className="w-4 h-4" />
                   </button>
                 </div>
@@ -259,11 +287,13 @@ export function CampaignBuilderModal({
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge tone="neutral">{lines.length} productos</Badge>
               <Badge tone="amber">
-                Descuento promedio {Math.round(lines.reduce((a, l) => a + l.discountPct, 0) / lines.length)}%
+                Descuento promedio{" "}
+                {Math.round(lines.reduce((a, l) => a + l.discountPct, 0) / lines.length)}%
               </Badge>
               {lines.some((l) => l.availableStock <= 5) && (
                 <Badge tone="red">
-                  {lines.filter((l) => l.availableStock <= 5).length} con stock bajo — revisa compra antes de lanzar
+                  {lines.filter((l) => l.availableStock <= 5).length} con stock bajo — revisa compra
+                  antes de lanzar
                 </Badge>
               )}
             </div>

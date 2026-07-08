@@ -23,6 +23,13 @@ function base(path: React.ReactNode) {
   };
 }
 
+export const IconCalendar = base(
+  <>
+    <rect x="3" y="4.5" width="18" height="16" rx="2" />
+    <path d="M3 9h18M8 2.5v4M16 2.5v4" />
+  </>
+);
+
 export const IconDashboard = base(
   <>
     <rect x="3" y="3" width="7" height="9" rx="1.5" />

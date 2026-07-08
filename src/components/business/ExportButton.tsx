@@ -11,7 +11,12 @@ interface ExportButtonProps<T> {
 }
 
 /** Botón reutilizable para exportar una tabla a CSV (Excel). */
-export function ExportButton<T>({ filename, rows, columns, label = "Exportar" }: ExportButtonProps<T>) {
+export function ExportButton<T>({
+  filename,
+  rows,
+  columns,
+  label = "Exportar",
+}: ExportButtonProps<T>) {
   const toast = useToast();
 
   const handleExport = () => {
@@ -20,11 +25,18 @@ export function ExportButton<T>({ filename, rows, columns, label = "Exportar" }:
       return;
     }
     exportToCsv(filename, rows, columns);
-    toast.success(`Se exportaron ${rows.length} fila${rows.length === 1 ? "" : "s"} a ${filename}.csv`);
+    toast.success(
+      `Se exportaron ${rows.length} fila${rows.length === 1 ? "" : "s"} a ${filename}.csv`
+    );
   };
 
   return (
-    <Button variant="secondary" size="sm" icon={<IconDownload className="w-4 h-4" />} onClick={handleExport}>
+    <Button
+      variant="secondary"
+      size="sm"
+      icon={<IconDownload className="w-4 h-4" />}
+      onClick={handleExport}
+    >
       {label}
     </Button>
   );

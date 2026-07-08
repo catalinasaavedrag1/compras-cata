@@ -117,109 +117,127 @@ export function DataTable<T>({
       )}
 
       <div className={cn("overflow-x-auto scrollbar-thin", mobileCard && "hidden lg:block")}>
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr
-            className={cn(
-              "border-b border-slate-200 bg-slate-50",
-              stickyHeader && "sticky top-0 z-10"
-            )}
-          >
-            {selection && (
-              <th className="px-3 py-2.5 w-10">
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300 text-brand-600 focus:ring-brand-300 cursor-pointer"
-                  checked={allSelected}
-                  onChange={() => selection.onToggleAll(visibleKeys)}
-                  aria-label="Seleccionar todo"
-                />
-              </th>
-            )}
-            {columns.map((col) => {
-              const isSorted = sort?.key === col.key;
-              const canSort = col.sortable && !!onSortChange;
-              return (
-                <th
-                  key={col.key}
-                  scope="col"
-                  aria-sort={isSorted ? (sort?.dir === "asc" ? "ascending" : "descending") : canSort ? "none" : undefined}
-                  className={cn(
-                    "px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap",
-                    alignClass[col.align ?? "left"],
-                    col.hideOnMobile && "hidden lg:table-cell",
-                    col.className
-                  )}
-                >
-                  {canSort ? (
-                    <button
-                      type="button"
-                      onClick={() => onSortChange!(col.key)}
-                      className={cn(
-                        "inline-flex items-center gap-1 select-none hover:text-slate-700 uppercase tracking-wide",
-                        col.align === "right" && "flex-row-reverse"
-                      )}
-                    >
-                      {col.header}
-                      <span className={cn("text-[10px]", isSorted ? "text-brand-600" : "text-slate-300")}>
-                        {isSorted ? (sort?.dir === "asc" ? "▲" : "▼") : "↕"}
-                      </span>
-                    </button>
-                  ) : (
-                    <span className={cn("inline-flex items-center gap-1", col.align === "right" && "flex-row-reverse")}>
-                      {col.header}
-                    </span>
-                  )}
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr
+              className={cn(
+                "border-b border-slate-200 bg-slate-50",
+                stickyHeader && "sticky top-0 z-10"
+              )}
+            >
+              {selection && (
+                <th className="px-3 py-2.5 w-10">
+                  <input
+                    type="checkbox"
+                    className="rounded border-slate-300 text-brand-600 focus:ring-brand-300 cursor-pointer"
+                    checked={allSelected}
+                    onChange={() => selection.onToggleAll(visibleKeys)}
+                    aria-label="Seleccionar todo"
+                  />
                 </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {sortedData.map((row) => {
-            const key = rowKey(row);
-            const selected = selection?.selectedKeys.includes(key);
-            return (
-              <tr
-                key={key}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={cn(
-                  "border-b border-slate-100 transition-colors",
-                  onRowClick && "cursor-pointer hover:bg-slate-50",
-                  selected && "bg-brand-50/50",
-                  rowClassName?.(row)
-                )}
-              >
-                {selection && (
-                  <td className={cn("px-3 w-10", cellY)} onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      className="rounded border-slate-300 text-brand-600 focus:ring-brand-300 cursor-pointer"
-                      checked={selected}
-                      onChange={() => selection.onToggle(key)}
-                      aria-label="Seleccionar fila"
-                    />
-                  </td>
-                )}
-                {columns.map((col) => (
-                  <td
+              )}
+              {columns.map((col) => {
+                const isSorted = sort?.key === col.key;
+                const canSort = col.sortable && !!onSortChange;
+                return (
+                  <th
                     key={col.key}
+                    scope="col"
+                    aria-sort={
+                      isSorted
+                        ? sort?.dir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : canSort
+                          ? "none"
+                          : undefined
+                    }
                     className={cn(
-                      "px-3 text-slate-700 align-middle",
-                      cellY,
+                      "px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap",
                       alignClass[col.align ?? "left"],
                       col.hideOnMobile && "hidden lg:table-cell",
                       col.className
                     )}
                   >
-                    {col.render(row)}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                    {canSort ? (
+                      <button
+                        type="button"
+                        onClick={() => onSortChange!(col.key)}
+                        className={cn(
+                          "inline-flex items-center gap-1 select-none hover:text-slate-700 uppercase tracking-wide",
+                          col.align === "right" && "flex-row-reverse"
+                        )}
+                      >
+                        {col.header}
+                        <span
+                          className={cn(
+                            "text-[10px]",
+                            isSorted ? "text-brand-600" : "text-slate-300"
+                          )}
+                        >
+                          {isSorted ? (sort?.dir === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      </button>
+                    ) : (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1",
+                          col.align === "right" && "flex-row-reverse"
+                        )}
+                      >
+                        {col.header}
+                      </span>
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedData.map((row) => {
+              const key = rowKey(row);
+              const selected = selection?.selectedKeys.includes(key);
+              return (
+                <tr
+                  key={key}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={cn(
+                    "border-b border-slate-100 transition-colors",
+                    onRowClick && "cursor-pointer hover:bg-slate-50",
+                    selected && "bg-brand-50/50",
+                    rowClassName?.(row)
+                  )}
+                >
+                  {selection && (
+                    <td className={cn("px-3 w-10", cellY)} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-300 cursor-pointer"
+                        checked={selected}
+                        onChange={() => selection.onToggle(key)}
+                        aria-label="Seleccionar fila"
+                      />
+                    </td>
+                  )}
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      className={cn(
+                        "px-3 text-slate-700 align-middle",
+                        cellY,
+                        alignClass[col.align ?? "left"],
+                        col.hideOnMobile && "hidden lg:table-cell",
+                        col.className
+                      )}
+                    >
+                      {col.render(row)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </>
   );

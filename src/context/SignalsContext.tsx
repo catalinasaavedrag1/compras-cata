@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import { signalService, productService } from "../services";
 import type {
@@ -42,7 +36,12 @@ interface SignalPatch {
 
 export type SignalRequestFields = Pick<
   SignalPatch,
-  "customerName" | "requestedQty" | "requiredDate" | "targetPrice" | "suggestedSupplier" | "quotedCost"
+  | "customerName"
+  | "requestedQty"
+  | "requiredDate"
+  | "targetPrice"
+  | "suggestedSupplier"
+  | "quotedCost"
 >;
 
 interface SignalsState {
@@ -90,10 +89,7 @@ interface SignalsContextValue {
   setPriority: (id: string, priority: SignalPriority) => void;
   reject: (id: string, reason: string) => void;
   updateRequest: (id: string, fields: SignalRequestFields) => void;
-  addMessage: (
-    id: string,
-    msg: { role: "seller" | "buyer"; author: string; text: string }
-  ) => void;
+  addMessage: (id: string, msg: { role: "seller" | "buyer"; author: string; text: string }) => void;
   markConverted: (id: string, detail: string) => void;
 }
 
@@ -117,10 +113,7 @@ function supportFor(sku?: string, given?: SignalSupport): SignalSupport {
 }
 
 export function SignalsProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useLocalStorage<SignalsState>(
-    "compras:signals",
-    EMPTY_STATE
-  );
+  const [state, setState] = useLocalStorage<SignalsState>("compras:signals", EMPTY_STATE);
 
   const signals = useMemo<SalesSignal[]>(() => {
     const base = [...signalService.list(), ...state.created];
@@ -272,9 +265,7 @@ export function SignalsProvider({ children }: { children: ReactNode }) {
     };
   }, [signals, patch, pushEvent, setState]);
 
-  return (
-    <SignalsContext.Provider value={value}>{children}</SignalsContext.Provider>
-  );
+  return <SignalsContext.Provider value={value}>{children}</SignalsContext.Provider>;
 }
 
 export function useSignals(): SignalsContextValue {

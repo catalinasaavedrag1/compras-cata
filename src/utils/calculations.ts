@@ -13,19 +13,13 @@ export function calculateMargin(price: number, cost: number): number {
 }
 
 /** Días de inventario = stock disponible / (venta mensual / 30) */
-export function calculateInventoryDays(
-  stock: number,
-  monthlySales: number
-): number {
+export function calculateInventoryDays(stock: number, monthlySales: number): number {
   if (monthlySales <= 0) return stock > 0 ? 999 : 0;
   return Math.round((stock / (monthlySales / 30)) * 10) / 10;
 }
 
 /** Rotación anual aproximada = ventas 90 días * 4 / stock promedio */
-export function calculateRotation(
-  salesLast90Days: number,
-  averageStock: number
-): number {
+export function calculateRotation(salesLast90Days: number, averageStock: number): number {
   if (averageStock <= 0) return 0;
   return Math.round(((salesLast90Days * 4) / averageStock) * 10) / 10;
 }
@@ -54,9 +48,7 @@ export interface SuggestedPurchaseResult {
  * inventario. Calculamos la demanda esperada en ese horizonte, le restamos
  * el stock disponible (descontando comprometido) y respetamos stock mín/máx.
  */
-export function calculateSuggestedPurchase(
-  input: SuggestedPurchaseInput
-): SuggestedPurchaseResult {
+export function calculateSuggestedPurchase(input: SuggestedPurchaseInput): SuggestedPurchaseResult {
   const {
     availableStock,
     committedStock,
@@ -84,18 +76,13 @@ export function calculateSuggestedPurchase(
   if (suggested < 0) suggested = 0;
 
   const coverageDays =
-    dailyDemand > 0
-      ? Math.round(((netStock + suggested) / dailyDemand) * 10) / 10
-      : 999;
+    dailyDemand > 0 ? Math.round(((netStock + suggested) / dailyDemand) * 10) / 10 : 999;
 
   return { suggestedQuantity: suggested, coverageDays };
 }
 
 /** Días de cobertura del stock disponible considerando venta mensual */
-export function coverageDays(
-  availableStock: number,
-  monthlySales: number
-): number {
+export function coverageDays(availableStock: number, monthlySales: number): number {
   if (monthlySales <= 0) return availableStock > 0 ? 999 : 0;
   return Math.round((availableStock / (monthlySales / 30)) * 10) / 10;
 }
@@ -105,10 +92,7 @@ export function coverageDays(
  * "Vendiste 30 en 30 días · te queda para 3 días".
  * Pensada para que cualquiera entienda de un vistazo por qué hay que comprar.
  */
-export function coverageSentence(
-  availableStock: number,
-  salesLast30Days: number
-): string {
+export function coverageSentence(availableStock: number, salesLast30Days: number): string {
   if (salesLast30Days <= 0) {
     return availableStock > 0
       ? "No vendiste nada en 30 días · stock parado"
@@ -184,11 +168,7 @@ export function estimatedStockoutDate(
 }
 
 /** Capital inmovilizado estimado por sobrestock (unidades sobre el máximo) */
-export function frozenCapital(
-  availableStock: number,
-  maxStock: number,
-  unitCost: number
-): number {
+export function frozenCapital(availableStock: number, maxStock: number, unitCost: number): number {
   const excess = Math.max(0, availableStock - maxStock);
   return excess * unitCost;
 }

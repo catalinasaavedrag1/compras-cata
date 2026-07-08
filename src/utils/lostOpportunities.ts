@@ -1,5 +1,6 @@
 import { products } from "../data/mockProducts";
 import type { Product } from "../types/purchasing";
+import { hashString as hashStr } from "./hash";
 
 // ============================================================================
 //  Oportunidades no capturadas (sección 6 del spec).
@@ -7,12 +8,6 @@ import type { Product } from "../types/purchasing";
 //  sin stock, no se volvió a comprar, y la categoría siguió vendiendo. Eso es
 //  venta perdida no capturada. Se deriva del maestro de productos en frontend.
 // ============================================================================
-
-function hashStr(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
 
 export interface LostOpportunity {
   sku: string;
@@ -37,7 +32,8 @@ function histMonthlyOf(p: Product): number {
 export function lostOpportunities(): LostOpportunity[] {
   // Venta reciente por categoría (para saber si la categoría sigue viva)
   const catRecent = new Map<string, number>();
-  for (const p of products) catRecent.set(p.category, (catRecent.get(p.category) ?? 0) + p.salesLast30Days);
+  for (const p of products)
+    catRecent.set(p.category, (catRecent.get(p.category) ?? 0) + p.salesLast30Days);
 
   const out: LostOpportunity[] = [];
   for (const p of products) {
@@ -70,7 +66,20 @@ export function lostOpportunities(): LostOpportunity[] {
 
     const insight = `Vendía ~${histMonthly} u./mes y dejó de comprarse hace ${mesesSinCompra} meses. La categoría ${p.category} siguió vendiendo, así que no es falta de demanda: es una oportunidad no capturada de ~${Math.round(ventaPerdida / 1000)}k/mes. ${accion}.`;
 
-    out.push({ sku: p.sku, name: p.name, category: p.category, supplierName: p.supplierName, histMonthly, recent, ventaPerdida, mesesSinCompra, motivo, accion, tone, insight });
+    out.push({
+      sku: p.sku,
+      name: p.name,
+      category: p.category,
+      supplierName: p.supplierName,
+      histMonthly,
+      recent,
+      ventaPerdida,
+      mesesSinCompra,
+      motivo,
+      accion,
+      tone,
+      insight,
+    });
   }
 
   return out.sort((a, b) => b.ventaPerdida - a.ventaPerdida);

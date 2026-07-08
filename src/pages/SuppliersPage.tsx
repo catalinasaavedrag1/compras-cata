@@ -48,9 +48,15 @@ export function SuppliersPage() {
   const totalPending = filtered.reduce((a, s) => a + s.pendingAmount, 0);
   const openOCs = filtered.reduce((a, s) => a + s.openPurchaseOrders, 0);
 
-  const mostDelayed = [...suppliers].sort((a, b) => a.deliveryCompliance - b.deliveryCompliance).slice(0, 4);
-  const biggestBuy = [...suppliers].sort((a, b) => b.purchasedAmountLast90Days - a.purchasedAmountLast90Days).slice(0, 4);
-  const highLeadTime = [...suppliers].sort((a, b) => b.averageLeadTimeDays - a.averageLeadTimeDays).slice(0, 4);
+  const mostDelayed = [...suppliers]
+    .sort((a, b) => a.deliveryCompliance - b.deliveryCompliance)
+    .slice(0, 4);
+  const biggestBuy = [...suppliers]
+    .sort((a, b) => b.purchasedAmountLast90Days - a.purchasedAmountLast90Days)
+    .slice(0, 4);
+  const highLeadTime = [...suppliers]
+    .sort((a, b) => b.averageLeadTimeDays - a.averageLeadTimeDays)
+    .slice(0, 4);
 
   // Proveedores que entran en temporada alta pronto (negociar antes)
   const entranTemporada = suppliers
@@ -80,19 +86,40 @@ export function SuppliersPage() {
       render: (s) => (
         <div className="flex flex-wrap gap-1 max-w-[200px]">
           {s.categories.map((c) => (
-            <Badge key={c} tone="neutral">{c}</Badge>
+            <Badge key={c} tone="neutral">
+              {c}
+            </Badge>
           ))}
         </div>
       ),
     },
-    { key: "skus", header: "SKUs", align: "right", hideOnMobile: true, render: (s) => formatNumber(s.associatedSkus) },
-    { key: "openOc", header: "OC abiertas", align: "right", render: (s) => formatNumber(s.openPurchaseOrders) },
+    {
+      key: "skus",
+      header: "SKUs",
+      align: "right",
+      hideOnMobile: true,
+      render: (s) => formatNumber(s.associatedSkus),
+    },
+    {
+      key: "openOc",
+      header: "OC abiertas",
+      align: "right",
+      render: (s) => formatNumber(s.openPurchaseOrders),
+    },
     {
       key: "compliance",
       header: "Cumplimiento",
       align: "right",
       render: (s) => (
-        <span className={s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : s.deliveryCompliance < 85 ? "text-amber-600 font-medium" : "text-emerald-600 font-medium"}>
+        <span
+          className={
+            s.deliveryCompliance < 70
+              ? "text-rose-600 font-semibold"
+              : s.deliveryCompliance < 85
+                ? "text-amber-600 font-medium"
+                : "text-emerald-600 font-medium"
+          }
+        >
           {formatPercent(s.deliveryCompliance, 0)}
         </span>
       ),
@@ -103,17 +130,36 @@ export function SuppliersPage() {
       align: "right",
       render: (s) => {
         const f = supplierFulfillment(s.name);
-        const tone = f.tone === "red" ? "text-rose-600 font-semibold" : f.tone === "amber" ? "text-amber-600 font-medium" : "text-emerald-600 font-medium";
+        const tone =
+          f.tone === "red"
+            ? "text-rose-600 font-semibold"
+            : f.tone === "amber"
+              ? "text-amber-600 font-medium"
+              : "text-emerald-600 font-medium";
         return (
           <div className="text-sm min-w-[96px]">
             <span className={tone}>{f.arrivedOrders > 0 ? `${f.fillRate}%` : "—"}</span>
-            {f.undeliveredSkus > 0 && <p className="text-[11px] text-rose-500">{f.undeliveredSkus} SKU sin despachar</p>}
+            {f.undeliveredSkus > 0 && (
+              <p className="text-[11px] text-rose-500">{f.undeliveredSkus} SKU sin despachar</p>
+            )}
           </div>
         );
       },
     },
-    { key: "leadTime", header: "Lead time", align: "right", hideOnMobile: true, render: (s) => formatDays(s.averageLeadTimeDays) },
-    { key: "lastPurchase", header: "Última compra", align: "right", hideOnMobile: true, render: (s) => formatDate(s.lastPurchaseDate) },
+    {
+      key: "leadTime",
+      header: "Lead time",
+      align: "right",
+      hideOnMobile: true,
+      render: (s) => formatDays(s.averageLeadTimeDays),
+    },
+    {
+      key: "lastPurchase",
+      header: "Última compra",
+      align: "right",
+      hideOnMobile: true,
+      render: (s) => formatDate(s.lastPurchaseDate),
+    },
     {
       key: "buy90",
       header: "Compra 90 días",
@@ -126,12 +172,18 @@ export function SuppliersPage() {
       header: "Monto pendiente",
       align: "right",
       render: (s) => (
-        <span className={s.pendingAmount > 20000000 ? "text-amber-600 font-medium" : "text-slate-700"}>
+        <span
+          className={s.pendingAmount > 20000000 ? "text-amber-600 font-medium" : "text-slate-700"}
+        >
           {formatCurrency(s.pendingAmount)}
         </span>
       ),
     },
-    { key: "status", header: "Estado", render: (s) => <StatusBadge kind="supplier" value={s.status} /> },
+    {
+      key: "status",
+      header: "Estado",
+      render: (s) => <StatusBadge kind="supplier" value={s.status} />,
+    },
   ];
 
   return (
@@ -142,9 +194,9 @@ export function SuppliersPage() {
       />
 
       <HelpNote className="mb-4">
-El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuánto de lo pedido
-        realmente envió (según recepciones): un proveedor puede entregar a tiempo pero dejar SKUs sin
-        despachar. Ambos bajos = riesgo de quiebre y proveedor a revisar.
+        El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuánto de lo
+        pedido realmente envió (según recepciones): un proveedor puede entregar a tiempo pero dejar
+        SKUs sin despachar. Ambos bajos = riesgo de quiebre y proveedor a revisar.
       </HelpNote>
 
       <div className="mb-4">
@@ -154,7 +206,10 @@ El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuán
           searchPlaceholder="Buscar por nombre o RUT"
           resultCount={filtered.length}
           summary={`${filtered.length} proveedor${filtered.length === 1 ? "" : "es"} · ${delayed} atrasado${delayed === 1 ? "" : "s"} · ${lowCompliance} por revisar`}
-          onClear={() => { setQuery(""); setStatus(""); }}
+          onClear={() => {
+            setQuery("");
+            setStatus("");
+          }}
           selects={[
             {
               key: "status",
@@ -174,29 +229,87 @@ El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuán
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Proveedores atrasados" value={formatNumber(delayed)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} />
-        <KpiCard title="Bajo cumplimiento (<70%)" value={formatNumber(lowCompliance)} tone="warn" icon={<IconSuppliers className="w-4 h-4" />} />
-        <KpiCard title="OC abiertas (total)" value={formatNumber(openOCs)} tone="neutral" icon={<IconOrders className="w-4 h-4" />} />
-        <KpiCard title="Monto pendiente total" value={formatCurrencyCompact(totalPending)} tone="info" icon={<IconSuppliers className="w-4 h-4" />} />
+        <KpiCard
+          title="Proveedores atrasados"
+          value={formatNumber(delayed)}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Bajo cumplimiento (<70%)"
+          value={formatNumber(lowCompliance)}
+          tone="warn"
+          icon={<IconSuppliers className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="OC abiertas (total)"
+          value={formatNumber(openOCs)}
+          tone="neutral"
+          icon={<IconOrders className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Monto pendiente total"
+          value={formatCurrencyCompact(totalPending)}
+          tone="info"
+          icon={<IconSuppliers className="w-4 h-4" />}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-        <MiniRank title="Peor cumplimiento" items={mostDelayed.map((s) => ({ name: s.name, value: formatPercent(s.deliveryCompliance, 0), tone: "red" as const, sub: `${s.openPurchaseOrders} OC abiertas` }))} />
-        <MiniRank title="Mayor compra (90 días)" items={biggestBuy.map((s) => ({ name: s.name, value: formatCurrencyCompact(s.purchasedAmountLast90Days), tone: "green" as const, sub: `${formatNumber(s.associatedSkus)} SKUs` }))} />
-        <MiniRank title="Lead time más alto" items={highLeadTime.map((s) => ({ name: s.name, value: formatDays(s.averageLeadTimeDays), tone: "amber" as const, sub: `Cumple ${formatPercent(s.deliveryCompliance, 0)}` }))} />
+        <MiniRank
+          title="Peor cumplimiento"
+          items={mostDelayed.map((s) => ({
+            name: s.name,
+            value: formatPercent(s.deliveryCompliance, 0),
+            tone: "red" as const,
+            sub: `${s.openPurchaseOrders} OC abiertas`,
+          }))}
+        />
+        <MiniRank
+          title="Mayor compra (90 días)"
+          items={biggestBuy.map((s) => ({
+            name: s.name,
+            value: formatCurrencyCompact(s.purchasedAmountLast90Days),
+            tone: "green" as const,
+            sub: `${formatNumber(s.associatedSkus)} SKUs`,
+          }))}
+        />
+        <MiniRank
+          title="Lead time más alto"
+          items={highLeadTime.map((s) => ({
+            name: s.name,
+            value: formatDays(s.averageLeadTimeDays),
+            tone: "amber" as const,
+            sub: `Cumple ${formatPercent(s.deliveryCompliance, 0)}`,
+          }))}
+        />
       </div>
 
       {entranTemporada.length > 0 && (
         <Card className="mb-5">
-          <CardHeader title="Entran en temporada próximamente" description="Negocia antes del peak: stock reservado, fill mínimo y despacho anticipado" />
+          <CardHeader
+            title="Entran en temporada próximamente"
+            description="Negocia antes del peak: stock reservado, fill mínimo y despacho anticipado"
+          />
           <CardBody className="space-y-2">
             {entranTemporada.map(({ s, seas }) => (
-              <Link key={s.id} to={`/proveedores/${s.id}?tab=temporadas`} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+              <Link
+                key={s.id}
+                to={`/proveedores/${s.id}?tab=temporadas`}
+                className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+              >
                 <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-medium text-slate-800 truncate">{s.name}</span>
-                  <span className="block text-xs text-slate-400">Temporada alta {seas.preSeason!.month} (~{seas.preSeason!.days} días) · fill {seas.fill}% · lead {formatDays(s.averageLeadTimeDays)}</span>
+                  <span className="block text-sm font-medium text-slate-800 truncate">
+                    {s.name}
+                  </span>
+                  <span className="block text-xs text-slate-400">
+                    Temporada alta {seas.preSeason!.month} (~{seas.preSeason!.days} días) · fill{" "}
+                    {seas.fill}% · lead {formatDays(s.averageLeadTimeDays)}
+                  </span>
                 </span>
-                <Badge tone={seas.classification.risky ? "red" : "amber"}>{seas.classification.risky ? "Riesgo de quiebre" : "Preparar compra"}</Badge>
+                <Badge tone={seas.classification.risky ? "red" : "amber"}>
+                  {seas.classification.risky ? "Riesgo de quiebre" : "Preparar compra"}
+                </Badge>
               </Link>
             ))}
           </CardBody>
@@ -219,9 +332,24 @@ El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuán
                 <StatusBadge kind="supplier" value={s.status} dot={false} />
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                <div><p className="text-xs text-slate-400">Cumple</p><p className={s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : "text-slate-700"}>{formatPercent(s.deliveryCompliance, 0)}</p></div>
-                <div><p className="text-xs text-slate-400">Lead time</p><p className="text-slate-700">{formatDays(s.averageLeadTimeDays)}</p></div>
-                <div><p className="text-xs text-slate-400">OC abiertas</p><p className="text-slate-700">{formatNumber(s.openPurchaseOrders)}</p></div>
+                <div>
+                  <p className="text-xs text-slate-400">Cumple</p>
+                  <p
+                    className={
+                      s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : "text-slate-700"
+                    }
+                  >
+                    {formatPercent(s.deliveryCompliance, 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Lead time</p>
+                  <p className="text-slate-700">{formatDays(s.averageLeadTimeDays)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">OC abiertas</p>
+                  <p className="text-slate-700">{formatNumber(s.openPurchaseOrders)}</p>
+                </div>
               </div>
             </div>
           )}
@@ -244,12 +372,17 @@ function MiniRank({
       <CardHeader title={title} />
       <CardBody className="space-y-2">
         {items.map((it) => (
-          <div key={it.name} className="flex items-center justify-between gap-2 py-1 border-b border-slate-50 last:border-0">
+          <div
+            key={it.name}
+            className="flex items-center justify-between gap-2 py-1 border-b border-slate-50 last:border-0"
+          >
             <div className="min-w-0">
               <p className="text-sm font-medium text-slate-800 truncate">{it.name}</p>
               <p className="text-xs text-slate-400">{it.sub}</p>
             </div>
-            <span className={`text-sm font-semibold flex-shrink-0 ${toneText[it.tone]}`}>{it.value}</span>
+            <span className={`text-sm font-semibold flex-shrink-0 ${toneText[it.tone]}`}>
+              {it.value}
+            </span>
           </div>
         ))}
       </CardBody>

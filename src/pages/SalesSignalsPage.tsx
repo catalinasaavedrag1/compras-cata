@@ -26,20 +26,10 @@ import { useBuyer } from "../context/BuyerContext";
 import { useToast } from "../context/ToastContext";
 import { formatCurrencyCompact, formatNumber } from "../utils/formatters";
 import { cn } from "../utils/cn";
+import { inRange, type IsoRange } from "../utils/dateRange";
 import { TODAY_ISO } from "../utils/constants";
-import {
-  IconSignal,
-  IconPlus,
-  IconCheck,
-  IconAlerts,
-  IconChat,
-} from "../components/ui/icons";
-import type {
-  SalesSignal,
-  SignalChannel,
-  SignalPriority,
-  SignalType,
-} from "../types/purchasing";
+import { IconSignal, IconPlus, IconCheck, IconAlerts, IconChat } from "../components/ui/icons";
+import type { SalesSignal, SignalChannel, SignalPriority, SignalType } from "../types/purchasing";
 
 const TABS = [
   { value: "to_review", label: "Por revisar" },
@@ -64,9 +54,7 @@ function fmtDate(iso: string): string {
 }
 function daysAgo(iso: string): number {
   const today = new Date(`${TODAY_ISO}T00:00:00`).getTime();
-  return Math.round(
-    (today - new Date(`${iso.slice(0, 10)}T00:00:00`).getTime()) / 86400000
-  );
+  return Math.round((today - new Date(`${iso.slice(0, 10)}T00:00:00`).getTime()) / 86400000);
 }
 
 export function SalesSignalsPage() {
@@ -82,7 +70,7 @@ export function SalesSignalsPage() {
   const [store, setStore] = useState("");
   const [category, setCategory] = useState("");
   const [assigned, setAssigned] = useState("");
-  const [dateRange, setDateRange] = useState("");
+  const [dates, setDates] = useState<IsoRange>({ from: "", to: "" });
   const [onlyStockout, setOnlyStockout] = useState(false);
   const [mine, setMine] = useState(false);
 
@@ -92,24 +80,19 @@ export function SalesSignalsPage() {
   const [reportDefaults] = useState<ReportSignalDefaults | undefined>(undefined);
 
   const stores = useMemo(
-    () =>
-      Array.from(new Set(signals.map((s) => s.store))).sort((a, b) =>
-        a.localeCompare(b, "es")
-      ),
+    () => Array.from(new Set(signals.map((s) => s.store))).sort((a, b) => a.localeCompare(b, "es")),
     [signals]
   );
   const categories = useMemo(
     () =>
-      Array.from(new Set(signals.map((s) => s.category))).sort((a, b) =>
-        a.localeCompare(b, "es")
-      ),
+      Array.from(new Set(signals.map((s) => s.category))).sort((a, b) => a.localeCompare(b, "es")),
     [signals]
   );
   const assignees = useMemo(
     () =>
-      Array.from(
-        new Set(signals.map((s) => s.assignedBuyer).filter(Boolean) as string[])
-      ).sort((a, b) => a.localeCompare(b, "es")),
+      Array.from(new Set(signals.map((s) => s.assignedBuyer).filter(Boolean) as string[])).sort(
+        (a, b) => a.localeCompare(b, "es")
+      ),
     [signals]
   );
 
@@ -133,12 +116,7 @@ export function SalesSignalsPage() {
       if (assigned && s.assignedBuyer !== assigned) return false;
       if (mine && s.assignedBuyer !== buyer) return false;
       if (onlyStockout && !STOCKOUT_TYPES.includes(s.type)) return false;
-      if (dateRange) {
-        const d = daysAgo(s.date);
-        if (dateRange === "today" && d > 0) return false;
-        if (dateRange === "7" && d > 7) return false;
-        if (dateRange === "30" && d > 30) return false;
-      }
+      if (!inRange(s.date, dates)) return false;
       return true;
     });
   }, [
@@ -152,15 +130,13 @@ export function SalesSignalsPage() {
     assigned,
     mine,
     onlyStockout,
-    dateRange,
+    dates,
     buyer,
   ]);
 
   const counts = useMemo(
     () => ({
-      to_review: byFilters.filter(
-        (s) => s.status === "new" || s.status === "in_review"
-      ).length,
+      to_review: byFilters.filter((s) => s.status === "new" || s.status === "in_review").length,
       in_progress: byFilters.filter((s) => IN_PROGRESS_STATUSES.includes(s.status)).length,
       accepted: byFilters.filter((s) => s.status === "accepted").length,
       resolved: byFilters.filter((s) => s.status === "resolved").length,
@@ -173,10 +149,7 @@ export function SalesSignalsPage() {
   // KPIs
   const kpiNew = byFilters.filter((s) => s.status === "new").length;
   const kpiStockout = byFilters.filter(
-    (s) =>
-      STOCKOUT_TYPES.includes(s.type) &&
-      s.status !== "resolved" &&
-      s.status !== "rejected"
+    (s) => STOCKOUT_TYPES.includes(s.type) && s.status !== "resolved" && s.status !== "rejected"
   ).length;
   const kpiPending = counts.to_review;
   const kpiAccepted = counts.accepted;
@@ -185,7 +158,10 @@ export function SalesSignalsPage() {
     .reduce((acc, s) => acc + (s.estimatedLostSale ?? 0), 0);
 
   // Analítica
-  const topProducts = useMemo(() => aggCount(byFilters, (s) => s.productName).slice(0, 5), [byFilters]);
+  const topProducts = useMemo(
+    () => aggCount(byFilters, (s) => s.productName).slice(0, 5),
+    [byFilters]
+  );
   const topStores = useMemo(() => aggCount(byFilters, (s) => s.store).slice(0, 5), [byFilters]);
   const mostAsked = useMemo(
     () =>
@@ -222,7 +198,7 @@ export function SalesSignalsPage() {
     setStore("");
     setCategory("");
     setAssigned("");
-    setDateRange("");
+    setDates({ from: "", to: "" });
     setOnlyStockout(false);
     setMine(false);
   };
@@ -265,8 +241,18 @@ export function SalesSignalsPage() {
           summary={`${byFilters.length} señal${byFilters.length === 1 ? "" : "es"} · ${kpiPending} por revisar · ${kpiStockout} de quiebre`}
           onClear={clearFilters}
           toggles={[
-            { key: "mine", label: "Asignadas a mí", active: mine, onToggle: () => setMine((v) => !v) },
-            { key: "stockout", label: "Sólo quiebres", active: onlyStockout, onToggle: () => setOnlyStockout((v) => !v) },
+            {
+              key: "mine",
+              label: "Asignadas a mí",
+              active: mine,
+              onToggle: () => setMine((v) => !v),
+            },
+            {
+              key: "stockout",
+              label: "Sólo quiebres",
+              active: onlyStockout,
+              onToggle: () => setOnlyStockout((v) => !v),
+            },
           ]}
           selects={[
             {
@@ -274,21 +260,30 @@ export function SalesSignalsPage() {
               placeholder: "Prioridad",
               value: priority,
               onChange: setPriority,
-              options: (["high", "medium", "low"] as SignalPriority[]).map((p) => ({ value: p, label: SIGNAL_PRIORITY[p].label })),
+              options: (["high", "medium", "low"] as SignalPriority[]).map((p) => ({
+                value: p,
+                label: SIGNAL_PRIORITY[p].label,
+              })),
             },
             {
               key: "type",
               placeholder: "Tipo de señal",
               value: type,
               onChange: setType,
-              options: (Object.keys(SIGNAL_TYPE) as SignalType[]).map((t) => ({ value: t, label: SIGNAL_TYPE[t].label })),
+              options: (Object.keys(SIGNAL_TYPE) as SignalType[]).map((t) => ({
+                value: t,
+                label: SIGNAL_TYPE[t].label,
+              })),
             },
             {
               key: "channel",
               placeholder: "Canal",
               value: channel,
               onChange: setChannel,
-              options: (Object.keys(SIGNAL_CHANNEL) as SignalChannel[]).map((c) => ({ value: c, label: SIGNAL_CHANNEL[c] })),
+              options: (Object.keys(SIGNAL_CHANNEL) as SignalChannel[]).map((c) => ({
+                value: c,
+                label: SIGNAL_CHANNEL[c],
+              })),
             },
             {
               key: "store",
@@ -311,28 +306,62 @@ export function SalesSignalsPage() {
               onChange: setAssigned,
               options: assignees.map((b) => ({ value: b, label: b })),
             },
-            {
-              key: "date",
-              placeholder: "Fecha",
-              value: dateRange,
-              onChange: setDateRange,
-              options: [
-                { value: "today", label: "Hoy" },
-                { value: "7", label: "Últimos 7 días" },
-                { value: "30", label: "Últimos 30 días" },
-              ],
-            },
           ]}
+          dateRange={{ value: dates, onChange: setDates, label: "Fecha de la señal" }}
         />
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-        <KpiCard title="Nuevas" value={formatNumber(kpiNew)} tone="info" icon={<IconSignal className="w-4 h-4" />} description="Ver por revisar" active={tab === "to_review"} onClick={() => setTab("to_review")} />
-        <KpiCard title="Quiebres reportados" value={formatNumber(kpiStockout)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="Filtrar quiebres" active={onlyStockout} onClick={() => { setOnlyStockout((v) => !v); setTab("to_review"); }} />
-        <KpiCard title="Por revisar" value={formatNumber(kpiPending)} tone="warn" icon={<IconChat className="w-4 h-4" />} description="Pendientes de decisión" active={tab === "to_review" && !onlyStockout} onClick={() => { setTab("to_review"); setOnlyStockout(false); }} />
-        <KpiCard title="Aceptadas" value={formatNumber(kpiAccepted)} tone="good" icon={<IconCheck className="w-4 h-4" />} description="Ver aceptadas" active={tab === "accepted"} onClick={() => setTab("accepted")} />
-        <KpiCard title="Venta perdida est." value={formatCurrencyCompact(kpiLostSale)} tone="bad" icon={<IconAlerts className="w-4 h-4" />} description="En señales activas" />
+        <KpiCard
+          title="Nuevas"
+          value={formatNumber(kpiNew)}
+          tone="info"
+          icon={<IconSignal className="w-4 h-4" />}
+          description="Ver por revisar"
+          active={tab === "to_review"}
+          onClick={() => setTab("to_review")}
+        />
+        <KpiCard
+          title="Quiebres reportados"
+          value={formatNumber(kpiStockout)}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="Filtrar quiebres"
+          active={onlyStockout}
+          onClick={() => {
+            setOnlyStockout((v) => !v);
+            setTab("to_review");
+          }}
+        />
+        <KpiCard
+          title="Por revisar"
+          value={formatNumber(kpiPending)}
+          tone="warn"
+          icon={<IconChat className="w-4 h-4" />}
+          description="Pendientes de decisión"
+          active={tab === "to_review" && !onlyStockout}
+          onClick={() => {
+            setTab("to_review");
+            setOnlyStockout(false);
+          }}
+        />
+        <KpiCard
+          title="Aceptadas"
+          value={formatNumber(kpiAccepted)}
+          tone="good"
+          icon={<IconCheck className="w-4 h-4" />}
+          description="Ver aceptadas"
+          active={tab === "accepted"}
+          onClick={() => setTab("accepted")}
+        />
+        <KpiCard
+          title="Venta perdida est."
+          value={formatCurrencyCompact(kpiLostSale)}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+          description="En señales activas"
+        />
       </div>
 
       {/* Analítica: qué se repite, qué tiendas, qué se pide */}
@@ -343,9 +372,36 @@ export function SalesSignalsPage() {
         />
         <CardBody>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <MiniBar title="Top productos reportados" empty="Sin señales" items={topProducts.map((x) => ({ label: x.label, value: x.value, display: `${x.value}`, tone: "blue" }))} />
-            <MiniBar title="Top tiendas con señales" empty="Sin señales" items={topStores.map((x) => ({ label: x.label, value: x.value, display: `${x.value}`, tone: "violet" }))} />
-            <MiniBar title="Productos más solicitados" empty="Sin solicitudes registradas" items={mostAsked.map((x) => ({ label: x.label, value: x.value, display: `${x.value} clientes`, tone: "amber" }))} />
+            <MiniBar
+              title="Top productos reportados"
+              empty="Sin señales"
+              items={topProducts.map((x) => ({
+                label: x.label,
+                value: x.value,
+                display: `${x.value}`,
+                tone: "blue",
+              }))}
+            />
+            <MiniBar
+              title="Top tiendas con señales"
+              empty="Sin señales"
+              items={topStores.map((x) => ({
+                label: x.label,
+                value: x.value,
+                display: `${x.value}`,
+                tone: "violet",
+              }))}
+            />
+            <MiniBar
+              title="Productos más solicitados"
+              empty="Sin solicitudes registradas"
+              items={mostAsked.map((x) => ({
+                label: x.label,
+                value: x.value,
+                display: `${x.value} clientes`,
+                tone: "amber",
+              }))}
+            />
           </div>
         </CardBody>
       </Card>
@@ -367,7 +423,11 @@ export function SalesSignalsPage() {
               title="No hay señales en esta vista"
               description="Ajusta los filtros o reporta una nueva señal desde el terreno."
               action={
-                <Button variant="secondary" icon={<IconPlus className="w-4 h-4" />} onClick={() => setReportOpen(true)}>
+                <Button
+                  variant="secondary"
+                  icon={<IconPlus className="w-4 h-4" />}
+                  onClick={() => setReportOpen(true)}
+                >
                   Reportar señal
                 </Button>
               }
@@ -401,9 +461,7 @@ export function SalesSignalsPage() {
             ))}
           </div>
           {/* Detalle (escritorio) */}
-          <div className="hidden lg:block">
-            {selected && <SignalDetail signal={selected} />}
-          </div>
+          <div className="hidden lg:block">{selected && <SignalDetail signal={selected} />}</div>
         </div>
       )}
 
@@ -513,9 +571,7 @@ function SignalRow({
       onClick={onClick}
       className={cn(
         "w-full cursor-pointer rounded-lg border px-3 py-2.5 transition-colors",
-        selected
-          ? "border-brand-300 bg-brand-50/60"
-          : "border-slate-200 bg-white hover:bg-slate-50"
+        selected ? "border-brand-300 bg-brand-50/60" : "border-slate-200 bg-white hover:bg-slate-50"
       )}
     >
       <div className="flex items-center gap-1.5 mb-1">
@@ -534,7 +590,12 @@ function SignalRow({
         <div className="flex-1" />
         <span className="text-xs text-slate-400 flex-shrink-0">{fmtDate(signal.date)}</span>
       </div>
-      <p className={cn("text-sm truncate", unread ? "font-semibold text-slate-900" : "font-medium text-slate-700")}>
+      <p
+        className={cn(
+          "text-sm truncate",
+          unread ? "font-semibold text-slate-900" : "font-medium text-slate-700"
+        )}
+      >
         {signal.productName}
       </p>
       <p className="text-xs text-slate-500 line-clamp-2">{signal.comment}</p>

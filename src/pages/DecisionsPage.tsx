@@ -27,7 +27,13 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
   const all = role === "lider" ? decisions : decisions.filter((d) => d.buyerName === buyer);
 
   const filtered = all.filter((d) => {
-    if (query.trim() && !`${d.productName} ${d.sku} ${d.buyerName} ${d.supplierName}`.toLowerCase().includes(query.toLowerCase())) return false;
+    if (
+      query.trim() &&
+      !`${d.productName} ${d.sku} ${d.buyerName} ${d.supplierName}`
+        .toLowerCase()
+        .includes(query.toLowerCase())
+    )
+      return false;
     if (outcome && d.outcome !== outcome) return false;
     return true;
   });
@@ -42,10 +48,13 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
         placeholder: "Resultado",
         value: outcome,
         onChange: setOutcome,
-        options: (Object.keys(OUTCOME_META) as DecisionOutcome[]).map((o) => ({ value: o, label: OUTCOME_META[o].label })),
+        options: (Object.keys(OUTCOME_META) as DecisionOutcome[]).map((o) => ({
+          value: o,
+          label: OUTCOME_META[o].label,
+        })),
       },
     ],
-    [outcome]
+    [outcome, setOutcome]
   );
 
   return (
@@ -58,16 +67,37 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
       )}
 
       <HelpNote className="mb-4">
-        Cada decisión guarda el <b>sugerido original</b> vs <b>lo comprado</b>, el <b>motivo del desvío</b>, quién compró y
-        aprobó, el <b>resultado posterior</b> y el <b>aprendizaje</b>. Separar la causa importa: a veces el quiebre fue por el
-        proveedor (no despachó), no por la decisión del comprador.
+        Cada decisión guarda el <b>sugerido original</b> vs <b>lo comprado</b>, el{" "}
+        <b>motivo del desvío</b>, quién compró y aprobó, el <b>resultado posterior</b> y el{" "}
+        <b>aprendizaje</b>. Separar la causa importa: a veces el quiebre fue por el proveedor (no
+        despachó), no por la decisión del comprador.
       </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard title="Decisiones registradas" value={formatNumber(all.length)} tone="neutral" icon={<IconBulb className="w-4 h-4" />} />
-        <KpiCard title="Compró bien" value={formatNumber(countOf("bueno"))} tone="good" icon={<IconCheck className="w-4 h-4" />} />
-        <KpiCard title="Sobrecompras" value={formatNumber(countOf("sobrestock"))} tone="warn" icon={<IconAlerts className="w-4 h-4" />} />
-        <KpiCard title="Compras cortas" value={formatNumber(countOf("corto"))} tone="bad" icon={<IconAlerts className="w-4 h-4" />} />
+        <KpiCard
+          title="Decisiones registradas"
+          value={formatNumber(all.length)}
+          tone="neutral"
+          icon={<IconBulb className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Compró bien"
+          value={formatNumber(countOf("bueno"))}
+          tone="good"
+          icon={<IconCheck className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Sobrecompras"
+          value={formatNumber(countOf("sobrestock"))}
+          tone="warn"
+          icon={<IconAlerts className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Compras cortas"
+          value={formatNumber(countOf("corto"))}
+          tone="bad"
+          icon={<IconAlerts className="w-4 h-4" />}
+        />
       </div>
 
       <div className="mb-4">
@@ -77,13 +107,23 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
           searchPlaceholder="Buscar producto, comprador o proveedor"
           resultCount={filtered.length}
           summary={`${filtered.length} decisión${filtered.length === 1 ? "" : "es"}`}
-          onClear={() => { setQuery(""); setOutcome(""); }}
+          onClear={() => {
+            setQuery("");
+            setOutcome("");
+          }}
           selects={selects}
         />
       </div>
 
       {filtered.length === 0 ? (
-        <Card><CardBody><EmptyState title="Sin decisiones" description="No hay decisiones que coincidan con los filtros." /></CardBody></Card>
+        <Card>
+          <CardBody>
+            <EmptyState
+              title="Sin decisiones"
+              description="No hay decisiones que coincidan con los filtros."
+            />
+          </CardBody>
+        </Card>
       ) : (
         <div className="space-y-3">
           {filtered.map((d) => {
@@ -95,35 +135,73 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <Link to={`/productos/${d.sku}`} className="text-sm font-semibold text-slate-900 hover:text-brand-700 truncate">{d.productName}</Link>
-                        <Badge tone={OUTCOME_META[d.outcome].tone}>{OUTCOME_META[d.outcome].label}</Badge>
+                        <Link
+                          to={`/productos/${d.sku}`}
+                          className="text-sm font-semibold text-slate-900 hover:text-brand-700 truncate"
+                        >
+                          {d.productName}
+                        </Link>
+                        <Badge tone={OUTCOME_META[d.outcome].tone}>
+                          {OUTCOME_META[d.outcome].label}
+                        </Badge>
                       </div>
-                      <p className="text-xs text-slate-400">{fmtDate(d.date)} · {d.buyerName}{d.approvedBy !== "—" && <> · aprobó {d.approvedBy}</>} · <Link to={supplierPath(d.supplierName)} className="hover:text-brand-600 hover:underline">{d.supplierName}</Link></p>
+                      <p className="text-xs text-slate-400">
+                        {fmtDate(d.date)} · {d.buyerName}
+                        {d.approvedBy !== "—" && <> · aprobó {d.approvedBy}</>} ·{" "}
+                        <Link
+                          to={supplierPath(d.supplierName)}
+                          className="hover:text-brand-600 hover:underline"
+                        >
+                          {d.supplierName}
+                        </Link>
+                      </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2.5 mb-3">
                     <div className="rounded-lg bg-slate-50 px-3 py-2">
                       <p className="text-xs text-slate-400">Sugerido</p>
-                      <p className="text-sm font-semibold text-slate-700">{formatNumber(d.suggestedQty)} u.</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {formatNumber(d.suggestedQty)} u.
+                      </p>
                     </div>
                     <div className="rounded-lg bg-slate-50 px-3 py-2">
                       <p className="text-xs text-slate-400">Comprado</p>
-                      <p className="text-sm font-semibold text-slate-800">{formatNumber(d.purchasedQty)} u.</p>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {formatNumber(d.purchasedQty)} u.
+                      </p>
                     </div>
                     <div className="rounded-lg bg-slate-50 px-3 py-2">
                       <p className="text-xs text-slate-400">Desvío</p>
-                      <p className={`text-sm font-semibold ${diff === 0 ? "text-slate-500" : diff > 0 ? "text-violet-600" : "text-rose-600"}`}>
-                        {diff > 0 ? "+" : ""}{formatNumber(diff)} u. {diff !== 0 && <span className="text-xs font-normal">({diffPct > 0 ? "+" : ""}{diffPct}%)</span>}
+                      <p
+                        className={`text-sm font-semibold ${diff === 0 ? "text-slate-500" : diff > 0 ? "text-violet-600" : "text-rose-600"}`}
+                      >
+                        {diff > 0 ? "+" : ""}
+                        {formatNumber(diff)} u.{" "}
+                        {diff !== 0 && (
+                          <span className="text-xs font-normal">
+                            ({diffPct > 0 ? "+" : ""}
+                            {diffPct}%)
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-1.5 text-sm">
-                    <p className="text-slate-700"><span className="text-slate-400">Motivo:</span> {d.reason}</p>
-                    <p className="text-slate-700"><span className="text-slate-400">Resultado{d.resultDays > 0 ? ` (${d.resultDays}d)` : ""}:</span> {d.resultText}</p>
+                    <p className="text-slate-700">
+                      <span className="text-slate-400">Motivo:</span> {d.reason}
+                    </p>
+                    <p className="text-slate-700">
+                      <span className="text-slate-400">
+                        Resultado{d.resultDays > 0 ? ` (${d.resultDays}d)` : ""}:
+                      </span>{" "}
+                      {d.resultText}
+                    </p>
                     {d.learning !== "—" && (
-                      <p className="text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2 mt-1"><span className="font-semibold">Aprendizaje:</span> {d.learning}</p>
+                      <p className="text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2 mt-1">
+                        <span className="font-semibold">Aprendizaje:</span> {d.learning}
+                      </p>
                     )}
                   </div>
                 </CardBody>

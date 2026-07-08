@@ -6,17 +6,9 @@ import { Badge } from "../ui/Badge";
 import { IconSearch, IconBox, IconBulb } from "../ui/icons";
 import { productService } from "../../services";
 import { cn } from "../../utils/cn";
-import {
-  SIGNAL_TYPE,
-  SIGNAL_CHANNEL,
-  SIGNAL_PRIORITY,
-  suggestPriority,
-} from "./signalLabels";
-import type {
-  SignalChannel,
-  SignalPriority,
-  SignalType,
-} from "../../types/purchasing";
+import { DOT_TONE as TONE_DOT } from "../../utils/tone";
+import { SIGNAL_TYPE, SIGNAL_CHANNEL, SIGNAL_PRIORITY, suggestPriority } from "./signalLabels";
+import type { SignalChannel, SignalPriority, SignalType } from "../../types/purchasing";
 import type { NewSignalInput } from "../../context/SignalsContext";
 
 // ============================================================================
@@ -47,16 +39,6 @@ const TYPE_ORDER: SignalType[] = [
   "customer_suggested",
 ];
 
-const TONE_DOT: Record<string, string> = {
-  red: "bg-rose-500",
-  amber: "bg-amber-500",
-  blue: "bg-blue-500",
-  violet: "bg-violet-500",
-  green: "bg-emerald-500",
-  slate: "bg-slate-400",
-  neutral: "bg-slate-400",
-};
-
 export interface ReportSignalDefaults {
   sku?: string;
   productName?: string;
@@ -71,18 +53,11 @@ interface ReportSignalModalProps {
   defaults?: ReportSignalDefaults;
 }
 
-export function ReportSignalModal({
-  open,
-  onClose,
-  onSubmit,
-  defaults,
-}: ReportSignalModalProps) {
+export function ReportSignalModal({ open, onClose, onSubmit, defaults }: ReportSignalModalProps) {
   const products = productService.list();
   const categories = useMemo(
     () =>
-      Array.from(new Set(products.map((p) => p.category))).sort((a, b) =>
-        a.localeCompare(b, "es")
-      ),
+      Array.from(new Set(products.map((p) => p.category))).sort((a, b) => a.localeCompare(b, "es")),
     [products]
   );
 
@@ -134,9 +109,7 @@ export function ReportSignalModal({
   }, [type]);
 
   // Prioridad sugerida (recalcula salvo que el usuario la haya tocado)
-  const stock = sku
-    ? productService.getBySku(sku)?.availableStock ?? 0
-    : 0;
+  const stock = sku ? (productService.getBySku(sku)?.availableStock ?? 0) : 0;
   const suggestion = useMemo(
     () =>
       suggestPriority({
@@ -201,9 +174,7 @@ export function ReportSignalModal({
       comment: comment.trim(),
       recommendedAction: SIGNAL_TYPE[type].hint,
       customersAsking: customersAsking ? Number(customersAsking) : undefined,
-      estimatedLostSale: estimatedLostSale
-        ? Number(estimatedLostSale)
-        : undefined,
+      estimatedLostSale: estimatedLostSale ? Number(estimatedLostSale) : undefined,
       evidenceNote: evidenceNote.trim() || undefined,
     });
     onClose();
@@ -257,12 +228,7 @@ export function ReportSignalModal({
                       : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   )}
                 >
-                  <span
-                    className={cn(
-                      "w-2 h-2 rounded-full flex-shrink-0",
-                      TONE_DOT[meta.tone]
-                    )}
-                  />
+                  <span className={cn("w-2 h-2 rounded-full flex-shrink-0", TONE_DOT[meta.tone])} />
                   <span className="truncate">{meta.short}</span>
                 </button>
               );
@@ -340,9 +306,7 @@ export function ReportSignalModal({
                       className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50"
                     >
                       <span className="min-w-0">
-                        <span className="block text-sm text-slate-700 truncate">
-                          {p.name}
-                        </span>
+                        <span className="block text-sm text-slate-700 truncate">{p.name}</span>
                         <span className="block text-xs text-slate-400">
                           {p.category} · {p.brand}
                         </span>

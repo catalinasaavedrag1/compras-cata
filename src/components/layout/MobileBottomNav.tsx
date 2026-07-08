@@ -1,12 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "../../utils/cn";
-import {
-  IconDashboard,
-  IconOrders,
-  IconReplenish,
-  IconAlerts,
-  IconMenu,
-} from "../ui/icons";
+import { IconDashboard, IconOrders, IconReplenish, IconAlerts, IconMenu } from "../ui/icons";
 
 const items = [
   { to: "/", label: "Inicio", icon: IconDashboard, end: true },
@@ -48,7 +42,12 @@ export function MobileBottomNav({ menuOpen, onToggleMenu, onNavigate }: MobileBo
         >
           {({ isActive }) => (
             <>
-              <item.icon className={cn("w-5 h-5", isActive && !menuOpen ? "text-brand-600" : "text-slate-400")} />
+              <item.icon
+                className={cn(
+                  "w-5 h-5",
+                  isActive && !menuOpen ? "text-brand-600" : "text-slate-400"
+                )}
+              />
               {item.label}
             </>
           )}

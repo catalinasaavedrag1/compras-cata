@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "../ui/Input";
-import { IconSearch, IconOrders, IconProducts, IconSuppliers, IconCategories, IconDensity } from "../ui/icons";
+import {
+  IconSearch,
+  IconOrders,
+  IconProducts,
+  IconSuppliers,
+  IconCategories,
+  IconDensity,
+} from "../ui/icons";
 import { useDensity } from "../../context/DensityContext";
 import { useAuth } from "../../context/AuthContext";
 import { IconLogout } from "../ui/icons";
@@ -12,7 +19,7 @@ import { cn } from "../../utils/cn";
 import { NotificationCenter } from "./NotificationCenter";
 import { BackendStatus } from "./BackendStatus";
 import { TODAY_ISO } from "../../utils/constants";
-import { formatDate, formatNumber } from "../../utils/formatters";
+import { formatDate, formatNumber, productLabel } from "../../utils/formatters";
 import { products as mockProducts } from "../../data/mockProducts";
 import { suppliers as mockSuppliers } from "../../data/mockSuppliers";
 import { purchaseOrders as mockPOs } from "../../data/mockPurchaseOrders";
@@ -43,10 +50,15 @@ export function TopbarActions() {
     const onDown = (e: MouseEvent) => {
       if (acctRef.current && !acctRef.current.contains(e.target as Node)) setAcctOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setAcctOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAcctOpen(false);
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [acctOpen]);
 
   const products = useCollection<Product>("products", mockProducts);
@@ -91,8 +103,8 @@ export function TopbarActions() {
       if (`${p.sku} ${p.name} ${p.brand}`.toLowerCase().includes(q)) {
         out.push({
           type: "product",
-          title: p.name,
-          subtitle: `${p.sku} · ${p.category} · disp. ${formatNumber(p.availableStock)}`,
+          title: productLabel(p.name, p.sku),
+          subtitle: `${p.brand} · ${p.category} · disp. ${formatNumber(p.availableStock)}`,
           to: `/productos/${p.sku}`,
         });
       }
@@ -100,19 +112,34 @@ export function TopbarActions() {
     }
     for (const s of suppliers) {
       if (`${s.name} ${s.rut}`.toLowerCase().includes(q)) {
-        out.push({ type: "supplier", title: s.name, subtitle: `${s.rut} · ${s.categories.join(", ")}`, to: `/proveedores/${s.id}` });
+        out.push({
+          type: "supplier",
+          title: s.name,
+          subtitle: `${s.rut} · ${s.categories.join(", ")}`,
+          to: `/proveedores/${s.id}`,
+        });
       }
       if (out.filter((r) => r.type === "supplier").length >= 3) break;
     }
     for (const c of categories) {
       if (c.name.toLowerCase().includes(q)) {
-        out.push({ type: "category", title: c.name, subtitle: `Categoría · ${formatNumber(c.activeSkus)} SKU · ${c.buyer}`, to: `/categorias/${c.id}` });
+        out.push({
+          type: "category",
+          title: c.name,
+          subtitle: `Categoría · ${formatNumber(c.activeSkus)} SKU · ${c.buyer}`,
+          to: `/categorias/${c.id}`,
+        });
       }
       if (out.filter((r) => r.type === "category").length >= 3) break;
     }
     for (const o of purchaseOrders) {
       if (`${o.number} ${o.supplierName}`.toLowerCase().includes(q)) {
-        out.push({ type: "order", title: o.number, subtitle: `${o.supplierName} · espera ${formatDate(o.expectedDate)}`, to: "/ordenes-compra" });
+        out.push({
+          type: "order",
+          title: o.number,
+          subtitle: `${o.supplierName} · espera ${formatDate(o.expectedDate)}`,
+          to: "/ordenes-compra",
+        });
       }
       if (out.filter((r) => r.type === "order").length >= 3) break;
     }
@@ -142,7 +169,12 @@ export function TopbarActions() {
       <IconOrders className="w-4 h-4 text-slate-400" />
     );
 
-  const groupLabel = { product: "Productos", supplier: "Proveedores", category: "Categorías", order: "Órdenes de compra" };
+  const groupLabel = {
+    product: "Productos",
+    supplier: "Proveedores",
+    category: "Categorías",
+    order: "Órdenes de compra",
+  };
 
   return (
     <>
@@ -170,7 +202,9 @@ export function TopbarActions() {
             }}
           />
           {!search && (
-            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden lg:inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 pointer-events-none">⌘K</kbd>
+            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden lg:inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 pointer-events-none">
+              ⌘K
+            </kbd>
           )}
         </form>
 
@@ -198,8 +232,12 @@ export function TopbarActions() {
                       >
                         {iconFor(r.type)}
                         <span className="min-w-0">
-                          <span className="block text-sm font-medium text-slate-800 truncate">{r.title}</span>
-                          <span className="block text-xs text-slate-500 truncate">{r.subtitle}</span>
+                          <span className="block text-sm font-medium text-slate-800 truncate">
+                            {r.title}
+                          </span>
+                          <span className="block text-xs text-slate-500 truncate">
+                            {r.subtitle}
+                          </span>
                         </span>
                       </button>
                     ))}
@@ -249,7 +287,9 @@ export function TopbarActions() {
         onClick={() => navigate("/ordenes-compra")}
         className="relative inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
         title="Borrador de orden de compra"
-        aria-label={count > 0 ? `Borrador de orden de compra, ${count} ítems` : "Borrador de orden de compra"}
+        aria-label={
+          count > 0 ? `Borrador de orden de compra, ${count} ítems` : "Borrador de orden de compra"
+        }
       >
         <IconOrders className="w-4 h-4" />
         <span className="hidden sm:inline">Borrador OC</span>
@@ -296,14 +336,25 @@ export function TopbarActions() {
           {role === "lider" ? persona.initials : initials(buyer)}
         </button>
         {acctOpen && (
-          <div role="menu" className="absolute right-0 mt-2 w-60 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
+          <div
+            role="menu"
+            className="absolute right-0 mt-2 w-60 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50"
+          >
             <div className="px-4 py-3 border-b border-slate-100">
-              <p className="text-sm font-medium text-slate-800 truncate">{role === "lider" ? persona.name : buyer}</p>
-              <p className="text-xs text-slate-400 truncate">{email || (role === "lider" ? "Líder de Compras" : "Comprador")}</p>
+              <p className="text-sm font-medium text-slate-800 truncate">
+                {role === "lider" ? persona.name : buyer}
+              </p>
+              <p className="text-xs text-slate-400 truncate">
+                {email || (role === "lider" ? "Líder de Compras" : "Comprador")}
+              </p>
             </div>
             <button
               role="menuitem"
-              onClick={() => { setAcctOpen(false); logout(); navigate("/login"); }}
+              onClick={() => {
+                setAcctOpen(false);
+                logout();
+                navigate("/login");
+              }}
               className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-slate-50"
             >
               <IconLogout className="w-4 h-4" />

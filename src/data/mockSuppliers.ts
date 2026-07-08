@@ -14,6 +14,47 @@ export const suppliers: Supplier[] = [
     purchasedAmountLast90Days: 87500000,
     pendingAmount: 12400000,
     status: "active",
+    contactoComercial: {
+      nombre: "Rodrigo Cáceres",
+      email: "rcaceres@andes.cl",
+      telefono: "+56 9 8123 4567",
+    },
+    contactoLogistica: {
+      nombre: "Marcela Tapia",
+      email: "despachos@andes.cl",
+      telefono: "+56 9 7234 5678",
+    },
+    contactoCobranza: {
+      nombre: "Patricia Soto",
+      email: "cobranza@andes.cl",
+      telefono: "+56 2 2345 6789",
+    },
+    condicionPago: "30 días fecha factura",
+    plazoEntregaDias: 7,
+    minimoCompra: 500000,
+    minimoCompraTipo: "monto",
+    marcas: ["Polpaico", "Masisa", "Acma", "Andes"],
+    documentosTributarios: [
+      { tipo: "Inicio de actividades SII", numero: "76.123.456-7", vigente: true },
+      {
+        tipo: "Certificado de cumplimiento laboral",
+        numero: "CCL-2026-0142",
+        vigente: true,
+        vence: "2026-12-31",
+      },
+      { tipo: "Boletín comercial", numero: "BC-77821", vigente: true, vence: "2026-09-30" },
+    ],
+    acuerdosComerciales: [
+      {
+        titulo: "Rebate por volumen",
+        detalle: "2% sobre compras anuales > $300M, liquidación trimestral",
+      },
+      { titulo: "Flete incluido", detalle: "Despacho sin costo a CD para OC > $1.000.000" },
+      {
+        titulo: "Stock reservado peak",
+        detalle: "Reserva de cemento y fierro en pretemporada (sep-nov)",
+      },
+    ],
   },
   {
     id: "SUP-02",
@@ -28,6 +69,43 @@ export const suppliers: Supplier[] = [
     purchasedAmountLast90Days: 54200000,
     pendingAmount: 23800000,
     status: "review",
+    contactoComercial: {
+      nombre: "Felipe Aguirre",
+      email: "faguirre@ferrepro.cl",
+      telefono: "+56 9 6311 2200",
+    },
+    contactoLogistica: {
+      nombre: "Karina Reyes",
+      email: "logistica@ferrepro.cl",
+      telefono: "+56 9 6311 2201",
+    },
+    contactoCobranza: {
+      nombre: "Equipo Cobranza",
+      email: "pagos@ferrepro.cl",
+      telefono: "+56 2 2987 1100",
+    },
+    condicionPago: "45 días fecha factura",
+    plazoEntregaDias: 10,
+    minimoCompra: 350000,
+    minimoCompraTipo: "monto",
+    marcas: ["Vinilit", "Topex", "Stanley", "Bahco", "Hilti", "Odis", "Nibsa", "Cinta"],
+    documentosTributarios: [
+      { tipo: "Inicio de actividades SII", numero: "77.984.221-K", vigente: true },
+      {
+        tipo: "Certificado de cumplimiento laboral",
+        numero: "CCL-2026-0318",
+        vigente: false,
+        vence: "2026-05-31",
+      },
+      { tipo: "Boletín comercial", numero: "BC-66120", vigente: true, vence: "2026-10-15" },
+    ],
+    acuerdosComerciales: [
+      { titulo: "Descuento por pronto pago", detalle: "3% adicional pagando dentro de 15 días" },
+      {
+        titulo: "Plan de cumplimiento",
+        detalle: "En revisión: meta fill rate 95% y despacho semanal",
+      },
+    ],
   },
   {
     id: "SUP-03",
@@ -42,6 +120,43 @@ export const suppliers: Supplier[] = [
     purchasedAmountLast90Days: 41300000,
     pendingAmount: 6900000,
     status: "active",
+    contactoComercial: {
+      nombre: "Ignacio Fuentes",
+      email: "ifuentes@dmaule.cl",
+      telefono: "+56 9 5422 8810",
+    },
+    contactoLogistica: {
+      nombre: "Daniela Moya",
+      email: "bodega@dmaule.cl",
+      telefono: "+56 9 5422 8811",
+    },
+    contactoCobranza: {
+      nombre: "Hernán Vidal",
+      email: "finanzas@dmaule.cl",
+      telefono: "+56 71 241 5500",
+    },
+    condicionPago: "30 días fecha factura",
+    plazoEntregaDias: 6,
+    minimoCompra: 250000,
+    minimoCompraTipo: "monto",
+    marcas: ["Covisa", "Philips", "Bticino", "Legrand", "3M", "Odis"],
+    documentosTributarios: [
+      { tipo: "Inicio de actividades SII", numero: "76.551.009-3", vigente: true },
+      {
+        tipo: "Certificado SEC instalaciones",
+        numero: "SEC-2026-0091",
+        vigente: true,
+        vence: "2027-03-31",
+      },
+      { tipo: "Boletín comercial", numero: "BC-51230", vigente: true, vence: "2026-11-30" },
+    ],
+    acuerdosComerciales: [
+      {
+        titulo: "Exclusividad iluminación LED",
+        detalle: "Precio preferente línea Philips para campañas web",
+      },
+      { titulo: "Despacho 48 h", detalle: "Entrega garantizada en 48 h dentro de la región" },
+    ],
   },
   {
     id: "SUP-04",
@@ -56,6 +171,46 @@ export const suppliers: Supplier[] = [
     purchasedAmountLast90Days: 68900000,
     pendingAmount: 31200000,
     status: "delayed",
+    contactoComercial: {
+      nombre: "Sebastián Lillo",
+      email: "ventas@indsur.cl",
+      telefono: "+56 9 9011 4523",
+    },
+    contactoLogistica: {
+      nombre: "Camila Pérez",
+      email: "operaciones@indsur.cl",
+      telefono: "+56 9 9011 4524",
+    },
+    contactoCobranza: {
+      nombre: "Tesorería",
+      email: "tesoreria@indsur.cl",
+      telefono: "+56 41 220 3300",
+    },
+    condicionPago: "60 días fecha factura",
+    plazoEntregaDias: 18,
+    minimoCompra: 800000,
+    minimoCompraTipo: "monto",
+    marcas: ["Makita", "Truper", "3M"],
+    documentosTributarios: [
+      { tipo: "Inicio de actividades SII", numero: "78.220.778-1", vigente: true },
+      {
+        tipo: "Certificado de cumplimiento laboral",
+        numero: "CCL-2025-0810",
+        vigente: false,
+        vence: "2026-04-30",
+      },
+      { tipo: "Boletín comercial", numero: "BC-44021", vigente: false, vence: "2026-03-31" },
+    ],
+    acuerdosComerciales: [
+      {
+        titulo: "Penalidad por atraso",
+        detalle: "Nota de crédito 1% por cada semana de atraso en OC",
+      },
+      {
+        titulo: "Plan de regularización",
+        detalle: "Comprometido a reducir lead time de 18 a 12 días",
+      },
+    ],
   },
   {
     id: "SUP-05",
@@ -70,6 +225,43 @@ export const suppliers: Supplier[] = [
     purchasedAmountLast90Days: 52600000,
     pendingAmount: 9800000,
     status: "active",
+    contactoComercial: {
+      nombre: "Andrés Bravo",
+      email: "abravo@hglobal.cl",
+      telefono: "+56 9 7788 1212",
+    },
+    contactoLogistica: {
+      nombre: "Logística Global",
+      email: "despacho@hglobal.cl",
+      telefono: "+56 9 7788 1213",
+    },
+    contactoCobranza: {
+      nombre: "Valentina Ortiz",
+      email: "cuentas@hglobal.cl",
+      telefono: "+56 2 2456 7890",
+    },
+    condicionPago: "30 días fecha factura",
+    plazoEntregaDias: 14,
+    minimoCompra: 400000,
+    minimoCompraTipo: "monto",
+    marcas: ["Bosch", "DeWalt", "Stanley", "Bauker", "VoltMax"],
+    documentosTributarios: [
+      { tipo: "Inicio de actividades SII", numero: "76.808.345-9", vigente: true },
+      {
+        tipo: "Representación oficial Bosch",
+        numero: "REP-BSH-2026",
+        vigente: true,
+        vence: "2026-12-31",
+      },
+      { tipo: "Boletín comercial", numero: "BC-58844", vigente: true, vence: "2026-08-31" },
+    ],
+    acuerdosComerciales: [
+      {
+        titulo: "Garantía extendida",
+        detalle: "Soporte técnico y garantía directa de marca en herramientas",
+      },
+      { titulo: "Co-marketing", detalle: "Aporte de material POP para campañas Bosch/DeWalt" },
+    ],
   },
   {
     id: "SUP-06",
@@ -84,6 +276,43 @@ export const suppliers: Supplier[] = [
     purchasedAmountLast90Days: 29700000,
     pendingAmount: 4100000,
     status: "active",
+    contactoComercial: {
+      nombre: "Lorena Espinoza",
+      email: "lespinoza@pinturasnac.cl",
+      telefono: "+56 9 6655 3344",
+    },
+    contactoLogistica: {
+      nombre: "Bodega Central",
+      email: "bodega@pinturasnac.cl",
+      telefono: "+56 9 6655 3345",
+    },
+    contactoCobranza: {
+      nombre: "Cobranza",
+      email: "cobranza@pinturasnac.cl",
+      telefono: "+56 2 2733 8800",
+    },
+    condicionPago: "30 días fecha factura",
+    plazoEntregaDias: 9,
+    minimoCompra: 300000,
+    minimoCompraTipo: "monto",
+    marcas: ["Sipa", "Tricolor"],
+    documentosTributarios: [
+      { tipo: "Inicio de actividades SII", numero: "77.345.612-4", vigente: true },
+      {
+        tipo: "Hoja de seguridad productos químicos",
+        numero: "HDS-2026-PN",
+        vigente: true,
+        vence: "2027-01-31",
+      },
+      { tipo: "Boletín comercial", numero: "BC-39200", vigente: true, vence: "2026-12-15" },
+    ],
+    acuerdosComerciales: [
+      { titulo: "Tinte sin costo", detalle: "Preparación de colores a pedido sin recargo" },
+      {
+        titulo: "Devolución por temporada",
+        detalle: "Recepción de excedentes de látex post temporada",
+      },
+    ],
   },
   {
     id: "SUP-07",
@@ -98,6 +327,40 @@ export const suppliers: Supplier[] = [
     purchasedAmountLast90Days: 18400000,
     pendingAmount: 0,
     status: "review",
+    contactoComercial: {
+      nombre: "Manuel Garrido",
+      email: "mgarrido@agrocentral.cl",
+      telefono: "+56 9 8899 7766",
+    },
+    contactoLogistica: {
+      nombre: "Despachos Agro",
+      email: "despachos@agrocentral.cl",
+      telefono: "+56 9 8899 7767",
+    },
+    contactoCobranza: {
+      nombre: "Administración",
+      email: "admin@agrocentral.cl",
+      telefono: "+56 75 233 1900",
+    },
+    condicionPago: "30 días fecha factura",
+    plazoEntregaDias: 11,
+    minimoCompra: 300000,
+    minimoCompraTipo: "monto",
+    marcas: ["Anasac", "Soquimich", "Agroflex", "Gardena"],
+    documentosTributarios: [
+      { tipo: "Inicio de actividades SII", numero: "76.119.887-0", vigente: true },
+      {
+        tipo: "Registro SAG agroquímicos",
+        numero: "SAG-2026-1187",
+        vigente: true,
+        vence: "2026-12-31",
+      },
+      { tipo: "Boletín comercial", numero: "BC-30115", vigente: true, vence: "2026-09-15" },
+    ],
+    acuerdosComerciales: [
+      { titulo: "Compra estacional", detalle: "Programa de abastecimiento por temporada agrícola" },
+      { titulo: "Asesoría técnica", detalle: "Visitas de apoyo en terreno para clientes B2B" },
+    ],
   },
   {
     id: "SUP-08",
@@ -112,6 +375,38 @@ export const suppliers: Supplier[] = [
     purchasedAmountLast90Days: 0,
     pendingAmount: 0,
     status: "inactive",
+    contactoComercial: {
+      nombre: "Jorge Núñez",
+      email: "jnunez@matpacifico.cl",
+      telefono: "+56 9 4455 6677",
+    },
+    contactoLogistica: { nombre: "Sin contacto vigente", email: "—", telefono: "—" },
+    contactoCobranza: {
+      nombre: "Cobranza",
+      email: "cobranza@matpacifico.cl",
+      telefono: "+56 32 244 5500",
+    },
+    condicionPago: "Contado / prepago",
+    plazoEntregaDias: 22,
+    minimoCompra: 1000000,
+    minimoCompraTipo: "monto",
+    marcas: ["Princesa", "Fix"],
+    documentosTributarios: [
+      { tipo: "Inicio de actividades SII", numero: "78.660.451-2", vigente: true },
+      {
+        tipo: "Certificado de cumplimiento laboral",
+        numero: "CCL-2025-0440",
+        vigente: false,
+        vence: "2025-12-31",
+      },
+      { tipo: "Boletín comercial", numero: "BC-28004", vigente: false, vence: "2025-11-30" },
+    ],
+    acuerdosComerciales: [
+      {
+        titulo: "Relación suspendida",
+        detalle: "Sin compras desde marzo 2026 por incumplimiento reiterado",
+      },
+    ],
   },
 ];
 

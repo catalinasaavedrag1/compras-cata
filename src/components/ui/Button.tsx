@@ -16,19 +16,20 @@ function Spinner() {
   return (
     <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z"
+      />
     </svg>
   );
 }
 
 const variants: Record<Variant, string> = {
-  primary:
-    "bg-brand-600 text-white hover:bg-brand-700 border border-transparent shadow-sm",
-  secondary:
-    "bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm",
+  primary: "bg-brand-600 text-white hover:bg-brand-700 border border-transparent shadow-sm",
+  secondary: "bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm",
   ghost: "bg-transparent text-slate-600 hover:bg-slate-100 border border-transparent",
-  danger:
-    "bg-rose-600 text-white hover:bg-rose-700 border border-transparent shadow-sm",
+  danger: "bg-rose-600 text-white hover:bg-rose-700 border border-transparent shadow-sm",
 };
 
 const sizes: Record<Size, string> = {

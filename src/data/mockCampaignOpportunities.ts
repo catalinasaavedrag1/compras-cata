@@ -143,7 +143,8 @@ export const campaignOpportunities: CampaignOpportunity[] = [
     margin: 30.6,
     status: "buy_before_campaign",
     risk: "Producto de alta rotación bajo el punto de reposición con campaña en tienda en 10 días.",
-    recommendation: "Comprar 240 unidades a Proveedor Andes (lead time 7 días) antes de la campaña.",
+    recommendation:
+      "Comprar 240 unidades a Proveedor Andes (lead time 7 días) antes de la campaña.",
     actionLabel: "Agregar a OC",
   },
   {

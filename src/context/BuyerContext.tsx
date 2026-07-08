@@ -23,10 +23,7 @@ interface BuyerContextValue {
 const BuyerContext = createContext<BuyerContextValue | null>(null);
 
 export function BuyerProvider({ children }: { children: ReactNode }) {
-  const [buyer, setBuyer] = useLocalStorage<string>(
-    "compras:buyer",
-    "Catalina Saavedra"
-  );
+  const [buyer, setBuyer] = useLocalStorage<string>("compras:buyer", "Catalina Saavedra");
 
   const value = useMemo<BuyerContextValue>(
     () => ({
