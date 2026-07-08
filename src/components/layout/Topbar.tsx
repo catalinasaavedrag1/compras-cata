@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "../ui/Input";
+import { Modal } from "../ui/Modal";
 import {
   IconSearch,
   IconOrders,
@@ -8,6 +9,7 @@ import {
   IconSuppliers,
   IconCategories,
   IconDensity,
+  IconClose,
 } from "../ui/icons";
 import { useDensity } from "../../context/DensityContext";
 import { useAuth } from "../../context/AuthContext";
@@ -73,6 +75,8 @@ export function TopbarActions() {
   };
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const modalSearchRef = useRef<HTMLInputElement>(null);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Atajo global: ⌘K / Ctrl+K (o "/") enfoca el buscador desde cualquier vista.
@@ -85,9 +89,13 @@ export function TopbarActions() {
       if (isK || isSlash) {
         e.preventDefault();
         const el = document.getElementById("global-search") as HTMLInputElement | null;
-        el?.focus();
-        el?.select();
-        setOpen(true);
+        if (el && window.matchMedia("(min-width: 1280px)").matches) {
+          el.focus();
+          el.select();
+          setOpen(true);
+        } else {
+          setSearchModalOpen(true);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -138,7 +146,7 @@ export function TopbarActions() {
           type: "order",
           title: o.number,
           subtitle: `${o.supplierName} · espera ${formatDate(o.expectedDate)}`,
-          to: "/ordenes-compra",
+          to: `/ordenes-compra?oc=${encodeURIComponent(o.number)}`,
         });
       }
       if (out.filter((r) => r.type === "order").length >= 3) break;
@@ -148,6 +156,7 @@ export function TopbarActions() {
 
   const go = (to: string) => {
     setOpen(false);
+    setSearchModalOpen(false);
     setSearch("");
     navigate(to);
   };
@@ -176,8 +185,92 @@ export function TopbarActions() {
     order: "Órdenes de compra",
   };
 
+  useEffect(() => {
+    if (!searchModalOpen) return;
+    const t = window.setTimeout(() => modalSearchRef.current?.focus(), 50);
+    return () => window.clearTimeout(t);
+  }, [searchModalOpen]);
+
+  const searchResultsPanel = (compact = false) => {
+    const q = search.trim();
+    if (q.length < 2) {
+      return (
+        <div
+          className={cn(
+            "rounded-xl border border-dashed border-slate-200 bg-slate-50",
+            compact ? "p-4" : "p-6"
+          )}
+        >
+          <p className="text-sm font-medium text-slate-700">Busca en toda la plataforma</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Escribe al menos 2 caracteres para encontrar productos, proveedores, categorías u
+            órdenes de compra.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+            <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-slate-200">SKU</span>
+            <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-slate-200">
+              Proveedor
+            </span>
+            <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-slate-200">
+              Categoría
+            </span>
+            <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-slate-200">OC-2026</span>
+          </div>
+        </div>
+      );
+    }
+    if (results.length === 0) {
+      return (
+        <p className="rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-500">
+          Sin resultados para “{q}”.
+        </p>
+      );
+    }
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden max-h-[60vh] overflow-y-auto scrollbar-thin">
+        {(["product", "supplier", "category", "order"] as const).map((type) => {
+          const group = results.filter((r) => r.type === type);
+          if (group.length === 0) return null;
+          return (
+            <div key={type} className="py-1">
+              <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {groupLabel[type]}
+              </p>
+              {group.map((r, i) => (
+                <button
+                  key={`${type}-${i}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => go(r.to)}
+                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                >
+                  {iconFor(r.type)}
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-800 truncate">
+                      {r.title}
+                    </span>
+                    <span className="block text-xs text-slate-500 truncate">{r.subtitle}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <>
+      <button
+        onClick={() => setSearchModalOpen(true)}
+        className="inline-flex xl:hidden items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        aria-label="Abrir buscador global"
+        title="Buscar (Ctrl/⌘K)"
+      >
+        <IconSearch className="w-4 h-4" />
+        <span className="hidden sm:inline">Buscar</span>
+      </button>
+
       {/* Buscador global con resultados instantáneos */}
       <div
         className="hidden xl:block relative w-64 2xl:w-80"
@@ -209,45 +302,41 @@ export function TopbarActions() {
         </form>
 
         {open && search.trim().length >= 2 && (
-          <div className="absolute mt-1.5 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden max-h-[70vh] overflow-y-auto scrollbar-thin">
-            {results.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-slate-500">
-                Sin resultados para “{search.trim()}”.
-              </p>
-            ) : (
-              (["product", "supplier", "category", "order"] as const).map((type) => {
-                const group = results.filter((r) => r.type === type);
-                if (group.length === 0) return null;
-                return (
-                  <div key={type} className="py-1">
-                    <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      {groupLabel[type]}
-                    </p>
-                    {group.map((r, i) => (
-                      <button
-                        key={`${type}-${i}`}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => go(r.to)}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50"
-                      >
-                        {iconFor(r.type)}
-                        <span className="min-w-0">
-                          <span className="block text-sm font-medium text-slate-800 truncate">
-                            {r.title}
-                          </span>
-                          <span className="block text-xs text-slate-500 truncate">
-                            {r.subtitle}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <div className="absolute mt-1.5 w-full">{searchResultsPanel()}</div>
         )}
       </div>
+
+      <Modal
+        open={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        title="Búsqueda global"
+        description="Encuentra rápidamente productos, proveedores, categorías y órdenes de compra."
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative">
+            <Input
+              inputRef={modalSearchRef}
+              icon={<IconSearch className="w-4 h-4" />}
+              placeholder="Buscar SKU, producto, proveedor, categoría u OC..."
+              aria-label="Buscar en la plataforma"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                aria-label="Limpiar búsqueda"
+              >
+                <IconClose className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {searchResultsPanel(true)}
+        </form>
+      </Modal>
 
       <BackendStatus />
 
