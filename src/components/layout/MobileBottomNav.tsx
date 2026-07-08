@@ -1,12 +1,12 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "../../utils/cn";
-import { IconDashboard, IconOrders, IconReplenish, IconAlerts, IconMenu } from "../ui/icons";
+import { IconDashboard, IconCategories, IconReplenish, IconInventory, IconMenu } from "../ui/icons";
 
 const items = [
   { to: "/", label: "Inicio", icon: IconDashboard, end: true },
-  { to: "/reposicion", label: "Reposición", icon: IconReplenish },
-  { to: "/ordenes-compra", label: "Órdenes", icon: IconOrders },
-  { to: "/alertas", label: "Alertas", icon: IconAlerts },
+  { to: "/mi-cartera", label: "Cartera", icon: IconCategories },
+  { to: "/reposicion", label: "Comprar", icon: IconReplenish },
+  { to: "/inventario", label: "Inventario", icon: IconInventory },
 ];
 
 interface MobileBottomNavProps {

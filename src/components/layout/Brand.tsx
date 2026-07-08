@@ -25,13 +25,13 @@ export function BrandLink() {
     <Link
       to="/"
       className="flex items-center gap-2 flex-shrink-0"
-      aria-label="Inicio · Plataforma de Compras"
-      title="Plataforma de Compras"
+      aria-label="Inicio · Buyer Workspace"
+      title="Buyer Workspace"
     >
       <BrandLogo />
       <div className="leading-tight hidden sm:block">
-        <p className="text-sm font-semibold text-slate-900">Plataforma</p>
-        <p className="text-xs text-slate-500 -mt-0.5">de Compras</p>
+        <p className="text-sm font-semibold text-slate-900">Buyer</p>
+        <p className="text-xs text-slate-500 -mt-0.5">Workspace</p>
       </div>
     </Link>
   );
@@ -43,8 +43,8 @@ export function Brand() {
     <div className="flex items-center gap-2.5 px-5 h-16 border-b border-slate-100 flex-shrink-0">
       <BrandLogo />
       <div className="leading-tight">
-        <p className="text-sm font-semibold text-slate-900">Plataforma</p>
-        <p className="text-xs text-slate-500 -mt-0.5">de Compras</p>
+        <p className="text-sm font-semibold text-slate-900">Buyer</p>
+        <p className="text-xs text-slate-500 -mt-0.5">Workspace</p>
       </div>
     </div>
   );

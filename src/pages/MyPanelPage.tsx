@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
@@ -20,6 +20,7 @@ import {
   IconCheck,
   IconPlus,
   IconChevronRight,
+  IconSales,
 } from "../components/ui/icons";
 import { products } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
@@ -43,8 +44,13 @@ import { TODAY_ISO } from "../utils/constants";
 import { seasonalFactor } from "../utils/seasonality";
 import { lostOpportunities } from "../utils/lostOpportunities";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
-import { useState } from "react";
-import { formatCurrencyCompact, formatDate, formatDays, formatNumber } from "../utils/formatters";
+import {
+  formatCurrencyCompact,
+  formatDate,
+  formatDays,
+  formatNumber,
+  formatPercent,
+} from "../utils/formatters";
 import type { Product } from "../types/purchasing";
 
 interface RiskRow {
@@ -53,6 +59,14 @@ interface RiskRow {
   stockoutDate: string | null;
   suggestedQty: number;
   coverageAfter: number;
+}
+
+interface SalesPaceRow {
+  product: Product;
+  expected30: number;
+  diffUnits: number;
+  diffPct: number;
+  coverage: number;
 }
 
 export function MyPanelPage() {
@@ -85,6 +99,77 @@ export function MyPanelPage() {
   );
 
   const myCats = categories.filter((c) => c.buyer === buyer);
+
+  const portfolio = useMemo(() => {
+    const salesValue = myProducts.reduce((sum, p) => sum + p.salesLast30Days * p.price, 0);
+    const grossProfit = myProducts.reduce(
+      (sum, p) => sum + p.salesLast30Days * (p.price - p.cost),
+      0
+    );
+    const inventoryValue = myProducts.reduce((sum, p) => sum + p.availableStock * p.cost, 0);
+    const overstockValue = myProducts
+      .filter((p) => p.purchaseStatus === "overstock" || p.inventoryDays > 180)
+      .reduce((sum, p) => sum + p.availableStock * p.cost, 0);
+    const noSalesStockValue = myProducts
+      .filter((p) => p.salesLast90Days === 0 && p.availableStock > 0)
+      .reduce((sum, p) => sum + p.availableStock * p.cost, 0);
+    const coverageWeighted =
+      salesValue > 0
+        ? myProducts.reduce((sum, p) => sum + p.inventoryDays * p.salesLast30Days * p.price, 0) /
+          salesValue
+        : 0;
+    const rotation =
+      inventoryValue > 0
+        ? (myProducts.reduce((sum, p) => sum + p.salesLast30Days * p.cost, 0) * 12) / inventoryValue
+        : 0;
+    const gmroi = inventoryValue > 0 ? (grossProfit * 12) / inventoryValue : 0;
+    const brands = Array.from(new Set(myProducts.map((p) => p.brand).filter(Boolean))).sort();
+    const supplierNames = Array.from(
+      new Set(myProducts.map((p) => p.supplierName).filter(Boolean))
+    ).sort();
+    const subcategories = Array.from(new Set(myProducts.map((p) => p.subcategory))).sort();
+
+    return {
+      salesValue,
+      marginPct: salesValue > 0 ? (grossProfit / salesValue) * 100 : 0,
+      inventoryValue,
+      overstockValue,
+      noSalesStockValue,
+      coverageWeighted,
+      rotation,
+      gmroi,
+      brands,
+      supplierNames,
+      subcategories,
+    };
+  }, [myProducts]);
+
+  const salesPace = useMemo(() => {
+    const rows = myProducts
+      .map<SalesPaceRow | null>((p) => {
+        const expected30 = p.salesLast90Days / 3;
+        if (expected30 < 8) return null;
+        const diffUnits = p.salesLast30Days - expected30;
+        const diffPct = expected30 > 0 ? diffUnits / expected30 : 0;
+        return {
+          product: p,
+          expected30,
+          diffUnits,
+          diffPct,
+          coverage: coverageDays(p.availableStock, p.salesLast30Days),
+        };
+      })
+      .filter((r): r is SalesPaceRow => !!r);
+
+    const faster = rows
+      .filter((r) => r.diffPct >= 0.15)
+      .sort((a, b) => b.diffPct - a.diffPct || a.coverage - b.coverage);
+    const slower = rows
+      .filter((r) => r.diffPct <= -0.15 && r.product.availableStock > 0)
+      .sort((a, b) => a.diffPct - b.diffPct || b.product.availableStock - a.product.availableStock);
+
+    return { faster, slower };
+  }, [myProducts]);
 
   // Oportunidades no capturadas y aprobaciones del comprador
   const myLostOpps = useMemo(
@@ -185,6 +270,30 @@ export function MyPanelPage() {
       tone: "red",
     });
   });
+  salesPace.faster.slice(0, 3).forEach((r) => {
+    agenda.push({
+      id: `fast-${r.product.sku}`,
+      dueDate: TODAY_ISO,
+      days: 0,
+      kind: "Venta rápida",
+      title: r.product.name,
+      detail: `Venta ${formatNumber(Math.round(r.diffPct * 100))}% sobre lo esperado · revisar stock`,
+      to: `/productos/${r.product.sku}`,
+      tone: r.coverage <= r.product.supplierLeadTimeDays * 2 ? "red" : "blue",
+    });
+  });
+  salesPace.slower.slice(0, 3).forEach((r) => {
+    agenda.push({
+      id: `slow-${r.product.sku}`,
+      dueDate: addDaysISO(TODAY_ISO, 7),
+      days: 7,
+      kind: "Venta lenta",
+      title: r.product.name,
+      detail: `Venta ${formatNumber(Math.abs(Math.round(r.diffPct * 100)))}% bajo lo esperado · revisar compra`,
+      to: `/productos/${r.product.sku}`,
+      tone: "amber",
+    });
+  });
   myOpenOrders.forEach((o) => {
     agenda.push({
       id: `oc-${o.id}`,
@@ -253,9 +362,16 @@ export function MyPanelPage() {
   // Acción recomendada del día (lo más urgente) + resumen compacto
   const topRisk = riskRows[0];
   const quiebresHoy = riskRows.filter((r) => r.product.availableStock <= 0).length;
-  const ocPorLlegar = myOpenOrders.length;
+  const fastWithLowCoverage = salesPace.faster.filter(
+    (r) => r.coverage <= r.product.supplierLeadTimeDays * 2
+  ).length;
+  const slowCapital = salesPace.slower.reduce(
+    (sum, r) => sum + r.product.availableStock * r.product.cost,
+    0
+  );
   const criticalActions =
     quiebresHoy +
+    fastWithLowCoverage +
     myDelayedPOs.length +
     mySuppliersToReview.filter((s) => s.status === "delayed").length;
 
@@ -401,7 +517,7 @@ export function MyPanelPage() {
     <div>
       <PageHeader
         title={`Hola, ${buyer}`}
-        description={`${formatDate(TODAY_ISO)} · ${criticalActions > 0 ? `Tienes ${criticalActions} acción${criticalActions === 1 ? "" : "es"} crítica${criticalActions === 1 ? "" : "s"} para hoy.` : "Sin acciones críticas para hoy."}`}
+        description={`${formatDate(TODAY_ISO)} · ${criticalActions > 0 ? `${criticalActions} foco${criticalActions === 1 ? "" : "s"} crítico${criticalActions === 1 ? "" : "s"} para revisar ahora.` : "Sin focos críticos para hoy."}`}
         action={
           <Button
             variant="secondary"
@@ -413,67 +529,256 @@ export function MyPanelPage() {
         }
       />
 
-      {/* Resumen compacto del día (chips cliqueables) */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-3 pb-0.5">
-        <Chip
-          tone="red"
-          label={`${quiebresHoy} quiebres hoy`}
-          onClick={() => {
-            setHorizon("hoy");
-          }}
-        />
-        <Chip tone="amber" label={`${riskRows.length} en riesgo`} to="#riesgo" />
-        <Chip tone="blue" label={`${ocPorLlegar} OC sin recibir`} to="#ordenes" />
-        <Chip tone="amber" label={`${mySuppliersToReview.length} proveedores`} to="#proveedores" />
-        <Chip tone="violet" label={`${overstockProducts.length} sobrestock`} to="#sobrestock" />
-      </div>
+      <section className="mb-4 lg:hidden rounded-xl border border-slate-200 bg-white p-4 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Prioridades hoy
+        </p>
+        <h2 className="mt-1 text-lg font-semibold text-slate-900">
+          Qué mirar primero en tu cartera
+        </h2>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <AttentionMetric
+            tone="red"
+            label="Quiebres"
+            value={formatNumber(quiebresHoy)}
+            detail={`${riskRows.length} en riesgo`}
+            to="#riesgo"
+          />
+          <AttentionMetric
+            tone="blue"
+            label="Venta rápida"
+            value={formatNumber(salesPace.faster.length)}
+            detail={`${fastWithLowCoverage} cortos`}
+            to="#ventas-rapidas"
+          />
+          <AttentionMetric
+            tone="amber"
+            label="Venta lenta"
+            value={formatNumber(salesPace.slower.length)}
+            detail={formatCurrencyCompact(slowCapital)}
+            to="#ventas-lentas"
+          />
+          <AttentionMetric
+            tone="violet"
+            label="No capturada"
+            value={formatCurrencyCompact(myLostRevenue)}
+            detail={`${myLostOpps.length} casos`}
+            to="/venta-no-capturada"
+          />
+        </div>
+        <Button
+          className="mt-3 w-full"
+          size="sm"
+          variant="primary"
+          onClick={() => navigate(topRisk ? `/productos/${topRisk.product.sku}` : "/reposicion")}
+          icon={<IconAlerts className="w-3.5 h-3.5" />}
+        >
+          Revisar prioridad principal
+        </Button>
+      </section>
 
-      {/* Acción recomendada hoy */}
-      {topRisk && (
-        <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-rose-600 mb-1">
-            Acción recomendada hoy
-          </p>
-          <p className="text-lg font-semibold text-slate-900">
-            Comprar {formatNumber(topRisk.suggestedQty)} u. de {topRisk.product.name}
-          </p>
-          <p className="text-sm text-slate-600 mt-0.5">
-            {topRisk.product.availableStock <= 0
-              ? "Quiebre hoy"
-              : `Quiebre estimado ${formatDate(topRisk.stockoutDate ?? "")}`}{" "}
-            · stock {formatNumber(topRisk.product.availableStock)} u. · lead time proveedor{" "}
-            {formatDays(topRisk.product.supplierLeadTimeDays)} · cubre ~
-            {formatDays(topRisk.coverageAfter)}
-          </p>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <Button
-              size="sm"
-              disabled={hasItem(topRisk.product.sku)}
-              variant={hasItem(topRisk.product.sku) ? "secondary" : "primary"}
-              onClick={() => handleAdd(topRisk.product, topRisk.suggestedQty)}
-              icon={
-                hasItem(topRisk.product.sku) ? (
-                  <IconCheck className="w-3.5 h-3.5" />
-                ) : (
-                  <IconPlus className="w-3.5 h-3.5" />
-                )
-              }
-            >
-              {hasItem(topRisk.product.sku) ? "En OC" : "Crear OC"}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => navigate(`/productos/${topRisk.product.sku}`)}
-            >
-              Revisar SKU
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => navigate("/reposicion?foco=urgent")}>
-              Ver reposición
-            </Button>
+      <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-card">
+        <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.2fr]">
+          <div className="border-b border-slate-100 p-4 xl:border-b-0 xl:border-r">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Mi cartera asignada
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">
+              {myCats.length} categorías · {portfolio.subcategories.length} subcategorías ·{" "}
+              {myProducts.length} SKU
+            </h2>
+            <div className="mt-3 space-y-3">
+              <PortfolioGroup
+                label="Categorías"
+                items={myCats.map((c) => c.name)}
+                tone="blue"
+                moreTo="/categorias"
+              />
+              <PortfolioGroup
+                label="Marcas"
+                items={portfolio.brands}
+                tone="violet"
+                moreTo="/productos"
+              />
+              <PortfolioGroup
+                label="Proveedores"
+                items={portfolio.supplierNames}
+                tone="amber"
+                moreTo="/proveedores"
+              />
+            </div>
+          </div>
+
+          <div className="p-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <PortfolioMetric
+                label="Venta 30d"
+                value={formatCurrencyCompact(portfolio.salesValue)}
+              />
+              <PortfolioMetric label="Margen" value={formatPercent(portfolio.marginPct)} />
+              <PortfolioMetric
+                label="Inventario"
+                value={formatCurrencyCompact(portfolio.inventoryValue)}
+              />
+              <PortfolioMetric label="Rotación" value={`${formatNumber(portfolio.rotation)}x`} />
+              <PortfolioMetric
+                label="Cobertura"
+                value={formatDays(Math.round(portfolio.coverageWeighted))}
+              />
+              <PortfolioMetric
+                label="Quiebres críticos"
+                value={`${formatNumber(quiebresHoy)} SKU`}
+              />
+              <PortfolioMetric
+                label="Sobrestock"
+                value={formatCurrencyCompact(portfolio.overstockValue)}
+              />
+              <PortfolioMetric label="GMROI" value={portfolio.gmroi.toFixed(1).replace(".", ",")} />
+            </div>
           </div>
         </div>
-      )}
+      </section>
+
+      <section className="mb-4">
+        <div className="hidden grid-cols-1 gap-4 lg:grid xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Radar de atención
+                </p>
+                <h2 className="mt-1 text-xl font-semibold text-slate-900">
+                  Primero mira quiebres y cambios de velocidad de venta
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Detecté productos sin stock, SKUs que se aceleraron contra su ritmo histórico y
+                  productos que se frenaron antes de que se transformen en sobrestock.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() =>
+                  navigate(topRisk ? `/productos/${topRisk.product.sku}` : "/reposicion")
+                }
+                icon={<IconAlerts className="w-3.5 h-3.5" />}
+              >
+                Revisar prioridad
+              </Button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <AttentionMetric
+                tone="red"
+                label="Quiebres ahora"
+                value={formatNumber(quiebresHoy)}
+                detail={`${riskRows.length} SKUs en riesgo`}
+                to="#riesgo"
+              />
+              <AttentionMetric
+                tone="blue"
+                label="Venta más rápida"
+                value={formatNumber(salesPace.faster.length)}
+                detail={`${fastWithLowCoverage} con cobertura corta`}
+                to="#ventas-rapidas"
+              />
+              <AttentionMetric
+                tone="amber"
+                label="Venta más lenta"
+                value={formatNumber(salesPace.slower.length)}
+                detail={`${formatCurrencyCompact(slowCapital)} expuesto`}
+                to="#ventas-lentas"
+              />
+              <AttentionMetric
+                tone="violet"
+                label="Venta no capturada"
+                value={formatCurrencyCompact(myLostRevenue)}
+                detail={`${myLostOpps.length} oportunidades`}
+                to="/venta-no-capturada"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-rose-600">
+              Acción recomendada hoy
+            </p>
+            {topRisk ? (
+              <>
+                <p className="mt-1 text-lg font-semibold text-slate-900">
+                  Comprar {formatNumber(topRisk.suggestedQty)} u. de {topRisk.product.name}
+                </p>
+                <p className="text-sm text-slate-600 mt-1">
+                  {topRisk.product.availableStock <= 0
+                    ? "Quiebre hoy"
+                    : `Quiebre estimado ${formatDate(topRisk.stockoutDate ?? "")}`}{" "}
+                  · stock {formatNumber(topRisk.product.availableStock)} u. · lead{" "}
+                  {formatDays(topRisk.product.supplierLeadTimeDays)} · cubre ~
+                  {formatDays(topRisk.coverageAfter)}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Button
+                    size="sm"
+                    disabled={hasItem(topRisk.product.sku)}
+                    variant={hasItem(topRisk.product.sku) ? "secondary" : "primary"}
+                    onClick={() => handleAdd(topRisk.product, topRisk.suggestedQty)}
+                    icon={
+                      hasItem(topRisk.product.sku) ? (
+                        <IconCheck className="w-3.5 h-3.5" />
+                      ) : (
+                        <IconPlus className="w-3.5 h-3.5" />
+                      )
+                    }
+                  >
+                    {hasItem(topRisk.product.sku) ? "En OC" : "Crear OC"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => navigate(`/productos/${topRisk.product.sku}`)}
+                  >
+                    Revisar SKU
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate("/reposicion?foco=urgent")}
+                  >
+                    Ver reposición
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-slate-600">
+                No hay quiebres urgentes. Revisa los cambios de velocidad de venta para anticiparte.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <SalesPaceCard
+            id="ventas-rapidas"
+            tone="blue"
+            title="Ventas más rápidas de lo esperado"
+            description="Subieron contra su promedio reciente. Si la cobertura es corta, conviene comprar antes."
+            icon={<IconSales className="w-4 h-4" />}
+            rows={salesPace.faster.slice(0, 4)}
+            emptyTitle="Sin aceleraciones relevantes"
+            emptyDescription="Tus productos están vendiendo cerca de su ritmo esperado."
+          />
+          <SalesPaceCard
+            id="ventas-lentas"
+            tone="amber"
+            title="Ventas más lentas de lo esperado"
+            description="Cayeron contra su promedio reciente. Evita recomprar igual que antes y revisa precio, campaña o surtido."
+            icon={<IconBox className="w-4 h-4" />}
+            rows={salesPace.slower.slice(0, 4)}
+            emptyTitle="Sin frenos relevantes"
+            emptyDescription="No hay señales fuertes de desaceleración en tus categorías."
+          />
+        </div>
+      </section>
 
       {/* Agenda por horizonte: qué revisar hoy / semana / mes / 3 meses */}
       <Card className="mb-4">
@@ -1000,33 +1305,161 @@ export function MyPanelPage() {
   );
 }
 
-function Chip({
+function AttentionMetric({
   label,
+  value,
+  detail,
   tone,
   to,
-  onClick,
 }: {
   label: string;
+  value: string;
+  detail: string;
   tone: "red" | "amber" | "blue" | "violet";
-  to?: string;
-  onClick?: () => void;
+  to: string;
 }) {
   const toneClass = {
-    red: "bg-rose-50 text-rose-700 border-rose-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
+    red: "border-rose-200 bg-rose-50 text-rose-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    blue: "border-brand-200 bg-brand-50 text-brand-700",
+    violet: "border-violet-200 bg-violet-50 text-violet-700",
+  }[tone];
+
+  return (
+    <a href={to} className={`rounded-lg border p-3 transition-colors hover:bg-white ${toneClass}`}>
+      <span className="block text-xs font-medium">{label}</span>
+      <span className="mt-1 block text-2xl font-semibold leading-none text-slate-900">{value}</span>
+      <span className="mt-1 block text-xs text-slate-500">{detail}</span>
+    </a>
+  );
+}
+
+function PortfolioMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function PortfolioGroup({
+  label,
+  items,
+  tone,
+  moreTo,
+}: {
+  label: string;
+  items: string[];
+  tone: "blue" | "amber" | "violet";
+  moreTo: string;
+}) {
+  const shown = items.slice(0, 5);
+  const remaining = Math.max(0, items.length - shown.length);
+  const toneClass = {
     blue: "bg-brand-50 text-brand-700 border-brand-200",
+    amber: "bg-amber-50 text-amber-700 border-amber-200",
     violet: "bg-violet-50 text-violet-700 border-violet-200",
   }[tone];
-  const cls = `whitespace-nowrap flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${toneClass}`;
-  if (to)
-    return (
-      <a href={to} className={cls}>
-        {label}
-      </a>
-    );
+
   return (
-    <button onClick={onClick} className={cls}>
-      {label}
-    </button>
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+        <Link to={moreTo} className="text-xs font-medium text-brand-600 hover:text-brand-700">
+          Ver
+        </Link>
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {shown.map((item) => (
+          <span key={item} className={`rounded-full border px-2 py-1 text-xs ${toneClass}`}>
+            {item}
+          </span>
+        ))}
+        {remaining > 0 && (
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-500">
+            +{remaining}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SalesPaceCard({
+  id,
+  tone,
+  title,
+  description,
+  icon,
+  rows,
+  emptyTitle,
+  emptyDescription,
+}: {
+  id: string;
+  tone: "blue" | "amber";
+  title: string;
+  description: string;
+  icon: ReactNode;
+  rows: SalesPaceRow[];
+  emptyTitle: string;
+  emptyDescription: string;
+}) {
+  const toneClass =
+    tone === "blue"
+      ? "bg-brand-50 text-brand-700 border-brand-200"
+      : "bg-amber-50 text-amber-700 border-amber-200";
+
+  return (
+    <div id={id}>
+      <Card>
+        <CardHeader
+          title={title}
+          description={description}
+          action={<span className={`rounded-lg border p-2 ${toneClass}`}>{icon}</span>}
+        />
+        <CardBody className="space-y-2">
+          {rows.length === 0 ? (
+            <EmptyState title={emptyTitle} description={emptyDescription} />
+          ) : (
+            rows.map((r) => {
+              const diff = Math.round(r.diffPct * 100);
+              const absDiff = Math.abs(diff);
+              const risk =
+                tone === "blue" && r.coverage <= r.product.supplierLeadTimeDays * 2
+                  ? "Cobertura corta"
+                  : tone === "amber"
+                    ? `${formatNumber(r.product.inventoryDays)} días inv.`
+                    : `${formatDays(r.coverage)} cobertura`;
+
+              return (
+                <Link
+                  key={r.product.sku}
+                  to={`/productos/${r.product.sku}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-800 truncate">
+                      {r.product.name}
+                    </span>
+                    <span className="block text-xs text-slate-500 truncate">
+                      Esperado {formatNumber(Math.round(r.expected30))} u. · real{" "}
+                      {formatNumber(r.product.salesLast30Days)} u.
+                    </span>
+                  </span>
+                  <span className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <Badge tone={tone === "blue" ? "blue" : "amber"}>
+                      {tone === "blue" ? "+" : "-"}
+                      {formatNumber(absDiff)}%
+                    </Badge>
+                    <span className="text-xs text-slate-500">{risk}</span>
+                  </span>
+                </Link>
+              );
+            })
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

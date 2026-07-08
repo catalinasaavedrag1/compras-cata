@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
-import { navGroupsFor } from "./navItems";
+import { NavLink, useLocation } from "react-router-dom";
+import { activeModuleFor, modulesFor } from "./navItems";
 import { cn } from "../../utils/cn";
 import { useLocalStorage } from "../../utils/useLocalStorage";
 import { useRole } from "../../context/RoleContext";
@@ -20,11 +20,13 @@ interface HoverTip {
 export function Sidebar() {
   const [collapsed, setCollapsed] = useLocalStorage<boolean>("compras:sidebar-collapsed", false);
   const [tip, setTip] = useState<HoverTip | null>(null);
+  const { pathname } = useLocation();
   const { role } = useRole();
-  const navGroups = navGroupsFor(role);
+  const modules = modulesFor(role);
+  const activeModule = activeModuleFor(modules, pathname);
   const badges = useNavBadges();
   // Accesos rápidos: visitados recientemente dentro del menú del rol actual.
-  const roleRoutes = new Set(navGroups.flatMap((g) => g.items.map((i) => i.to)));
+  const roleRoutes = new Set(modules.flatMap((m) => m.children.map((i) => i.to)));
   const recent = useRecentRoutes(3).filter((i) => roleRoutes.has(i.to));
 
   // Atajo de teclado: "[" colapsa/expande sin usar el mouse.
@@ -51,6 +53,19 @@ export function Sidebar() {
     if (!collapsed) return;
     const r = e.currentTarget.getBoundingClientRect();
     setTip({ label, hint, top: r.top + r.height / 2 });
+  };
+
+  const moduleBadge = (keys: (typeof modules)[number]["badgeKeys"]) => {
+    if (!keys || keys.length === 0) return undefined;
+    const active = keys.map((k) => badges[k]).filter((b) => b.count > 0);
+    if (active.length === 0) return undefined;
+    const count = active.reduce((sum, b) => sum + b.count, 0);
+    const tone = active.some((b) => b.tone === "red")
+      ? "red"
+      : active.some((b) => b.tone === "amber")
+        ? "amber"
+        : active[0].tone;
+    return { count, tone };
   };
 
   return (
@@ -81,8 +96,8 @@ export function Sidebar() {
             <div className="flex items-center gap-2.5 flex-1 min-w-0">
               <BrandLogo />
               <div className="leading-tight min-w-0">
-                <p className="text-sm font-semibold text-slate-900 truncate">Plataforma</p>
-                <p className="text-xs text-slate-500 -mt-0.5">de Compras</p>
+                <p className="text-sm font-semibold text-slate-900 truncate">Buyer</p>
+                <p className="text-xs text-slate-500 -mt-0.5">Workspace</p>
               </div>
             </div>
           )}
@@ -123,84 +138,77 @@ export function Sidebar() {
               </div>
             </div>
           )}
-          {navGroups.map((group) => (
-            <div key={group.title} className="mb-3 last:mb-0">
-              {!collapsed && (
-                <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  {group.title}
-                </p>
-              )}
-              {collapsed && <div className="h-px bg-slate-100 mx-2 mb-2" />}
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const b = item.badge ? badges[item.badge] : undefined;
-                  const showBadge = !!b && b.count > 0;
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end}
-                      title={collapsed ? undefined : item.hint}
-                      onMouseEnter={(e) => showTip(e, item.label, item.hint)}
-                      onMouseLeave={() => setTip(null)}
-                      className={({ isActive }) =>
-                        cn(
-                          "relative flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
-                          collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2",
-                          isActive
-                            ? "bg-brand-50 text-brand-700"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        )
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
-                          {/* Barra de acento del estado activo (más evidente que solo color) */}
-                          {isActive && (
-                            <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-brand-600" />
+          <div className="mb-3">
+            {!collapsed && (
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Módulos
+              </p>
+            )}
+            {collapsed && <div className="h-px bg-slate-100 mx-2 mb-2" />}
+            <div className="space-y-0.5">
+              {modules.map((module) => {
+                const b = moduleBadge(module.badgeKeys);
+                const showBadge = !!b && b.count > 0;
+                const isActive = activeModule?.key === module.key;
+                return (
+                  <NavLink
+                    key={module.key}
+                    to={module.to}
+                    end={module.end}
+                    title={collapsed ? undefined : module.hint}
+                    onMouseEnter={(e) => showTip(e, module.label, module.hint)}
+                    onMouseLeave={() => setTip(null)}
+                    className={cn(
+                      "relative flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
+                      collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2",
+                      isActive
+                        ? "bg-brand-50 text-brand-700"
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    )}
+                  >
+                    {isActive && (
+                      <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-brand-600" />
+                    )}
+                    <span className="relative flex-shrink-0">
+                      <module.icon
+                        className={cn("w-5 h-5", isActive ? "text-brand-600" : "text-slate-400")}
+                      />
+                      {collapsed && showBadge && (
+                        <span
+                          className={cn(
+                            "absolute -top-1 -right-1 w-2 h-2 rounded-full ring-2 ring-white",
+                            BADGE_DOT[b!.tone]
                           )}
-                          <span className="relative flex-shrink-0">
-                            <item.icon
-                              className={cn(
-                                "w-5 h-5",
-                                isActive ? "text-brand-600" : "text-slate-400"
-                              )}
-                            />
-                            {collapsed && showBadge && (
-                              <span
-                                className={cn(
-                                  "absolute -top-1 -right-1 w-2 h-2 rounded-full ring-2 ring-white",
-                                  BADGE_DOT[b!.tone]
-                                )}
-                              />
-                            )}
-                          </span>
-                          {!collapsed && <span className="truncate">{item.label}</span>}
-                          {!collapsed && showBadge && (
-                            <span
-                              className={cn(
-                                "ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 min-w-[20px] text-center",
-                                BADGE_PILL[b!.tone]
-                              )}
-                            >
-                              {b!.count > 99 ? "99+" : b!.count}
-                            </span>
-                          )}
-                        </>
+                        />
                       )}
-                    </NavLink>
-                  );
-                })}
-              </div>
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="truncate">{module.label}</span>
+                        {showBadge && (
+                          <span
+                            className={cn(
+                              "ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 min-w-[20px] text-center",
+                              BADGE_PILL[b!.tone]
+                            )}
+                          >
+                            {b!.count > 99 ? "99+" : b!.count}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
-          ))}
+          </div>
         </nav>
 
         {!collapsed && (
           <div className="px-4 py-3 border-t border-slate-100">
             <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-              <p className="text-xs font-medium text-slate-700">Demo con datos mock</p>
-              <p className="text-xs text-slate-500 mt-0.5">Sin backend. Datos locales.</p>
+              <p className="text-xs font-medium text-slate-700">Decisiones priorizadas</p>
+              <p className="text-xs text-slate-500 mt-0.5">Venta · margen · stock · catálogo.</p>
             </div>
           </div>
         )}

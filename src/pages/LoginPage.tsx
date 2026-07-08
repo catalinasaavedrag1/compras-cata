@@ -43,8 +43,8 @@ export function LoginPage() {
               <path d="M4 16l4-8 4 5 2-3 4 6" />
             </svg>
           </div>
-          <h1 className="text-lg font-semibold text-slate-900">Plataforma de Compras</h1>
-          <p className="text-sm text-slate-500">Inicia sesión para continuar</p>
+          <h1 className="text-lg font-semibold text-slate-900">Buyer Workspace</h1>
+          <p className="text-sm text-slate-500">Tu cartera, prioridades y decisiones</p>
         </div>
 
         <form

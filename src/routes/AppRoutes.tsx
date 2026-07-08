@@ -128,6 +128,7 @@ export default function AppRoutes() {
                             >
                               {/* Inicio: una sola portada operativa (antes "Dashboard" + "Mi panel"). */}
                               <Route path="/" element={<InicioPage />} />
+                              <Route path="/mi-cartera" element={<InicioPage />} />
                               <Route path="/mi-panel" element={<Navigate to="/" replace />} />
                               <Route path="/mi-desempeno" element={<MyPerformancePage />} />
                               <Route

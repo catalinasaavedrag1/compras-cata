@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { navGroupsFor } from "./navItems";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { activeModuleFor, modulesFor } from "./navItems";
 import { Brand } from "./Brand";
 import { cn } from "../../utils/cn";
 import { Input } from "../ui/Input";
@@ -16,9 +16,11 @@ interface MobileNavProps {
 
 export function MobileNav({ open, onClose }: MobileNavProps) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [search, setSearch] = useState("");
   const { role } = useRole();
-  const navGroups = navGroupsFor(role);
+  const modules = modulesFor(role);
+  const activeModule = activeModuleFor(modules, pathname) ?? modules[0];
   const badges = useNavBadges();
 
   if (!open) return null;
@@ -54,57 +56,115 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
           />
         </form>
         <nav className="flex-1 px-3 py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] overflow-y-auto scrollbar-thin">
-          {navGroups.map((group) => (
-            <div key={group.title} className="mb-3 last:mb-0">
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {group.title}
-              </p>
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const b = item.badge ? badges[item.badge] : undefined;
-                  const showBadge = !!b && b.count > 0;
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end}
-                      onClick={onClose}
-                      className={({ isActive }) =>
-                        cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                          isActive
-                            ? "bg-brand-50 text-brand-700"
-                            : "text-slate-600 hover:bg-slate-100"
-                        )
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Módulo actual
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {activeModule.children.map((item) => {
+                const b = item.badge ? badges[item.badge] : undefined;
+                const showBadge = !!b && b.count > 0;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    onClick={onClose}
+                    title={item.hint}
+                    className={({ isActive }) =>
+                      cn(
+                        "min-h-16 rounded-lg border px-3 py-2 text-left transition-colors",
+                        isActive
+                          ? "border-brand-200 bg-white text-brand-700 shadow-sm"
+                          : "border-slate-200 bg-white text-slate-700"
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
                           <item.icon
                             className={cn(
-                              "w-5 h-5",
+                              "w-4 h-4",
                               isActive ? "text-brand-600" : "text-slate-400"
                             )}
                           />
-                          {item.label}
                           {showBadge && (
                             <span
                               className={cn(
-                                "ml-auto text-[11px] font-semibold rounded-full px-1.5 py-0.5 min-w-[20px] text-center",
+                                "text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-[18px] text-center",
                                 PILL[b!.tone] ?? "bg-slate-100 text-slate-600"
                               )}
                             >
                               {b!.count > 99 ? "99+" : b!.count}
                             </span>
                           )}
-                        </>
-                      )}
-                    </NavLink>
-                  );
-                })}
-              </div>
+                        </div>
+                        <span className="mt-1 block text-sm font-semibold leading-tight">
+                          {item.label}
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
-          ))}
+          </div>
+
+          <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Cambiar módulo
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {modules.map((module) => {
+              const isActive = module.key === activeModule.key;
+              const activeBadges = module.badgeKeys
+                ?.map((k) => badges[k])
+                .filter((b) => b.count > 0);
+              const count = activeBadges?.reduce((sum, b) => sum + b.count, 0) ?? 0;
+              const tone = activeBadges?.some((b) => b.tone === "red")
+                ? "red"
+                : activeBadges?.some((b) => b.tone === "amber")
+                  ? "amber"
+                  : activeBadges?.[0]?.tone;
+              return (
+                <NavLink
+                  key={module.key}
+                  to={module.to}
+                  end={module.end}
+                  onClick={onClose}
+                  title={module.hint}
+                  className={cn(
+                    "rounded-xl border p-3 min-h-20 transition-colors",
+                    isActive
+                      ? "border-brand-200 bg-brand-50 text-brand-700"
+                      : "border-slate-200 bg-white text-slate-700"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <module.icon
+                      className={cn("w-5 h-5", isActive ? "text-brand-600" : "text-slate-400")}
+                    />
+                    {count > 0 && tone && (
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-[18px] text-center",
+                          PILL[tone] ?? "bg-slate-100 text-slate-600"
+                        )}
+                      >
+                        {count > 99 ? "99+" : count}
+                      </span>
+                    )}
+                  </div>
+                  <span className="mt-2 block text-sm font-semibold leading-tight">
+                    {module.label}
+                  </span>
+                  <span className="mt-1 block text-[11px] leading-snug text-slate-500 line-clamp-2">
+                    {module.hint}
+                  </span>
+                </NavLink>
+              );
+            })}
+          </div>
         </nav>
       </div>
     </div>
