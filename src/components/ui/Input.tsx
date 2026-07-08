@@ -4,9 +4,10 @@ import { cn } from "../../utils/cn";
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   icon?: ReactNode;
   label?: string;
+  inputRef?: React.Ref<HTMLInputElement>;
 }
 
-export function Input({ icon, label, className, id, ...props }: InputProps) {
+export function Input({ icon, label, className, id, inputRef, ...props }: InputProps) {
   const reactId = useId();
   const fieldId = id ?? reactId;
   return (
@@ -23,6 +24,7 @@ export function Input({ icon, label, className, id, ...props }: InputProps) {
           </span>
         )}
         <input
+          ref={inputRef}
           id={fieldId}
           className={cn(
             "w-full rounded-lg border border-slate-300 bg-white py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100",

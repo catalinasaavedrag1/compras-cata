@@ -413,20 +413,46 @@ export function MyPanelPage() {
         }
       />
 
-      {/* Resumen compacto del día (chips cliqueables) */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-3 pb-0.5">
-        <Chip
-          tone="red"
-          label={`${quiebresHoy} quiebres hoy`}
-          onClick={() => {
-            setHorizon("hoy");
-          }}
-        />
-        <Chip tone="amber" label={`${riskRows.length} en riesgo`} to="#riesgo" />
-        <Chip tone="blue" label={`${ocPorLlegar} OC sin recibir`} to="#ordenes" />
-        <Chip tone="amber" label={`${mySuppliersToReview.length} proveedores`} to="#proveedores" />
-        <Chip tone="violet" label={`${overstockProducts.length} sobrestock`} to="#sobrestock" />
-      </div>
+      <Card className="mb-4 border-brand-100 bg-gradient-to-br from-white to-brand-50/40">
+        <CardBody>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+                Empieza aquí
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                Un flujo simple para comprar sin perderse
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                La plataforma tiene muchas vistas, pero tu rutina diaria se resume en tres pasos.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3 lg:w-[48rem]">
+              <QuickStartStep
+                number="1"
+                title="Compra lo urgente"
+                detail={`${riskRows.length} SKU en riesgo`}
+                to="/reposicion"
+                onClick={navigate}
+              />
+              <QuickStartStep
+                number="2"
+                title="Sigue lo pendiente"
+                detail={`${ocPorLlegar} OC por recibir`}
+                to="/ordenes-compra"
+                onClick={navigate}
+              />
+              <QuickStartStep
+                number="3"
+                title="Resuelve alertas"
+                detail={`${mySignals.length} señales abiertas`}
+                to="/alertas"
+                onClick={navigate}
+              />
+            </div>
+          </div>
+        </CardBody>
+      </Card>
 
       {/* Acción recomendada hoy */}
       {topRisk && (
@@ -1000,33 +1026,33 @@ export function MyPanelPage() {
   );
 }
 
-function Chip({
-  label,
-  tone,
+function QuickStartStep({
+  number,
+  title,
+  detail,
   to,
   onClick,
 }: {
-  label: string;
-  tone: "red" | "amber" | "blue" | "violet";
-  to?: string;
-  onClick?: () => void;
+  number: string;
+  title: string;
+  detail: string;
+  to: string;
+  onClick: (to: string) => void;
 }) {
-  const toneClass = {
-    red: "bg-rose-50 text-rose-700 border-rose-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    blue: "bg-brand-50 text-brand-700 border-brand-200",
-    violet: "bg-violet-50 text-violet-700 border-violet-200",
-  }[tone];
-  const cls = `whitespace-nowrap flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${toneClass}`;
-  if (to)
-    return (
-      <a href={to} className={cls}>
-        {label}
-      </a>
-    );
   return (
-    <button onClick={onClick} className={cls}>
-      {label}
+    <button
+      type="button"
+      onClick={() => onClick(to)}
+      className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition hover:border-brand-300 hover:bg-brand-50"
+    >
+      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 group-hover:bg-brand-600 group-hover:text-white">
+        {number}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-slate-800">{title}</span>
+        <span className="block truncate text-xs text-slate-500">{detail}</span>
+      </span>
+      <IconChevronRight className="ml-auto h-4 w-4 flex-shrink-0 text-slate-300 group-hover:text-brand-500" />
     </button>
   );
 }

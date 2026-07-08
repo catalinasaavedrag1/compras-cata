@@ -403,6 +403,88 @@ export function navGroupsFor(role: Role): NavGroup[] {
 /** Rutas que son exclusivas del líder (cross-comprador). Un comprador no entra. */
 export const LEADER_ONLY_PREFIXES = ["/equipo"];
 
+const PRIMARY_ROUTE_BY_ROLE: Record<Role, Set<string>> = {
+  comprador: new Set([
+    "/",
+    "/reposicion",
+    "/ordenes-compra",
+    "/aprobaciones",
+    "/alertas",
+    "/productos",
+  ]),
+  lider: new Set([
+    "/",
+    "/reposicion",
+    "/ordenes-compra",
+    "/aprobaciones",
+    "/alertas",
+    "/productos",
+    "/equipo",
+    "/equipo/alertas",
+    "/equipo/compradores",
+  ]),
+};
+
+const PRIMARY_GROUP_TITLES: Record<Role, Record<string, string[]>> = {
+  comprador: {
+    "Trabajo diario": [
+      "/",
+      "/reposicion",
+      "/ordenes-compra",
+      "/aprobaciones",
+      "/alertas",
+      "/productos",
+    ],
+  },
+  lider: {
+    "Trabajo diario": [
+      "/",
+      "/reposicion",
+      "/ordenes-compra",
+      "/aprobaciones",
+      "/alertas",
+      "/productos",
+    ],
+    Equipo: ["/equipo", "/equipo/alertas", "/equipo/compradores"],
+  },
+};
+
+function splitNavGroups(role: Role) {
+  const primaryRoutes = PRIMARY_ROUTE_BY_ROLE[role];
+  const allItems = navGroupsFor(role).flatMap((group) => group.items);
+  const primary: NavGroup[] = Object.entries(PRIMARY_GROUP_TITLES[role])
+    .map(([title, routes]) => ({
+      title,
+      items: routes
+        .map((route) => allItems.find((item) => item.to === route))
+        .filter((item): item is NavItem => Boolean(item)),
+    }))
+    .filter((group) => group.items.length > 0);
+  const secondaryItems = allItems.filter((item) => !primaryRoutes.has(item.to));
+
+  return {
+    primary,
+    secondary:
+      secondaryItems.length > 0 ? [{ title: "Vistas avanzadas", items: secondaryItems }] : [],
+  };
+}
+
+/** Navegación de foco: muestra solo las vistas operativas más usadas. */
+export function primaryNavGroupsFor(role: Role): NavGroup[] {
+  return splitNavGroups(role).primary;
+}
+
+/** Vistas especializadas que se esconden por defecto para reducir ruido. */
+export function secondaryNavGroupsFor(role: Role): NavGroup[] {
+  return splitNavGroups(role).secondary;
+}
+
+export function isSecondaryRoute(role: Role, pathname: string): boolean {
+  return secondaryNavGroupsFor(role).some((group) =>
+    group.items.some((item) => isPathActive(pathname, item.to, item.end))
+  );
+}
+
 /** Lista plana de todas las vistas (para títulos de ruta, recientes, etc.). */
 export const navItems: NavItem[] = [...compradorModules, ...liderExtraModules]
   .flatMap((m) => m.children)

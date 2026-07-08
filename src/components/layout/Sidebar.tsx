@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
-import { navGroupsFor } from "./navItems";
+import { NavLink, useLocation } from "react-router-dom";
+import { isSecondaryRoute, primaryNavGroupsFor, secondaryNavGroupsFor } from "./navItems";
 import { cn } from "../../utils/cn";
 import { useLocalStorage } from "../../utils/useLocalStorage";
 import { useRole } from "../../context/RoleContext";
 import { IconChevronRight } from "../ui/icons";
+import { Button } from "../ui/Button";
 import { useNavBadges } from "./useNavBadges";
-import { useRecentRoutes } from "./useRecentRoutes";
 import { BrandLogo } from "./Brand";
 import { PILL_TONE as BADGE_PILL, DOT_TONE as BADGE_DOT } from "../../utils/tone";
 
@@ -21,12 +21,13 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useLocalStorage<boolean>("compras:sidebar-collapsed", false);
   const [tip, setTip] = useState<HoverTip | null>(null);
   const { role } = useRole();
-  const navGroups = navGroupsFor(role);
+  const location = useLocation();
+  const [showAllViews, setShowAllViews] = useLocalStorage<boolean>("compras:show-all-views", false);
+  const primaryGroups = primaryNavGroupsFor(role);
+  const secondaryGroups = secondaryNavGroupsFor(role);
+  const showSecondary = showAllViews || isSecondaryRoute(role, location.pathname);
+  const navGroups = showSecondary ? [...primaryGroups, ...secondaryGroups] : primaryGroups;
   const badges = useNavBadges();
-  // Accesos rápidos: visitados recientemente dentro del menú del rol actual.
-  const roleRoutes = new Set(navGroups.flatMap((g) => g.items.map((i) => i.to)));
-  const recent = useRecentRoutes(3).filter((i) => roleRoutes.has(i.to));
-
   // Atajo de teclado: "[" colapsa/expande sin usar el mouse.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -103,25 +104,27 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 px-2 py-3 overflow-y-auto no-scrollbar">
-          {!collapsed && recent.length > 0 && (
-            <div className="mb-3">
-              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Recientes
-              </p>
-              <div className="space-y-0.5">
-                {recent.map((item) => (
-                  <NavLink
-                    key={`recent-${item.to}`}
-                    to={item.to}
-                    end={item.end}
-                    className="flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                  >
-                    <item.icon className="w-4 h-4 flex-shrink-0 text-slate-400" />
-                    <span className="truncate">{item.label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            </div>
+          {!collapsed && secondaryGroups.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="mb-3 w-full justify-between px-3 text-slate-500"
+              onClick={() => setShowAllViews((v) => !v)}
+            >
+              {showAllViews
+                ? "Ocultar vistas avanzadas"
+                : `Vistas avanzadas (${secondaryGroups[0].items.length})`}
+            </Button>
+          )}
+          {collapsed && secondaryGroups.length > 0 && (
+            <button
+              onClick={() => setShowAllViews((v) => !v)}
+              className="mb-3 flex h-9 w-full items-center justify-center rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+              title={showAllViews ? "Ocultar vistas avanzadas" : "Mostrar vistas avanzadas"}
+              aria-label={showAllViews ? "Ocultar vistas avanzadas" : "Mostrar vistas avanzadas"}
+            >
+              {showAllViews ? "−" : "+"}
+            </button>
           )}
           {navGroups.map((group) => (
             <div key={group.title} className="mb-3 last:mb-0">

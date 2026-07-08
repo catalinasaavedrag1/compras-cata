@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { navGroupsFor } from "./navItems";
+import { primaryNavGroupsFor, secondaryNavGroupsFor } from "./navItems";
 import { Brand } from "./Brand";
 import { cn } from "../../utils/cn";
 import { Input } from "../ui/Input";
@@ -18,7 +18,10 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const { role } = useRole();
-  const navGroups = navGroupsFor(role);
+  const primaryGroups = primaryNavGroupsFor(role);
+  const secondaryGroups = secondaryNavGroupsFor(role);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const navGroups = showAdvanced ? [...primaryGroups, ...secondaryGroups] : primaryGroups;
   const badges = useNavBadges();
 
   if (!open) return null;
@@ -54,6 +57,17 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
           />
         </form>
         <nav className="flex-1 px-3 py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] overflow-y-auto scrollbar-thin">
+          {secondaryGroups.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="mb-3 w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-slate-500 hover:bg-slate-50"
+            >
+              {showAdvanced
+                ? "Ocultar vistas avanzadas"
+                : `Vistas avanzadas (${secondaryGroups[0].items.length})`}
+            </button>
+          )}
           {navGroups.map((group) => (
             <div key={group.title} className="mb-3 last:mb-0">
               <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
