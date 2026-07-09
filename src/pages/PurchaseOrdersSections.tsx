@@ -32,7 +32,7 @@ export function OcDetailModal({
               Cerrar
             </Button>
             {detail.status === "pending_approval" && (
-              <Button variant="primary" onClick={() => navigate("/aprobaciones")}>
+              <Button variant="primary" onClick={() => navigate("/comprar/aprobaciones")}>
                 Ver aprobaciones
               </Button>
             )}

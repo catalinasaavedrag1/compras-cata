@@ -129,6 +129,10 @@ export default function AppRoutes() {
                               {/* Inicio: una sola portada operativa (antes "Dashboard" + "Mi panel"). */}
                               <Route path="/" element={<InicioPage />} />
                               <Route path="/mi-cartera" element={<InicioPage />} />
+                              <Route path="/mi-cartera/productos-clave" element={<InicioPage />} />
+                              <Route path="/mi-cartera/marcas" element={<InicioPage />} />
+                              <Route path="/mi-cartera/proveedores" element={<InicioPage />} />
+                              <Route path="/mi-cartera/oportunidades" element={<InicioPage />} />
                               <Route path="/mi-panel" element={<Navigate to="/" replace />} />
                               <Route path="/mi-desempeno" element={<MyPerformancePage />} />
                               <Route
@@ -179,6 +183,8 @@ export default function AppRoutes() {
                                   </RoleGate>
                                 }
                               />
+                              <Route path="/comprar/decisiones" element={<ReplenishmentPage />} />
+                              <Route path="/comprar/reposicion" element={<ReplenishmentPage />} />
                               <Route path="/reposicion" element={<ReplenishmentPage />} />
                               <Route path="/campanas" element={<CampaignsPage />} />
                               {/* Renombrada: "Oportunidades" → "Anticipación de campañas". */}
@@ -203,7 +209,11 @@ export default function AppRoutes() {
                               <Route path="/proveedores" element={<SuppliersPage />} />
                               <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
                               <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
+                              <Route path="/comprar/borradores" element={<PurchaseOrdersPage />} />
+                              <Route path="/comprar/ordenes" element={<PurchaseOrdersPage />} />
+                              <Route path="/comprar/seguimiento" element={<PurchaseOrdersPage />} />
                               <Route path="/recepciones" element={<ReceptionsPage />} />
+                              <Route path="/comprar/recepciones" element={<ReceptionsPage />} />
                               {/* Renombrada: "Oportunidades perdidas" → "Venta no capturada". */}
                               <Route
                                 path="/venta-no-capturada"
@@ -224,10 +234,12 @@ export default function AppRoutes() {
                                 element={<Navigate to="/aprendizaje?tab=decisiones" replace />}
                               />
                               <Route path="/aprobaciones" element={<ApprovalsPage />} />
+                              <Route path="/comprar/aprobaciones" element={<ApprovalsPage />} />
                               <Route path="/alertas" element={<AlertsPage />} />
                               <Route path="/senales-ventas" element={<SalesSignalsPage />} />
                               <Route path="/analisis-compra" element={<PurchaseAnalysisPage />} />
                               <Route path="/cotizaciones" element={<RfqPage />} />
+                              <Route path="/comprar/cotizaciones" element={<RfqPage />} />
                               <Route path="/alzas-precio" element={<PriceIncreasesPage />} />
                               <Route path="/presupuesto" element={<BudgetPage />} />
                               <Route path="/documentos" element={<DocumentsPage />} />

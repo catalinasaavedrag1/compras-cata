@@ -83,6 +83,43 @@ export function SupplierDetailPage() {
     (p) => p.purchaseStatus === "overstock" || (p.salesLast30Days === 0 && p.availableStock > 0)
   );
   const delayedPOs = supPOs.filter((o) => o.status === "delayed" || o.delayedDays > 0);
+  const topSupplierProducts = [...supProducts]
+    .map((p) => {
+      const expected30 = p.salesLast90Days / 3;
+      const growth = expected30 > 0 ? (p.salesLast30Days - expected30) / expected30 : 0;
+      const inventoryValue = p.availableStock * p.cost;
+      return {
+        product: p,
+        sales: sales30Amount(p),
+        profit: utility30(p),
+        growth,
+        inventoryValue,
+      };
+    })
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 10);
+  const topSalesShare =
+    ventas30 > 0 ? topSupplierProducts.reduce((sum, p) => sum + p.sales, 0) / ventas30 : 0;
+  const topProfitShare =
+    utilidad30 > 0 ? topSupplierProducts.reduce((sum, p) => sum + p.profit, 0) / utilidad30 : 0;
+  const stalledCapital = detenidos.reduce((sum, p) => sum + p.availableStock * p.cost, 0);
+  const costIncreaseProducts = supProducts.filter(
+    (p) => p.costoAnterior && p.cost > p.costoAnterior * 1.05
+  );
+  const alternativeProducts = supProducts.filter((p) => (p.equivalencias?.length ?? 0) > 0);
+  const growingConstrained = topSupplierProducts.filter(
+    (r) =>
+      r.growth >= 0.25 &&
+      r.product.salesLast30Days > 0 &&
+      r.product.availableStock / (r.product.salesLast30Days / 30) <=
+        r.product.supplierLeadTimeDays * 2
+  );
+  const negotiationPower =
+    alternativeProducts.length / Math.max(1, supProducts.length) >= 0.45
+      ? "Media-alta"
+      : supplier.purchasedAmountLast90Days > 120000000
+        ? "Media"
+        : "Baja";
 
   // Nivel de importancia: combina compra (90d) vs el mayor del panel y tamaño del surtido
   const maxBuy = Math.max(1, ...suppliers.map((s) => s.purchasedAmountLast90Days));
@@ -194,6 +231,89 @@ export function SupplierDetailPage() {
             </p>
           </button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 mb-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card>
+          <CardHeader
+            title="Cockpit de negociación"
+            description="Lo que conviene llevar preparado a la reunión con este proveedor."
+          />
+          <CardBody className="space-y-3">
+            <NegotiationAgendaItem
+              index={1}
+              title="Costo"
+              detail={`${costIncreaseProducts.length} SKU subieron más de 5%. Impacto potencial en margen: ${formatCurrencyCompact(costIncreaseProducts.reduce((sum, p) => sum + p.salesLast30Days * (p.cost - (p.costoAnterior ?? p.cost)), 0))}.`}
+              ask="Pedir recuperación de margen, descuento por volumen o lista escalonada."
+              tone={costIncreaseProducts.length > 0 ? "amber" : "green"}
+            />
+            <NegotiationAgendaItem
+              index={2}
+              title="Productos detenidos"
+              detail={`${detenidos.length} SKU · ${formatCurrencyCompact(stalledCapital)} inmovilizados.`}
+              ask="Solicitar devolución, nota de crédito, apoyo promocional o cambio por otros SKU."
+              tone={detenidos.length > 0 ? "red" : "green"}
+            />
+            <NegotiationAgendaItem
+              index={3}
+              title="Cumplimiento"
+              detail={`OTIF ${formatPercent(supplier.deliveryCompliance, 0)} · ${delayedPOs.length} OC atrasadas.`}
+              ask="Acordar objetivo de servicio, lead time realista y plan para atrasos."
+              tone={delayedPOs.length > 0 || supplier.deliveryCompliance < 85 ? "amber" : "green"}
+            />
+            <NegotiationAgendaItem
+              index={4}
+              title="Oportunidad"
+              detail={`${growingConstrained.length} SKU crecen sobre 25% con cobertura corta.`}
+              ask="Negociar capacidad, prioridad de despacho y precio por volumen."
+              tone={growingConstrained.length > 0 ? "blue" : "neutral"}
+            />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Posición negociadora"
+            description="Dependencia, alternativas y concentración real del proveedor."
+          />
+          <CardBody className="space-y-3">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Posición
+              </p>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <p className="text-xl font-semibold text-slate-900">{negotiationPower}</p>
+                <Badge tone={negotiationPower === "Media-alta" ? "green" : "amber"}>
+                  {formatPercent(
+                    (alternativeProducts.length / Math.max(1, supProducts.length)) * 100,
+                    0
+                  )}{" "}
+                  con alternativa
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                {topSupplierProducts.length} productos concentran{" "}
+                {formatPercent(topSalesShare * 100, 0)} de la venta y{" "}
+                {formatPercent(topProfitShare * 100, 0)} de la utilidad del proveedor.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <SupplierCockpitMetric
+                label="Compras 90d"
+                value={formatCurrencyCompact(supplier.purchasedAmountLast90Days)}
+              />
+              <SupplierCockpitMetric
+                label="Productos activos"
+                value={formatNumber(supProducts.length)}
+              />
+              <SupplierCockpitMetric
+                label="Alternativas"
+                value={formatNumber(alternativeProducts.length)}
+              />
+              <SupplierCockpitMetric label="Detenidos" value={formatNumber(detenidos.length)} />
+            </div>
+          </CardBody>
+        </Card>
       </div>
 
       {/* Más vendidos / Productos detenidos */}
@@ -413,7 +533,7 @@ export function SupplierDetailPage() {
               supPOs.map((o) => (
                 <Link
                   key={o.id}
-                  to={`/ordenes-compra?oc=${encodeURIComponent(o.number)}`}
+                  to={`/comprar/seguimiento?oc=${encodeURIComponent(o.number)}`}
                   className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
                 >
                   <div className="min-w-0">
@@ -481,6 +601,52 @@ export function SupplierDetailPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function NegotiationAgendaItem({
+  index,
+  title,
+  detail,
+  ask,
+  tone,
+}: {
+  index: number;
+  title: string;
+  detail: string;
+  ask: string;
+  tone: "green" | "amber" | "red" | "blue" | "neutral";
+}) {
+  const toneClass = {
+    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    red: "border-rose-200 bg-rose-50 text-rose-700",
+    blue: "border-brand-200 bg-brand-50 text-brand-700",
+    neutral: "border-slate-200 bg-slate-50 text-slate-600",
+  }[tone];
+
+  return (
+    <div className={`rounded-lg border p-3 ${toneClass}`}>
+      <div className="flex items-start gap-3">
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold">
+          {index}
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900">{title}</p>
+          <p className="mt-0.5 text-sm text-slate-700">{detail}</p>
+          <p className="mt-1 text-xs font-medium text-slate-600">Pedir: {ask}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SupplierCockpitMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-base font-semibold text-slate-900">{value}</p>
     </div>
   );
 }

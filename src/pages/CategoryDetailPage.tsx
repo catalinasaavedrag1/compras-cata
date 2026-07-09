@@ -5,6 +5,7 @@ import { Card, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { Tabs } from "../components/ui/Tabs";
 import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { RecommendationBadge } from "../components/business/RecommendationBadge";
@@ -54,6 +55,42 @@ export function CategoryDetailPage() {
     (a) => a.relatedEntity === category.name || (a.relatedSku && catSkus.has(a.relatedSku))
   );
   const redundantCount = analyzeCatalog(catProducts).candidateCount;
+  const productRoles = catProducts
+    .map((p) => {
+      const sales = p.salesLast30Days * p.price;
+      const profit = p.salesLast30Days * (p.price - p.cost);
+      const expected = p.salesLast90Days / 3;
+      const growth = expected > 0 ? (p.salesLast30Days - expected) / expected : 0;
+      const role =
+        p.salesLast30Days === 0 && p.availableStock > 0
+          ? "Detenido"
+          : growth >= 0.25
+            ? "Emergente"
+            : growth <= -0.25 && p.availableStock > 0
+              ? "Deterioro"
+              : p.margin >= 34 && sales > 0
+                ? "Margen"
+                : p.salesLast30Days >= 40
+                  ? "Tractor"
+                  : "Riesgo";
+      return { product: p, sales, profit, growth, role };
+    })
+    .sort((a, b) => b.sales - a.sales);
+  const catBrandRows = Array.from(new Set(catProducts.map((p) => p.brand).filter(Boolean)))
+    .map((brand) => {
+      const rows = catProducts.filter((p) => p.brand === brand);
+      const sales = rows.reduce((sum, p) => sum + p.salesLast30Days * p.price, 0);
+      const profit = rows.reduce((sum, p) => sum + p.salesLast30Days * (p.price - p.cost), 0);
+      const stockouts = rows.filter((p) => p.availableStock <= 0 && p.salesLast30Days > 0).length;
+      return {
+        brand,
+        sales,
+        margin: sales > 0 ? (profit / sales) * 100 : 0,
+        skus: rows.length,
+        stockouts,
+      };
+    })
+    .sort((a, b) => b.sales - a.sales);
 
   return (
     <div>
@@ -103,6 +140,18 @@ export function CategoryDetailPage() {
         onChange={setTab}
         tabs={[
           { value: "productos", label: "Productos", count: catProducts.length },
+          { value: "clave", label: "Productos clave", count: productRoles.length },
+          {
+            value: "crecimiento",
+            label: "Crecimiento",
+            count: productRoles.filter((r) => r.growth >= 0.25).length,
+          },
+          {
+            value: "detenidos",
+            label: "Detenidos",
+            count: productRoles.filter((r) => r.role === "Detenido").length,
+          },
+          { value: "marcas", label: "Marcas", count: catBrandRows.length },
           { value: "optimizar", label: "Optimizar surtido", count: redundantCount },
           { value: "reposicion", label: "Reposición", count: catRecs.length },
           { value: "proveedores", label: "Proveedores", count: catSuppliers.length },
@@ -134,6 +183,136 @@ export function CategoryDetailPage() {
                 </Link>
               ))
             )}
+          </CardBody>
+        </Card>
+      )}
+
+      {tab === "clave" && (
+        <Card>
+          <CardBody className="space-y-2">
+            {productRoles.slice(0, 12).map((r) => (
+              <Link
+                key={r.product.sku}
+                to={`/productos/${r.product.sku}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      tone={
+                        r.role === "Detenido" || r.role === "Deterioro"
+                          ? "red"
+                          : r.role === "Margen"
+                            ? "violet"
+                            : "blue"
+                      }
+                    >
+                      {r.role}
+                    </Badge>
+                    <span className="text-xs font-mono text-slate-400">{r.product.sku}</span>
+                  </div>
+                  <p className="mt-1 text-sm font-medium text-slate-800 truncate">
+                    {r.product.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    venta {formatCurrencyCompact(r.sales)} · margen{" "}
+                    {formatPercent(r.product.margin)} · utilidad {formatCurrencyCompact(r.profit)}
+                  </p>
+                </div>
+                <StatusBadge kind="purchase" value={r.product.purchaseStatus} dot={false} />
+              </Link>
+            ))}
+          </CardBody>
+        </Card>
+      )}
+
+      {tab === "crecimiento" && (
+        <Card>
+          <CardBody className="space-y-2">
+            {productRoles.filter((r) => r.growth >= 0.25).length === 0 ? (
+              <EmptyState
+                title="Sin aceleraciones fuertes"
+                description="No hay productos con crecimiento sobre 25% contra su ritmo reciente."
+              />
+            ) : (
+              productRoles
+                .filter((r) => r.growth >= 0.25)
+                .map((r) => (
+                  <Link
+                    key={r.product.sku}
+                    to={`/productos/${r.product.sku}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-slate-800 truncate">
+                        {r.product.name}
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        cobertura {formatNumber(r.product.inventoryDays)} d · stock{" "}
+                        {formatNumber(r.product.availableStock)}
+                      </span>
+                    </span>
+                    <Badge tone="blue">{formatPercent(r.growth * 100, 0)}</Badge>
+                  </Link>
+                ))
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {tab === "detenidos" && (
+        <Card>
+          <CardBody className="space-y-2">
+            {productRoles.filter((r) => r.role === "Detenido").length === 0 ? (
+              <EmptyState
+                title="Sin productos detenidos"
+                description="No hay productos con venta detenida y stock expuesto en esta categoría."
+              />
+            ) : (
+              productRoles
+                .filter((r) => r.role === "Detenido")
+                .map((r) => (
+                  <Link
+                    key={r.product.sku}
+                    to={`/productos/${r.product.sku}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50/40 px-3 py-2 hover:border-rose-300"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-slate-800 truncate">
+                        {r.product.name}
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        stock {formatNumber(r.product.availableStock)} · capital{" "}
+                        {formatCurrencyCompact(r.product.availableStock * r.product.cost)}
+                      </span>
+                    </span>
+                    <Badge tone="red">Detenido</Badge>
+                  </Link>
+                ))
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {tab === "marcas" && (
+        <Card>
+          <CardBody className="space-y-2">
+            {catBrandRows.map((b) => (
+              <div key={b.brand} className="rounded-lg border border-slate-200 px-3 py-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{b.brand}</p>
+                    <p className="text-xs text-slate-500">
+                      {b.skus} SKU · margen {formatPercent(b.margin)}
+                    </p>
+                  </div>
+                  {b.stockouts > 0 && <Badge tone="red">{b.stockouts} quiebre</Badge>}
+                </div>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {formatCurrencyCompact(b.sales)}
+                </p>
+              </div>
+            ))}
           </CardBody>
         </Card>
       )}
@@ -180,7 +359,7 @@ export function CategoryDetailPage() {
                           });
                           toast.success(`${r.productName} agregado al borrador de OC`, {
                             label: "Ver borrador OC",
-                            onClick: () => navigate("/ordenes-compra"),
+                            onClick: () => navigate("/comprar/borradores"),
                           });
                         }}
                       >

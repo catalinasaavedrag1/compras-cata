@@ -126,13 +126,13 @@ export function AlertsPage() {
           });
           toast.success(`${rec.productName} agregado al borrador de OC`, {
             label: "Ver borrador OC",
-            onClick: () => navigate("/ordenes-compra"),
+            onClick: () => navigate("/comprar/borradores"),
           });
         },
       };
     }
     if (a.type === "po_delayed")
-      return { label: "Ver órdenes de compra", onClick: () => navigate("/ordenes-compra") };
+      return { label: "Ver órdenes de compra", onClick: () => navigate("/comprar/seguimiento") };
     if (a.type === "supplier_delay")
       return { label: "Revisar proveedor", onClick: () => navigate("/proveedores") };
     if (a.type === "lost_opportunity" || a.type === "no_recent_purchase")
@@ -261,7 +261,7 @@ export function AlertsPage() {
               }
               action={
                 tab === "active" ? (
-                  <Button variant="secondary" onClick={() => navigate("/reposicion")}>
+                  <Button variant="secondary" onClick={() => navigate("/comprar/decisiones")}>
                     Ir a reposición
                   </Button>
                 ) : undefined

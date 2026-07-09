@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
 import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
@@ -15,11 +15,14 @@ import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
+import { PurchaseProcessBar } from "../components/business/PurchaseProcessBar";
 import { IconPlus, IconReplenish, IconOrders, IconSearch, IconClose } from "../components/ui/icons";
 import { purchaseOrders as mockPOs } from "../data/mockPurchaseOrders";
+import { suppliers as mockSuppliers } from "../data/mockSuppliers";
 import { useCollection } from "../context/DataContext";
 import { apiCreate, backendEnabled } from "../services/apiClient";
 import { recommendations } from "../data/mockRecommendations";
+import { rfqs } from "../data/mockRfq";
 import { getProductBySku, products as allProducts } from "../data/mockProducts";
 import { OcDetailModal } from "./PurchaseOrdersSections";
 import { lineNet, type OcDraftItem } from "../context/OcDraftContext";
@@ -39,6 +42,7 @@ import {
   formatCurrencyCompact,
   formatDate,
   formatNumber,
+  formatPercent,
 } from "../utils/formatters";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
 
@@ -67,6 +71,7 @@ const PAYMENT_TERMS = [
 
 export function PurchaseOrdersPage() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const {
     items,
     count,
@@ -97,12 +102,19 @@ export function PurchaseOrdersPage() {
     Record<string, PurchaseOrderStatus>
   >("compras:po-status", {});
 
-  const [tab, setTab] = useState("all");
+  const initialTab = pathname.includes("/comprar/borradores")
+    ? "draft"
+    : pathname.includes("/comprar/seguimiento")
+      ? "open"
+      : "all";
+  const [tab, setTab] = useState(initialTab);
   const [dates, setDates] = useState<IsoRange>({ from: "", to: "" });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [prodSearch, setProdSearch] = useState("");
   const [detail, setDetail] = useState<PurchaseOrder | null>(null);
   const [createdNumber, setCreatedNumber] = useState<string | null>(null);
+  const [draftContextSku, setDraftContextSku] = useState<string | null>(null);
+  const [draftContextTab, setDraftContextTab] = useState("resumen");
 
   // Estado derivado de aprobación: una OC "por aprobar" pasa a "aprobada" cuando
   // todas sus líneas con solicitud quedan aprobadas (mismo número en el id APR-).
@@ -143,6 +155,19 @@ export function PurchaseOrdersPage() {
       setSearchParams(searchParams, { replace: true });
     }
   };
+
+  useEffect(() => {
+    if (pathname.includes("/comprar/borradores")) setTab("draft");
+    if (pathname.includes("/comprar/ordenes")) setTab("all");
+    if (pathname.includes("/comprar/seguimiento")) setTab("open");
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!drawerOpen || items.length === 0) return;
+    if (!draftContextSku || !items.some((i) => i.sku === draftContextSku)) {
+      setDraftContextSku(items[0].sku);
+    }
+  }, [drawerOpen, draftContextSku, items]);
 
   // Conjunto acotado por el rango de fechas (por fecha de creación de la OC).
   const visible = useMemo(() => orders.filter((o) => inRange(o.createdAt, dates)), [orders, dates]);
@@ -189,16 +214,15 @@ export function PurchaseOrdersPage() {
     .reduce((a, o) => a + o.totalAmount, 0);
   const delayedCount = visible.filter((o) => o.status === "delayed").length;
   const draftCount = visible.filter((o) => o.status === "draft").length;
-
-  const markAsSent = (id: string) => {
-    setStatusOverrides((prev) => ({ ...prev, [id]: "sent" }));
-    setDetail(null);
-    toast.success("Orden de compra marcada como enviada");
-  };
-
-  // Sugerencias que aún no están en el borrador
-  const pendingSuggestions = recommendations.filter(
-    (r) => r.suggestedQuantity > 0 && !hasItem(r.sku)
+  const openRfqs = rfqs.filter((r) => !["convertida", "rechazada", "vencida"].includes(r.estado));
+  const pendingApprovals = approvals.filter(
+    (a) => (approvalState[a.id] ?? "pendiente") === "pendiente"
+  );
+  const emittedOrders = visible.filter((o) =>
+    ["sent", "confirmed", "partially_received", "with_difference"].includes(o.status)
+  );
+  const receivingOrders = visible.filter((o) =>
+    ["sent", "confirmed", "partially_received", "delayed"].includes(o.status)
   );
 
   // Líneas del borrador agrupadas por proveedor (una OC no mezcla proveedores).
@@ -211,6 +235,74 @@ export function PurchaseOrdersPage() {
     });
     return [...m.entries()];
   }, [items]);
+
+  const draftSummary = useMemo(() => {
+    const suppliers = new Set(items.map((i) => i.supplierName));
+    const mainSupplier =
+      supplierGroups.length === 1
+        ? supplierGroups[0][0]
+        : supplierGroups.length > 1
+          ? `${supplierGroups.length} proveedores`
+          : "Sin proveedor";
+    const critical = items.filter((i) => {
+      const p = getProductBySku(i.sku);
+      return !!p && p.availableStock <= 0;
+    }).length;
+    const overSuggested = items.filter((i) => {
+      const rec = recommendations.find((r) => r.sku === i.sku);
+      return rec ? i.quantity > rec.suggestedQuantity * 1.2 : false;
+    }).length;
+    const openOverlap = items.filter((i) =>
+      orders.some(
+        (o) =>
+          suppliers.has(o.supplierName) &&
+          !["received", "closed", "cancelled"].includes(o.status) &&
+          o.lines?.some((line) => line.sku === i.sku)
+      )
+    ).length;
+    const highCoverage = items.filter((i) => {
+      const p = getProductBySku(i.sku);
+      return (
+        !!p &&
+        p.salesLast30Days > 0 &&
+        coverageDays(p.availableStock + i.quantity, p.salesLast30Days) > 90
+      );
+    }).length;
+    const futureCoverageValues = items
+      .map((i) => {
+        const p = getProductBySku(i.sku);
+        if (!p || p.salesLast30Days <= 0) return null;
+        return coverageDays(p.availableStock + i.quantity, p.salesLast30Days);
+      })
+      .filter((v): v is number => v !== null);
+    const avgCoverage =
+      futureCoverageValues.length > 0
+        ? Math.round(futureCoverageValues.reduce((a, v) => a + v, 0) / futureCoverageValues.length)
+        : 0;
+
+    return {
+      mainSupplier,
+      critical,
+      overSuggested,
+      openOverlap,
+      highCoverage,
+      avgCoverage,
+      budgetAvailable: 22000000,
+    };
+  }, [items, orders, supplierGroups]);
+
+  const selectedDraftItem = items.find((i) => i.sku === draftContextSku) ?? items[0] ?? null;
+
+  const markAsSent = (id: string) => {
+    setStatusOverrides((prev) => ({ ...prev, [id]: "sent" }));
+    setDetail(null);
+    toast.success("Orden de compra marcada como enviada");
+  };
+
+  // Sugerencias que aún no están en el borrador
+  const pendingSuggestions = recommendations.filter(
+    (r) => r.suggestedQuantity > 0 && !hasItem(r.sku)
+  );
 
   // Búsqueda de cualquier producto para agregar al borrador.
   const searchResults = useMemo(() => {
@@ -371,7 +463,7 @@ export function PurchaseOrdersPage() {
       `${n} borrador${n === 1 ? "" : "es"} creado${n === 1 ? "" : "s"} (${numbers})` +
         (approvalsCreated > 0 ? ` · ${approvalsCreated} línea(s) requieren aprobación` : ""),
       approvalsCreated > 0
-        ? { label: "Ver aprobaciones", onClick: () => navigate("/aprobaciones") }
+        ? { label: "Ver aprobaciones", onClick: () => navigate("/comprar/aprobaciones") }
         : undefined
     );
   };
@@ -468,8 +560,24 @@ export function PurchaseOrdersPage() {
   return (
     <div>
       <PageHeader
-        title="Órdenes de compra"
-        description="Seguimiento de OC y creación desde sugerencias."
+        title={
+          pathname.includes("/comprar/borradores")
+            ? "Comprar · Borradores OC"
+            : pathname.includes("/comprar/ordenes")
+              ? "Comprar · Órdenes"
+              : pathname.includes("/comprar/seguimiento")
+                ? "Comprar · Seguimiento"
+                : "Órdenes de compra"
+        }
+        description={
+          pathname.includes("/comprar/borradores")
+            ? "Construye la compra por proveedor, revisa restricciones y formaliza la OC."
+            : pathname.includes("/comprar/ordenes")
+              ? "Revisa órdenes emitidas, borradores y estados sin salir del proceso de compra."
+              : pathname.includes("/comprar/seguimiento")
+                ? "Sigue OC emitidas, atrasos, entregas parciales y recepción."
+                : "Seguimiento de OC y creación desde sugerencias."
+        }
         action={
           <Button onClick={() => setDrawerOpen(true)} icon={<IconPlus className="w-4 h-4" />}>
             Nuevo borrador de OC
@@ -478,6 +586,64 @@ export function PurchaseOrdersPage() {
             )}
           </Button>
         }
+      />
+
+      <PurchaseProcessBar
+        stages={[
+          {
+            label: "Necesidad",
+            detail: "Decidir qué comprar",
+            count: recommendations.filter((r) => r.status === "critical" || r.status === "buy_now")
+              .length,
+            to: "/comprar/decisiones",
+            tone: "red",
+          },
+          {
+            label: "Preparación",
+            detail: "Cotizar y negociar",
+            count: openRfqs.length,
+            to: "/comprar/cotizaciones",
+            tone: openRfqs.length > 0 ? "amber" : "neutral",
+          },
+          {
+            label: "Borrador",
+            detail: "Construir OC",
+            count,
+            to: "/comprar/borradores",
+            active: pathname.includes("/comprar/borradores"),
+            tone: count > 0 ? "blue" : "neutral",
+          },
+          {
+            label: "Aprobación",
+            detail: "Validar desvíos",
+            count: pendingApprovals.length,
+            to: "/comprar/aprobaciones",
+            tone: pendingApprovals.length > 0 ? "amber" : "green",
+          },
+          {
+            label: "Órdenes",
+            detail: "Emitidas",
+            count: visible.length,
+            to: "/comprar/ordenes",
+            active: pathname.includes("/comprar/ordenes"),
+            tone: visible.length > 0 ? "blue" : "neutral",
+          },
+          {
+            label: "Emitidas",
+            detail: "OC en curso",
+            count: emittedOrders.length,
+            to: "/comprar/seguimiento",
+            active: pathname.includes("/comprar/seguimiento"),
+            tone: emittedOrders.length > 0 ? "blue" : "neutral",
+          },
+          {
+            label: "Por recibir",
+            detail: "Recepción",
+            count: receivingOrders.length,
+            to: "/comprar/recepciones",
+            tone: receivingOrders.some((o) => o.status === "delayed") ? "red" : "blue",
+          },
+        ]}
       />
 
       {createdNumber && (
@@ -493,6 +659,64 @@ export function PurchaseOrdersPage() {
             Cerrar
           </button>
         </div>
+      )}
+
+      {count > 0 && (
+        <Card className="mb-4 border-brand-200">
+          <div className="grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+                Compra en curso
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                Borrador · {draftSummary.mainSupplier}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {count} SKU · {formatCurrency(totalAmount)} · cobertura futura promedio{" "}
+                {draftSummary.avgCoverage > 0 ? `${draftSummary.avgCoverage} días` : "sin venta"}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <DraftMetric
+                  label="Presupuesto disp."
+                  value={formatCurrencyCompact(draftSummary.budgetAvailable)}
+                />
+                <DraftMetric
+                  label="Cobertura futura"
+                  value={draftSummary.avgCoverage > 0 ? `${draftSummary.avgCoverage} d` : "n/a"}
+                />
+                <DraftMetric label="SKU críticos" value={formatNumber(draftSummary.critical)} />
+                <DraftMetric label="Valor OC" value={formatCurrencyCompact(totalAmount)} />
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Observaciones antes de formalizar
+              </p>
+              <div className="mt-2 space-y-2 text-sm">
+                <DraftWarning
+                  count={draftSummary.openOverlap}
+                  text="productos tienen OC abiertas"
+                />
+                <DraftWarning
+                  count={draftSummary.overSuggested}
+                  text="cantidades superan la recomendación"
+                />
+                <DraftWarning
+                  count={draftSummary.highCoverage}
+                  text="productos quedarían con cobertura mayor a 90 días"
+                />
+                <DraftWarning
+                  count={Math.max(0, totalAmount - draftSummary.budgetAvailable)}
+                  text="sobre presupuesto disponible"
+                  currency
+                />
+              </div>
+              <Button className="mt-3 w-full" size="sm" onClick={() => setDrawerOpen(true)}>
+                Continuar trabajando
+              </Button>
+            </div>
+          </div>
+        </Card>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -670,7 +894,7 @@ export function PurchaseOrdersPage() {
                 <Button
                   onClick={() => {
                     setDrawerOpen(false);
-                    navigate("/reposicion");
+                    navigate("/comprar/decisiones");
                   }}
                 >
                   Ir a reposición
@@ -717,6 +941,17 @@ export function PurchaseOrdersPage() {
                   </div>
                 </div>
               </div>
+
+              {selectedDraftItem && (
+                <DraftLineContext
+                  item={selectedDraftItem}
+                  orders={orders}
+                  tab={draftContextTab}
+                  onTabChange={setDraftContextTab}
+                  onQuantityChange={(quantity) => updateQuantity(selectedDraftItem.sku, quantity)}
+                  onOpenProduct={() => navigate(`/productos/${selectedDraftItem.sku}`)}
+                />
+              )}
 
               {/* Líneas agrupadas por proveedor */}
               {supplierGroups.map(([supplierName, groupItems]) => {
@@ -792,6 +1027,13 @@ export function PurchaseOrdersPage() {
                             </label>
                           </div>
                           <div className="flex justify-end items-baseline gap-2 mt-1.5 text-sm">
+                            <button
+                              type="button"
+                              onClick={() => setDraftContextSku(it.sku)}
+                              className="mr-auto text-xs font-medium text-brand-600 hover:text-brand-700"
+                            >
+                              Analizar línea
+                            </button>
                             <span className="text-xs text-slate-400">Total línea</span>
                             <span className="font-semibold text-slate-900">
                               {formatCurrency(lineNet(it))}
@@ -866,6 +1108,212 @@ export function PurchaseOrdersPage() {
       </Drawer>
 
       <OcDetailModal detail={detail} onClose={closeDetail} onMarkSent={markAsSent} />
+    </div>
+  );
+}
+
+function DraftLineContext({
+  item,
+  orders,
+  tab,
+  onTabChange,
+  onQuantityChange,
+  onOpenProduct,
+}: {
+  item: OcDraftItem;
+  orders: PurchaseOrder[];
+  tab: string;
+  onTabChange: (value: string) => void;
+  onQuantityChange: (quantity: number) => void;
+  onOpenProduct: () => void;
+}) {
+  const product = getProductBySku(item.sku);
+  const rec = recommendations.find((r) => r.sku === item.sku);
+  const supplier = mockSuppliers.find((s) => s.name === item.supplierName);
+  const openOrders = orders.filter(
+    (o) =>
+      o.supplierName === item.supplierName &&
+      !["received", "closed", "cancelled"].includes(o.status) &&
+      o.lines?.some((line) => line.sku === item.sku)
+  );
+  const currentCoverage = product
+    ? coverageDays(product.availableStock, product.salesLast30Days)
+    : 0;
+  const futureCoverage =
+    product && product.salesLast30Days > 0
+      ? coverageDays(product.availableStock + item.quantity, product.salesLast30Days)
+      : 0;
+  const suggestedQty = rec?.suggestedQuantity ?? item.quantity;
+  const deltaVsSuggested = item.quantity - suggestedQty;
+
+  return (
+    <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+            Contexto de línea
+          </p>
+          <h3 className="mt-1 text-base font-semibold text-slate-900 truncate">
+            {item.productName}
+          </h3>
+          <p className="text-xs text-slate-500">
+            {item.sku} · cantidad OC {formatNumber(item.quantity)} u. · sugerido{" "}
+            {formatNumber(suggestedQty)} u.
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={onOpenProduct}>
+          Ver SKU 360
+        </Button>
+      </div>
+
+      <Tabs
+        className="mt-3"
+        value={tab}
+        onChange={onTabChange}
+        tabs={[
+          { value: "resumen", label: "Resumen" },
+          { value: "inventario", label: "Inventario" },
+          { value: "venta", label: "Venta" },
+          { value: "proveedor", label: "Proveedor" },
+        ]}
+      />
+
+      {tab === "resumen" && (
+        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <DraftMetric
+            label="Stock"
+            value={product ? `${formatNumber(product.availableStock)} u.` : "n/a"}
+          />
+          <DraftMetric label="Cobertura actual" value={product ? `${currentCoverage} d` : "n/a"} />
+          <DraftMetric label="Cobertura futura" value={product ? `${futureCoverage} d` : "n/a"} />
+          <DraftMetric
+            label="OC abiertas"
+            value={
+              openOrders.length > 0
+                ? `${formatNumber(openOrders.reduce((sum, o) => sum + (o.lines?.find((l) => l.sku === item.sku)?.quantity ?? 0), 0))} u.`
+                : "0 u."
+            }
+          />
+        </div>
+      )}
+
+      {tab === "inventario" && (
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {(product?.stockByLocation ?? []).slice(0, 3).map((loc) => (
+            <div key={loc.locationName} className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-xs font-medium text-slate-500">{loc.locationName}</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">
+                {formatNumber(loc.available)} u.
+              </p>
+              <p className="text-xs text-slate-400">comprometido {formatNumber(loc.committed)}</p>
+            </div>
+          ))}
+          {openOrders.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 sm:col-span-3">
+              <p className="text-sm font-medium text-amber-800">
+                Hay {openOrders.length} OC abierta{openOrders.length === 1 ? "" : "s"} con este SKU.
+              </p>
+              <p className="text-xs text-amber-700">
+                Revisa antes de duplicar compra o elevar cobertura.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "venta" && (
+        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <DraftMetric
+            label="Venta 30d"
+            value={product ? `${formatNumber(product.salesLast30Days)} u.` : "n/a"}
+          />
+          <DraftMetric
+            label="Venta 90d"
+            value={product ? `${formatNumber(product.salesLast90Days)} u.` : "n/a"}
+          />
+          <DraftMetric
+            label="Rotación"
+            value={product ? `${formatNumber(product.rotation)}x` : "n/a"}
+          />
+          <DraftMetric
+            label="Variación OC"
+            value={`${deltaVsSuggested > 0 ? "+" : ""}${formatNumber(deltaVsSuggested)} u.`}
+          />
+        </div>
+      )}
+
+      {tab === "proveedor" && (
+        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Proveedor
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{item.supplierName}</p>
+            <p className="text-xs text-slate-500">
+              Cumplimiento {supplier ? `${supplier.deliveryCompliance}%` : "n/a"} · lead time{" "}
+              {supplier ? `${supplier.averageLeadTimeDays} d` : "n/a"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Rentabilidad
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              Margen {product ? formatPercent(product.margin) : "n/a"}
+            </p>
+            <p className="text-xs text-slate-500">
+              Costo {formatCurrency(item.unitCost)} · línea {formatCurrency(lineNet(item))}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-end">
+        <label className="block flex-1 text-xs font-medium text-slate-600">
+          Cantidad OC
+          <Input
+            type="number"
+            min={0}
+            value={item.quantity}
+            onChange={(e) => onQuantityChange(Number(e.target.value))}
+          />
+        </label>
+        <div className="text-sm text-slate-500">
+          Después de comprar:{" "}
+          <span className="font-semibold text-slate-900">
+            {product ? `${futureCoverage} días` : "sin cálculo"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DraftMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-base font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function DraftWarning({
+  count,
+  text,
+  currency,
+}: {
+  count: number;
+  text: string;
+  currency?: boolean;
+}) {
+  const active = count > 0;
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
+      <span className={active ? "text-slate-700" : "text-slate-400"}>{text}</span>
+      <Badge tone={active ? "amber" : "green"}>
+        {currency ? (active ? formatCurrencyCompact(count) : "$0") : count}
+      </Badge>
     </div>
   );
 }

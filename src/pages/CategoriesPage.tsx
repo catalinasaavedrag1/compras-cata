@@ -105,7 +105,7 @@ export function CategoriesPage() {
       render: (c) => (
         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <Link
-            to={`/reposicion?cat=${encodeURIComponent(c.name)}`}
+            to={`/comprar/decisiones?cat=${encodeURIComponent(c.name)}`}
             className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50 whitespace-nowrap"
             title={`Ver reposición de ${c.name}`}
           >
@@ -207,7 +207,7 @@ export function CategoriesPage() {
               </p>
               <div className="flex items-center gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
                 <Link
-                  to={`/reposicion?cat=${encodeURIComponent(c.name)}`}
+                  to={`/comprar/decisiones?cat=${encodeURIComponent(c.name)}`}
                   className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50"
                 >
                   Reposición

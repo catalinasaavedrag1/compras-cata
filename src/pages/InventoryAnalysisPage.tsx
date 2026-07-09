@@ -130,7 +130,7 @@ export function InventoryAnalysisPage() {
           tone="warn"
           icon={<IconBox className="w-4 h-4" />}
           description="Liberar capital"
-          to="/reposicion?foco=overstock"
+          to="/comprar/decisiones?foco=overstock"
         />
         <KpiCard
           title="Stock muerto"

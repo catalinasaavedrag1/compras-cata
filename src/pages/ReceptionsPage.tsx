@@ -184,7 +184,7 @@ export function ReceptionsPage() {
     addItem({ sku, productName: name, supplierName, quantity: missing, unitCost: p?.cost ?? 0 });
     toast.success(`${name}: ${formatNumber(missing)} u. agregadas al borrador de OC`, {
       label: "Ver borrador OC",
-      onClick: () => navigate("/ordenes-compra"),
+      onClick: () => navigate("/comprar/seguimiento"),
     });
   };
 

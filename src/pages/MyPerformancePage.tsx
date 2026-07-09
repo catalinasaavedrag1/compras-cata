@@ -121,7 +121,7 @@ export function MyPerformancePage() {
       {/* Foco de hoy: la palanca de mayor impacto para subir el score, con su acción. */}
       {improvements[0] && (
         <Link
-          to="/reposicion"
+          to="/comprar/decisiones"
           className="group flex items-center gap-3 mb-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 hover:bg-brand-100/70 transition-colors"
         >
           <span className="text-xl flex-shrink-0">🎯</span>

@@ -138,7 +138,7 @@ export function TopbarActions() {
           type: "order",
           title: o.number,
           subtitle: `${o.supplierName} · espera ${formatDate(o.expectedDate)}`,
-          to: "/ordenes-compra",
+          to: "/comprar/seguimiento",
         });
       }
       if (out.filter((r) => r.type === "order").length >= 3) break;
@@ -284,7 +284,7 @@ export function TopbarActions() {
       <NotificationCenter />
 
       <button
-        onClick={() => navigate("/ordenes-compra")}
+        onClick={() => navigate("/comprar/borradores")}
         className="relative inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
         title="Borrador de orden de compra"
         aria-label={

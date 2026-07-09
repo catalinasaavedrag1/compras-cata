@@ -140,7 +140,7 @@ export function RfqPage() {
         ? `${added} línea${added === 1 ? "" : "s"} de ${rfq.numero} agregada${added === 1 ? "" : "s"} al borrador de OC`
         : `No hay ofertas disponibles para convertir en ${rfq.numero}`,
       added > 0
-        ? { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") }
+        ? { label: "Ver borrador OC", onClick: () => navigate("/comprar/borradores") }
         : undefined
     );
   };

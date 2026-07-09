@@ -21,6 +21,15 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
   const { role } = useRole();
   const modules = modulesFor(role);
   const activeModule = activeModuleFor(modules, pathname) ?? modules[0];
+  const activeChildren = activeModule.children.filter((item) => {
+    if (!item.secondary) return true;
+    return pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/"));
+  });
+  const secondaryChildren = activeModule.children.filter(
+    (item) =>
+      item.secondary &&
+      !(pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/")))
+  );
   const badges = useNavBadges();
 
   if (!open) return null;
@@ -61,7 +70,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
               Módulo actual
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              {activeModule.children.map((item) => {
+              {activeChildren.map((item) => {
                 const b = item.badge ? badges[item.badge] : undefined;
                 const showBadge = !!b && b.count > 0;
                 return (
@@ -109,6 +118,58 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
                 );
               })}
             </div>
+            {secondaryChildren.length > 0 && (
+              <details className="mt-2">
+                <summary className="cursor-pointer list-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                  Ver más vistas de {activeModule.label}
+                </summary>
+                <div className="mt-2 space-y-1">
+                  {secondaryChildren.map((item) => {
+                    const b = item.badge ? badges[item.badge] : undefined;
+                    const showBadge = !!b && b.count > 0;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.end}
+                        onClick={onClose}
+                        title={item.hint}
+                        className={({ isActive }) =>
+                          cn(
+                            "flex items-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium",
+                            isActive
+                              ? "border-brand-200 bg-white text-brand-700"
+                              : "border-slate-200 bg-white text-slate-600"
+                          )
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <item.icon
+                              className={cn(
+                                "w-4 h-4",
+                                isActive ? "text-brand-600" : "text-slate-400"
+                              )}
+                            />
+                            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                            {showBadge && (
+                              <span
+                                className={cn(
+                                  "text-[10px] font-semibold rounded-full px-1.5 py-0.5 min-w-[18px] text-center",
+                                  PILL[b!.tone] ?? "bg-slate-100 text-slate-600"
+                                )}
+                              >
+                                {b!.count > 99 ? "99+" : b!.count}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
           </div>
 
           <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">

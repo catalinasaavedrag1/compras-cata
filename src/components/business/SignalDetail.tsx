@@ -120,7 +120,7 @@ export function SignalDetail({ signal }: { signal: SalesSignal }) {
     );
     toast.success(`${ocItem.productName} agregado al borrador de OC`, {
       label: "Ver borrador OC",
-      onClick: () => navigate("/ordenes-compra"),
+      onClick: () => navigate("/comprar/borradores"),
     });
   };
 

@@ -195,7 +195,7 @@ export function CampaignOpportunitiesPage() {
       added > 0
         ? `${added} producto${added === 1 ? "" : "s"} de ${group.supplier} agregado${added === 1 ? "" : "s"} al borrador de OC`
         : `Ya estaban en el borrador`,
-      { label: "Ver borrador OC", onClick: () => navigate("/ordenes-compra") }
+      { label: "Ver borrador OC", onClick: () => navigate("/comprar/borradores") }
     );
   };
 
@@ -210,7 +210,7 @@ export function CampaignOpportunitiesPage() {
       });
       toast.success(`${o.productName} agregado al borrador de OC`, {
         label: "Ver borrador OC",
-        onClick: () => navigate("/ordenes-compra"),
+        onClick: () => navigate("/comprar/borradores"),
       });
       return;
     }
