@@ -4,6 +4,7 @@ import { AppLayout } from "../layouts/AppLayout";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { LoginPage } from "../pages/LoginPage";
 import { OcDraftProvider } from "../context/OcDraftContext";
+import { DatasheetsProvider } from "../context/DatasheetsContext";
 import { ToastProvider } from "../context/ToastContext";
 import { BuyerProvider } from "../context/BuyerContext";
 import { RoleProvider } from "../context/RoleContext";
@@ -114,146 +115,160 @@ export default function AppRoutes() {
               <BuyerProvider>
                 <NotificationProvider>
                   <OcDraftProvider>
-                    <PurchaseFlowProvider>
-                      <SignalsProvider>
-                        <Routes>
-                          <Route path="/login" element={<LoginGate />} />
-                          <Route element={<RequireAuth />}>
-                            <Route
-                              element={
-                                <Suspense fallback={<PageLoader />}>
-                                  <Outlet />
-                                </Suspense>
-                              }
-                            >
-                              {/* Inicio: una sola portada operativa (antes "Dashboard" + "Mi panel"). */}
-                              <Route path="/" element={<InicioPage />} />
-                              <Route path="/mi-cartera" element={<InicioPage />} />
-                              <Route path="/mi-cartera/productos-clave" element={<InicioPage />} />
-                              <Route path="/mi-cartera/marcas" element={<InicioPage />} />
-                              <Route path="/mi-cartera/proveedores" element={<InicioPage />} />
-                              <Route path="/mi-cartera/oportunidades" element={<InicioPage />} />
-                              <Route path="/mi-panel" element={<Navigate to="/" replace />} />
-                              <Route path="/mi-desempeno" element={<MyPerformancePage />} />
+                    <DatasheetsProvider>
+                      <PurchaseFlowProvider>
+                        <SignalsProvider>
+                          <Routes>
+                            <Route path="/login" element={<LoginGate />} />
+                            <Route element={<RequireAuth />}>
                               <Route
-                                path="/equipo"
                                 element={
-                                  <RoleGate allow="lider">
-                                    <TeamDashboardPage />
-                                  </RoleGate>
+                                  <Suspense fallback={<PageLoader />}>
+                                    <Outlet />
+                                  </Suspense>
                                 }
-                              />
-                              <Route
-                                path="/equipo/alertas"
-                                element={
-                                  <RoleGate allow="lider">
-                                    <TeamAlertsPage />
-                                  </RoleGate>
-                                }
-                              />
-                              <Route
-                                path="/equipo/compradores"
-                                element={
-                                  <RoleGate allow="lider">
-                                    <BuyersPage />
-                                  </RoleGate>
-                                }
-                              />
-                              <Route
-                                path="/equipo/ranking"
-                                element={
-                                  <RoleGate allow="lider">
-                                    <RankingPage />
-                                  </RoleGate>
-                                }
-                              />
-                              <Route
-                                path="/equipo/metas"
-                                element={
-                                  <RoleGate allow="lider">
-                                    <GoalsPage />
-                                  </RoleGate>
-                                }
-                              />
-                              <Route
-                                path="/equipo/carga"
-                                element={
-                                  <RoleGate allow="lider">
-                                    <WorkloadPage />
-                                  </RoleGate>
-                                }
-                              />
-                              <Route path="/comprar/decisiones" element={<ReplenishmentPage />} />
-                              <Route path="/comprar/reposicion" element={<ReplenishmentPage />} />
-                              <Route path="/reposicion" element={<ReplenishmentPage />} />
-                              <Route path="/campanas" element={<CampaignsPage />} />
-                              {/* Renombrada: "Oportunidades" → "Anticipación de campañas". */}
-                              <Route path="/anticipacion" element={<CampaignOpportunitiesPage />} />
-                              <Route
-                                path="/campanas-oportunidades"
-                                element={<Navigate to="/anticipacion" replace />}
-                              />
-                              <Route path="/productos" element={<ProductsPage />} />
-                              <Route path="/productos/:sku" element={<ProductDetailPage />} />
-                              <Route path="/categorias" element={<CategoriesPage />} />
-                              <Route path="/categorias/:id" element={<CategoryDetailPage />} />
-                              {/* Renombrada: "Catálogo optimizado" → "Surtido redundante". */}
-                              <Route
-                                path="/surtido-redundante"
-                                element={<CatalogOptimizationPage />}
-                              />
-                              <Route
-                                path="/catalogo-optimizado"
-                                element={<Navigate to="/surtido-redundante" replace />}
-                              />
-                              <Route path="/proveedores" element={<SuppliersPage />} />
-                              <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
-                              <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
-                              <Route path="/comprar/borradores" element={<PurchaseOrdersPage />} />
-                              <Route path="/comprar/ordenes" element={<PurchaseOrdersPage />} />
-                              <Route path="/comprar/seguimiento" element={<PurchaseOrdersPage />} />
-                              <Route path="/recepciones" element={<ReceptionsPage />} />
-                              <Route path="/comprar/recepciones" element={<ReceptionsPage />} />
-                              {/* Renombrada: "Oportunidades perdidas" → "Venta no capturada". */}
-                              <Route
-                                path="/venta-no-capturada"
-                                element={<LostOpportunitiesPage />}
-                              />
-                              <Route
-                                path="/oportunidades-perdidas"
-                                element={<Navigate to="/venta-no-capturada" replace />}
-                              />
-                              {/* Fusión: "Calidad de compra" + "Historial de decisiones" → "Aprendizaje de compra". */}
-                              <Route path="/aprendizaje" element={<AprendizajePage />} />
-                              <Route
-                                path="/calidad-compra"
-                                element={<Navigate to="/aprendizaje" replace />}
-                              />
-                              <Route
-                                path="/decisiones"
-                                element={<Navigate to="/aprendizaje?tab=decisiones" replace />}
-                              />
-                              <Route path="/aprobaciones" element={<ApprovalsPage />} />
-                              <Route path="/comprar/aprobaciones" element={<ApprovalsPage />} />
-                              <Route path="/alertas" element={<AlertsPage />} />
-                              <Route path="/senales-ventas" element={<SalesSignalsPage />} />
-                              <Route path="/analisis-compra" element={<PurchaseAnalysisPage />} />
-                              <Route path="/cotizaciones" element={<RfqPage />} />
-                              <Route path="/comprar/cotizaciones" element={<RfqPage />} />
-                              <Route path="/alzas-precio" element={<PriceIncreasesPage />} />
-                              <Route path="/presupuesto" element={<BudgetPage />} />
-                              <Route path="/documentos" element={<DocumentsPage />} />
-                              <Route path="/reportes" element={<ReportsPage />} />
-                              <Route path="/inventario" element={<InventoryAnalysisPage />} />
-                              <Route path="/ventas" element={<SalesAnalysisPage />} />
-                              <Route path="/margen-canal" element={<ChannelMarginPage />} />
-                              <Route path="/reglas" element={<SettingsPage />} />
-                              <Route path="*" element={<Navigate to="/" replace />} />
+                              >
+                                {/* Inicio: una sola portada operativa (antes "Dashboard" + "Mi panel"). */}
+                                <Route path="/" element={<InicioPage />} />
+                                <Route path="/mi-cartera" element={<InicioPage />} />
+                                <Route
+                                  path="/mi-cartera/productos-clave"
+                                  element={<InicioPage />}
+                                />
+                                <Route path="/mi-cartera/marcas" element={<InicioPage />} />
+                                <Route path="/mi-cartera/proveedores" element={<InicioPage />} />
+                                <Route path="/mi-cartera/oportunidades" element={<InicioPage />} />
+                                <Route path="/mi-panel" element={<Navigate to="/" replace />} />
+                                <Route path="/mi-desempeno" element={<MyPerformancePage />} />
+                                <Route
+                                  path="/equipo"
+                                  element={
+                                    <RoleGate allow="lider">
+                                      <TeamDashboardPage />
+                                    </RoleGate>
+                                  }
+                                />
+                                <Route
+                                  path="/equipo/alertas"
+                                  element={
+                                    <RoleGate allow="lider">
+                                      <TeamAlertsPage />
+                                    </RoleGate>
+                                  }
+                                />
+                                <Route
+                                  path="/equipo/compradores"
+                                  element={
+                                    <RoleGate allow="lider">
+                                      <BuyersPage />
+                                    </RoleGate>
+                                  }
+                                />
+                                <Route
+                                  path="/equipo/ranking"
+                                  element={
+                                    <RoleGate allow="lider">
+                                      <RankingPage />
+                                    </RoleGate>
+                                  }
+                                />
+                                <Route
+                                  path="/equipo/metas"
+                                  element={
+                                    <RoleGate allow="lider">
+                                      <GoalsPage />
+                                    </RoleGate>
+                                  }
+                                />
+                                <Route
+                                  path="/equipo/carga"
+                                  element={
+                                    <RoleGate allow="lider">
+                                      <WorkloadPage />
+                                    </RoleGate>
+                                  }
+                                />
+                                <Route path="/comprar/decisiones" element={<ReplenishmentPage />} />
+                                <Route path="/comprar/reposicion" element={<ReplenishmentPage />} />
+                                <Route path="/reposicion" element={<ReplenishmentPage />} />
+                                <Route path="/campanas" element={<CampaignsPage />} />
+                                {/* Renombrada: "Oportunidades" → "Anticipación de campañas". */}
+                                <Route
+                                  path="/anticipacion"
+                                  element={<CampaignOpportunitiesPage />}
+                                />
+                                <Route
+                                  path="/campanas-oportunidades"
+                                  element={<Navigate to="/anticipacion" replace />}
+                                />
+                                <Route path="/productos" element={<ProductsPage />} />
+                                <Route path="/productos/:sku" element={<ProductDetailPage />} />
+                                <Route path="/categorias" element={<CategoriesPage />} />
+                                <Route path="/categorias/:id" element={<CategoryDetailPage />} />
+                                {/* Renombrada: "Catálogo optimizado" → "Surtido redundante". */}
+                                <Route
+                                  path="/surtido-redundante"
+                                  element={<CatalogOptimizationPage />}
+                                />
+                                <Route
+                                  path="/catalogo-optimizado"
+                                  element={<Navigate to="/surtido-redundante" replace />}
+                                />
+                                <Route path="/proveedores" element={<SuppliersPage />} />
+                                <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
+                                <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
+                                <Route
+                                  path="/comprar/borradores"
+                                  element={<PurchaseOrdersPage />}
+                                />
+                                <Route path="/comprar/ordenes" element={<PurchaseOrdersPage />} />
+                                <Route
+                                  path="/comprar/seguimiento"
+                                  element={<PurchaseOrdersPage />}
+                                />
+                                <Route path="/recepciones" element={<ReceptionsPage />} />
+                                <Route path="/comprar/recepciones" element={<ReceptionsPage />} />
+                                {/* Renombrada: "Oportunidades perdidas" → "Venta no capturada". */}
+                                <Route
+                                  path="/venta-no-capturada"
+                                  element={<LostOpportunitiesPage />}
+                                />
+                                <Route
+                                  path="/oportunidades-perdidas"
+                                  element={<Navigate to="/venta-no-capturada" replace />}
+                                />
+                                {/* Fusión: "Calidad de compra" + "Historial de decisiones" → "Aprendizaje de compra". */}
+                                <Route path="/aprendizaje" element={<AprendizajePage />} />
+                                <Route
+                                  path="/calidad-compra"
+                                  element={<Navigate to="/aprendizaje" replace />}
+                                />
+                                <Route
+                                  path="/decisiones"
+                                  element={<Navigate to="/aprendizaje?tab=decisiones" replace />}
+                                />
+                                <Route path="/aprobaciones" element={<ApprovalsPage />} />
+                                <Route path="/comprar/aprobaciones" element={<ApprovalsPage />} />
+                                <Route path="/alertas" element={<AlertsPage />} />
+                                <Route path="/senales-ventas" element={<SalesSignalsPage />} />
+                                <Route path="/analisis-compra" element={<PurchaseAnalysisPage />} />
+                                <Route path="/cotizaciones" element={<RfqPage />} />
+                                <Route path="/comprar/cotizaciones" element={<RfqPage />} />
+                                <Route path="/alzas-precio" element={<PriceIncreasesPage />} />
+                                <Route path="/presupuesto" element={<BudgetPage />} />
+                                <Route path="/documentos" element={<DocumentsPage />} />
+                                <Route path="/reportes" element={<ReportsPage />} />
+                                <Route path="/inventario" element={<InventoryAnalysisPage />} />
+                                <Route path="/ventas" element={<SalesAnalysisPage />} />
+                                <Route path="/margen-canal" element={<ChannelMarginPage />} />
+                                <Route path="/reglas" element={<SettingsPage />} />
+                                <Route path="*" element={<Navigate to="/" replace />} />
+                              </Route>
                             </Route>
-                          </Route>
-                        </Routes>
-                      </SignalsProvider>
-                    </PurchaseFlowProvider>
+                          </Routes>
+                        </SignalsProvider>
+                      </PurchaseFlowProvider>
+                    </DatasheetsProvider>
                   </OcDraftProvider>
                 </NotificationProvider>
               </BuyerProvider>

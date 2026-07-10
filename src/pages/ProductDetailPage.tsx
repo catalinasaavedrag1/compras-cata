@@ -15,7 +15,20 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BarList } from "../components/business/BarList";
-import { IconPlus, IconInfo, IconAlerts, IconSignal } from "../components/ui/icons";
+import {
+  IconPlus,
+  IconInfo,
+  IconAlerts,
+  IconSignal,
+  IconPaperclip,
+  IconEye,
+  IconDownload,
+  IconTrash,
+} from "../components/ui/icons";
+import { AttachDatasheetModal } from "../components/business/AttachDatasheetModal";
+import { useDatasheets } from "../context/DatasheetsContext";
+import { useToast } from "../context/ToastContext";
+import { openDataUrl, downloadDataUrl } from "../utils/fileClient";
 import { getProductBySku, products } from "../data/mockProducts";
 import { suppliers, getSupplierByName } from "../data/mockSuppliers";
 import { supplierFulfillment } from "../utils/supplierPerf";
@@ -54,6 +67,7 @@ export function ProductDetailPage() {
   const { addItem, hasItem } = useOcDraft();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "resumen");
+  const [attachOpen, setAttachOpen] = useState(false);
 
   const product = sku ? getProductBySku(sku) : undefined;
 
@@ -420,6 +434,11 @@ export function ProductDetailPage() {
             </Card>
           </div>
 
+          {/* Fichas técnicas y manuales del proveedor (mapeadas por SKU / EAN) */}
+          <div className="mb-5">
+            <DatasheetsCard product={product} onAttach={() => setAttachOpen(true)} />
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Alertas relacionadas */}
             <div>
@@ -631,7 +650,118 @@ export function ProductDetailPage() {
           </CardBody>
         </Card>
       )}
+
+      <AttachDatasheetModal
+        open={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        product={product}
+      />
     </div>
+  );
+}
+
+/**
+ * Fichas técnicas y manuales adjuntados por el comprador para este SKU.
+ * El proveedor las entrega mapeadas por SKU o EAN; aquí quedan disponibles
+ * para ver o descargar sin perseguir correos.
+ */
+function DatasheetsCard({ product, onAttach }: { product: Product; onAttach: () => void }) {
+  const datasheets = useDatasheets();
+  const toast = useToast();
+  const items = datasheets.bySku(product.sku);
+
+  return (
+    <Card>
+      <CardHeader
+        title="Fichas técnicas y manuales"
+        description={`Documentos del proveedor mapeados a este producto por SKU${
+          product.codigoBarras
+            ? ` (${product.sku}) o EAN (${product.codigoBarras})`
+            : ` (${product.sku})`
+        }`}
+        action={
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<IconPaperclip className="w-4 h-4" />}
+            onClick={onAttach}
+          >
+            Adjuntar
+          </Button>
+        }
+      />
+      <CardBody>
+        {items.length === 0 ? (
+          <EmptyState
+            icon={<IconPaperclip className="w-6 h-6" />}
+            title="Sin fichas técnicas"
+            description={`Aún no adjuntas la ficha técnica ni el manual de este producto (SKU ${product.sku}).`}
+            action={
+              <Button size="sm" icon={<IconPaperclip className="w-4 h-4" />} onClick={onAttach}>
+                Adjuntar ficha técnica
+              </Button>
+            }
+          />
+        ) : (
+          <div className="space-y-2">
+            {items.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5"
+              >
+                <span className="w-9 h-9 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
+                  <IconPaperclip className="w-4 h-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-800 truncate">{d.fileName}</p>
+                  <p className="text-xs text-slate-500">
+                    {d.sizeLabel} · {formatDate(d.uploadedAt.slice(0, 10))} · {d.uploadedBy}
+                    {d.ean ? ` · EAN ${d.ean}` : ""}
+                  </p>
+                  {d.note && <p className="text-xs text-slate-400 mt-0.5 truncate">{d.note}</p>}
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<IconEye className="w-4 h-4" />}
+                    onClick={() =>
+                      d.dataUrl
+                        ? openDataUrl(d.dataUrl)
+                        : toast.info("El archivo no está disponible en esta sesión.")
+                    }
+                  >
+                    Ver
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<IconDownload className="w-4 h-4" />}
+                    onClick={() =>
+                      d.dataUrl
+                        ? downloadDataUrl(d.dataUrl, d.fileName)
+                        : toast.info("El archivo no está disponible en esta sesión.")
+                    }
+                  >
+                    Descargar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<IconTrash className="w-4 h-4" />}
+                    aria-label="Eliminar ficha"
+                    onClick={() => {
+                      datasheets.remove(d.id);
+                      toast.info("Ficha técnica eliminada.");
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 

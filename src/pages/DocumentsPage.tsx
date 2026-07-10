@@ -9,6 +9,9 @@ import { HelpNote } from "../components/business/HelpNote";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { useToast } from "../context/ToastContext";
+import { useDatasheets, type Datasheet } from "../context/DatasheetsContext";
+import { AttachDatasheetModal } from "../components/business/AttachDatasheetModal";
+import { openDataUrl, downloadDataUrl } from "../utils/fileClient";
 import { inRange, type IsoRange } from "../utils/dateRange";
 import { formatDate } from "../utils/formatters";
 import {
@@ -20,7 +23,24 @@ import {
   type DocType,
   type ProcurementDoc,
 } from "../data/mockDocuments";
-import { IconOrders, IconMail, IconDownload, IconEye } from "../components/ui/icons";
+import { IconOrders, IconMail, IconDownload, IconEye, IconPaperclip } from "../components/ui/icons";
+
+/** Fila de la tabla: documento del repositorio o ficha adjuntada por el comprador. */
+type DocRow = ProcurementDoc & { attached?: Datasheet };
+
+/** Convierte una ficha adjuntada por el comprador en una fila de la tabla. */
+function datasheetToRow(d: Datasheet): DocRow {
+  return {
+    id: d.id,
+    nombre: d.fileName,
+    tipo: "ficha_tecnica",
+    proveedor: d.supplierName,
+    fecha: d.uploadedAt.slice(0, 10),
+    relacionado: d.ean ? `SKU ${d.sku} · EAN ${d.ean}` : `SKU ${d.sku}`,
+    tamano: d.sizeLabel,
+    attached: d,
+  };
+}
 
 /** Pestañas por tipo: "Todos" + cada tipo de documento. */
 const TYPE_TABS = [
@@ -30,15 +50,26 @@ const TYPE_TABS = [
 
 export function DocumentsPage() {
   const toast = useToast();
+  const datasheets = useDatasheets();
 
   const [query, setQuery] = useState("");
   const [tipo, setTipo] = useState<string>("");
   const [proveedor, setProveedor] = useState("");
   const [range, setRange] = useState<IsoRange>({ from: "", to: "" });
+  const [attachOpen, setAttachOpen] = useState(false);
+
+  // Fichas adjuntadas por el comprador (mapeadas por SKU/EAN) + repositorio mock.
+  const allDocs = useMemo<DocRow[]>(
+    () =>
+      [...datasheets.items.map(datasheetToRow), ...documents].sort((a, b) =>
+        b.fecha.localeCompare(a.fecha)
+      ),
+    [datasheets.items]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return documents.filter((d) => {
+    return allDocs.filter((d) => {
       if (
         q &&
         !d.nombre.toLowerCase().includes(q) &&
@@ -52,7 +83,7 @@ export function DocumentsPage() {
       if (!inRange(d.fecha, range)) return false;
       return true;
     });
-  }, [query, tipo, proveedor, range]);
+  }, [allDocs, query, tipo, proveedor, range]);
 
   // KPIs por tipo mayor (sobre el total, dan la foto del repositorio).
   const countBy = (t: DocType) => documents.filter((d) => d.tipo === t).length;
@@ -64,22 +95,39 @@ export function DocumentsPage() {
     setRange({ from: "", to: "" });
   };
 
-  const handleDownload = () => toast.info("Demo: documento simulado");
+  // Las fichas adjuntadas por el comprador se ven/descargan de verdad; el resto
+  // del repositorio es mock y solo muestra un aviso de demo.
+  const handleView = (d: DocRow) =>
+    d.attached?.dataUrl
+      ? openDataUrl(d.attached.dataUrl)
+      : d.attached
+        ? toast.info("El archivo no está disponible en esta sesión.")
+        : toast.info("Demo: documento simulado");
 
-  const columns: Column<ProcurementDoc>[] = [
+  const handleDownload = (d: DocRow) =>
+    d.attached?.dataUrl
+      ? downloadDataUrl(d.attached.dataUrl, d.attached.fileName)
+      : d.attached
+        ? toast.info("El archivo no está disponible en esta sesión.")
+        : toast.info("Demo: documento simulado");
+
+  const columns: Column<DocRow>[] = [
     {
       key: "nombre",
       header: "Documento",
       render: (d) => (
         <div className="flex items-center gap-2.5 min-w-[200px]">
           <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
-            {d.tipo === "correo" ? (
+            {d.attached ? (
+              <IconPaperclip className="w-4 h-4" />
+            ) : d.tipo === "correo" ? (
               <IconMail className="w-4 h-4" />
             ) : (
               <IconOrders className="w-4 h-4" />
             )}
           </span>
           <span className="font-medium text-slate-800 leading-snug">{d.nombre}</span>
+          {d.attached && <Badge tone="green">Adjuntada</Badge>}
         </div>
       ),
       sortable: true,
@@ -129,13 +177,13 @@ export function DocumentsPage() {
       key: "actions",
       header: "Acción",
       align: "right",
-      render: () => (
+      render: (d) => (
         <div className="flex items-center justify-end gap-1.5">
           <Button
             size="sm"
             variant="ghost"
             icon={<IconEye className="w-4 h-4" />}
-            onClick={handleDownload}
+            onClick={() => handleView(d)}
           >
             Ver
           </Button>
@@ -143,7 +191,7 @@ export function DocumentsPage() {
             size="sm"
             variant="secondary"
             icon={<IconDownload className="w-4 h-4" />}
-            onClick={handleDownload}
+            onClick={() => handleDownload(d)}
           >
             Descargar
           </Button>
@@ -157,12 +205,19 @@ export function DocumentsPage() {
       <PageHeader
         title="Documentos centralizados"
         description="Cotizaciones, órdenes de compra, guías, facturas, contratos y más, en un solo repositorio buscable."
+        action={
+          <Button icon={<IconPaperclip className="w-4 h-4" />} onClick={() => setAttachOpen(true)}>
+            Adjuntar ficha técnica
+          </Button>
+        }
       />
 
       <HelpNote className="mb-4">
         Este repositorio <b>centraliza los documentos del proceso de compra</b> que hoy viven
         dispersos en correos y planillas Excel. Busca por nombre, proveedor u orden relacionada,
-        filtra por tipo y fecha, y encuentra cualquier respaldo sin perseguir a nadie por mail.
+        filtra por tipo y fecha, y encuentra cualquier respaldo sin perseguir a nadie por mail.{" "}
+        <b>Adjunta la ficha técnica o manual del proveedor</b> y queda mapeada al producto por su
+        SKU o código EAN.
       </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -237,7 +292,9 @@ export function DocumentsPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
-                    {d.tipo === "correo" ? (
+                    {d.attached ? (
+                      <IconPaperclip className="w-4 h-4" />
+                    ) : d.tipo === "correo" ? (
                       <IconMail className="w-4 h-4" />
                     ) : (
                       <IconOrders className="w-4 h-4" />
@@ -261,7 +318,7 @@ export function DocumentsPage() {
                     size="sm"
                     variant="ghost"
                     icon={<IconEye className="w-4 h-4" />}
-                    onClick={handleDownload}
+                    onClick={() => handleView(d)}
                   >
                     Ver
                   </Button>
@@ -269,7 +326,7 @@ export function DocumentsPage() {
                     size="sm"
                     variant="secondary"
                     icon={<IconDownload className="w-4 h-4" />}
-                    onClick={handleDownload}
+                    onClick={() => handleDownload(d)}
                   >
                     Descargar
                   </Button>
@@ -279,6 +336,8 @@ export function DocumentsPage() {
           )}
         />
       </Card>
+
+      <AttachDatasheetModal open={attachOpen} onClose={() => setAttachOpen(false)} />
     </div>
   );
 }
