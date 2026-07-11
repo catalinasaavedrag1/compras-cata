@@ -799,7 +799,7 @@ export function MyPanelPage() {
   return (
     <div>
       <PageHeader
-        title={isPortfolioView ? portfolioHeader[portfolioFocus].title : `Inicio · ${buyer}`}
+        title={isPortfolioView ? portfolioHeader[portfolioFocus].title : `Hola, ${buyer.split(" ")[0]}`}
         description={
           isPortfolioView
             ? portfolioHeader[portfolioFocus].description

@@ -33,18 +33,23 @@ export function AppHeader() {
         <div className="flex-1 min-w-0" />
         <TopbarActions />
       </div>
-      <div className="lg:hidden border-t border-slate-100 bg-white">
-        <div className="px-3 py-2">
-          <div className="mb-1.5 flex items-center gap-2">
-            <activeModule.icon className="w-4 h-4 text-brand-600" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {activeModule.label}
-            </span>
-          </div>
-          <nav
-            aria-label={`Vistas de ${activeModule.label}`}
-            className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5"
-          >
+      {/* Sub-pestañas móviles: solo cuando el módulo tiene más de una vista.
+          Con una sola (p. ej. Inicio o Proveedores) el rótulo + la píldora
+          repetirían el título de la página y la sección activa del menú
+          inferior — puro ruido —, así que se ocultan. */}
+      {activeChildren.length > 1 && (
+        <div className="lg:hidden border-t border-slate-100 bg-white">
+          <div className="px-3 py-2">
+            <div className="mb-1.5 flex items-center gap-2">
+              <activeModule.icon className="w-4 h-4 text-brand-600" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {activeModule.label}
+              </span>
+            </div>
+            <nav
+              aria-label={`Vistas de ${activeModule.label}`}
+              className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5"
+            >
             {activeChildren.map((item) => {
               const b = item.badge ? badges[item.badge] : undefined;
               return (
@@ -83,9 +88,10 @@ export function AppHeader() {
                 </NavLink>
               );
             })}
-          </nav>
+            </nav>
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }
