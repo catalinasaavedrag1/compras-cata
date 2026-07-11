@@ -13,7 +13,6 @@ import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Tabs } from "../components/ui/Tabs";
 import { IconPlus, IconCampaign, IconArrowUp, IconArrowDown } from "../components/ui/icons";
-import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
 import { useToast } from "../context/ToastContext";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import { TODAY_ISO } from "../utils/constants";
@@ -83,7 +82,6 @@ interface ProductForm {
 
 export function CampaignsPage() {
   const toast = useToast();
-  const { scope, setScope, inScope, myCategories } = useCategoryScope();
   const [plans, setPlans] = useLocalStorage<CampaignPlan[]>(
     "compras:campaign-plans",
     CAMPAIGN_PLANS
@@ -364,13 +362,9 @@ export function CampaignsPage() {
     toast.success(`Campaña "${plan.name}" creada`);
   };
 
-  // Alcance del comprador: al armar la campaña solo ofrece sus productos.
   const productOptions = useMemo(
-    () =>
-      products
-        .filter((p) => inScope(p.category))
-        .map((p) => ({ value: p.sku, label: `${p.sku} — ${p.name}` })),
-    [inScope]
+    () => products.map((p) => ({ value: p.sku, label: `${p.sku} — ${p.name}` })),
+    []
   );
 
   return (
@@ -379,12 +373,9 @@ export function CampaignsPage() {
         title="Campañas y descuentos"
         description="Arma cada evento: elige los productos en descuento, reparte el presupuesto por canal y define dónde se exhibe cada uno (reel, banner, góndola o listado destacado)."
         action={
-          <div className="flex items-center gap-2">
-            <ScopeToggle scope={scope} onChange={setScope} myCount={myCategories.length} />
-            <Button icon={<IconPlus className="w-4 h-4" />} onClick={() => openAdd()}>
-              Agregar producto
-            </Button>
-          </div>
+          <Button icon={<IconPlus className="w-4 h-4" />} onClick={() => openAdd()}>
+            Agregar producto
+          </Button>
         }
       />
 

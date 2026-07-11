@@ -89,16 +89,21 @@ interface BudgetSeed {
 }
 
 // Presupuestos ligados al tamaño de cada categoría (compra sugerida + holgura).
+// Nota: los committedRatio se mantienen por debajo de 1 en las categorías del
+// comprador por defecto (Construcción, Maderas) para que el estado base sea
+// sano y el rojo de "sobre OTB" aparezca solo cuando el borrador realmente
+// sobregira. Se deja una categoría por sobre 1 (Agrícola) para seguir
+// demostrando el semáforo "excedido" sin castigar la vista inicial.
 const SEEDS: Record<string, BudgetSeed> = {
-  Construcción: { presupuesto: 22000000, committedRatio: 1.06, receivedRatio: 0.62 },
+  Construcción: { presupuesto: 22000000, committedRatio: 0.74, receivedRatio: 0.62 },
   Ferretería: { presupuesto: 12000000, committedRatio: 0.78, receivedRatio: 0.71 },
   "Herramientas eléctricas": { presupuesto: 24000000, committedRatio: 0.91, receivedRatio: 0.58 },
   Pinturas: { presupuesto: 5000000, committedRatio: 0.62, receivedRatio: 0.8 },
   Electricidad: { presupuesto: 8500000, committedRatio: 0.83, receivedRatio: 0.66 },
   Gasfitería: { presupuesto: 13000000, committedRatio: 0.96, receivedRatio: 0.74 },
   Jardín: { presupuesto: 2200000, committedRatio: 0.41, receivedRatio: 0.9 },
-  Agrícola: { presupuesto: 7000000, committedRatio: 0.88, receivedRatio: 0.63 },
-  Maderas: { presupuesto: 11000000, committedRatio: 1.12, receivedRatio: 0.55 },
+  Agrícola: { presupuesto: 7000000, committedRatio: 1.08, receivedRatio: 0.63 },
+  Maderas: { presupuesto: 11000000, committedRatio: 0.8, receivedRatio: 0.55 },
   "Seguridad industrial": { presupuesto: 1800000, committedRatio: 0.34, receivedRatio: 0.95 },
 };
 

@@ -36,12 +36,18 @@ export function MonthlyBars({
   return (
     <div>
       <div className="relative flex items-end gap-1" style={{ height }}>
-        {/* Línea de promedio anual */}
+        {/* Línea de promedio anual (etiqueta a la izquierda, con fondo para no
+            solaparse con las barras; bajo la línea si el promedio está muy alto). */}
         <div
           className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-300"
           style={{ bottom: `${avgPct}%` }}
         >
-          <span className="absolute -top-4 right-0 text-[10px] text-slate-400">
+          <span
+            className={cn(
+              "absolute left-0 rounded bg-white/80 px-1 text-[10px] text-slate-400",
+              avgPct > 82 ? "top-0.5" : "-top-4"
+            )}
+          >
             promedio {format ? format(avg) : Math.round(avg)}
           </span>
         </div>
@@ -97,6 +103,9 @@ export function StackedChannelBars({
           const tip = DEMAND_CHANNELS.map(
             (ch) => `${CHANNEL_META[ch].short}: ${fmt(m.byChannel[ch])}`
           ).join(" · ");
+          // Índice del primer canal (de arriba hacia abajo) con altura > 0,
+          // para redondear el tope real de la barra aunque el canal superior sea 0.
+          const topIdx = stackOrder.findIndex((ch) => m.byChannel[ch] > 0);
           return (
             <div
               key={m.label}
@@ -109,7 +118,7 @@ export function StackedChannelBars({
                 return (
                   <div
                     key={ch}
-                    className={cn(i === 0 && "rounded-t")}
+                    className={cn(i === topIdx && "rounded-t")}
                     style={{ height: `${h}%`, background: CHANNEL_META[ch].color }}
                   />
                 );

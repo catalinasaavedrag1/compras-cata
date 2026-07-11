@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { Select } from "../components/ui/Select";
@@ -106,8 +107,12 @@ export function SeasonsChannelsPage() {
         La misma categoría se vende por varios canales y cada uno tiene su propia temporada: el{" "}
         <b>ecommerce</b> y el <b>marketplace</b> suben en CyberDay y fin de año, las{" "}
         <b>licitaciones</b> se concentran cuando se ejecuta presupuesto (marzo-abril, oct-nov) y la{" "}
-        <b>venta empresa</b> sigue la temporada de obra. Verlo así explica <b>cuánto</b> comprar y{" "}
-        <b>por qué</b>, no solo el total.
+        <b>venta empresa</b> sigue la temporada de obra. Este es el <b>diagnóstico</b>; para
+        convertirlo en compra, usa{" "}
+        <Link to="/comprar/temporada" className="font-medium text-brand-700 hover:underline">
+          Planificar temporada
+        </Link>
+        .
       </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">

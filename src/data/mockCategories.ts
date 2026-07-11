@@ -20,7 +20,7 @@ export const categories: Category[] = [
   {
     id: "CAT-02",
     name: "Ferretería",
-    buyer: "Juan Pérez",
+    buyer: "Catalina Saavedra",
     activeSkus: 318,
     salesLast30Days: 22900000,
     salesLast90Days: 68100000,

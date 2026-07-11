@@ -412,6 +412,11 @@ export function ProductsPage() {
           data={filtered}
           rowKey={(p) => p.sku}
           onRowClick={(p) => navigate(`/productos/${p.sku}`)}
+          emptyMessage={
+            scope === "mine"
+              ? 'Sin productos con estos filtros en tu cartera. Cambia a "Todas" arriba o limpia los filtros.'
+              : "Sin productos que coincidan con los filtros."
+          }
           mobileCard={(p) => (
             <div>
               <div className="flex items-start justify-between gap-2">

@@ -117,7 +117,7 @@ export function BudgetPage() {
       key: "presupuesto",
       header: "Presupuesto",
       align: "right",
-      render: (v) => <span className="text-slate-700">{formatCurrency(v.presupuesto)}</span>,
+      render: (v) => <span className="text-slate-700">{formatCurrencyCompact(v.presupuesto)}</span>,
       sortable: true,
       sortValue: (v) => v.presupuesto,
     },
@@ -126,7 +126,9 @@ export function BudgetPage() {
       header: "Comprometido",
       align: "right",
       hideOnMobile: true,
-      render: (v) => <span className="text-slate-700">{formatCurrency(v.comprometido)}</span>,
+      render: (v) => (
+        <span className="text-slate-700">{formatCurrencyCompact(v.comprometido)}</span>
+      ),
       sortable: true,
       sortValue: (v) => v.comprometido,
     },
@@ -136,7 +138,9 @@ export function BudgetPage() {
       align: "right",
       render: (v) =>
         v.enBorrador > 0 ? (
-          <span className="font-medium text-brand-600">+ {formatCurrency(v.enBorrador)}</span>
+          <span className="font-medium text-brand-600">
+            + {formatCurrencyCompact(v.enBorrador)}
+          </span>
         ) : (
           <span className="text-slate-300">—</span>
         ),
@@ -151,7 +155,7 @@ export function BudgetPage() {
         <span
           className={cn("font-semibold", v.disponible < 0 ? "text-rose-600" : "text-slate-900")}
         >
-          {formatCurrency(v.disponible)}
+          {formatCurrencyCompact(v.disponible)}
         </span>
       ),
       sortable: true,
