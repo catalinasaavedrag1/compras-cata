@@ -101,6 +101,7 @@ export interface SeasonProductPlan {
   price: number;
   margin: number;
   rotation: number;
+  maxStock: number;
   // Demanda por origen (unidades de la temporada)
   histAdjusted: number;
   growth: number;
@@ -360,6 +361,7 @@ function decompose(
     price: p.price,
     margin: p.margin,
     rotation: p.rotation,
+    maxStock: p.maxStock,
     histAdjusted,
     growth,
     ecommerce,
