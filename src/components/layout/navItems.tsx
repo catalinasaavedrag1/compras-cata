@@ -15,6 +15,7 @@ import {
   IconSignal,
   IconChat,
   IconDownload,
+  IconTruck,
 } from "../ui/icons";
 import type { Role } from "../../context/RoleContext";
 
@@ -165,6 +166,12 @@ export const compradorModules: NavModule[] = [
         label: "Borradores OC",
         icon: IconOrders,
         hint: "Construye la compra por proveedor, revisa restricciones y formaliza",
+      },
+      {
+        to: "/comprar/plan-retiro",
+        label: "Plan de retiro",
+        icon: IconTruck,
+        hint: "Cómo se retira la mercadería: camiones, capacidad, centros, fechas y costo logístico",
       },
       {
         to: "/comprar/aprobaciones",

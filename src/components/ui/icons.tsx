@@ -246,6 +246,15 @@ export const IconChat = base(
   </>
 );
 
+// Camión de retiro / logística.
+export const IconTruck = base(
+  <>
+    <path d="M3 6h11v9H3zM14 9h4l3 3v3h-7z" />
+    <circle cx="7" cy="18" r="1.6" />
+    <circle cx="17.5" cy="18" r="1.6" />
+  </>
+);
+
 // Convertir en tarea de compra / carrito.
 export const IconCart = base(
   <>
