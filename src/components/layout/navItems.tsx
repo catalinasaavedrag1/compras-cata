@@ -313,11 +313,17 @@ export const compradorModules: NavModule[] = [
   },
   {
     key: "catalogo",
-    label: "Catálogo",
+    label: "Surtido",
     icon: IconProducts,
-    to: "/surtido-redundante",
-    hint: "Racionalización, duplicidad, candidatos a salida y nuevos productos",
+    to: "/surtido",
+    hint: "Qué surtido llevar: rol de categoría, surtido por tienda, marca propia, altas y salidas",
     children: [
+      {
+        to: "/surtido",
+        label: "Gestión de surtido",
+        icon: IconProducts,
+        hint: "Rol de categoría, surtido por tienda, marca propia y line review (altas y salidas)",
+      },
       {
         to: "/surtido-redundante",
         label: "Duplicidad",

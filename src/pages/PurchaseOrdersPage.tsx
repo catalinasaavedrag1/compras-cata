@@ -30,6 +30,8 @@ import {
   LogisticsAdvice,
   LogisticsInlineSummary,
 } from "../components/business/LogisticsPlan";
+import { draftBudgetImpact } from "../utils/openToBuy";
+import { LandedCostBreakdown } from "../components/business/LandedCost";
 import { purchaseOrders as mockPOs } from "../data/mockPurchaseOrders";
 import { suppliers as mockSuppliers } from "../data/mockSuppliers";
 import { useCollection } from "../context/DataContext";
@@ -55,7 +57,6 @@ import {
   formatCurrencyCompact,
   formatDate,
   formatNumber,
-  formatPercent,
 } from "../utils/formatters";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
 
@@ -300,7 +301,6 @@ export function PurchaseOrdersPage() {
       openOverlap,
       highCoverage,
       avgCoverage,
-      budgetAvailable: 22000000,
     };
   }, [items, orders, supplierGroups]);
 
@@ -310,6 +310,12 @@ export function PurchaseOrdersPage() {
     [items]
   );
   const pickupPlan = usePickupPlan(pickupLines);
+
+  // Open-to-Buy en vivo: cuánto presupuesto consume el borrador y si sobregira.
+  const budget = useMemo(
+    () => draftBudgetImpact(TODAY_ISO.slice(0, 7), items, createdOrders),
+    [items, createdOrders]
+  );
 
   const selectedDraftItem = items.find((i) => i.sku === draftContextSku) ?? items[0] ?? null;
 
@@ -720,10 +726,12 @@ export function PurchaseOrdersPage() {
                 </button>
               )}
               <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <DraftMetric
-                  label="Presupuesto disp."
-                  value={formatCurrencyCompact(draftSummary.budgetAvailable)}
-                />
+                <Link to="/presupuesto" className="block" title="Ver Open-to-Buy por categoría">
+                  <DraftMetric
+                    label="Presupuesto disp. (OTB)"
+                    value={formatCurrencyCompact(budget.availableBefore)}
+                  />
+                </Link>
                 <DraftMetric
                   label="Cobertura futura"
                   value={draftSummary.avgCoverage > 0 ? `${draftSummary.avgCoverage} d` : "n/a"}
@@ -750,8 +758,12 @@ export function PurchaseOrdersPage() {
                   text="productos quedarían con cobertura mayor a 90 días"
                 />
                 <DraftWarning
-                  count={Math.max(0, totalAmount - draftSummary.budgetAvailable)}
-                  text="sobre presupuesto disponible"
+                  count={budget.over}
+                  text={
+                    budget.overCategories.length > 0
+                      ? `sobre OTB en ${budget.overCategories.map((c) => c.categoria).join(", ")}`
+                      : "sobre presupuesto disponible (OTB)"
+                  }
                   currency
                 />
               </div>
@@ -1324,17 +1336,18 @@ function DraftLineContext({
               {supplier ? `${supplier.averageLeadTimeDays} d` : "n/a"}
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Rentabilidad
-            </p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
-              Margen {product ? formatPercent(product.margin) : "n/a"}
-            </p>
-            <p className="text-xs text-slate-500">
-              Costo {formatCurrency(item.unitCost)} · línea {formatCurrency(lineNet(item))}
-            </p>
-          </div>
+          {product ? (
+            <LandedCostBreakdown product={product} unitCost={item.unitCost} />
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Rentabilidad
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">
+                Costo {formatCurrency(item.unitCost)} · línea {formatCurrency(lineNet(item))}
+              </p>
+            </div>
+          )}
         </div>
       )}
 

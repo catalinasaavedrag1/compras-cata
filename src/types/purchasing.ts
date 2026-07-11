@@ -96,6 +96,9 @@ export interface Product {
   costoAnterior?: number; // costo anterior (para mostrar el delta)
   descuentoVigentePct?: number; // descuento vigente del proveedor %
   equivalencias?: ProductEquivalence[]; // mismo producto en proveedores alternativos
+  marcaPropia?: boolean; // marca propia / private label (si no viene, se deriva de la marca)
+  esImportado?: boolean; // producto de importación (si no viene, se deriva de la marca)
+  arancelPct?: number; // arancel de importación % (si aplica)
   // -------------------------------------------------------------------------
   //  Logística de retiro (opcional). Si no viene explícita, se deriva de la
   //  categoría con `productLogistics()` (src/data/logistics.ts). En materiales

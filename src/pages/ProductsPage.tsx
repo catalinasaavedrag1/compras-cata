@@ -5,6 +5,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
+import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { KpiCard } from "../components/business/KpiCard";
 import { MoreActions } from "../components/ui/MoreActions";
@@ -38,6 +39,13 @@ export function ProductsPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const allProducts = useCollection<Product>("products", mockProducts);
+  const { scope, setScope, inScope, myCategories } = useCategoryScope();
+
+  // Alcance del comprador: por defecto solo sus categorías asignadas.
+  const scopedProducts = useMemo(
+    () => allProducts.filter((p) => inScope(p.category)),
+    [allProducts, inScope]
+  );
 
   const [query, setQuery] = useUrlState("q");
   const [category, setCategory] = useUrlState("cat");
@@ -55,7 +63,7 @@ export function ProductsPage() {
   });
 
   const filtered = useMemo(() => {
-    let result = filterProducts(allProducts, {
+    let result = filterProducts(scopedProducts, {
       query,
       category,
       subcategory,
@@ -75,7 +83,7 @@ export function ProductsPage() {
     }
     return result;
   }, [
-    allProducts,
+    scopedProducts,
     query,
     category,
     subcategory,
@@ -232,17 +240,20 @@ export function ProductsPage() {
         title="Productos / SKUs"
         description="Revisa stock, margen, rotación y estado del surtido."
         action={
-          <MoreActions
-            actions={[
-              {
-                label: "Exportar a CSV",
-                onClick: () => {
-                  exportToCsv("productos", filtered, PRODUCT_CSV_COLUMNS);
-                  toast.success(`Se exportaron ${filtered.length} productos a productos.csv`);
+          <div className="flex items-center gap-2">
+            <ScopeToggle scope={scope} onChange={setScope} myCount={myCategories.length} />
+            <MoreActions
+              actions={[
+                {
+                  label: "Exportar a CSV",
+                  onClick: () => {
+                    exportToCsv("productos", filtered, PRODUCT_CSV_COLUMNS);
+                    toast.success(`Se exportaron ${filtered.length} productos a productos.csv`);
+                  },
                 },
-              },
-            ]}
-          />
+              ]}
+            />
+          </div>
         }
       />
 
@@ -260,7 +271,7 @@ export function ProductsPage() {
               placeholder: "Categoría",
               value: category,
               onChange: setCategory,
-              options: uniqueValues(allProducts, (p) => p.category).map((c) => ({
+              options: uniqueValues(scopedProducts, (p) => p.category).map((c) => ({
                 value: c,
                 label: c,
               })),
@@ -270,7 +281,7 @@ export function ProductsPage() {
               placeholder: "Subcategoría",
               value: subcategory,
               onChange: setSubcategory,
-              options: uniqueValues(allProducts, (p) => p.subcategory).map((c) => ({
+              options: uniqueValues(scopedProducts, (p) => p.subcategory).map((c) => ({
                 value: c,
                 label: c,
               })),
@@ -280,7 +291,7 @@ export function ProductsPage() {
               placeholder: "Marca",
               value: brand,
               onChange: setBrand,
-              options: uniqueValues(allProducts, (p) => p.brand).map((c) => ({
+              options: uniqueValues(scopedProducts, (p) => p.brand).map((c) => ({
                 value: c,
                 label: c,
               })),
@@ -291,7 +302,7 @@ export function ProductsPage() {
               value: supplier,
               onChange: setSupplier,
               options: uniqueValues(
-                allProducts.filter((p) => p.supplierName),
+                scopedProducts.filter((p) => p.supplierName),
                 (p) => p.supplierName
               ).map((c) => ({ value: c, label: c })),
             },

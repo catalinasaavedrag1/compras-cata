@@ -12,10 +12,12 @@ import {
   BUDGET_MONTHS,
   DEFAULT_BUDGET_MONTH,
   formatBudgetMonth,
-  getBudgetViews,
   type BudgetStatus,
-  type CategoryBudgetView,
 } from "../data/mockBudgets";
+import { computeOtb, type CategoryOtb } from "../utils/openToBuy";
+import { useOcDraft } from "../context/OcDraftContext";
+import { useLocalStorage } from "../utils/useLocalStorage";
+import type { PurchaseOrder } from "../types/purchasing";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "../utils/formatters";
 import { IconInventory, IconCart, IconBox, IconAlerts } from "../components/ui/icons";
 
@@ -32,7 +34,7 @@ function barColor(estado: BudgetStatus): string {
   return "bg-emerald-500";
 }
 
-function UsageBar({ row }: { row: CategoryBudgetView }) {
+function UsageBar({ row }: { row: CategoryOtb }) {
   const pct = Math.min(100, Math.round(row.usadoPct));
   const over = row.usadoPct > 100;
   return (
@@ -56,16 +58,24 @@ export function BudgetPage() {
   const [month, setMonth] = useState<string>(DEFAULT_BUDGET_MONTH);
   const [query, setQuery] = useState("");
   const [estado, setEstado] = useState("");
+  const { items: draftItems, count: draftCount } = useOcDraft();
+  const [createdOrders] = useLocalStorage<PurchaseOrder[]>("compras:po-created", []);
 
-  const views = useMemo(() => getBudgetViews(month), [month]);
+  // Open-to-Buy en vivo: el borrador y las OC creadas consumen presupuesto.
+  const views = useMemo(
+    () => computeOtb(month, draftItems, createdOrders),
+    [month, draftItems, createdOrders]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return views.filter((v) => {
-      if (q && !v.categoria.toLowerCase().includes(q)) return false;
-      if (estado && v.estado !== estado) return false;
-      return true;
-    });
+    return views
+      .filter((v) => {
+        if (q && !v.categoria.toLowerCase().includes(q)) return false;
+        if (estado && v.estado !== estado) return false;
+        return true;
+      })
+      .sort((a, b) => b.presupuesto - a.presupuesto);
   }, [views, query, estado]);
 
   // KPIs del mes completo (no se filtran, dan la foto global del mes).
@@ -75,23 +85,27 @@ export function BudgetPage() {
         acc.presupuesto += v.presupuesto;
         acc.comprometido += v.comprometido;
         acc.recibido += v.recibido;
+        acc.enBorrador += v.enBorrador;
         return acc;
       },
-      { presupuesto: 0, comprometido: 0, recibido: 0 }
+      { presupuesto: 0, comprometido: 0, recibido: 0, enBorrador: 0 }
     );
   }, [views]);
 
-  const disponibleTotal = totals.presupuesto - totals.comprometido;
+  const disponibleTotal = totals.presupuesto - totals.comprometido - totals.enBorrador;
   const usadoTotalPct =
-    totals.presupuesto > 0 ? (totals.comprometido / totals.presupuesto) * 100 : 0;
+    totals.presupuesto > 0
+      ? ((totals.comprometido + totals.enBorrador) / totals.presupuesto) * 100
+      : 0;
   const excedidas = views.filter((v) => v.estado === "excedido");
+  const draftCategories = views.filter((v) => v.enBorrador > 0);
 
   const clearFilters = () => {
     setQuery("");
     setEstado("");
   };
 
-  const columns: Column<CategoryBudgetView>[] = [
+  const columns: Column<CategoryOtb>[] = [
     {
       key: "categoria",
       header: "Categoría",
@@ -111,22 +125,27 @@ export function BudgetPage() {
       key: "comprometido",
       header: "Comprometido",
       align: "right",
+      hideOnMobile: true,
       render: (v) => <span className="text-slate-700">{formatCurrency(v.comprometido)}</span>,
       sortable: true,
       sortValue: (v) => v.comprometido,
     },
     {
-      key: "recibido",
-      header: "Recibido",
+      key: "borrador",
+      header: "En borrador",
       align: "right",
-      hideOnMobile: true,
-      render: (v) => <span className="text-slate-600">{formatCurrency(v.recibido)}</span>,
+      render: (v) =>
+        v.enBorrador > 0 ? (
+          <span className="font-medium text-brand-600">+ {formatCurrency(v.enBorrador)}</span>
+        ) : (
+          <span className="text-slate-300">—</span>
+        ),
       sortable: true,
-      sortValue: (v) => v.recibido,
+      sortValue: (v) => v.enBorrador,
     },
     {
       key: "disponible",
-      header: "Disponible",
+      header: "Disponible (OTB)",
       align: "right",
       render: (v) => (
         <span
@@ -148,23 +167,6 @@ export function BudgetPage() {
       sortValue: (v) => v.usadoPct,
     },
     {
-      key: "proyeccion",
-      header: "Proyección cierre",
-      align: "right",
-      hideOnMobile: true,
-      render: (v) => (
-        <span
-          className={cn(
-            v.proyeccionCierre > v.presupuesto ? "text-rose-600 font-medium" : "text-slate-600"
-          )}
-        >
-          {formatCurrency(v.proyeccionCierre)}
-        </span>
-      ),
-      sortable: true,
-      sortValue: (v) => v.proyeccionCierre,
-    },
-    {
       key: "estado",
       header: "Estado",
       render: (v) => <Badge tone={STATUS_META[v.estado].tone}>{STATUS_META[v.estado].label}</Badge>,
@@ -177,7 +179,7 @@ export function BudgetPage() {
     <div>
       <PageHeader
         title="Presupuesto por categoría"
-        description="Controla el presupuesto de compra mensual: cuánto está comprometido, cuánto ya llegó y cuánto queda disponible por categoría."
+        description="Open-to-Buy: cuánto puedes comprar en cada categoría después de descontar lo ya comprometido y lo que estás armando en el borrador."
         action={
           <div className="w-44">
             <Select
@@ -191,10 +193,10 @@ export function BudgetPage() {
       />
 
       <HelpNote className="mb-4">
-        <b>Comprometido</b> es la caja que ya reservaste al aprobar órdenes de compra, haya llegado
-        o no la mercadería. <b>Recibido</b> es solo lo que ya se recepcionó (un subconjunto de lo
-        comprometido). El <b>disponible</b> se calcula sobre lo comprometido, no sobre lo recibido,
-        para no volver a gastar plata que ya está reservada.
+        El <b>disponible (OTB)</b> es lo que aún puedes comprar: presupuesto − <b>comprometido</b>{" "}
+        (OC ya emitidas, haya llegado o no la mercadería) − lo que tienes <b>en borrador</b> ahora
+        mismo. Si armas una compra, verás bajar el disponible de su categoría en vivo, para no
+        gastar plata que ya está reservada.
       </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -210,17 +212,17 @@ export function BudgetPage() {
           value={formatCurrencyCompact(totals.comprometido)}
           tone={usadoTotalPct > 100 ? "bad" : usadoTotalPct >= 85 ? "warn" : "good"}
           icon={<IconCart className="w-4 h-4" />}
-          description={`${formatPercent(usadoTotalPct, 0)} del presupuesto`}
+          description={`${formatPercent(usadoTotalPct, 0)} con borrador`}
         />
         <KpiCard
-          title="Recibido"
-          value={formatCurrencyCompact(totals.recibido)}
-          tone="neutral"
+          title="En borrador"
+          value={formatCurrencyCompact(totals.enBorrador)}
+          tone={totals.enBorrador > 0 ? "warn" : "neutral"}
           icon={<IconBox className="w-4 h-4" />}
-          description="Mercadería recepcionada"
+          description={draftCount > 0 ? `${draftCount} SKU sin emitir` : "Sin borrador en curso"}
         />
         <KpiCard
-          title="Disponible"
+          title="Disponible (OTB)"
           value={formatCurrencyCompact(disponibleTotal)}
           tone={disponibleTotal < 0 ? "bad" : "good"}
           icon={<IconAlerts className="w-4 h-4" />}
@@ -228,11 +230,19 @@ export function BudgetPage() {
         />
       </div>
 
+      {draftCategories.length > 0 && (
+        <HelpNote variant="tip" className="mb-4">
+          Tu borrador en curso suma <b>{formatCurrency(totals.enBorrador)}</b> en{" "}
+          {draftCategories.length} categoría{draftCategories.length === 1 ? "" : "s"} (
+          {draftCategories.map((v) => v.categoria).join(", ")}). El disponible ya lo refleja.
+        </HelpNote>
+      )}
+
       {excedidas.length > 0 && (
         <HelpNote variant="tip" className="mb-4">
-          <b>{excedidas.length}</b> categoría{excedidas.length === 1 ? "" : "s"} ya superó su
-          presupuesto de {formatBudgetMonth(month)}: {excedidas.map((v) => v.categoria).join(", ")}.
-          Revisa antes de aprobar nuevas órdenes de compra.
+          <b>{excedidas.length}</b> categoría{excedidas.length === 1 ? "" : "s"} quedaría
+          {excedidas.length === 1 ? "" : "n"} sobre presupuesto en {formatBudgetMonth(month)}:{" "}
+          {excedidas.map((v) => v.categoria).join(", ")}. Revisa antes de emitir la orden de compra.
         </HelpNote>
       )}
 
@@ -264,7 +274,13 @@ export function BudgetPage() {
           columns={columns}
           data={filtered}
           rowKey={(v) => v.categoria}
-          rowClassName={(v) => (v.estado === "excedido" ? "bg-rose-50/60" : undefined)}
+          rowClassName={(v) =>
+            v.estado === "excedido"
+              ? "bg-rose-50/60"
+              : v.enBorrador > 0
+                ? "bg-brand-50/40"
+                : undefined
+          }
           emptyMessage="No hay categorías que coincidan con los filtros."
           mobileCard={(v) => (
             <div>
@@ -278,8 +294,10 @@ export function BudgetPage() {
                   <p className="text-slate-700">{formatCurrencyCompact(v.presupuesto)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Comprometido</p>
-                  <p className="text-slate-700">{formatCurrencyCompact(v.comprometido)}</p>
+                  <p className="text-xs text-slate-400">En borrador</p>
+                  <p className={v.enBorrador > 0 ? "text-brand-600" : "text-slate-400"}>
+                    {v.enBorrador > 0 ? `+ ${formatCurrencyCompact(v.enBorrador)}` : "—"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Disponible</p>
