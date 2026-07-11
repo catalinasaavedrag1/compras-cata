@@ -6,6 +6,7 @@ import { StatusBadge } from "../components/business/StatusBadge";
 import { Badge } from "../components/ui/Badge";
 import { BarList } from "../components/business/BarList";
 import { HelpNote } from "../components/business/HelpNote";
+import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
 import { categories } from "../data/mockCategories";
 import {
   formatCurrency,
@@ -17,12 +18,16 @@ import type { Category } from "../types/purchasing";
 
 export function CategoriesPage() {
   const navigate = useNavigate();
-  const sortedBySales = [...categories].sort((a, b) => b.salesLast30Days - a.salesLast30Days);
-  const sortedByCritical = [...categories].sort(
+  const { scope, setScope, inScope, myCategories } = useCategoryScope();
+
+  // Alcance del comprador: por defecto solo sus categorías asignadas.
+  const scoped = categories.filter((c) => inScope(c.name));
+  const sortedBySales = [...scoped].sort((a, b) => b.salesLast30Days - a.salesLast30Days);
+  const sortedByCritical = [...scoped].sort(
     (a, b) => b.stockoutSkus + b.riskSkus - (a.stockoutSkus + a.riskSkus)
   );
-  const sortedByMargin = [...categories].sort((a, b) => a.averageMargin - b.averageMargin);
-  const sortedByInventory = [...categories].sort((a, b) => b.inventoryValue - a.inventoryValue);
+  const sortedByMargin = [...scoped].sort((a, b) => a.averageMargin - b.averageMargin);
+  const sortedByInventory = [...scoped].sort((a, b) => b.inventoryValue - a.inventoryValue);
 
   const columns: Column<Category>[] = [
     {
@@ -128,6 +133,7 @@ export function CategoriesPage() {
       <PageHeader
         title="Categorías"
         description="Salud comercial por categoría: venta, margen, quiebres y rotación."
+        action={<ScopeToggle scope={scope} onChange={setScope} myCount={myCategories.length} />}
       />
 
       <HelpNote className="mb-4">
@@ -181,10 +187,15 @@ export function CategoriesPage() {
       </div>
 
       <Card>
-        <CardHeader title="Detalle por categoría" description="Todas las categorías del surtido" />
+        <CardHeader
+          title="Detalle por categoría"
+          description={
+            scope === "mine" ? "Categorías de tu cartera" : "Todas las categorías del surtido"
+          }
+        />
         <DataTable
           columns={columns}
-          data={categories}
+          data={scoped}
           rowKey={(c) => c.id}
           onRowClick={(c) => navigate(`/categorias/${c.id}`)}
           mobileCard={(c) => (

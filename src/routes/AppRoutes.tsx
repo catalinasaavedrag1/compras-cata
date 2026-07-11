@@ -46,6 +46,7 @@ const ChannelMarginPage = lazy(() =>
 );
 const ReceptionsPage = lazy(() => named(import("../pages/ReceptionsPage"), "ReceptionsPage"));
 const PlanRetiroPage = lazy(() => named(import("../pages/PlanRetiroPage"), "PlanRetiroPage"));
+const AssortmentPage = lazy(() => named(import("../pages/AssortmentPage"), "AssortmentPage"));
 const SupplierDetailPage = lazy(() =>
   named(import("../pages/SupplierDetailPage"), "SupplierDetailPage")
 );
@@ -198,6 +199,7 @@ export default function AppRoutes() {
                               <Route path="/productos/:sku" element={<ProductDetailPage />} />
                               <Route path="/categorias" element={<CategoriesPage />} />
                               <Route path="/categorias/:id" element={<CategoryDetailPage />} />
+                              <Route path="/surtido" element={<AssortmentPage />} />
                               {/* Renombrada: "Catálogo optimizado" → "Surtido redundante". */}
                               <Route
                                 path="/surtido-redundante"

@@ -14,6 +14,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { ExportButton } from "../components/business/ExportButton";
 import { CampaignBuilderModal } from "../components/business/CampaignBuilderModal";
+import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
 import { uniqueValues } from "../utils/filters";
 import {
   formatCurrency,
@@ -53,6 +54,10 @@ export function CampaignOpportunitiesPage() {
   const navigate = useNavigate();
   const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
+  const { scope, setScope, inScope, myCategories } = useCategoryScope();
+
+  // Alcance del comprador: por defecto solo oportunidades de sus categorías.
+  const scopedOpps = useMemo(() => all.filter((o) => inScope(o.category)), [inScope]);
 
   const [view, setView] = useState<"oportunidades" | "campanas">("oportunidades");
   const [createdCampaigns, setCreatedCampaigns] = useLocalStorage<CreatedCampaign[]>(
@@ -79,7 +84,7 @@ export function CampaignOpportunitiesPage() {
   });
 
   const filtered = useMemo(() => {
-    const result = all.filter((o) => {
+    const result = scopedOpps.filter((o) => {
       if (query.trim()) {
         const q = query.toLowerCase();
         if (!`${o.sku} ${o.productName} ${o.campaignName}`.toLowerCase().includes(q)) return false;
@@ -100,13 +105,16 @@ export function CampaignOpportunitiesPage() {
       (a, b) =>
         STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] || a.daysToCampaign - b.daysToCampaign
     );
-  }, [query, channel, type, status, category, supplier, toggles]);
+  }, [scopedOpps, query, channel, type, status, category, supplier, toggles]);
 
   // KPIs
-  const stockoutRisk = all.filter((o) => o.status === "stockout_risk").length;
-  const buyBefore = all.filter((o) => o.status === "buy_before_campaign").length;
-  const toLiquidateList = all.filter((o) => o.status === "liquidate");
-  const suggestedBuyTotal = all.reduce((a, o) => a + o.suggestedPurchaseQuantity * o.unitCost, 0);
+  const stockoutRisk = scopedOpps.filter((o) => o.status === "stockout_risk").length;
+  const buyBefore = scopedOpps.filter((o) => o.status === "buy_before_campaign").length;
+  const toLiquidateList = scopedOpps.filter((o) => o.status === "liquidate");
+  const suggestedBuyTotal = scopedOpps.reduce(
+    (a, o) => a + o.suggestedPurchaseQuantity * o.unitCost,
+    0
+  );
 
   // Campañas próximas (agrupadas)
   const upcoming = useMemo(() => {
@@ -114,7 +122,7 @@ export function CampaignOpportunitiesPage() {
       string,
       { name: string; days: number; date: string; count: number; channels: Set<string> }
     >();
-    for (const o of all) {
+    for (const o of scopedOpps) {
       const e = map.get(o.campaignName);
       if (e) {
         e.count += 1;
@@ -134,7 +142,7 @@ export function CampaignOpportunitiesPage() {
       }
     }
     return Array.from(map.values()).sort((a, b) => a.days - b.days);
-  }, []);
+  }, [scopedOpps]);
 
   // Consolidación de compras de campaña por proveedor (una OC por proveedor),
   // con alerta de lead time crítico (no alcanza a llegar antes de la campaña).
@@ -150,7 +158,7 @@ export function CampaignOpportunitiesPage() {
         leadTime: number;
       }
     >();
-    for (const o of all) {
+    for (const o of scopedOpps) {
       if (o.suggestedPurchaseQuantity <= 0) continue;
       const e = map.get(o.supplierName);
       if (e) {
@@ -174,7 +182,7 @@ export function CampaignOpportunitiesPage() {
       const br = b.leadTime >= b.minDays ? 0 : 1;
       return ar - br || a.minDays - b.minDays;
     });
-  }, []);
+  }, [scopedOpps]);
   const ocCount = bySupplier.length;
   const criticalLeadCount = bySupplier.filter((s) => s.leadTime >= s.minDays).length;
 
@@ -483,7 +491,8 @@ export function CampaignOpportunitiesPage() {
         title="Anticipación de campañas"
         description="Comprar antes del peak, liquidar y detectar crecimiento por canal: productos que irán a campañas, oportunidades de liquidación, crecimiento acelerado y riesgos de quiebre."
         action={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <ScopeToggle scope={scope} onChange={setScope} myCount={myCategories.length} />
             <ExportButton
               filename="campanas-oportunidades"
               rows={filtered}
@@ -537,7 +546,7 @@ export function CampaignOpportunitiesPage() {
         value={view}
         onChange={(v) => setView(v as typeof view)}
         tabs={[
-          { value: "oportunidades", label: "Oportunidades detectadas", count: all.length },
+          { value: "oportunidades", label: "Oportunidades detectadas", count: scopedOpps.length },
           { value: "campanas", label: "Mis campañas", count: createdCampaigns.length },
         ]}
       />
@@ -662,19 +671,19 @@ export function CampaignOpportunitiesPage() {
             value={status || "all"}
             onChange={(v) => setStatus(v === "all" ? "" : v)}
             tabs={[
-              { value: "all", label: "Todos", count: all.length },
+              { value: "all", label: "Todos", count: scopedOpps.length },
               { value: "buy_before_campaign", label: "Comprar antes", count: buyBefore },
               { value: "stockout_risk", label: "Riesgo de quiebre", count: stockoutRisk },
               { value: "liquidate", label: "Liquidar", count: toLiquidateList.length },
               {
                 value: "boost",
                 label: "Potenciar",
-                count: all.filter((o) => o.status === "boost").length,
+                count: scopedOpps.filter((o) => o.status === "boost").length,
               },
               {
                 value: "not_recommended",
                 label: "No recomendado",
-                count: all.filter((o) => o.status === "not_recommended").length,
+                count: scopedOpps.filter((o) => o.status === "not_recommended").length,
               },
             ]}
           />
@@ -723,7 +732,7 @@ export function CampaignOpportunitiesPage() {
                   placeholder: "Categoría",
                   value: category,
                   onChange: setCategory,
-                  options: uniqueValues(all, (o) => o.category).map((c) => ({
+                  options: uniqueValues(scopedOpps, (o) => o.category).map((c) => ({
                     value: c,
                     label: c,
                   })),
@@ -734,7 +743,7 @@ export function CampaignOpportunitiesPage() {
                   value: supplier,
                   onChange: setSupplier,
                   options: uniqueValues(
-                    all.filter((o) => o.supplierName),
+                    scopedOpps.filter((o) => o.supplierName),
                     (o) => o.supplierName
                   ).map((c) => ({ value: c, label: c })),
                 },
