@@ -47,6 +47,9 @@ const ChannelMarginPage = lazy(() =>
 const ReceptionsPage = lazy(() => named(import("../pages/ReceptionsPage"), "ReceptionsPage"));
 const PlanRetiroPage = lazy(() => named(import("../pages/PlanRetiroPage"), "PlanRetiroPage"));
 const AssortmentPage = lazy(() => named(import("../pages/AssortmentPage"), "AssortmentPage"));
+const SeasonsChannelsPage = lazy(() =>
+  named(import("../pages/SeasonsChannelsPage"), "SeasonsChannelsPage")
+);
 const SupplierDetailPage = lazy(() =>
   named(import("../pages/SupplierDetailPage"), "SupplierDetailPage")
 );
@@ -251,6 +254,7 @@ export default function AppRoutes() {
                               <Route path="/inventario" element={<InventoryAnalysisPage />} />
                               <Route path="/ventas" element={<SalesAnalysisPage />} />
                               <Route path="/margen-canal" element={<ChannelMarginPage />} />
+                              <Route path="/temporadas" element={<SeasonsChannelsPage />} />
                               <Route path="/reglas" element={<SettingsPage />} />
                               <Route path="*" element={<Navigate to="/" replace />} />
                             </Route>

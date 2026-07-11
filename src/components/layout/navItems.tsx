@@ -296,6 +296,12 @@ export const compradorModules: NavModule[] = [
         hint: "Precio y margen por marketplace, web y tienda",
       },
       {
+        to: "/temporadas",
+        label: "Temporadas y canales",
+        icon: IconCampaign,
+        hint: "Cuándo sube la demanda y por qué canal se compra (tienda, ecommerce, marketplace, empresa, licitaciones)",
+      },
+      {
         to: "/alzas-precio",
         label: "Variaciones de costo",
         icon: IconSales,

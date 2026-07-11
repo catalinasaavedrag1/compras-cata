@@ -10,6 +10,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import { useToast } from "../context/ToastContext";
 import { StatusBadge } from "../components/business/StatusBadge";
+import { MonthlyBars } from "../components/business/SeasonalityChart";
 import { suppliers } from "../data/mockSuppliers";
 import { products } from "../data/mockProducts";
 import { categories } from "../data/mockCategories";
@@ -434,17 +435,8 @@ export function SeasonView({ supplier }: { supplier: Supplier }) {
   const s = supplierSeasonality(supplier.name);
   const last12 = s.series.slice(12);
   const maxSales = Math.max(1, ...s.series.map((p) => p.sales));
+  const last12avg = last12.reduce((a, p) => a + p.sales, 0) / (last12.length || 1);
   const scoreTone = s.score >= 80 ? "good" : s.score >= 60 ? "warn" : "bad";
-
-  // Curva 24 meses (SVG)
-  const W = 240;
-  const H = 56;
-  const pts = s.series
-    .map(
-      (p, i) =>
-        `${((i / (s.series.length - 1)) * W).toFixed(1)},${(H - (p.sales / maxSales) * H).toFixed(1)}`
-    )
-    .join(" ");
 
   return (
     <div className="space-y-4">
@@ -532,32 +524,19 @@ export function SeasonView({ supplier }: { supplier: Supplier }) {
           </CardBody>
         </Card>
 
-        {/* Curva 24 meses */}
+        {/* Curva de venta (12 meses) */}
         <Card>
-          <CardHeader title="Curva de venta (24 meses)" description="Tendencia y temporadas" />
+          <CardHeader title="Curva de venta (12 meses)" description="Tendencia y meses peak" />
           <CardBody>
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              preserveAspectRatio="none"
-              className="w-full"
-              style={{ height: 90 }}
-            >
-              <polyline
-                points={pts}
-                fill="none"
-                stroke="#1f49d6"
-                strokeWidth={2}
-                vectorEffect="non-scaling-stroke"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="flex justify-between mt-1">
-              <span className="text-[10px] text-slate-400">{s.series[0].label}</span>
-              <span className="text-[10px] text-slate-400">
-                {s.series[s.series.length - 1].label}
-              </span>
-            </div>
+            <MonthlyBars
+              data={last12.map((p) => ({
+                label: p.label.split(" ")[0],
+                value: p.sales,
+                highlight: p.sales >= (last12avg || 1) * 1.1,
+              }))}
+              format={(n) => formatCurrencyCompact(n)}
+              height={120}
+            />
           </CardBody>
         </Card>
       </div>
