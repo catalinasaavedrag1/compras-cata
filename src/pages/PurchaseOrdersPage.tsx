@@ -16,7 +16,20 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
 import { PurchaseProcessBar } from "../components/business/PurchaseProcessBar";
-import { IconPlus, IconReplenish, IconOrders, IconSearch, IconClose } from "../components/ui/icons";
+import {
+  IconPlus,
+  IconReplenish,
+  IconOrders,
+  IconSearch,
+  IconClose,
+  IconTruck,
+} from "../components/ui/icons";
+import {
+  usePickupPlan,
+  LogisticsSummary,
+  LogisticsAdvice,
+  LogisticsInlineSummary,
+} from "../components/business/LogisticsPlan";
 import { purchaseOrders as mockPOs } from "../data/mockPurchaseOrders";
 import { suppliers as mockSuppliers } from "../data/mockSuppliers";
 import { useCollection } from "../context/DataContext";
@@ -290,6 +303,13 @@ export function PurchaseOrdersPage() {
       budgetAvailable: 22000000,
     };
   }, [items, orders, supplierGroups]);
+
+  // Plan de retiro en vivo: se recalcula al agregar/cambiar líneas del borrador.
+  const pickupLines = useMemo(
+    () => items.map((i) => ({ sku: i.sku, productName: i.productName, quantity: i.quantity })),
+    [items]
+  );
+  const pickupPlan = usePickupPlan(pickupLines);
 
   const selectedDraftItem = items.find((i) => i.sku === draftContextSku) ?? items[0] ?? null;
 
@@ -614,6 +634,18 @@ export function PurchaseOrdersPage() {
             tone: count > 0 ? "blue" : "neutral",
           },
           {
+            label: "Retiro",
+            detail: "Planificar transporte",
+            count: pickupPlan.truckCount,
+            to: "/comprar/plan-retiro",
+            active: pathname.includes("/comprar/plan-retiro"),
+            tone: pickupPlan.alerts.some((a) => a.level === "warning")
+              ? "amber"
+              : pickupPlan.truckCount > 0
+                ? "blue"
+                : "neutral",
+          },
+          {
             label: "Aprobación",
             detail: "Validar desvíos",
             count: pendingApprovals.length,
@@ -675,6 +707,18 @@ export function PurchaseOrdersPage() {
                 {count} SKU · {formatCurrency(totalAmount)} · cobertura futura promedio{" "}
                 {draftSummary.avgCoverage > 0 ? `${draftSummary.avgCoverage} días` : "sin venta"}
               </p>
+              {pickupPlan.truckCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/comprar/plan-retiro")}
+                  className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-left hover:border-brand-200 hover:bg-brand-50/40"
+                >
+                  <LogisticsInlineSummary plan={pickupPlan} />
+                  <span className="flex-shrink-0 text-xs font-medium text-brand-600">
+                    Ver plan de retiro →
+                  </span>
+                </button>
+              )}
               <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <DraftMetric
                   label="Presupuesto disp."
@@ -1070,6 +1114,32 @@ export function PurchaseOrdersPage() {
                   </p>
                 )}
               </div>
+
+              {/* Plan de retiro en vivo: cómo se retirará físicamente la mercadería */}
+              {pickupPlan.truckCount > 0 && (
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <div className="mb-2.5 flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+                      <IconTruck className="w-4 h-4 text-brand-600" />
+                      Plan de retiro
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        navigate("/comprar/plan-retiro");
+                      }}
+                      className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                    >
+                      Ver detalle por camión →
+                    </button>
+                  </div>
+                  <LogisticsSummary plan={pickupPlan} />
+                  <div className="mt-3">
+                    <LogisticsAdvice plan={pickupPlan} />
+                  </div>
+                </div>
+              )}
             </>
           )}
 

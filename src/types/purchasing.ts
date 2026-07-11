@@ -96,6 +96,57 @@ export interface Product {
   costoAnterior?: number; // costo anterior (para mostrar el delta)
   descuentoVigentePct?: number; // descuento vigente del proveedor %
   equivalencias?: ProductEquivalence[]; // mismo producto en proveedores alternativos
+  // -------------------------------------------------------------------------
+  //  Logística de retiro (opcional). Si no viene explícita, se deriva de la
+  //  categoría con `productLogistics()` (src/data/logistics.ts). En materiales
+  //  de construcción el retiro físico es parte de la decisión de compra.
+  // -------------------------------------------------------------------------
+  logistica?: ProductLogistics;
+}
+
+// ============================================================================
+//  Logística de retiro — datos físicos del producto para planificar el retiro
+//  (peso, volumen, manipulación, vehículo, centro y disponibilidad).
+// ============================================================================
+
+/** Cómo se manipula/carga el producto en el proveedor. */
+export type HandlingType =
+  | "manual" // a mano
+  | "horquilla" // grúa horquilla
+  | "pluma" // camión pluma / brazo hidráulico
+  | "grua" // grúa / carga especial
+  | "rampla"; // rampla / carga lateral
+
+/** Clase de vehículo requerido para retirar la carga. */
+export type VehicleClass =
+  | "camioneta"
+  | "camion_3_4"
+  | "camion_simple"
+  | "camion_rampla"
+  | "camion_pluma";
+
+/**
+ * Ficha logística del producto. Los pesos y volúmenes son por **unidad de la
+ * línea de compra** (la misma unidad en que se ingresa la cantidad en la OC),
+ * para poder estimar directamente peso y volumen totales de la compra.
+ */
+export interface ProductLogistics {
+  pesoUnitarioKg: number; // peso por unidad
+  volumenM3: number; // volumen por unidad (m³)
+  unidadesPorPallet?: number; // cuántas unidades entran por pallet
+  apilable: boolean; // se puede apilar carga encima
+  fragil: boolean; // requiere cuidado / no soporta peso encima
+  sobredimensionado: boolean; // excede medidas estándar (largo/alto/ancho)
+  cargaPesada: boolean; // material pesado (cemento, áridos, fierro)
+  manipulacion: HandlingType; // cómo se carga en el proveedor
+  vehiculoMinimo: VehicleClass; // vehículo mínimo que puede transportarlo
+  centroRetiro: string; // centro/planta desde donde se despacha
+  fechaDisponible: string; // fecha ISO en que estará listo para retiro
+  tiempoCargaMin?: number; // tiempo estimado de carga (min)
+  /** Grupo de carga (para reglas de compatibilidad entre productos). */
+  grupoCarga?: string;
+  /** Grupos de carga con los que NO puede compartir camión. */
+  incompatibleCon?: string[];
 }
 
 /** Equivalencia: el mismo producto ofrecido por un proveedor alternativo. */
