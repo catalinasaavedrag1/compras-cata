@@ -5,7 +5,7 @@ import { IconDashboard, IconCategories, IconReplenish, IconInventory, IconMenu }
 const items = [
   { to: "/", label: "Inicio", icon: IconDashboard, end: true },
   { to: "/mi-cartera", label: "Cartera", icon: IconCategories },
-  { to: "/reposicion", label: "Comprar", icon: IconReplenish },
+  { to: "/comprar/decisiones", label: "Comprar", icon: IconReplenish },
   { to: "/inventario", label: "Inventario", icon: IconInventory },
 ];
 

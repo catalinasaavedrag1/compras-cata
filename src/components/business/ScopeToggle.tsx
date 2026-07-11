@@ -58,7 +58,10 @@ interface ScopeToggleProps {
 /** Segmentado "Mi cartera / Todas" para acotar una vista al alcance del comprador. */
 export function ScopeToggle({ scope, onChange, myCount, className }: ScopeToggleProps) {
   const options: { value: Scope; label: string }[] = [
-    { value: "mine", label: myCount != null ? `Mi cartera (${myCount})` : "Mi cartera" },
+    {
+      value: "mine",
+      label: myCount != null ? `Mi cartera · ${myCount} cat.` : "Mi cartera",
+    },
     { value: "all", label: "Todas" },
   ];
   return (

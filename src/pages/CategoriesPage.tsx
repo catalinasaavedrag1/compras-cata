@@ -198,6 +198,11 @@ export function CategoriesPage() {
           data={scoped}
           rowKey={(c) => c.id}
           onRowClick={(c) => navigate(`/categorias/${c.id}`)}
+          emptyMessage={
+            scope === "mine"
+              ? 'Estás viendo solo tu cartera. Cambia a "Todas" arriba para ver el resto de las categorías.'
+              : "No hay categorías."
+          }
           mobileCard={(c) => (
             <div>
               <div className="flex items-start justify-between gap-2">

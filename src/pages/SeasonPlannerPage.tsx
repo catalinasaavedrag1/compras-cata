@@ -57,7 +57,7 @@ const RISK_META: Record<SeasonRisk, { label: string; tone: BadgeTone }> = {
 const SCENARIO_ORDER: ScenarioKey[] = ["conservador", "probable", "agresivo"];
 
 export function SeasonPlannerPage() {
-  const { addItem } = useOcDraft();
+  const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -83,6 +83,8 @@ export function SeasonPlannerPage() {
 
   const addAllToDraft = () => {
     const buyable = plan.products.filter((p) => p.suggested > 0);
+    const already = buyable.filter((p) => hasItem(p.sku)).length;
+    const added = buyable.length - already;
     buyable.forEach((p) =>
       addItem({
         sku: p.sku,
@@ -93,9 +95,8 @@ export function SeasonPlannerPage() {
       })
     );
     toast.success(
-      `${buyable.length} propuesta(s) agregada(s) al borrador de OC (${formatNumber(
-        plan.summary.unitsTotal
-      )} u.)`,
+      `${added} propuesta(s) al borrador · ${formatCurrencyCompact(plan.summary.compraPropuesta)}` +
+        (already > 0 ? ` · ${already} ya estaban` : ""),
       { label: "Ir al borrador", onClick: () => navigate("/comprar/borradores") }
     );
   };
@@ -111,18 +112,6 @@ export function SeasonPlannerPage() {
             {p.sku} · {p.category}
           </p>
         </div>
-      ),
-    },
-    {
-      key: "origin",
-      header: "Origen (tienda/ecom/mkt/empresa/licit)",
-      hideOnMobile: true,
-      render: (p) => (
-        <span className="text-xs text-slate-500">
-          {formatNumber(p.histAdjusted + p.growth)} / {formatNumber(p.ecommerce)} /{" "}
-          {formatNumber(p.mercadoLibre + p.falabella)} / {formatNumber(p.empresaConfirmed)} /{" "}
-          {formatNumber(p.licitConfirmed + p.licitWeighted)}
-        </span>
       ),
     },
     {
@@ -371,6 +360,35 @@ export function SeasonPlannerPage() {
               onRowClick={(p) => setDetailSku(p.sku)}
               rowClassName={(p) => (p.risk === "alto_quiebre" ? "bg-rose-50/40" : undefined)}
               emptyMessage="No hay productos en las categorías de esta temporada."
+              mobileCard={(p) => (
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-400">
+                        {p.sku} · {p.category}
+                      </p>
+                    </div>
+                    <Badge tone={RISK_META[p.risk].tone}>{RISK_META[p.risk].label}</Badge>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-slate-400">Demanda</p>
+                      <p className="text-slate-700">{formatNumber(p.needTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Stock + tránsito</p>
+                      <p className="text-slate-700">
+                        {formatNumber(p.available)} + {formatNumber(p.inTransit)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Compra sugerida</p>
+                      <p className="font-semibold text-slate-900">{formatNumber(p.suggested)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             />
           </Card>
         </>
@@ -406,7 +424,7 @@ export function SeasonPlannerPage() {
             <HeaderField label="Presupuesto" value={formatCurrencyCompact(season.budget)} />
             <HeaderField label="Crecimiento esp." value={`+${season.expectedGrowthPct}%`} />
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 pt-3 text-xs">
+          <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3 text-xs">
             <ChipRow label="Categorías" items={season.categories} />
             <ChipRow label="Canales" items={season.channels.map((c) => CHANNEL_META[c].short)} />
             <ChipRow label="Bodegas" items={season.warehouses} />

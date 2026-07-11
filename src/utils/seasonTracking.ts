@@ -87,10 +87,10 @@ function channelPlanned(plan: SeasonPlan): Record<DemandChannel, number> {
 
 function trackProduct(p: SeasonProductPlan, progress: number): ProductTracking {
   const h = hashString(p.sku + "trk");
-  const saleFactor = 0.7 + (h % 8) * 0.1; // 0.7 .. 1.4
+  const saleFactor = 0.8 + (h % 6) * 0.07; // 0.8 .. 1.15 (venta moderada vs plan)
   const ventaReal = round(p.needTotal * progress * saleFactor);
   const emitido = p.suggested;
-  const receivedFactor = 0.2 + (h % 4) * 0.2; // 0.2 .. 0.8
+  const receivedFactor = 0.45 + (h % 5) * 0.11; // 0.45 .. 0.89 (buena parte ya recibida)
   const recibido = round(emitido * receivedFactor);
   const stockActual = Math.max(0, p.available + recibido - ventaReal);
   const pronosticoActual = progress > 0 ? round(ventaReal / progress) : p.needTotal;
@@ -98,15 +98,18 @@ function trackProduct(p: SeasonProductPlan, progress: number): ProductTracking {
   const remainingWeeks = Math.max(1, round((1 - progress) * 16));
   const weeklyDemand = (pronosticoActual * (1 - progress)) / remainingWeeks;
   const pendingReceipt = Math.max(0, emitido - recibido);
+  // Cobertura considerando lo que aún llegará en tránsito: solo hay quiebre si
+  // ni el stock ni lo pendiente alcanzan a cubrir lo que resta de temporada.
+  const coverageUnits = stockActual + pendingReceipt;
   const stockoutWeek =
-    weeklyDemand > 0 && stockActual / weeklyDemand < remainingWeeks
-      ? Math.max(1, round(stockActual / weeklyDemand))
+    weeklyDemand > 0 && coverageUnits / weeklyDemand < remainingWeeks
+      ? Math.max(1, round(coverageUnits / weeklyDemand))
       : null;
   const invFinalProyectado = Math.max(
     0,
     round(stockActual + pendingReceipt - pronosticoActual * (1 - progress))
   );
-  const delayDays = h % 3 === 0 ? 7 : 0;
+  const delayDays = h % 4 === 0 ? 7 : 0;
 
   return {
     sku: p.sku,
