@@ -16,6 +16,7 @@ import {
   IconChat,
   IconDownload,
   IconTruck,
+  IconCalendar,
 } from "../ui/icons";
 import type { Role } from "../../context/RoleContext";
 
@@ -154,6 +155,12 @@ export const compradorModules: NavModule[] = [
         label: "Reposición",
         icon: IconInventory,
         hint: "Reponer productos con riesgo de quiebre o cobertura corta",
+      },
+      {
+        to: "/comprar/temporada",
+        label: "Planificador de temporada",
+        icon: IconCalendar,
+        hint: "Planifica la compra por temporada: demanda por origen, escenarios, riesgo y compra sugerida explicable",
       },
       {
         to: "/comprar/cotizaciones",

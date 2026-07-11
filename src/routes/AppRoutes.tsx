@@ -50,6 +50,9 @@ const AssortmentPage = lazy(() => named(import("../pages/AssortmentPage"), "Asso
 const SeasonsChannelsPage = lazy(() =>
   named(import("../pages/SeasonsChannelsPage"), "SeasonsChannelsPage")
 );
+const SeasonPlannerPage = lazy(() =>
+  named(import("../pages/SeasonPlannerPage"), "SeasonPlannerPage")
+);
 const SupplierDetailPage = lazy(() =>
   named(import("../pages/SupplierDetailPage"), "SupplierDetailPage")
 );
@@ -219,6 +222,7 @@ export default function AppRoutes() {
                               <Route path="/comprar/ordenes" element={<PurchaseOrdersPage />} />
                               <Route path="/comprar/seguimiento" element={<PurchaseOrdersPage />} />
                               <Route path="/comprar/plan-retiro" element={<PlanRetiroPage />} />
+                              <Route path="/comprar/temporada" element={<SeasonPlannerPage />} />
                               <Route path="/recepciones" element={<ReceptionsPage />} />
                               <Route path="/comprar/recepciones" element={<ReceptionsPage />} />
                               {/* Renombrada: "Oportunidades perdidas" → "Venta no capturada". */}
