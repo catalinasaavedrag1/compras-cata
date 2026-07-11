@@ -959,8 +959,9 @@ function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRe
               </span>
             </div>
             <p className="text-[11px] text-slate-400 mt-2">
-              El costo real suma flete, logística y merma sobre el costo de factura. Negocia sobre
-              el costo real, no sobre el descuento de lista.
+              El costo real suma el flete, el arancel y el manejo sobre el costo de factura — el
+              mismo <b>costo puesto en bodega</b> que verás en la línea de la orden de compra.
+              Negocia sobre este costo, no sobre el descuento de lista.
             </p>
           </CardBody>
         </Card>

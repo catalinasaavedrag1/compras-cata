@@ -1,6 +1,7 @@
 import type { Product } from "../types/purchasing";
 import { products } from "../data/mockProducts";
 import { hashString as hashStr } from "./hash";
+import { landedCost } from "./landedCost";
 
 // ============================================================================
 //  Inteligencia de negociación por producto (simulada en frontend, determinista).
@@ -69,13 +70,12 @@ export function productNegotiation(p: Product): ProductNegotiation {
   const reAmt = Math.round((costoLista * rebate) / 100);
   const costoNetoFactura = costoLista - dcAmt - dvAmt - boAmt - reAmt;
 
-  const fletePct = pick(p.sku, "fl", 2, 5);
-  const logisticaPct = pick(p.sku, "lo", 1, 3);
-  const mermaPct = pick(p.sku, "me", 0.5, 2);
-  const fleteAmt = Math.round((costoNetoFactura * fletePct) / 100);
-  const logiAmt = Math.round((costoNetoFactura * logisticaPct) / 100);
-  const mermaAmt = Math.round((costoNetoFactura * mermaPct) / 100);
-  const costoReal = costoNetoFactura + fleteAmt + logiAmt + mermaAmt;
+  // La parte logística del costo real (flete + arancel + manejo) la calcula el
+  // MISMO motor de landed cost que usa el borrador de OC, para que el "costo
+  // real" del detalle de producto y el "costo puesto en bodega" de la línea
+  // coincidan exactamente (costoNetoFactura reconstruido == p.cost).
+  const lc = landedCost(p, costoNetoFactura);
+  const costoReal = lc.landed;
 
   const costLines: CostLine[] = [
     { label: "Costo lista", amount: costoLista, kind: "base" },
@@ -84,14 +84,18 @@ export function productNegotiation(p: Product): ProductNegotiation {
     { label: `Bonificación (${bonificacion}%)`, amount: -boAmt, kind: "discount" },
     { label: `Rebate (${rebate}%)`, amount: -reAmt, kind: "discount" },
     { label: "Costo neto factura", amount: costoNetoFactura, kind: "total" },
-    { label: "Flete", amount: fleteAmt, kind: "extra" },
-    { label: "Logística", amount: logiAmt, kind: "extra" },
-    { label: "Merma esperada", amount: mermaAmt, kind: "extra" },
-    { label: "Costo real", amount: costoReal, kind: "total" },
+    { label: "Flete", amount: lc.freight, kind: "extra" },
+    ...(lc.duty > 0
+      ? [{ label: "Arancel importación", amount: lc.duty, kind: "extra" as const }]
+      : []),
+    ...(lc.handling > 0
+      ? [{ label: "Manejo especial", amount: lc.handling, kind: "extra" as const }]
+      : []),
+    { label: "Costo real (puesto en bodega)", amount: costoReal, kind: "total" },
   ];
 
   const margenNominal = p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
-  const margenReal = p.price > 0 ? ((p.price - costoReal) / p.price) * 100 : 0;
+  const margenReal = lc.landedMargin;
 
   // ---- Historial de costo / precio ----
   const varCostoPct = pick(p.sku, "vc", -6, 12); // alza típica
