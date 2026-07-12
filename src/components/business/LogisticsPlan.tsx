@@ -12,6 +12,7 @@ import {
   type PickupPlan,
   type TruckLoad,
 } from "../../utils/logistics";
+import { TruckLoad3D } from "./TruckLoad3D";
 
 // ============================================================================
 //  UI del plan de retiro
@@ -167,7 +168,13 @@ export function TruckLoadCard({ truck }: { truck: TruckLoad }) {
           <Badge tone="neutral">{truck.center}</Badge>
         </div>
       </div>
-      <div className="grid gap-3 p-3 sm:grid-cols-2">
+      <div className="p-3">
+        <TruckLoad3D
+          fillPct={Math.max(truck.weightPct, truck.volumePct)}
+          height={150}
+        />
+      </div>
+      <div className="grid gap-3 px-3 pb-3 sm:grid-cols-2">
         <CapacityBar
           label="Peso"
           pct={truck.weightPct}
