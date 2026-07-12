@@ -14,7 +14,7 @@ import { DateRangePicker } from "../components/ui/DateRangePicker";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { KpiCard } from "../components/business/KpiCard";
-import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { PurchaseProcessBar } from "../components/business/PurchaseProcessBar";
 import {
   IconPlus,
@@ -612,6 +612,18 @@ export function PurchaseOrdersPage() {
             )}
           </Button>
         }
+        help={
+          <InfoHint label="Ciclo de una orden de compra">
+            <p>
+              Una OC pasa por: <b>borrador → enviada → confirmada → recibida</b>.
+            </p>
+            <p>
+              Las <b>atrasadas</b> (rojo) superaron su fecha esperada y pueden provocar quiebre:
+              priorízalas.
+            </p>
+            <p>Crea nuevas OC desde las sugerencias de reposición con el botón de arriba.</p>
+          </InfoHint>
+        }
       />
 
       <PurchaseProcessBar
@@ -813,12 +825,6 @@ export function PurchaseOrdersPage() {
           onClick={() => setTab("all")}
         />
       </div>
-
-      <HelpNote className="mb-4">
-        Una OC pasa por: <b>borrador → enviada → confirmada → recibida</b>. Las <b>atrasadas</b>{" "}
-        (rojo) superaron su fecha esperada y pueden provocar quiebre: priorízalas. Crea nuevas OC
-        desde las sugerencias de reposición con el botón de arriba.
-      </HelpNote>
 
       <div className="mb-3 flex flex-col sm:flex-row sm:items-center gap-2">
         <div className="flex-1 min-w-0">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
@@ -11,6 +11,7 @@ import { useLocalStorage } from "../utils/useLocalStorage";
 import { useToast } from "../context/ToastContext";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { MonthlyBars } from "../components/business/SeasonalityChart";
+import { MetricHint } from "../components/business/supplierMetricHelp";
 import { suppliers } from "../data/mockSuppliers";
 import { products } from "../data/mockProducts";
 import { categories } from "../data/mockCategories";
@@ -33,11 +34,13 @@ function GStat({
   value,
   tone,
   sub,
+  hint,
 }: {
   label: string;
   value: string;
   tone?: "good" | "warn" | "bad";
   sub?: string;
+  hint?: ReactNode;
 }) {
   const c =
     tone === "bad"
@@ -49,7 +52,10 @@ function GStat({
           : "text-slate-800";
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-      <p className="text-xs text-slate-400">{label}</p>
+      <p className="flex items-center gap-1 text-xs text-slate-400">
+        {label}
+        {hint}
+      </p>
       <p className={`text-lg font-semibold ${c}`}>{value}</p>
       {sub && <p className="text-[11px] text-slate-400 leading-tight">{sub}</p>}
     </div>
@@ -240,12 +246,14 @@ export function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
               value={perf.arrivedOrders > 0 ? `${perf.fillRate}%` : "—"}
               tone={perf.fillRate < 90 ? "bad" : "good"}
               sub="despacho completo"
+              hint={<MetricHint metric="fillRate" />}
             />
             <GStat
               label="OTIF"
               value={`${otif}%`}
               tone={otif < 85 ? "warn" : "good"}
               sub="completo y a tiempo"
+              hint={<MetricHint metric="otif" />}
             />
             <GStat
               label="Cumplimiento"
@@ -258,11 +266,13 @@ export function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
                     : "good"
               }
               sub="a tiempo"
+              hint={<MetricHint metric="cumplimiento" />}
             />
             <GStat
               label="Lead time"
               value={formatDays(supplier.averageLeadTimeDays)}
               tone={supplier.averageLeadTimeDays >= 15 ? "warn" : undefined}
+              hint={<MetricHint metric="leadTime" />}
             />
             <GStat
               label="OC atrasadas"
@@ -467,7 +477,12 @@ export function SeasonView({ supplier }: { supplier: Supplier }) {
           value={formatNumber(s.quiebres12)}
           tone={s.quiebres12 >= 8 ? "bad" : "good"}
         />
-        <GStat label="Fill rate" value={`${s.fill}%`} tone={s.fill < 90 ? "bad" : "good"} />
+        <GStat
+          label="Fill rate"
+          value={`${s.fill}%`}
+          tone={s.fill < 90 ? "bad" : "good"}
+          hint={<MetricHint metric="fillRate" />}
+        />
         <GStat
           label="Venta perdida"
           value={s.lost12 > 0 ? formatCurrencyCompact(s.lost12) : "—"}

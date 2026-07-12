@@ -5,7 +5,7 @@ import { DataTable, type Column } from "../components/ui/Table";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { Badge } from "../components/ui/Badge";
 import { BarList } from "../components/business/BarList";
-import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
 import { categories } from "../data/mockCategories";
 import {
@@ -134,14 +134,22 @@ export function CategoriesPage() {
         title="Categorías"
         description="Salud comercial por categoría: venta, margen, quiebres y rotación."
         action={<ScopeToggle scope={scope} onChange={setScope} myCount={myCategories.length} />}
+        help={
+          <InfoHint label="Cómo leer esta vista">
+            <p>
+              Empieza por las tarjetas de la izquierda: muestran las <b>categorías críticas</b>{" "}
+              (más quiebres y riesgo).
+            </p>
+            <p>
+              En la columna Quiebre/Riesgo/Sobrestock, los números rojo/ámbar/violeta resumen
+              cuántos SKUs requieren acción en cada categoría.
+            </p>
+            <p>
+              Cada fila enlaza directo a su acción: <b>Reposición</b> o <b>Surtido</b>.
+            </p>
+          </InfoHint>
+        }
       />
-
-      <HelpNote className="mb-4">
-        Empieza por las tarjetas de la izquierda: muestran las <b>categorías críticas</b> (más
-        quiebres y riesgo). En la columna Quiebre/Riesgo/Sobrestock, los números rojo/ámbar/violeta
-        resumen cuántos SKUs requieren acción en cada categoría. Cada fila enlaza directo a su
-        acción: <b>Reposición</b> o <b>Surtido</b>.
-      </HelpNote>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
         <RankCard

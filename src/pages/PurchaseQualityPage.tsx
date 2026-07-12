@@ -6,7 +6,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { FilterBar } from "../components/business/FilterBar";
-import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { Badge } from "../components/ui/Badge";
 import { DataTable, type Column } from "../components/ui/Table";
 import {
@@ -132,15 +132,21 @@ export function PurchaseQualityPage({ embedded = false }: { embedded?: boolean }
         <PageHeader
           title="Calidad de compra"
           description="Mide si se compró bien: los 'días comprados' (cantidad ÷ venta diaria) frente al rango objetivo de cobertura de cada producto. Detecta compras cortas y sobrecompras."
+          help={
+            <InfoHint label="Qué son los días comprados">
+              <p>
+                <b>Días comprados</b> = cantidad comprada ÷ venta diaria esperada.
+              </p>
+              <p>
+                Si el objetivo es 30–45 días y se compró para 8, fue una <b>compra corta</b>{" "}
+                (riesgo de quiebre). Si se compró para 150, fue una <b>sobrecompra</b> (capital
+                inmovilizado).
+              </p>
+              <p>El objetivo sale de la regla de compra aplicable a cada producto.</p>
+            </InfoHint>
+          }
         />
       )}
-
-      <HelpNote className="mb-4">
-        <b>Días comprados</b> = cantidad comprada ÷ venta diaria esperada. Si el objetivo es 30–45
-        días y se compró para 8, fue una <b>compra corta</b> (riesgo de quiebre). Si se compró para
-        150, fue una <b>sobrecompra</b> (capital inmovilizado). El objetivo sale de la regla de
-        compra aplicable a cada producto.
-      </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
         <KpiCard

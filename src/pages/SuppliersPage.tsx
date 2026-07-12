@@ -7,7 +7,7 @@ import { DataTable, type Column } from "../components/ui/Table";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { KpiCard } from "../components/business/KpiCard";
 import { FilterBar } from "../components/business/FilterBar";
-import { HelpNote } from "../components/business/HelpNote";
+import { MetricHint } from "../components/business/supplierMetricHelp";
 import { Badge } from "../components/ui/Badge";
 import { suppliers as mockSuppliers } from "../data/mockSuppliers";
 import { useCollection } from "../context/DataContext";
@@ -108,7 +108,12 @@ export function SuppliersPage() {
     },
     {
       key: "compliance",
-      header: "Cumplimiento",
+      header: (
+        <span className="inline-flex items-center gap-1">
+          Cumplimiento
+          <MetricHint metric="cumplimiento" />
+        </span>
+      ),
       align: "right",
       render: (s) => (
         <span
@@ -126,7 +131,12 @@ export function SuppliersPage() {
     },
     {
       key: "fill",
-      header: "Despacho",
+      header: (
+        <span className="inline-flex items-center gap-1">
+          Despacho
+          <MetricHint metric="despacho" />
+        </span>
+      ),
       align: "right",
       render: (s) => {
         const f = supplierFulfillment(s.name);
@@ -148,7 +158,12 @@ export function SuppliersPage() {
     },
     {
       key: "leadTime",
-      header: "Lead time",
+      header: (
+        <span className="inline-flex items-center gap-1">
+          Lead time
+          <MetricHint metric="leadTime" />
+        </span>
+      ),
       align: "right",
       hideOnMobile: true,
       render: (s) => formatDays(s.averageLeadTimeDays),
@@ -169,7 +184,12 @@ export function SuppliersPage() {
     },
     {
       key: "pending",
-      header: "Monto pendiente",
+      header: (
+        <span className="inline-flex items-center gap-1">
+          Monto pendiente
+          <MetricHint metric="pendiente" />
+        </span>
+      ),
       align: "right",
       render: (s) => (
         <span
@@ -192,12 +212,6 @@ export function SuppliersPage() {
         title="Proveedores"
         description="Gestión de proveedores con foco en cumplimiento, lead time y monto pendiente. Información para decidir si seguir comprando a cada uno."
       />
-
-      <HelpNote className="mb-4">
-        El <b>cumplimiento</b> es el % de entregas a tiempo. El <b>despacho</b> es cuánto de lo
-        pedido realmente envió (según recepciones): un proveedor puede entregar a tiempo pero dejar
-        SKUs sin despachar. Ambos bajos = riesgo de quiebre y proveedor a revisar.
-      </HelpNote>
 
       <div className="mb-4">
         <FilterBar
@@ -240,6 +254,7 @@ export function SuppliersPage() {
           value={formatNumber(lowCompliance)}
           tone="warn"
           icon={<IconSuppliers className="w-4 h-4" />}
+          info={<MetricHint metric="cumplimiento" />}
         />
         <KpiCard
           title="OC abiertas (total)"
@@ -252,6 +267,7 @@ export function SuppliersPage() {
           value={formatCurrencyCompact(totalPending)}
           tone="info"
           icon={<IconSuppliers className="w-4 h-4" />}
+          info={<MetricHint metric="pendiente" />}
         />
       </div>
 
@@ -322,37 +338,63 @@ export function SuppliersPage() {
           data={filtered}
           rowKey={(s) => s.id}
           onRowClick={(s) => navigate(`/proveedores/${s.id}`)}
-          mobileCard={(s) => (
-            <div>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-800">{s.name}</p>
-                  <p className="text-xs text-slate-400 font-mono">{s.rut}</p>
+          mobileCard={(s) => {
+            const f = supplierFulfillment(s.name);
+            return (
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-800">{s.name}</p>
+                    <p className="text-xs text-slate-400 font-mono">{s.rut}</p>
+                  </div>
+                  <StatusBadge kind="supplier" value={s.status} dot={false} />
                 </div>
-                <StatusBadge kind="supplier" value={s.status} dot={false} />
+                <div className="grid grid-cols-2 gap-y-2 gap-x-2 mt-2 text-sm">
+                  <div>
+                    <p className="flex items-center gap-1 text-xs text-slate-400">
+                      Cumple
+                      <MetricHint metric="cumplimiento" />
+                    </p>
+                    <p
+                      className={
+                        s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : "text-slate-700"
+                      }
+                    >
+                      {formatPercent(s.deliveryCompliance, 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1 text-xs text-slate-400">
+                      Despacho
+                      <MetricHint metric="despacho" />
+                    </p>
+                    <p
+                      className={
+                        f.tone === "red"
+                          ? "text-rose-600 font-semibold"
+                          : f.tone === "amber"
+                            ? "text-amber-600 font-medium"
+                            : "text-slate-700"
+                      }
+                    >
+                      {f.arrivedOrders > 0 ? `${f.fillRate}%` : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1 text-xs text-slate-400">
+                      Lead time
+                      <MetricHint metric="leadTime" />
+                    </p>
+                    <p className="text-slate-700">{formatDays(s.averageLeadTimeDays)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">OC abiertas</p>
+                    <p className="text-slate-700">{formatNumber(s.openPurchaseOrders)}</p>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                <div>
-                  <p className="text-xs text-slate-400">Cumple</p>
-                  <p
-                    className={
-                      s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : "text-slate-700"
-                    }
-                  >
-                    {formatPercent(s.deliveryCompliance, 0)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Lead time</p>
-                  <p className="text-slate-700">{formatDays(s.averageLeadTimeDays)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">OC abiertas</p>
-                  <p className="text-slate-700">{formatNumber(s.openPurchaseOrders)}</p>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          }}
         />
       </Card>
     </div>

@@ -5,7 +5,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { FilterBar } from "../components/business/FilterBar";
-import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -55,14 +55,19 @@ export function LostOpportunitiesPage() {
       <PageHeader
         title="Venta no capturada"
         description="Productos que vendían, quedaron sin stock y no se recompraron — mientras la categoría siguió vendiendo. Venta que se pierde por no reponer, no por falta de demanda."
+        help={
+          <InfoHint label="Qué es venta no capturada">
+            <p>
+              Venta cero no siempre es falta de demanda. Si un producto <b>vendía históricamente</b>
+              , <b>quedó sin stock</b>, <b>no se volvió a comprar</b> y la{" "}
+              <b>categoría siguió vendiendo</b>, es una oportunidad no capturada.
+            </p>
+            <p>
+              La venta perdida estimada es lo que dejas de vender cada mes mientras no repones.
+            </p>
+          </InfoHint>
+        }
       />
-
-      <HelpNote className="mb-4">
-        Venta cero no siempre es falta de demanda. Si un producto <b>vendía históricamente</b>,{" "}
-        <b>quedó sin stock</b>,<b> no se volvió a comprar</b> y la <b>categoría siguió vendiendo</b>
-        , es una oportunidad no capturada. La venta perdida estimada es lo que dejas de vender cada
-        mes mientras no repones.
-      </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         <KpiCard

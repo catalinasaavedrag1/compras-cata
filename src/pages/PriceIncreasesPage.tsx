@@ -9,6 +9,7 @@ import { Modal } from "../components/ui/Modal";
 import { Select } from "../components/ui/Select";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { FilterBar } from "../components/business/FilterBar";
 import { DataTable, type Column } from "../components/ui/Table";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -330,14 +331,19 @@ export function PriceIncreasesPage() {
             Cargar lista de precios
           </Button>
         }
+        help={
+          <InfoHint label="Cómo funcionan las alzas">
+            <p>
+              Aquí gestionas los <b>cambios de costo</b> que envían los proveedores. El margen nuevo
+              asume que el precio de venta <b>no cambia</b>: por eso un alza de costo lo reduce.
+            </p>
+            <p>
+              Aprobar actualizaría el costo en el catálogo y notificaría a precios y catálogo
+              (simulado en esta demo).
+            </p>
+          </InfoHint>
+        }
       />
-
-      <HelpNote className="mb-4">
-        Aquí gestionas los <b>cambios de costo</b> que envían los proveedores. El margen nuevo asume
-        que el precio de venta <b>no cambia</b>: por eso un alza de costo lo reduce. Aprobar
-        actualizaría el costo en el catálogo y notificaría a precios y catálogo (simulado en esta
-        demo).
-      </HelpNote>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
