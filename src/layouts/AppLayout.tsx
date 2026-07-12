@@ -12,6 +12,12 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen flex bg-slate-50">
+      <a
+        href="#contenido-principal"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Saltar al contenido principal
+      </a>
       <ScrollToHash />
       {/* Menú lateral izquierdo (desktop): navegación principal. */}
       <Sidebar />
@@ -19,7 +25,11 @@ export function AppLayout() {
       <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <AppHeader />
-        <main className="flex-1 px-4 lg:px-6 py-4 pb-24 lg:pb-6 max-w-[1600px] w-full mx-auto">
+        <main
+          id="contenido-principal"
+          tabIndex={-1}
+          className="flex-1 px-4 py-4 pb-24 outline-none lg:px-6 lg:pb-6 max-w-[1600px] w-full mx-auto"
+        >
           <Outlet />
         </main>
       </div>
