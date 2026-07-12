@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { IconClose } from "./icons";
 import { useDialogA11y } from "../../utils/useDialogA11y";
 
@@ -13,10 +13,29 @@ interface BottomSheetProps {
 /**
  * Hoja inferior (bottom sheet) para móvil. Más liviana que un modal:
  * sube desde abajo, con cabecera y acciones sticky. Solo se usa en móvil.
+ * Se cierra tocando fuera, con Escape o deslizando la hoja hacia abajo.
  */
 export function BottomSheet({ open, onClose, title, children, footer }: BottomSheetProps) {
   const ref = useDialogA11y(open, onClose);
+  // Arrastre para cerrar: seguimos el dedo y cerramos si se suelta pasado el umbral.
+  const dragStart = useRef<number | null>(null);
+  const [dragY, setDragY] = useState(0);
+
   if (!open) return null;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    dragStart.current = e.touches[0].clientY;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (dragStart.current === null) return;
+    const dy = e.touches[0].clientY - dragStart.current;
+    if (dy > 0) setDragY(dy);
+  };
+  const onTouchEnd = () => {
+    if (dragY > 90) onClose();
+    dragStart.current = null;
+    setDragY(0);
+  };
 
   return (
     <div className="fixed inset-0 z-[55] lg:hidden flex flex-col justify-end">
@@ -28,8 +47,18 @@ export function BottomSheet({ open, onClose, title, children, footer }: BottomSh
         aria-label={title}
         tabIndex={-1}
         className="relative bg-white rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col animate-[sheetUp_0.2s_ease-out] focus:outline-none"
+        style={dragY > 0 ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+        {/* Barra de arrastre: permite cerrar deslizando hacia abajo. */}
+        <div
+          className="flex-shrink-0 flex justify-center pt-2.5 pb-1 cursor-grab touch-none"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          <span className="h-1.5 w-10 rounded-full bg-slate-300" />
+        </div>
+        <div className="flex items-center justify-between px-4 pb-3 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
           <button
             onClick={onClose}

@@ -5,7 +5,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { FilterBar } from "../components/business/FilterBar";
-import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { OUTCOME_META, type DecisionOutcome } from "../data/mockDecisions";
@@ -63,15 +63,21 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
         <PageHeader
           title="Historial de decisiones"
           description="Auditoría de compras: qué sugería el sistema, qué se compró, por qué se cambió y cómo resultó. Sin historial, los errores se repiten."
+          help={
+            <InfoHint label="Qué guarda cada decisión">
+              <p>
+                Cada decisión guarda el <b>sugerido original</b> vs <b>lo comprado</b>, el{" "}
+                <b>motivo del desvío</b>, quién compró y aprobó, el <b>resultado posterior</b> y el{" "}
+                <b>aprendizaje</b>.
+              </p>
+              <p>
+                Separar la causa importa: a veces el quiebre fue por el proveedor (no despachó), no
+                por la decisión del comprador.
+              </p>
+            </InfoHint>
+          }
         />
       )}
-
-      <HelpNote className="mb-4">
-        Cada decisión guarda el <b>sugerido original</b> vs <b>lo comprado</b>, el{" "}
-        <b>motivo del desvío</b>, quién compró y aprobó, el <b>resultado posterior</b> y el{" "}
-        <b>aprendizaje</b>. Separar la causa importa: a veces el quiebre fue por el proveedor (no
-        despachó), no por la decisión del comprador.
-      </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard

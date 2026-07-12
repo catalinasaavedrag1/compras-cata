@@ -4,7 +4,7 @@ import { supplierPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
-import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -54,15 +54,21 @@ export function ApprovalsPage() {
       <PageHeader
         title="Aprobaciones de compra"
         description="Compras que se salen de criterio (monto, cobertura, margen, proveedor o muy distintas al sugerido). El comprador justifica el desvío; aquí se aprueba o rechaza, dejando todo trazado."
+        help={
+          <InfoHint label="Cómo funcionan las aprobaciones">
+            <p>
+              No todo lo que se sale del rango es malo: un descuento por volumen o una compra de
+              temporada pueden justificarlo. Pero <b>debe quedar trazado</b> el{" "}
+              <b>sugerido vs lo solicitado</b> y el <b>motivo</b>. Eso alimenta el historial de
+              decisiones.
+            </p>
+            <p>
+              Flujo de roles: el <b>comprador solicita</b> y el <b>líder aprueba</b> — cambia el rol
+              arriba a la derecha para habilitar las acciones.
+            </p>
+          </InfoHint>
+        }
       />
-
-      <HelpNote className="mb-4">
-        No todo lo que se sale del rango es malo: un descuento por volumen o una compra de temporada
-        pueden justificarlo. Pero <b>debe quedar trazado</b> el <b>sugerido vs lo solicitado</b> y
-        el <b>motivo</b>. Eso alimenta el historial de decisiones. Flujo de roles: el{" "}
-        <b>comprador solicita</b> y el <b>líder aprueba</b> — cambia el rol arriba a la derecha para
-        habilitar las acciones.
-      </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard

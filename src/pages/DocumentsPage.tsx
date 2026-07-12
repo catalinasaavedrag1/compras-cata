@@ -5,7 +5,7 @@ import { Card } from "../components/ui/Card";
 import { Tabs } from "../components/ui/Tabs";
 import { DataTable, type Column } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
-import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { useToast } from "../context/ToastContext";
@@ -157,13 +157,19 @@ export function DocumentsPage() {
       <PageHeader
         title="Documentos centralizados"
         description="Cotizaciones, órdenes de compra, guías, facturas, contratos y más, en un solo repositorio buscable."
+        help={
+          <InfoHint label="Qué es este repositorio">
+            <p>
+              Centraliza los <b>documentos del proceso de compra</b> que hoy viven dispersos en
+              correos y planillas Excel.
+            </p>
+            <p>
+              Busca por nombre, proveedor u orden relacionada, filtra por tipo y fecha, y encuentra
+              cualquier respaldo sin perseguir a nadie por mail.
+            </p>
+          </InfoHint>
+        }
       />
-
-      <HelpNote className="mb-4">
-        Este repositorio <b>centraliza los documentos del proceso de compra</b> que hoy viven
-        dispersos en correos y planillas Excel. Busca por nombre, proveedor u orden relacionada,
-        filtra por tipo y fecha, y encuentra cualquier respaldo sin perseguir a nadie por mail.
-      </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard

@@ -6,6 +6,7 @@ import { Select } from "../components/ui/Select";
 import { DataTable, type Column } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { cn } from "../utils/cn";
 import {
@@ -194,14 +195,20 @@ export function BudgetPage() {
             />
           </div>
         }
+        help={
+          <InfoHint label="Qué es el disponible (OTB)">
+            <p>
+              El <b>disponible (OTB)</b> es lo que aún puedes comprar: presupuesto −{" "}
+              <b>comprometido</b> (OC ya emitidas, haya llegado o no la mercadería) − lo que tienes{" "}
+              <b>en borrador</b> ahora mismo.
+            </p>
+            <p>
+              Si armas una compra, verás bajar el disponible de su categoría en vivo, para no gastar
+              plata que ya está reservada.
+            </p>
+          </InfoHint>
+        }
       />
-
-      <HelpNote className="mb-4">
-        El <b>disponible (OTB)</b> es lo que aún puedes comprar: presupuesto − <b>comprometido</b>{" "}
-        (OC ya emitidas, haya llegado o no la mercadería) − lo que tienes <b>en borrador</b> ahora
-        mismo. Si armas una compra, verás bajar el disponible de su categoría en vivo, para no
-        gastar plata que ya está reservada.
-      </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard

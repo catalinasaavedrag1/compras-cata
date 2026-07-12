@@ -6,6 +6,7 @@ import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
 import {
   MonthlyBars,
@@ -101,19 +102,24 @@ export function SeasonsChannelsPage() {
             />
           </div>
         }
+        help={
+          <InfoHint label="Temporadas y canales">
+            <p>
+              La misma categoría se vende por varios canales y cada uno tiene su propia temporada:
+              el <b>ecommerce</b> y el <b>marketplace</b> suben en CyberDay y fin de año, las{" "}
+              <b>licitaciones</b> se concentran cuando se ejecuta presupuesto (marzo-abril,
+              oct-nov) y la <b>venta empresa</b> sigue la temporada de obra.
+            </p>
+            <p>
+              Este es el <b>diagnóstico</b>; para convertirlo en compra, usa{" "}
+              <Link to="/comprar/temporada" className="font-medium text-brand-700 hover:underline">
+                Planificar temporada
+              </Link>
+              .
+            </p>
+          </InfoHint>
+        }
       />
-
-      <HelpNote className="mb-4">
-        La misma categoría se vende por varios canales y cada uno tiene su propia temporada: el{" "}
-        <b>ecommerce</b> y el <b>marketplace</b> suben en CyberDay y fin de año, las{" "}
-        <b>licitaciones</b> se concentran cuando se ejecuta presupuesto (marzo-abril, oct-nov) y la{" "}
-        <b>venta empresa</b> sigue la temporada de obra. Este es el <b>diagnóstico</b>; para
-        convertirlo en compra, usa{" "}
-        <Link to="/comprar/temporada" className="font-medium text-brand-700 hover:underline">
-          Planificar temporada
-        </Link>
-        .
-      </HelpNote>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard

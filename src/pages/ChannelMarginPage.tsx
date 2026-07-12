@@ -4,7 +4,7 @@ import { supplierPath, categoryPath, productPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
-import { HelpNote } from "../components/business/HelpNote";
+import { InfoHint } from "../components/business/InfoHint";
 import { FilterBar } from "../components/business/FilterBar";
 import { ExportButton } from "../components/business/ExportButton";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -200,6 +200,18 @@ export function ChannelMarginPage() {
             ]}
           />
         }
+        help={
+          <InfoHint label="Cómo leer las tarjetas">
+            <p>
+              Cada tarjeta es un producto con sus 3 canales <b>lado a lado</b>. Verde = mejor
+              margen, rojo = peor.
+            </p>
+            <p>
+              Cuando un canal está bajo el objetivo se muestra el <b>precio sugerido</b> y la
+              acción.
+            </p>
+          </InfoHint>
+        }
       />
 
       {/* Alcance */}
@@ -359,12 +371,6 @@ export function ChannelMarginPage() {
           { value: "over", label: "Sobre marginados", count: tabCounts.over },
         ]}
       />
-
-      <HelpNote className="mb-4">
-        Cada tarjeta es un producto con sus 3 canales <b>lado a lado</b>. Verde = mejor margen, rojo
-        = peor. Cuando un canal está bajo el objetivo se muestra el <b>precio sugerido</b> y la
-        acción.
-      </HelpNote>
 
       {groups.length === 0 ? (
         <Card>

@@ -9,6 +9,7 @@ import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { AlertCard } from "../components/business/AlertCard";
+import { MetricHint } from "../components/business/supplierMetricHelp";
 import { suppliers } from "../data/mockSuppliers";
 import { products } from "../data/mockProducts";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
@@ -154,6 +155,7 @@ export function SupplierDetailPage() {
           }
           icon={<IconSuppliers className="w-4 h-4" />}
           description="Entregas a tiempo"
+          info={<MetricHint metric="cumplimiento" />}
         />
         <KpiCard
           title="Lead time"
@@ -161,6 +163,7 @@ export function SupplierDetailPage() {
           tone={supplier.averageLeadTimeDays >= 15 ? "warn" : "neutral"}
           icon={<IconInventory className="w-4 h-4" />}
           description="Promedio de entrega"
+          info={<MetricHint metric="leadTime" />}
         />
         <KpiCard
           title="OC abiertas"
@@ -176,6 +179,7 @@ export function SupplierDetailPage() {
           value={formatCurrencyCompact(supplier.pendingAmount)}
           tone={supplier.pendingAmount > 20000000 ? "warn" : "neutral"}
           icon={<IconOrders className="w-4 h-4" />}
+          info={<MetricHint metric="pendiente" />}
         />
       </div>
 

@@ -9,6 +9,8 @@ type Tone = "neutral" | "good" | "warn" | "bad" | "info";
 interface KpiCardProps {
   title: string;
   value: string;
+  /** Ayuda contextual (ⓘ) mostrada junto al título. */
+  info?: ReactNode;
   description?: string;
   /** Variación en %, positiva o negativa. */
   delta?: number;
@@ -43,6 +45,7 @@ const toneValue: Record<Tone, string> = {
 export function KpiCard({
   title,
   value,
+  info,
   description,
   delta,
   deltaPositiveIsGood = true,
@@ -60,7 +63,10 @@ export function KpiCard({
   const inner = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-medium text-slate-500">{title}</p>
+        <p className="flex items-center gap-1 text-xs font-medium text-slate-500">
+          {title}
+          {info}
+        </p>
         {icon && (
           <span
             className={cn(
