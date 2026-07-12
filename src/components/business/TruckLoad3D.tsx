@@ -3,39 +3,42 @@ import { cn } from "../../utils/cn";
 
 // ============================================================================
 //  Camión de carga en 3D (CSS puro, sin dependencias).
-//  Muestra un camión isométrico cuyo compartimento se va llenando de cajas a
-//  medida que crece el % de ocupación. Se usa en el borrador de OC (se recalcula
-//  al agregar productos) y en el detalle por camión del plan de retiro.
-//  Todo el 3D es con transform-style: preserve-3d + transforms; las cajas
-//  aparecen con una transición suave (efecto "se va cargando el camión").
+//  Un camión de furgón isométrico cuya caja de carga es un "contenedor de
+//  vidrio" que representa la CAPACIDAD TOTAL del camión. La carga se apila de
+//  abajo hacia arriba según el % de ocupación, así el espacio vacío del
+//  contenedor se lee como "capacidad disponible". Al subir el %, aparecen más
+//  cajas con una transición suave (efecto "se va cargando el camión").
 // ============================================================================
 
 // --- Geometría (px, en el espacio del modelo) ---------------------------------
-const CW = 24; // ancho de caja (x)
-const CD = 26; // profundidad de caja (z)
-const CH = 18; // alto de caja (y)
-const GX = 4; // separación en x
-const GZ = 6; // separación en z
-const COLS = 4; // cajas a lo largo
-const DEPTH = 2; // cajas a lo ancho
-const LAYERS = 3; // pisos
+const CW = 22; // ancho de caja (x)
+const CD = 24; // profundidad de caja (z)
+const CH = 14; // alto de caja (y)
+const GX = 4;
+const GZ = 5;
+const COLS = 4;
+const DEPTH = 2;
+const LAYERS = 4;
 const TOTAL = COLS * DEPTH * LAYERS;
 
-const BED_W = COLS * CW + (COLS + 1) * GX; // largo de la plataforma (x)
-const BED_D = DEPTH * CD + (DEPTH + 1) * GZ; // ancho de la plataforma (z)
-const DECK_H = 8;
-const RAIL_H = 13;
-const RAIL_T = 5;
-const CAB_W = 34;
-const CAB_H = 42;
+const BED_W = COLS * CW + (COLS + 1) * GX; // 108
+const BED_D = DEPTH * CD + (DEPTH + 1) * GZ; // 63
+const STACK_H = LAYERS * CH; // 56
+const MARGIN = 4;
+const BOX_W = BED_W + 2 * MARGIN;
+const BOX_D = BED_D + 2 * MARGIN;
+const BOX_H = STACK_H + 8; // capacidad total (alto del contenedor)
+const DECK_H = 7;
+const CAB_W = 30;
+const CAB_H = 36;
 const WHEEL_W = 11;
-const WHEEL_H = 15;
+const WHEEL_H = 14;
 const WHEEL_D = 8;
 
 type FaceKey = "top" | "bottom" | "front" | "back" | "left" | "right";
 type Faces = Partial<Record<FaceKey, string>>;
 
-/** Un cuboide en el espacio 3D con las caras que se le indiquen. */
+/** Un cuboide en el espacio 3D con las caras y el borde que se le indiquen. */
 function Box3D({
   w,
   h,
@@ -45,6 +48,7 @@ function Box3D({
   z = 0,
   faces,
   radius = 0,
+  edge,
   style,
 }: {
   w: number;
@@ -55,8 +59,10 @@ function Box3D({
   z?: number;
   faces: Faces;
   radius?: number;
+  edge?: string;
   style?: CSSProperties;
 }) {
+  const shadow = edge ? `inset 0 0 0 1px ${edge}` : "inset 0 0 0 0.5px rgba(15,23,42,0.12)";
   const faceStyle = (fw: number, fh: number, transform: string, bg: string): CSSProperties => ({
     position: "absolute",
     left: 0,
@@ -67,7 +73,7 @@ function Box3D({
     borderRadius: radius,
     transform: `translate(-50%,-50%) ${transform}`,
     backfaceVisibility: "hidden",
-    boxShadow: "inset 0 0 0 0.5px rgba(15,23,42,0.12)",
+    boxShadow: shadow,
   });
 
   return (
@@ -101,27 +107,22 @@ function Box3D({
   );
 }
 
-// Paletas de caras (dirección de luz consistente: arriba clara, lados oscuros).
-const DECK: Faces = { top: "#3f4b60", front: "#2b3547", right: "#232c3c", left: "#2b3547" };
-const RAIL: Faces = { top: "#55627a", front: "#3a4559", right: "#313b4d", left: "#3a4559" };
+// Paletas de caras (luz consistente: arriba clara, lados oscuros).
 const CAB: Faces = {
-  top: "#3f6be0",
-  front: "linear-gradient(180deg,#0f172a 0 46%,#254fd0 46% 100%)",
+  top: "#4471e4",
+  front: "linear-gradient(180deg,#0f172a 0 42%,#2551d4 42% 100%)",
   right: "#1f43b8",
-  left: "#254fd0",
+  left: "#2551d4",
 };
-const WHEEL: Faces = { top: "#374151", front: "#111827", right: "#0b0f1a", left: "#111827", back: "#111827" };
-
-function crateFaces(): Faces {
-  return { top: "#e3bd7d", front: "#cc9c5b", right: "#b6864b", left: "#c2925470" };
-}
+const WHEEL: Faces = { top: "#374151", front: "#111827", right: "#0b0f1a", left: "#111827" };
+const CRATE: Faces = { top: "#e7c281", front: "#d0a05e", right: "#b9884c", left: "#c99a58" };
 
 interface Crate {
   key: string;
   x: number;
   y: number;
   z: number;
-  order: number; // orden de llenado (piso por piso, de abajo hacia arriba)
+  order: number;
 }
 
 const CRATES: Crate[] = (() => {
@@ -129,14 +130,11 @@ const CRATES: Crate[] = (() => {
   for (let layer = 0; layer < LAYERS; layer++) {
     for (let dz = 0; dz < DEPTH; dz++) {
       for (let cx = 0; cx < COLS; cx++) {
-        const x = -BED_W / 2 + GX + CW / 2 + cx * (CW + GX);
-        const z = -BED_D / 2 + GZ + CD / 2 + dz * (CD + GZ);
-        const y = -(CH / 2 + layer * CH); // -y = hacia arriba
         list.push({
           key: `${layer}-${dz}-${cx}`,
-          x,
-          y,
-          z,
+          x: -BED_W / 2 + GX + CW / 2 + cx * (CW + GX),
+          z: -BED_D / 2 + GZ + CD / 2 + dz * (CD + GZ),
+          y: -(CH / 2 + layer * CH),
           order: layer * (COLS * DEPTH) + dz * COLS + cx,
         });
       }
@@ -148,18 +146,19 @@ const CRATES: Crate[] = (() => {
 function accentFor(pct: number): string {
   if (pct > 100) return "#e11d48";
   if (pct >= 85) return "#d97706";
-  return "#059669";
+  return "#0ea5e9";
 }
 
 /**
- * Camión de carga 3D. `fillPct` (0–100+) define cuántas cajas se muestran.
- * Al aumentar, las cajas nuevas aparecen con una transición (se va cargando).
+ * Camión de carga 3D. `fillPct` (0–100+) define cuánta de la capacidad del
+ * contenedor se llena de cajas. El contenedor de vidrio muestra el total, así
+ * el espacio vacío = capacidad disponible.
  */
 export function TruckLoad3D({
   fillPct,
   caption,
   className,
-  height = 168,
+  height = 190,
 }: {
   fillPct: number;
   caption?: string;
@@ -169,28 +168,38 @@ export function TruckLoad3D({
   const pct = Math.max(0, Math.round(fillPct));
   const revealed = useMemo(() => Math.round((Math.min(100, pct) / 100) * TOTAL), [pct]);
   const accent = accentFor(pct);
-  const crateColors = crateFaces();
 
-  // Chasis: viga bajo la plataforma y la cabina.
-  const chassisW = BED_W + CAB_W + 14;
-  const chassisX = (CAB_W + 6) / 2;
-  const wheelZ = BED_D / 2 + WHEEL_D / 2 - 1;
-  const wheelXs = [-BED_W / 2 + 14, BED_W / 2 - 12, BED_W / 2 + CAB_W - 8];
+  const wheelZ = BED_D / 2 + WHEEL_D / 2 + 1;
+  const chassisW = BOX_W + CAB_W + 12;
+  const chassisX = (CAB_W + 4) / 2;
+  const wheelXs = [-BED_W / 2 + 12, BED_W / 2 - 10, BED_W / 2 + CAB_W - 6];
+
+  // Contenedor de vidrio = capacidad total (paredes translúcidas con borde).
+  const glassWall = "rgba(148,163,184,0.14)";
+  const glassTop = "rgba(226,232,240,0.20)";
+  const glassEdge = "rgba(71,85,105,0.55)";
+  const boxCenterY = -BOX_H / 2;
 
   return (
     <div className={cn("select-none", className)}>
       <div
         className="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100"
-        style={{ height, perspective: 900 }}
+        style={{ height, perspective: 920 }}
       >
+        {/* Etiqueta: qué es */}
+        <div className="absolute left-2.5 top-2.5 z-10 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+          <TruckGlyph className="h-3.5 w-3.5 text-slate-400" />
+          Capacidad del camión
+        </div>
+
         {/* Sombra de piso */}
         <div
           className="absolute left-1/2 top-1/2 rounded-[50%]"
           style={{
-            width: BED_W + CAB_W + 40,
+            width: BOX_W + CAB_W + 46,
             height: 34,
-            transform: "translate(-50%, 46px)",
-            background: "radial-gradient(closest-side, rgba(15,23,42,0.28), rgba(15,23,42,0))",
+            transform: "translate(-50%, 52px)",
+            background: "radial-gradient(closest-side, rgba(15,23,42,0.26), rgba(15,23,42,0))",
             filter: "blur(2px)",
           }}
         />
@@ -200,7 +209,7 @@ export function TruckLoad3D({
           className="absolute left-1/2 top-1/2"
           style={{
             transformStyle: "preserve-3d",
-            transform: "translate(-50%,-50%) rotateX(-22deg) rotateY(-36deg)",
+            transform: "translate(-50%,-46%) rotateX(-20deg) rotateY(-34deg)",
           }}
         >
           {/* Ruedas */}
@@ -224,34 +233,18 @@ export function TruckLoad3D({
           <Box3D
             w={chassisW}
             h={6}
-            d={BED_D - 4}
+            d={BED_D - 2}
             x={chassisX}
             y={DECK_H + 4}
             z={0}
             faces={{ top: "#1f2937", front: "#111827", right: "#0b1220", left: "#111827" }}
           />
 
-          {/* Plataforma */}
-          <Box3D w={BED_W} h={DECK_H} d={BED_D} x={0} y={DECK_H / 2} z={0} faces={DECK} radius={1} />
+          {/* Piso del furgón */}
+          <Box3D w={BOX_W} h={DECK_H} d={BOX_D} x={0} y={DECK_H / 2} z={0}
+            faces={{ top: "#334155", front: "#1e293b", right: "#172033", left: "#1e293b" }} radius={1} />
 
-          {/* Barandas (3 lados, bajas para que se vean las cajas) */}
-          <Box3D w={RAIL_T} h={RAIL_H} d={BED_D} x={-BED_W / 2 + RAIL_T / 2} y={-RAIL_H / 2} z={0} faces={RAIL} />
-          <Box3D w={BED_W} h={RAIL_H} d={RAIL_T} x={0} y={-RAIL_H / 2} z={-BED_D / 2 + RAIL_T / 2} faces={RAIL} />
-          <Box3D w={BED_W} h={RAIL_H} d={RAIL_T} x={0} y={-RAIL_H / 2} z={BED_D / 2 - RAIL_T / 2} faces={RAIL} />
-
-          {/* Cabina */}
-          <Box3D
-            w={CAB_W}
-            h={CAB_H}
-            d={BED_D + 2}
-            x={BED_W / 2 + CAB_W / 2 + 3}
-            y={-CAB_H / 2 + DECK_H}
-            z={0}
-            faces={CAB}
-            radius={4}
-          />
-
-          {/* Cajas (se revelan según el % de ocupación) */}
+          {/* Cajas (se apilan según ocupación) */}
           {CRATES.map((c) => {
             const show = c.order < revealed;
             return (
@@ -264,27 +257,64 @@ export function TruckLoad3D({
                 y={c.y}
                 z={c.z}
                 radius={2}
-                faces={crateColors}
+                faces={CRATE}
                 style={{
                   transition: "opacity .35s ease, transform .35s ease",
-                  transitionDelay: `${(c.order % (COLS * DEPTH)) * 25}ms`,
+                  transitionDelay: `${(c.order % (COLS * DEPTH)) * 22}ms`,
                   opacity: show ? 1 : 0,
-                  transform: `translate3d(${c.x}px, ${show ? c.y : c.y - 26}px, ${c.z}px)`,
+                  transform: `translate3d(${c.x}px, ${show ? c.y : c.y - 22}px, ${c.z}px)`,
                 }}
               />
             );
           })}
+
+          {/* Contenedor de vidrio = capacidad total (se renderiza al final) */}
+          <Box3D
+            w={BOX_W}
+            h={BOX_H}
+            d={BOX_D}
+            x={0}
+            y={boxCenterY}
+            z={0}
+            radius={2}
+            edge={glassEdge}
+            faces={{ top: glassTop, front: glassWall, back: glassWall, left: glassWall, right: glassWall }}
+          />
+
+          {/* Cabina */}
+          <Box3D
+            w={CAB_W}
+            h={CAB_H}
+            d={BED_D}
+            x={BOX_W / 2 + CAB_W / 2 + 2}
+            y={-CAB_H / 2 + DECK_H}
+            z={0}
+            faces={CAB}
+            radius={4}
+          />
         </div>
 
-        {/* Indicador de ocupación */}
-        <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded-full bg-white/85 px-2 py-1 shadow-sm backdrop-blur">
-          <span className="h-2 w-2 rounded-full" style={{ background: accent }} />
-          <span className="text-xs font-semibold tabular-nums" style={{ color: accent }}>
+        {/* Insignia de ocupación */}
+        <div className="absolute right-2.5 top-2.5 z-10 flex items-baseline gap-1 rounded-lg bg-white/90 px-2.5 py-1 shadow-sm ring-1 ring-slate-200 backdrop-blur">
+          <span className="text-lg font-bold leading-none tabular-nums" style={{ color: accent }}>
             {pct}%
           </span>
+          <span className="text-[10px] font-medium text-slate-400">lleno</span>
         </div>
       </div>
       {caption && <p className="mt-1.5 text-center text-[11px] text-slate-500">{caption}</p>}
     </div>
+  );
+}
+
+function TruckGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 6h11v9H3z" />
+      <path d="M14 9h4l3 3v3h-7z" />
+      <circle cx="7" cy="18" r="1.6" />
+      <circle cx="17" cy="18" r="1.6" />
+    </svg>
   );
 }
