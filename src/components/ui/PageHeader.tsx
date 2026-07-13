@@ -19,12 +19,10 @@ export function PageHeader({ title, description, action, breadcrumbs, help }: Pa
       {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <div className="flex items-center gap-1.5">
-            <h1 className={`${compact ? "text-lg" : "text-xl"} font-semibold text-slate-900`}>
-              {title}
-            </h1>
-            {help}
-          </div>
+          <h1 className={`${compact ? "text-lg" : "text-xl"} font-semibold text-slate-900`}>
+            {title}
+            {help != null && <span className="ml-1.5 inline-flex align-middle">{help}</span>}
+          </h1>
           {/* En modo compacto se oculta la descripción larga para ganar densidad. */}
           {description && !compact && (
             <p className="text-sm text-slate-500 mt-1 max-w-3xl">{description}</p>

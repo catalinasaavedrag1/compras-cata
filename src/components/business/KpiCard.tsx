@@ -63,9 +63,9 @@ export function KpiCard({
   const inner = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <p className="flex items-center gap-1 text-xs font-medium text-slate-500">
+        <p className="text-xs font-medium text-slate-500">
           {title}
-          {info}
+          {info != null && <span className="ml-1 inline-flex align-middle">{info}</span>}
         </p>
         {icon && (
           <span

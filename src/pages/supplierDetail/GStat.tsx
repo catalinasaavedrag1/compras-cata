@@ -23,9 +23,9 @@ export function GStat({
           : "text-slate-800";
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-      <p className="flex items-center gap-1 text-xs text-slate-400">
+      <p className="text-xs text-slate-400">
         {label}
-        {hint}
+        {hint != null && <span className="ml-1 inline-flex align-middle">{hint}</span>}
       </p>
       <p className={`text-lg font-semibold ${c}`}>{value}</p>
       {sub && <p className="text-[11px] text-slate-400 leading-tight">{sub}</p>}
