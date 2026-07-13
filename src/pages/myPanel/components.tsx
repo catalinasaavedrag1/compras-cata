@@ -1,0 +1,589 @@
+import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { Card, CardBody, CardHeader } from "../../components/ui/Card";
+import { Badge } from "../../components/ui/Badge";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { StatusBadge } from "../../components/business/StatusBadge";
+import {
+  capitalize,
+  formatCurrencyCompact,
+  formatNumber,
+  formatPercent,
+} from "../../utils/formatters";
+import { cn } from "../../utils/cn";
+import type {
+  BrandPortfolioRow,
+  KeyProductRow,
+  PortfolioFocus,
+  PortfolioOpportunity,
+  PortfolioProductRole,
+  SalesPaceRow,
+  SupplierPortfolioRow,
+} from "./types";
+
+// ============================================================================
+//  Componentes de presentación de "Mi cartera".
+//  Piezas puras (sin estado ni cálculo): reciben filas ya derivadas y las
+//  pintan. El cálculo vive en el orquestador de la página.
+// ============================================================================
+
+export function PortfolioFocusWorkspace({
+  focus,
+  productRows,
+  brandRows,
+  supplierRows,
+  opportunities,
+}: {
+  focus: Exclude<PortfolioFocus, "resumen">;
+  productRows: KeyProductRow[];
+  brandRows: BrandPortfolioRow[];
+  supplierRows: SupplierPortfolioRow[];
+  opportunities: PortfolioOpportunity[];
+}) {
+  if (focus === "productos-clave") {
+    const roles: PortfolioProductRole[] = [
+      "Estrella",
+      "Tractor",
+      "Margen",
+      "Emergente",
+      "Deterioro",
+      "Detenido",
+      "Riesgo",
+    ];
+    const topSales = [...productRows].sort((a, b) => b.salesValue - a.salesValue).slice(0, 5);
+    const topProfit = [...productRows].sort((a, b) => b.grossProfit - a.grossProfit).slice(0, 5);
+    const topGmroi = [...productRows].sort((a, b) => b.gmroi - a.gmroi).slice(0, 5);
+
+    return (
+      <section className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card>
+          <CardHeader
+            title="Mapa de roles comerciales"
+            description="El mismo SKU puede ser importante por venta, margen, tráfico, crecimiento o riesgo."
+          />
+          <CardBody>
+            <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+              {roles.map((role) => (
+                <div
+                  key={role}
+                  className="min-w-[128px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                >
+                  <Badge tone={roleTone(role)}>{role}</Badge>
+                  <p className="mt-1 text-xl font-semibold text-slate-900">
+                    {productRows.filter((row) => row.role === role).length}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {productRows.slice(0, 10).map((row) => (
+                <KeyProductItem key={row.product.sku} row={row} />
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Rankings para decidir"
+            description="Cada lista responde una pregunta distinta antes de comprar o negociar."
+          />
+          <CardBody className="space-y-4">
+            <ProductRank title="Más vendidos" rows={topSales} metric="sales" />
+            <ProductRank title="Mayor utilidad" rows={topProfit} metric="profit" />
+            <ProductRank title="Mayor GMROI" rows={topGmroi} metric="gmroi" />
+          </CardBody>
+        </Card>
+      </section>
+    );
+  }
+
+  if (focus === "marcas") {
+    const growing = brandRows.filter((row) => row.growth > 0.08).length;
+    const pressured = brandRows.filter((row) => row.growth < -0.08 || row.stockouts > 0).length;
+
+    return (
+      <section className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <Card>
+          <CardHeader
+            title="Lectura de marcas"
+            description="Participación, crecimiento, margen e inventario para decidir qué proteger."
+          />
+          <CardBody className="grid grid-cols-2 gap-3">
+            <PortfolioMetric label="Marcas activas" value={formatNumber(brandRows.length)} />
+            <PortfolioMetric label="Creciendo" value={formatNumber(growing)} />
+            <PortfolioMetric label="Con presión" value={formatNumber(pressured)} />
+            <PortfolioMetric
+              label="Venta líder"
+              value={formatCurrencyCompact(brandRows[0]?.sales ?? 0)}
+            />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Desempeño por marca"
+            description="Detecta marcas que crecen consumiendo capital o que sostienen margen."
+          />
+          <CardBody className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {brandRows.map((row) => (
+              <BrandHealthItem key={row.brand} row={row} />
+            ))}
+          </CardBody>
+        </Card>
+      </section>
+    );
+  }
+
+  if (focus === "proveedores") {
+    const highDependency = supplierRows.filter((row) => row.dependency > 0.35).length;
+    const withAlternatives = supplierRows.filter((row) => row.alternatives > 0).length;
+    const stalled = supplierRows.reduce((sum, row) => sum + row.stalled, 0);
+
+    return (
+      <section className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+        <Card>
+          <CardHeader
+            title="Prioridad de negociación"
+            description="Dónde hay dependencia, alternativas y productos que llevar a reunión."
+          />
+          <CardBody className="space-y-3">
+            <PortfolioMetric label="Dependencia alta" value={formatNumber(highDependency)} />
+            <PortfolioMetric label="Con alternativas" value={formatNumber(withAlternatives)} />
+            <PortfolioMetric label="SKU detenidos" value={formatNumber(stalled)} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Proveedores de cartera"
+            description="Entra al proveedor para preparar costo, detenidos, cumplimiento y oportunidad."
+          />
+          <CardBody className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {supplierRows.map((row) => (
+              <SupplierPortfolioItem key={row.supplier.id} row={row} />
+            ))}
+          </CardBody>
+        </Card>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mb-4">
+      <Card>
+        <CardHeader
+          title="Radar de oportunidades"
+          description="Crecimiento con poca cobertura, margen por potenciar y alternativas para negociar."
+        />
+        <CardBody>
+          {opportunities.length === 0 ? (
+            <EmptyState
+              title="Sin oportunidades fuertes"
+              description="No hay señales comerciales destacadas en este momento."
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 xl:grid-cols-3">
+              {opportunities.map((item) => (
+                <OpportunityItem key={`${item.label}-${item.title}`} item={item} />
+              ))}
+            </div>
+          )}
+        </CardBody>
+      </Card>
+    </section>
+  );
+}
+
+function ProductRank({
+  title,
+  rows,
+  metric,
+}: {
+  title: string;
+  rows: KeyProductRow[];
+  metric: "sales" | "profit" | "gmroi";
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <div className="space-y-1.5">
+        {rows.map((row) => {
+          const value =
+            metric === "gmroi"
+              ? row.gmroi.toFixed(1).replace(".", ",")
+              : formatCurrencyCompact(metric === "sales" ? row.salesValue : row.grossProfit);
+          return (
+            <Link
+              key={`${title}-${row.product.sku}`}
+              to={`/productos/${row.product.sku}`}
+              className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-slate-800">
+                  {row.product.name}
+                </span>
+                <span className="text-xs text-slate-500">{row.role}</span>
+              </span>
+              <span className="flex-shrink-0 text-sm font-semibold text-slate-900">{value}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{children}</p>
+  );
+}
+
+export function PortfolioCountLink({
+  to,
+  label,
+  count,
+}: {
+  to: string;
+  label: string;
+  count: number;
+}) {
+  return (
+    <Link
+      to={to}
+      className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600 hover:border-brand-300 hover:text-brand-700"
+    >
+      {label} ({count})
+    </Link>
+  );
+}
+
+/** KPI con tendencia (↑/↓ vs mes anterior). `invert` = bajar es bueno. */
+export function TrendKpi({
+  label,
+  value,
+  delta,
+  unit = "",
+  invert,
+}: {
+  label: string;
+  value: string;
+  delta?: number;
+  unit?: string;
+  invert?: boolean;
+}) {
+  const hasDelta = delta !== undefined && Math.abs(delta) >= 0.05;
+  const positive = (delta ?? 0) >= 0;
+  const good = invert ? !positive : positive;
+  const arrow = positive ? "↑" : "↓";
+  const deltaText =
+    unit === "%" || unit === "pp"
+      ? `${Math.abs(delta ?? 0).toFixed(1)}${unit === "pp" ? "pp" : "%"}`
+      : unit === "d"
+        ? `${Math.round(Math.abs(delta ?? 0))} d`
+        : Math.abs(delta ?? 0).toFixed(1);
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-card">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold text-slate-900">{value}</p>
+      {hasDelta ? (
+        <p className={cn("text-xs font-medium", good ? "text-emerald-600" : "text-rose-600")}>
+          {arrow} {deltaText}
+        </p>
+      ) : (
+        <p className="text-xs text-slate-300">—</p>
+      )}
+    </div>
+  );
+}
+
+export function GoalBar({
+  label,
+  valueText,
+  metaText,
+  pct,
+  good,
+  invert,
+}: {
+  label: string;
+  valueText: string;
+  metaText: string;
+  pct: number;
+  good: boolean;
+  invert?: boolean;
+}) {
+  const clamped = Math.min(100, Math.max(0, Math.round(pct)));
+  const bar = good ? "bg-emerald-500" : "bg-amber-500";
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs text-slate-500">{label}</span>
+        <span className="text-[11px] text-slate-400">{metaText}</span>
+      </div>
+      <p className="mt-0.5 text-base font-semibold text-slate-900">{valueText}</p>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className={cn("h-full rounded-full", bar)} style={{ width: `${clamped}%` }} />
+      </div>
+      <p className="mt-1 text-[11px] text-slate-400">
+        {invert ? (good ? "Dentro de la meta" : "Sobre la meta") : `${clamped}% de la meta`}
+      </p>
+    </div>
+  );
+}
+
+export function MiniDim({ label, value }: { label: string; value: number }) {
+  const tone = value >= 75 ? "bg-emerald-500" : value >= 50 ? "bg-amber-500" : "bg-rose-500";
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs text-slate-500">{capitalize(label)}</span>
+        <span className="text-xs font-semibold text-slate-700">{value}</span>
+      </div>
+      <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className={cn("h-full rounded-full", tone)} style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export function FocoCard({ dot, text, to }: { dot: string; text: string; to: string }) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-2.5 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+    >
+      <span className={cn("h-2.5 w-2.5 flex-shrink-0 rounded-full", dot)} />
+      <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{text}</span>
+      <span className="flex-shrink-0 text-xs font-medium text-brand-600">Ir →</span>
+    </Link>
+  );
+}
+
+export function Delta({ pct }: { pct: number }) {
+  const up = pct >= 0;
+  return (
+    <span className={cn("text-xs font-medium", up ? "text-emerald-600" : "text-rose-600")}>
+      {up ? "+" : ""}
+      {formatPercent(pct, 0)}
+    </span>
+  );
+}
+
+export function TrendRow({ row, up }: { row: SalesPaceRow; up?: boolean }) {
+  return (
+    <Link
+      to={`/productos/${row.product.sku}`}
+      className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 hover:bg-slate-50"
+    >
+      <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{row.product.name}</span>
+      <span
+        className={cn(
+          "flex-shrink-0 text-xs font-medium",
+          up ? "text-emerald-600" : "text-amber-600"
+        )}
+      >
+        {up ? "+" : ""}
+        {formatPercent(row.diffPct * 100, 0)}
+      </span>
+    </Link>
+  );
+}
+
+export function QualityItem({
+  label,
+  value,
+  hint,
+  to,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  to: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
+    >
+      <p className={cn("text-2xl font-bold", value > 0 ? "text-slate-900" : "text-slate-300")}>
+        {formatNumber(value)}
+      </p>
+      <p className="text-sm font-medium text-slate-700">{label}</p>
+      <p className="text-[11px] text-slate-400">{hint}</p>
+    </Link>
+  );
+}
+
+function roleTone(role: PortfolioProductRole): "green" | "blue" | "amber" | "red" | "violet" {
+  if (role === "Estrella") return "green";
+  if (role === "Tractor") return "blue";
+  if (role === "Margen") return "violet";
+  if (role === "Emergente") return "blue";
+  if (role === "Detenido" || role === "Deterioro") return "red";
+  return "amber";
+}
+
+function KeyProductItem({ row }: { row: KeyProductRow }) {
+  return (
+    <Link
+      to={`/productos/${row.product.sku}`}
+      className="block rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Badge tone={roleTone(row.role)}>{row.role}</Badge>
+            <span className="text-xs font-mono text-slate-400">{row.product.sku}</span>
+          </div>
+          <p className="mt-1 text-sm font-medium text-slate-800">{row.product.name}</p>
+          <p className="mt-0.5 text-xs text-slate-500 line-clamp-2">{row.reason}</p>
+        </div>
+        <div className="flex-shrink-0 text-right">
+          <p className="text-sm font-semibold text-slate-900">
+            {formatCurrencyCompact(row.salesValue)}
+          </p>
+          <p className="text-xs text-slate-500">
+            margen {formatPercent(row.product.margin, 0)} · GMROI {row.gmroi.toFixed(1)}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function BrandHealthItem({ row }: { row: BrandPortfolioRow }) {
+  const conclusion =
+    row.growth > 0.15 && row.inventory > row.sales
+      ? "crece, pero consume capital"
+      : row.growth < -0.12
+        ? "se está frenando"
+        : row.margin >= 34
+          ? "protege rentabilidad"
+          : "monitorear mix";
+  return (
+    <div className="rounded-lg border border-slate-200 px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">{row.brand}</p>
+          <p className="text-xs text-slate-500">
+            {row.skus} SKU · {conclusion}
+          </p>
+        </div>
+        {row.stockouts > 0 && <Badge tone="red">{row.stockouts} quiebre</Badge>}
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+        <span>
+          <b className="block text-slate-800">{formatCurrencyCompact(row.sales)}</b>
+          venta
+        </span>
+        <span>
+          <b className="block text-slate-800">{formatPercent(row.margin, 0)}</b>
+          margen
+        </span>
+        <span>
+          <b className={row.growth >= 0 ? "block text-emerald-700" : "block text-rose-600"}>
+            {formatPercent(row.growth * 100, 0)}
+          </b>
+          crecimiento
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SupplierPortfolioItem({ row }: { row: SupplierPortfolioRow }) {
+  const position =
+    row.dependency > 0.35 && row.alternatives / Math.max(1, row.skus) > 0.4
+      ? "posición negociadora media-alta"
+      : row.dependency > 0.35
+        ? "dependencia alta"
+        : "relación diversificada";
+  return (
+    <Link
+      to={`/proveedores/${row.supplier.id}?tab=negociacion`}
+      className="block rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-800 truncate">{row.supplier.name}</p>
+          <p className="text-xs text-slate-500">{position}</p>
+        </div>
+        <StatusBadge kind="supplier" value={row.supplier.status} dot={false} />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+        <span>
+          <b className="block text-slate-800">{formatCurrencyCompact(row.sales)}</b>
+          venta
+        </span>
+        <span>
+          <b className="block text-slate-800">{formatPercent(row.dependency * 100, 0)}</b>
+          dependencia
+        </span>
+        <span>
+          <b className={row.stalled > 0 ? "block text-rose-600" : "block text-emerald-700"}>
+            {row.stalled}
+          </b>
+          detenidos
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function OpportunityItem({ item }: { item: PortfolioOpportunity }) {
+  return (
+    <Link
+      to={item.to}
+      className="block rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+    >
+      <div className="flex items-center gap-2">
+        <Badge tone={item.tone}>{item.label}</Badge>
+      </div>
+      <p className="mt-1 text-sm font-semibold text-slate-800">{item.title}</p>
+      <p className="text-xs text-slate-500">{item.detail}</p>
+    </Link>
+  );
+}
+
+function PortfolioMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+export function AgendaStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+export function SignalSummary({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "red" | "amber" | "blue" | "violet";
+}) {
+  const toneClass = {
+    red: "border-rose-200 bg-rose-50 text-rose-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    blue: "border-brand-200 bg-brand-50 text-brand-700",
+    violet: "border-violet-200 bg-violet-50 text-violet-700",
+  }[tone];
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-75">{label}</p>
+      <p className="mt-1 text-lg font-semibold leading-none">{value}</p>
+    </div>
+  );
+}
