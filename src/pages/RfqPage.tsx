@@ -83,9 +83,17 @@ export function RfqPage() {
     (r) => r.estado === "enviada" || r.estado === "respondida_parcial"
   ).length;
   const enNegociacion = all.filter((r) => r.estado === "en_negociacion").length;
+  // Una cotización sigue "en juego" mientras no esté cerrada: enviada, con respuesta
+  // (parcial/total) o en negociación. Cualquiera de estas puede vencer si no se decide.
+  const openEstados: RfqStatus[] = [
+    "enviada",
+    "respondida_parcial",
+    "respondida",
+    "en_negociacion",
+  ];
   const porVencer = all.filter(
     (r) =>
-      (r.estado === "enviada" || r.estado === "respondida_parcial" || r.estado === "respondida") &&
+      openEstados.includes(r.estado) &&
       daysUntil(r.fechaVencimiento) >= 0 &&
       daysUntil(r.fechaVencimiento) <= 7
   ).length;
@@ -171,12 +179,7 @@ export function RfqPage() {
       hideOnMobile: true,
       render: (r) => {
         const d = daysUntil(r.fechaVencimiento);
-        const soon =
-          (r.estado === "enviada" ||
-            r.estado === "respondida_parcial" ||
-            r.estado === "respondida") &&
-          d >= 0 &&
-          d <= 7;
+        const soon = openEstados.includes(r.estado) && d >= 0 && d <= 7;
         return (
           <div className="text-sm">
             <p className="text-slate-700">{formatDate(r.fecha)}</p>
