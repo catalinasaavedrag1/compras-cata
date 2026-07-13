@@ -1,28 +1,7 @@
 // ============================================================================
 //  Cálculos de negocio de compras
-//  Lógica coherente (no perfecta) para márgenes, rotación, días de inventario,
-//  prioridad, estado de recomendación y cantidad sugerida de compra.
+//  Cobertura, cantidad sugerida de compra, fechas de quiebre y capital congelado.
 // ============================================================================
-
-import type { Priority, RecommendationStatus } from "../types/purchasing";
-
-/** Margen % sobre precio de venta: (precio - costo) / precio * 100 */
-export function calculateMargin(price: number, cost: number): number {
-  if (!price) return 0;
-  return Math.round(((price - cost) / price) * 1000) / 10;
-}
-
-/** Días de inventario = stock disponible / (venta mensual / 30) */
-export function calculateInventoryDays(stock: number, monthlySales: number): number {
-  if (monthlySales <= 0) return stock > 0 ? 999 : 0;
-  return Math.round((stock / (monthlySales / 30)) * 10) / 10;
-}
-
-/** Rotación anual aproximada = ventas 90 días * 4 / stock promedio */
-export function calculateRotation(salesLast90Days: number, averageStock: number): number {
-  if (averageStock <= 0) return 0;
-  return Math.round(((salesLast90Days * 4) / averageStock) * 10) / 10;
-}
 
 export interface SuggestedPurchaseInput {
   availableStock: number;
@@ -109,39 +88,6 @@ export function coverageSentence(availableStock: number, salesLast30Days: number
         ? "menos de 1 día"
         : `${Math.round(days)} ${Math.round(days) === 1 ? "día" : "días"}`;
   return `Vendiste ${Math.round(salesLast30Days)} en 30 días · te queda para ${daysLabel}`;
-}
-
-/**
- * Determina el estado de recomendación según cobertura, lead time y rotación.
- */
-export function calculateRecommendationStatus(params: {
-  availableStock: number;
-  monthlySales: number;
-  leadTimeDays: number;
-  inventoryDays: number;
-}): RecommendationStatus {
-  const { availableStock, monthlySales, leadTimeDays, inventoryDays } = params;
-  const cover = coverageDays(availableStock, monthlySales);
-
-  if (monthlySales <= 0 && availableStock > 0) return "overstock";
-  if (inventoryDays >= 180) return "overstock";
-  if (availableStock <= 0 && monthlySales > 0) return "critical";
-  if (cover <= leadTimeDays) return "critical";
-  if (cover <= leadTimeDays * 1.5) return "buy_now";
-  if (cover <= leadTimeDays * 2.5) return "review";
-  return "normal";
-}
-
-/** Calcula la prioridad de compra a partir del estado y la venta */
-export function calculatePriority(params: {
-  status: RecommendationStatus;
-  monthlySales: number;
-}): Priority {
-  const { status, monthlySales } = params;
-  if (status === "critical") return "high";
-  if (status === "buy_now") return monthlySales >= 15 ? "high" : "medium";
-  if (status === "review") return "medium";
-  return "low";
 }
 
 /** Suma días a una fecha ISO (aaaa-mm-dd) y devuelve ISO. */

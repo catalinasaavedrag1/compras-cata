@@ -33,17 +33,6 @@ export interface EntityRef {
   route: string;
 }
 
-/** Registro de módulos: nombre legible y ruta base. */
-export const moduleRegistry: Record<string, { label: string; basePath: string }> = {
-  productos: { label: "Productos", basePath: "/productos" },
-  proveedores: { label: "Proveedores", basePath: "/proveedores" },
-  categorias: { label: "Categorías", basePath: "/categorias" },
-  ordenes: { label: "Órdenes de compra", basePath: "/ordenes-compra" },
-  reposicion: { label: "Reposición", basePath: "/reposicion" },
-  alertas: { label: "Alertas", basePath: "/alertas" },
-  campanas: { label: "Campañas", basePath: "/anticipacion" },
-};
-
 const ENTITY_TYPE_LABEL: Record<EntityType, string> = {
   product: "Producto",
   supplier: "Proveedor",
@@ -59,19 +48,6 @@ export function entityTypeLabel(t: EntityType): string {
 }
 
 // --- Constructores de referencia por entidad --------------------------------
-
-export function productRef(sku: string): EntityRef | null {
-  const p = productService.getBySku(sku);
-  if (!p) return null;
-  return {
-    entityType: "product",
-    entityId: p.sku,
-    moduleKey: "productos",
-    displayName: p.name,
-    status: p.purchaseStatus,
-    route: `/productos/${p.sku}`,
-  };
-}
 
 export function supplierRef(name: string): EntityRef | null {
   const s = supplierService.getByName(name);

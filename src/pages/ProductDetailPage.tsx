@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { VALUE_TONE } from "../utils/tone";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { Tabs } from "../components/ui/Tabs";
@@ -646,14 +647,7 @@ function Row({
   strong?: boolean;
   tone?: "good" | "warn" | "bad";
 }) {
-  const toneClass =
-    tone === "bad"
-      ? "text-rose-600"
-      : tone === "warn"
-        ? "text-amber-600"
-        : tone === "good"
-          ? "text-emerald-600"
-          : "text-slate-700";
+  const toneClass = tone ? VALUE_TONE[tone] : "text-slate-700";
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs text-slate-500">{label}</span>
