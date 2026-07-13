@@ -15,70 +15,11 @@ import { Tabs } from "../components/ui/Tabs";
 import { IconPlus, IconCampaign, IconArrowUp, IconArrowDown } from "../components/ui/icons";
 import { useToast } from "../context/ToastContext";
 import { useLocalStorage } from "../utils/useLocalStorage";
-import { TODAY_ISO } from "../utils/constants";
+
 import { formatCurrency, formatCurrencyCompact } from "../utils/formatters";
 import { products } from "../data/mockProducts";
-import {
-  CAMPAIGN_PLANS,
-  CHANNEL_META,
-  PLACEMENT_ICON,
-  PLACEMENT_LABELS,
-  SPACE_TYPES,
-  type CampaignPlan,
-  type CampaignProduct,
-  type PromoChannelKey,
-  type PlacementKey,
-} from "../data/mockCampaignPlans";
-
-const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-function dateShort(iso: string): string {
-  if (!iso) return "—";
-  const p = iso.split("-");
-  return `${parseInt(p[2], 10)} ${MONTHS[parseInt(p[1], 10) - 1]}`;
-}
-function rangeText(from: string, to: string): string {
-  if (!from || !to) return "—";
-  const pf = from.split("-"),
-    pt = to.split("-");
-  if (pf[1] === pt[1])
-    return `${parseInt(pf[2], 10)} – ${parseInt(pt[2], 10)} ${MONTHS[parseInt(pt[1], 10) - 1]}`;
-  return `${dateShort(from)} – ${dateShort(to)}`;
-}
-function daysUntil(iso: string): number {
-  const today = new Date(`${TODAY_ISO}T00:00:00`).getTime();
-  const d = new Date(`${iso}T00:00:00`).getTime();
-  return Math.max(0, Math.round((d - today) / 86400000));
-}
-function discountPct(normal: number, promo: number): number {
-  return normal > 0 && promo > 0 && promo < normal ? Math.round((1 - promo / normal) * 100) : 0;
-}
-
-const STATUS_CFG: Record<
-  CampaignProduct["status"],
-  { label: string; tone: "green" | "amber" | "red" }
-> = {
-  ready: { label: "Listo", tone: "green" },
-  pending: { label: "Falta creativo", tone: "amber" },
-  stock_risk: { label: "Riesgo de stock", tone: "red" },
-};
-
-interface ProductForm {
-  mode: "add" | "edit";
-  index: number;
-  sku: string;
-  name: string;
-  category: string;
-  from: string;
-  to: string;
-  normal: string;
-  promo: string;
-  channel: PromoChannelKey;
-  placement: PlacementKey;
-  budget: string;
-  status?: CampaignProduct["status"];
-  isNew?: boolean;
-}
+import { CAMPAIGN_PLANS, CHANNEL_META, PLACEMENT_ICON, PLACEMENT_LABELS, SPACE_TYPES, type CampaignPlan, type CampaignProduct, type PromoChannelKey, type PlacementKey } from "../data/mockCampaignPlans";
+import { daysUntil, discountPct, rangeText, STATUS_CFG, type ProductForm } from "./campaignsHelpers";
 
 export function CampaignsPage() {
   const toast = useToast();
