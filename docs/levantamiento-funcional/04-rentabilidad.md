@@ -220,10 +220,16 @@ No aplica (no hay formularios).
 
 ### Reglas de negocio inferibles
 - **Señales** derivadas: categoría que más crece / más cae (`salesByCategory` ordenado por `growth`); venta perdida por quiebre; primer producto en crecimiento.
-- **Venta perdida por producto** = `salesLast30Days × price` para productos con `availableStock ≤ 0` y `salesLast30Days > 0`, ordenado desc.
-- **Alta venta + bajo stock**: `coverageDays(stock, ventas30) ≤ supplierLeadTimeDays × 1,5` (riesgo de quiebre relativo al lead time del proveedor).
-- **Delta de crecimiento**: verde si `≥ 0`, rojo si `< 0`.
-- KPIs de venta globales fijos en `salesKpis` (mock): venta 30/90/180 días, margen promedio 33,7%, venta perdida 14,6M, etc.
+  - Con los mocks actuales: la que más crece = **Herramientas eléctricas (+14,2%)**; la que más cae = **Jardín (−18,6%)**; primer producto en crecimiento = **Teflón gasfitería 12 mm (+28,0%)** (`growingProducts[0]`).
+- **Venta perdida por producto** = `salesLast30Days × price` (redondeado) para productos con `availableStock ≤ 0` y `salesLast30Days > 0`, ordenado desc.
+- **Alta venta + bajo stock**: se evalúa **solo** sobre `topProducts` (lista mock de 8 ítems, no todo el catálogo): `coverageDays(stock, ventas30) ≤ supplierLeadTimeDays × 1,5` (riesgo de quiebre relativo al lead time del proveedor). Para móvil/badge "Alta venta + bajo stock" se usa el mismo criterio.
+- **Delta de crecimiento** (`formatDelta`): verde si `≥ 0`, rojo si `< 0` (temporada usa tono violeta).
+- **KPIs de venta globales fijos en `salesKpis`** (mock, valores exactos):
+  - Venta 30 días = `$191.400.000`; 90 días = `$574.800.000`; 180 días = `$1.098.200.000`.
+  - Margen promedio = `33,7%`; venta perdida por quiebre = `$14.600.000`.
+  - `topGrowthCategory` = "Herramientas eléctricas"; `topProduct` = "Cemento Polpaico 25 kg"; `topDropProduct` = "Carretilla reforzada 90 litros".
+- **Contadores de pestañas (mock, fijos):** Categorías 10, Proveedores 8, Productos 8, Crecimiento 4, Caída 4, Temporada 3. Venta perdida es dinámico (depende del catálogo).
+- La **participación de proveedor** (`salesBySupplier.share`) se dibuja con ancho `share × 3` (%) en la barra visual.
 
 ### Validaciones
 No aplica (solo navegación/selección).
@@ -288,8 +294,8 @@ Adicional: selector de **alcance** ("Viendo") y **pestañas** por estado general
 - Buscar/filtrar/togglear.
 - Cliquear KPIs para fijar estado/canal.
 - Cambiar pestaña por estado general.
-- **Exportar** (CSV/descarga vía `ExportButton`).
-- Por tarjeta: "Ver detalle" → ficha del producto (`/productos/:sku?tab=margen`); "Crear tarea" → `toast.success` (simulado).
+- **Exportar** (descarga vía `ExportButton`, archivo `margen-por-canal`). Columnas exportadas (sobre el alcance `scoped`, una fila por canal): **SKU, Producto, Canal, Precio final, Costo, Comisión, Margen %, Objetivo %, Diferencia pts, Precio sugerido, Estado**.
+- Por tarjeta: "Ver detalle" → ficha del producto (`/productos/:sku?tab=margen`); "Crear tarea" → `toast.success("Tarea de revisión de margen creada para {producto}")` (simulado).
 - Enlaces a producto, categoría, proveedor.
 
 ### Botones y controles
@@ -326,15 +332,21 @@ Estado **general por SKU** (`GENERAL_STATUS`): **negative**, **review** (Requier
 5. Puede exportar el conjunto en alcance.
 
 ### Reglas de negocio inferibles (derivadas del mock `mockChannelMargin`)
-- Cada SKU se modela en 3 canales con precios distintos: marketplace = `price × 0,96`, web = `price`, tienda = `price × 1,08`.
-- **Comisión marketplace** = `13%` del precio marketplace; web y tienda sin comisión.
-- **Descuentos**: marketplace 4% si `salesLast30Days > 50`; web 5% si `purchaseStatus === "overstock"`.
-- **Margen %** = `(finalPrice − cost − commission) / finalPrice`.
-- **Precio sugerido** = `(cost + commission) / (1 − target/100)`.
-- **Estado por canal** (`statusFor`): `< 0` → negative; `< target − 3` → low; `> target + 6` → over; resto → normal.
-- **Estado general del SKU** (`generalStatusFor`): si algún canal negative → negative; si alguno low → review; si `max(margen) − min(margen) ≥ 15 pts` → spread; si todos over → over; si alguno over → spread; si no → ok.
-- **Objetivo de margen por categoría** (`TARGET_BY_CATEGORY`): p. ej. Herramientas eléctricas 32%, Electricidad/Jardín/Seguridad 30%, Ferretería/Gasfitería 28%, Pinturas/Maderas 25%, Construcción 22%, Agrícola 27% (default 25%).
-- En las tarjetas, el canal con mejor margen se resalta en verde y el peor en rojo (solo si hay diferencia).
+- **Universo**: se modelan **29 SKUs representativos** del catálogo (constante `SELECTED`), cada uno en 3 canales → **87 filas** `ChannelMargin`. Solo estos SKUs aparecen (no todo el catálogo).
+- Precio de lista por canal: marketplace = `round(price × 0,96)`, web = `price`, tienda = `round(price × 1,08)`.
+- **Precio final** = `round(precioLista − descuento)`.
+- **Comisión marketplace** = `round(mktPrice × 0,13)` (13%); web y tienda **sin comisión**.
+- **Descuentos**: marketplace `round(mktPrice × 0,04)` (4%) si `salesLast30Days > 50`, si no 0; web `round(webPrice × 0,05)` (5%) si `purchaseStatus === "overstock"`, si no 0; tienda sin descuento.
+- **Reparto de venta/stock por canal** (informativo, no visible directo): venta 45% marketplace / 35% web / resto tienda; stock 40% / 30% / resto.
+- **Margen %** = `round(((finalPrice − cost − commission) / finalPrice) × 1000) / 10` (1 decimal).
+- **Precio sugerido** = `round((cost + commission) / (1 − target/100))`.
+- **Estado por canal** (`statusFor`): `marginPct < 0` → negative; `< target − 3` → low; `> target + 6` → over; resto → normal.
+- **Estado general del SKU** (`generalStatusFor`, en orden): si algún canal negative → negative; si alguno low → review; si `max(margen) − min(margen) ≥ 15 pts` → spread; si **todos** over → over; si **alguno** over → spread; si no → ok.
+- **Comprador del SKU** (`buyer`): se toma del `buyer` de la categoría en `mockCategories` (no del producto), default "—".
+- **Objetivo de margen por categoría** (`TARGET_BY_CATEGORY`, valores exactos): Herramientas eléctricas **32%**, Electricidad **30%**, Jardín **30%**, Seguridad industrial **30%**, Ferretería **28%**, Gasfitería **28%**, Pinturas **25%**, Maderas **25%**, Construcción **22%**, Agrícola **27%** (default **25%**).
+- **Problema principal** de la tarjeta: canal de peor margen (`worst`) con su estado y `diff = round((marginPct − targetMarginPct) × 10)/10` pts vs objetivo.
+- En las tarjetas, el canal con **mejor margen** se resalta en verde y el **peor** en rojo (solo si `maxMargin ≠ minMargin`).
+- Orden de las tarjetas: por `minMargin` ascendente (peor primero).
 
 ### Validaciones
 No hay validaciones de entrada. "Crear tarea" no valida ni persiste (toast simulado).
@@ -421,15 +433,22 @@ No aplica.
 4. Salta a "Planificar temporada" para ejecutar la compra.
 
 ### Reglas de negocio inferibles (utils `channelDemand` y `seasonality`)
-- **Canales de demanda**: tienda, ecommerce, marketplace, empresa (B2B), licitaciones, cada uno con perfil estacional mensual propio (ej. ecommerce peak en CyberDay/mayo y fin de año; licitaciones peak marzo-abril y oct-nov).
-- **Mezcla por familia de categoría** (`mixForCategory`): construcción, ferretería/herramientas, jardín/agrícola, instalación (pintura/gasfitería/electricidad) y default; cada mezcla suma 1.
-- **Demanda base** = suma de `salesLast30Days` de los productos de la categoría; **precio medio** ponderado por venta.
+- **Canales de demanda** (`DEMAND_CHANNELS`): tienda, ecommerce, marketplace, empresa (B2B), licitaciones; cada uno con perfil estacional mensual propio (`CHANNEL_PROFILE`, multiplicador por mes). Ejemplos: ecommerce peak mayo (CyberDay ×1,25) y nov-dic (×1,35/×1,30); marketplace peak mayo y nov-dic; licitaciones peak mar-abr (×1,4/×1,5) y oct-nov; empresa casi pareja; tienda peak oct-dic.
+- **Colores/etiquetas** (`CHANNEL_META`): Tienda física, Ecommerce propio, Marketplace, Venta empresa (B2B), Licitaciones / proyectos, cada uno con descripción.
+- **Mezcla por familia de categoría** (`mixForCategory`, cada una suma 1):
+  - Construcción (cemento/árido/acero/madera/ladrillo): tienda 0,30 · ecommerce 0,10 · marketplace 0,08 · empresa 0,30 · licitaciones 0,22.
+  - Ferretería/herramientas/seguridad: 0,42 · 0,22 · 0,18 · 0,12 · 0,06.
+  - Jardín/agrícola: 0,45 · 0,20 · 0,15 · 0,12 · 0,08.
+  - Instalación (pintura/gasfitería/electricidad): 0,38 · 0,18 · 0,14 · 0,18 · 0,12.
+  - Default: 0,40 · 0,20 · 0,15 · 0,15 · 0,10.
+- **Demanda base** (`baseUnitsPerMonth`) = suma de `salesLast30Days` de los productos de la categoría; **precio medio** = venta valorizada / unidades.
+- **Unidades por canal y mes** = `round(baseUnits × mix[canal] × perfil[mes] / promedio(perfil))`.
+- **Participación (mixPct)** de un canal = unidades del canal / total anual × 100; **meses peak** del canal = meses con `perfil ≥ promedio × 1,15`.
 - **Digital %** = ecommerce + marketplace; **Proyectos %** = empresa + licitaciones.
 - **Mes peak** = mes de mayor demanda total.
-- **Factor estacional** (`seasonalFactor`, 2 meses adelante vs promedio anual): "Entra en temporada" si `≥ 1,05`; "Sale de temporada" si `≤ 0,95`; si no "Demanda pareja".
-- **Tipo de demanda** (`demandType`): constante (`ratio < 1,12`), permanente con peak (`min ≥ 0,6`), estacional (resto).
-- **Compra sugerida por canal** = `suggestedPurchase × mixPct` de cada canal.
-- La compra sugerida de la categoría proviene de `selected.suggestedPurchase` (mock de categorías).
+- **Factor estacional** (`seasonalFactor`, `monthsAhead = 2` desde `CURRENT_MONTH = 5`/junio, vs promedio anual del perfil de categoría): "Entra en temporada" si `≥ 1,05`; "Sale de temporada" si `≤ 0,95`; si no "Demanda pareja". Perfiles de categoría (`PROFILES`): construcción/madera/ferretería/gasfitería/electricidad, jardín/agrícola, herramientas/seguridad, pinturas, flat.
+- **Tipo de demanda** (`demandType`, sobre `ratio = max/promedio` y `min/promedio`): constante (`ratio < 1,12`), permanente con peak (`min ≥ 0,6`), estacional (resto).
+- **Compra sugerida por canal** = `selected.suggestedPurchase × pct/100` de cada canal (tarjeta muestra monto compacto y % de la compra). La compra sugerida de la categoría proviene de `selected.suggestedPurchase` (mock `mockCategories`).
 
 ### Validaciones
 No aplica (sin captura de datos).
@@ -532,8 +551,9 @@ Encabezado (con botón "Cargar lista" y ayuda); grid de 4 KPIs; selector de list
 - **Umbral de margen bajo** = `LOW_MARGIN_THRESHOLD = 20%`; los ítems que quedan bajo 20% se resaltan (fila rosada + aviso).
 - **Objetivo por categoría** = `TARGET_MARGIN_BY_CATEGORY` (mismos valores que Margen por canal; default 25%).
 - **Resumen de lista** (`summarizeList`): nº productos, alza promedio, en alza, en baja, con margen bajo, impacto en margen (pts = promedio de `margenNuevo − margenActual`).
-- Al cargar, los ítems se generan con un patrón determinista de ajustes sobre el alza base (mayoría alzas, algunas bajas, algún "sin cambio"); id nuevo `PL-DEMO-N`, vigente desde `2026-07-15`.
-- Listas sembradas: FerrePro Chile (+9%), Distribuidora Maule (+6%), Proveedor Andes (+12%), Herramientas Global (+4%), todas pendientes.
+- Al cargar, los ítems se generan con `buildPriceListItems(proveedor, base)`: cada producto del proveedor recibe `delta = base + pattern[i % 20]`, con `pattern = [0, 1.5, −base, 3, 0.5, −1, 2, −base, 1, 4, −2, 0.5, 2.5, 1, −1.5, 3, 0, 2, −0.5, 1.5]` (mayoría alzas, algunas bajas, algún "sin cambio"). Id nuevo `PL-DEMO-{lists.length+1}`, vigente desde `2026-07-15`, estado pendiente, agregada al inicio y seleccionada.
+- **Resumen de lista** (`summarizeList`): productos, alza promedio, en alza (`alzaPct > 0`), en baja (`alzaPct < 0`), con margen bajo (`margenNuevo < 20`), impacto en margen (pts = promedio de `margenNuevo − margenActual`).
+- Listas sembradas (`PRICE_LISTS`, todas pendientes): **PL-2026-001** FerrePro Chile (base +9%, vigente 2026-07-01), **PL-2026-002** Distribuidora Maule (+6%, 2026-07-05), **PL-2026-003** Proveedor Andes (+12%, 2026-07-10), **PL-2026-004** Herramientas Global (+4%, 2026-06-28). Cada lista toma los productos de su proveedor en el catálogo.
 
 ### Validaciones
 - El botón "Cargar lista" del modal se **deshabilita** si la vista previa no tiene ítems.
@@ -631,9 +651,12 @@ No aplica.
 - **Recibido** = mercadería recepcionada (subconjunto de lo comprometido).
 - **Disponible (OTB)** = `presupuesto − comprometido − enBorrador`.
 - **% usado** = `(comprometido + enBorrador) / presupuesto × 100`.
-- **Semáforo** (`deriveStatus` en OTB): `usadoPct > 100` → excedido; `≥ 85` → ajustado; resto → ok. (El mock base `mockBudgets` añade además una proyección de cierre para el semáforo inicial: `proyeccionPct > 105` excedido, `≥ 95` ajustado.)
-- KPI Comprometido tono: `> 100%` bad, `≥ 85%` warn, si no good.
-- Presupuestos semilla por categoría (mock determinista), con Agrícola sembrada > 100% para demostrar el estado "excedido"; junio se calcula al día 24/30 (mes en curso), mayo como mes cerrado.
+- **Semáforo** (`deriveStatus` en `openToBuy`, el que ve la tabla): `usadoPct > 100` → excedido; `≥ 85` → ajustado; resto → ok. (El mock base `mockBudgets` usa un `deriveStatus` distinto que **además** considera proyección de cierre: `usadoPct > 100 || proyeccionPct > 105` excedido; `≥ 85 || proyeccionPct ≥ 95` ajustado. La página recalcula con `computeOtb`, por lo que el estado mostrado usa la regla de OTB.)
+- **Proyección de cierre** (solo en `mockBudgets`): `comprometido / fracción-de-mes-transcurrida`, con `MONTH_PROGRESS` = junio `24/30`, mayo `1` (cerrado).
+- KPI Comprometido tono: `usadoTotalPct > 100%` bad, `≥ 85%` warn, si no good (incluye borrador).
+- **Semillas de presupuesto** (`SEEDS`, presupuesto base y `committedRatio`): Herramientas eléctricas $24M (0,91), Construcción $22M (0,74), Gasfitería $13M (0,96), Ferretería $12M (0,78), Maderas $11M (0,80), Electricidad $8,5M (0,83), Agrícola $7M (**1,08 → excedido**), Pinturas $5M (0,62), Jardín $2,2M (0,41), Seguridad industrial $1,8M (0,34). Presupuestos redondeados a la centena de mil (`roundClp`).
+- **Factor por mes** (`MONTH_FACTOR`): junio 2026 sin ajuste; mayo 2026 (cerrado) presupuesto ×0,94, comprometido ×0,97, recibido ×1,18.
+- **Recibido** = OC recepcionadas (`min(comprometido, comprometido × receivedRatio × factor)`); se calcula pero **no** se muestra como columna en la tabla (sí entra en `totals`).
 
 ### Validaciones
 No aplica (sin captura de datos ni acciones de escritura).
@@ -688,3 +711,72 @@ El comprador diagnostica el desempeño (ventas, ranking, margen por canal, estac
 - **ToastContext**: notificaciones simuladas (Margen por canal, Alzas de precio).
 
 > **Nota transversal sobre datos mock:** todas las cifras (ventas, márgenes, presupuestos, alzas, demanda por canal) son deterministas y se derivan del catálogo o de semillas fijas; no hay backend ni datos transaccionales reales. Estados como "sin listas de precios" o "sin categorías en alcance" existen en el código pero rara vez se ven con los mocks sembrados por defecto.
+
+---
+
+## Verificación de cobertura
+
+Auditoría del documento contra el código real (`src/pages/*` + utils/data importados). Se listan hallazgos por pantalla.
+
+### 1. Ranking & liquidación (`/analisis-compra` → `PurchaseAnalysisPage.tsx`)
+- **Rutas**: `/analisis-compra` ✔ (título "Ranking & liquidación").
+- **Alcance por rol** (`role === "lider"` = todo; comprador = `myCategories`) ✔.
+- **4 KPIs**: SKUs en alcance, Venta 30d, Candidatos a liquidar (clic → tab liquidar), Sin rotación 30d (clic → tab liquidar) ✔.
+- **4 pestañas** con contador: Top productos / Top proveedores / Top marcas / Liquidar-descontinuar ✔.
+- **Columnas Top productos**: Producto, Categoría, Marca, Proveedor, Venta 30d, Stock, Cobertura, Margen %, Rotación ✔. **Agregados** (proveedor/marca): Nombre, Nº SKUs, Venta 30d, Margen prom. %, Valor stock ✔. **Liquidación**: Producto, Motivo, Métrica clave, Acción ✔.
+- **Constantes verificadas**: `TOP_LIMIT = 100`, `OVERSTOCK_COVERAGE_DAYS = 120`, `LOW_MARGIN_PCT = 20`; rotación ≥8/≥4/<4; severidad no_rotation `3 + min(cap/1M,5)`, low_margin `4|2`, overstock `1 + min(cover/200,2)` ✔.
+- **FilterBar solo en Top productos** ✔. Sin formularios de captura ✔.
+
+### 2. Análisis de ventas (`/ventas` → `SalesAnalysisPage.tsx`)
+- **Selector período** 30/90/180 y **8 pestañas** ✔. **4 KPIs cliqueables** ✔.
+- **"+8,4% vs período anterior"** hardcodeado y solo en 30d ✔ (confirmado, no hay cálculo real).
+- **Valores exactos de `salesKpis`** añadidos (venta 30/90/180, margen 33,7%, perdida 14,6M) — antes aproximados, **ahora exactos**.
+- **`highSaleLowStock`** opera solo sobre `topProducts` (8 mock), no todo el catálogo — **precisado**.
+- Listas de crecimiento/caída/temporada son arreglos mock curados (4/4/3) — **contadores añadidos**.
+
+### 3. Margen por canal (`/margen-canal` → `ChannelMarginPage.tsx`)
+- **Ruta y título** ✔. Selector alcance "Viendo" (mias/todos/comprador) ✔.
+- **6 KPIs (solo md+)** y **5 pestañas** por estado general ✔.
+- **`SELECTED` = 29 SKUs × 3 canales = 87 filas** — **añadido** (antes no cuantificado).
+- **Reglas exactas** (precios 0,96/1/1,08; comisión 13%; descuentos 4%/5%; finalPrice = round(lista−desc); statusFor; generalStatusFor; targets por categoría) ✔ verificadas 1:1 con `mockChannelMargin.ts`.
+- **Columnas de exportación** enumeradas — **añadidas**.
+- `buyer` proviene de la **categoría** (no del producto) — **precisado**.
+
+### 4. Temporadas y canales (`/temporadas` → `SeasonsChannelsPage.tsx`)
+- **ScopeToggle** (Mías/Todas) + Select de categoría ✔. **4 KPIs**, 2 gráficos, mezcla de canales, compra sugerida por canal ✔.
+- **Estado "sin categorías en alcance"** con mensaje exacto ✔.
+- **Mezclas por familia** (`MIX_*`) con porcentajes exactos y **perfiles de canal** con meses peak — **añadidos/detallados**.
+- `seasonalFactor` (monthsAhead=2, CURRENT_MONTH=5), `demandType` (1,12 / 0,6), peak `≥ promedio × 1,15` ✔.
+- Enlace único saliente: `/comprar/temporada` ✔.
+
+### 5. Alzas de precio (`/alzas-precio` → `PriceIncreasesPage.tsx`)
+- **Persistencia localStorage** `compras:price-lists` ✔. **4 KPIs** (con `LOW_MARGIN_THRESHOLD = 20`) ✔.
+- **Modal "Cargar lista"**: Select proveedor (`SUPPLIERS_WITH_PRODUCTS`) + Select alza base (`ALZA_OPTIONS`: 4/8/12/−3) + vista previa; botón deshabilitado si preview vacío ✔.
+- **Tabla**: Producto, Costo actual→nuevo, Margen actual→nuevo, Precio venta sugerido ✔. Orden por `alzaPct` desc por defecto ✔.
+- **Estados** pendiente/aprobada/rechazada + acciones Aprobar/Rechazar/Volver a pendiente (toasts simulados) ✔.
+- **Patrón de generación** `pattern[20]`, ids/fechas de listas sembradas — **añadidos exactos**.
+- **Permiso rol para aprobar/rechazar**: NO restringido en código (ambos roles) — **Definición pendiente** confirmada.
+
+### 6. Presupuesto por categoría (`/presupuesto` → `BudgetPage.tsx`)
+- **`BUDGET_MONTHS`** = junio 2026 (default) y mayo 2026 ✔. **4 KPIs** ✔.
+- **Tabla (7 columnas)**: Categoría, Presupuesto, Comprometido, En borrador, Disponible (OTB), % usado (UsageBar), Estado ✔.
+- **OTB en vivo**: `computeOtb(mes, borrador, OC creadas)`; `COMMITTED_STATUSES` (8 estados) ✔. `disponible = presupuesto − comprometido − enBorrador` ✔.
+- **Dos `deriveStatus` distintos** (OTB vs mockBudgets con proyección) — **aclarada la discrepancia**: la tabla usa la regla de OTB (sin proyección).
+- **Semillas por categoría** y factor por mes — **añadidos exactos**. Agrícola `committedRatio = 1,08` → excedido demostrativo ✔.
+- **`recibido`** se calcula pero no es columna visible — **precisado**. Sin acciones de escritura ✔.
+
+### Estados reales vs. inexistentes por mock
+- **Reales y alcanzables desde la UI**: pestañas/filtros sin resultados; aprobar/rechazar/volver a pendiente (Alzas); carga de nueva lista; alcance "sin categorías" (Temporadas, cambiando a Mías con comprador sin categorías); OTB total negativo/categorías excedidas (Presupuesto, con Agrícola o borrador).
+- **Raros con los mocks sembrados**: "No hay listas de precios" (solo si se vacía localStorage; se siembran 4); "Sin candidatos a liquidar" (los mocks suelen generar candidatos); "Sin venta perdida" (depende de quiebres del catálogo).
+- **Inexistentes / no implementados**: alcance por comprador en Análisis de ventas, Alzas de precio y Presupuesto (se ve todo); estados de carga/error (datos locales deterministas); backend real (todo mock).
+
+### Permisos y validaciones (resumen)
+- **Alcance por rol/comprador** solo en: Ranking (por rol), Margen por canal (selector comprador), Temporadas (ScopeToggle categorías). El resto no filtra por rol.
+- **Escritura simulada**: Alzas de precio (estado en localStorage), "Crear tarea" de Margen (toast), carga de lista (memoria/localStorage). Ninguna persiste en backend.
+- **Validaciones**: solo la del modal de carga (botón deshabilitado sin ítems + `toast.warning` si el proveedor no tiene productos + `parseFloat(upAlza) || 0`). No hay validación de rangos, fechas ni formularios de captura en el resto del módulo.
+
+### Definiciones pendientes destacadas
+- Quién puede **aprobar/rechazar alzas** (hoy sin distinción de rol; en un retailer normalmente sería atribución del `lider`).
+- Falta de **alcance por comprador** en Análisis de ventas, Alzas y Presupuesto.
+- La aprobación de alzas y la creación de tareas **no** impactan datos reales (simulado/declarado en la UI).
+- Origen de las listas de crecimiento/caída/temporada y del "+8,4%": **datos mock curados**, no cálculo sobre el catálogo.

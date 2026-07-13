@@ -75,12 +75,24 @@ La página arma una **"agenda de decisiones"** combinando varias fuentes y orden
 - Navegar a reposición, decisiones, seguimiento de OC, proveedores, inventario, producto, señales de ventas, venta no capturada.
 
 ## Botones y controles
-- `PageHeader` → botón **"Ir a reposición"** (`/comprar/decisiones`).
-- Chips de agenda (Prioridad / Hoy / Semana / Después).
-- Botón **"Revisar"** (destacado) → `featuredAgenda.to`.
-- Botón **"Continuar"** → `/comprar/borradores` (o "Ir a decisiones" si no hay borrador).
-- Botón por fila **"Agregar a OC" / "En OC"** (deshabilitado si ya está en el borrador o si `suggestedQty <= 0`).
-- Enlaces "Ver agenda completa", "Ver reposición", "Ver todas", etc.
+- `PageHeader` → botón **"Ir a reposición"** (`variant="secondary"`, ícono `IconReplenish`) → `/comprar/decisiones`.
+- **Chips de agenda** (`<button>` píldora): **"Prioridad"**, **"Hoy"**, **"Semana"**, **"Después"**, cada uno con contador; el activo queda en negro (`bg-slate-900`).
+- Tarjeta destacada → botón **"{actionLabel}"** (texto dinámico: "Revisar compra" / "Revisar stock" / "Revisar venta" / "Revisar OC" / "Revisar proveedor" / "Revisar sobrestock" / "Revisar aprobación") → `featuredAgenda.to`.
+- Enlace **"Ver agenda completa"** → `/comprar/decisiones`.
+- Tarjeta "Prioridad recomendada" → botón **"Revisar"** → `featuredAgenda.to`; si no hay agenda: título **"Sin prioridad crítica"** sin botón.
+- Tarjeta "Continuar trabajo" → con borrador: título **"Borrador OC activo"**, texto "{count} SKU · {total} preparados para compra.", botón **"Continuar"** (ícono `IconOrders`) → `/comprar/borradores` y "Último SKU: {nombre}"; sin borrador: título **"Sin borrador activo"** + botón **"Ir a decisiones"** → `/comprar/decisiones`.
+- Enlace **"Ver reposición"** (cabecera de la tabla de riesgo) → `/comprar/decisiones`.
+- Botón por fila de la tabla de riesgo **"Agregar a OC"** / **"En OC"** (ícono `IconPlus`/`IconCheck`; `disabled` si `hasItem(sku)` **o** `suggestedQty <= 0`). Usa `stopPropagation` para no navegar la fila.
+- Enlaces **"Ver todas"** en "Venta no capturada" (→ `/venta-no-capturada`) y "Señales de ventas para mí" (→ `/senales-ventas`).
+
+### Columnas de la tabla "Mis productos en riesgo de quiebre" (`riskColumns`)
+1. **Producto:** SKU (mono), nombre, `{categoría} · {proveedor|"Sin proveedor"}` y `coverageSentence(...)` en rojo.
+2. **Stock disp.** (rojo negrita si `≤ 0`).
+3. **Venta 30d** (oculta en móvil).
+4. **Quiebre estimado:** "En quiebre" (si `availableStock ≤ 0`) o fecha; subtexto "cubre {días} · lead {días}". Color rojo si `coverage ≤ lead`, ámbar si no.
+5. **Compra sugerida:** "{suggestedQty} u." + "para ~{coverageAfter} días".
+6. **(acción):** botón "Agregar a OC" / "En OC".
+- Fila con fondo `bg-rose-50/40` cuando `availableStock ≤ 0`. Clic en fila → `/productos/{sku}`.
 
 ## Tablas/tarjetas/formularios/componentes relevantes
 - `PageHeader`, `Card`/`CardBody`/`CardHeader`, `DataTable` (con `mobileCard`), `Badge`, `StatusBadge`, `Button`, `EmptyState`, `CollapsibleSection`, íconos.
@@ -117,12 +129,27 @@ No aplica (sin formularios).
 6. Continúa el trabajo desde el borrador activo o avanza a reposición/decisiones.
 
 ## Reglas de negocio inferibles
-- **Riesgo de quiebre:** un SKU entra si `salesLast30Days > 0` y (`availableStock <= 0` o cobertura ≤ `2 × leadTime`). La cantidad sugerida sale de la recomendación mock o, en su defecto, del cálculo `calculateSuggestedPurchase` (objetivo 45 días de inventario, con factor estacional por categoría).
-- **Prioridad de agenda:** quiebre activo (sin stock) = máxima prioridad (1000); OC atrasada suma según días; aprobaciones y aceleraciones con poca cobertura son altas; sobrestock es baja ("Después").
-- **Urgencia textual:** "CRÍTICO · HOY", "ALTA PRIORIDAD", "ATRASADO · N DÍAS", "REQUIERE DECISIÓN", "DESPUÉS", etc.
+- **Riesgo de quiebre (`riskRows`):** un SKU entra si `salesLast30Days > 0` y (`availableStock <= 0` **o** `coverageDays ≤ supplierLeadTimeDays × 2`). Orden ascendente por cobertura. La cantidad sugerida (`suggestedQty`) = `rec.suggestedQuantity` de la recomendación mock, o en su defecto `calculateSuggestedPurchase({ targetInventoryDays: 45, minStock, maxStock, seasonalFactor(category), ... })`. `coverageAfter = round(((availableStock + suggestedQty) / (salesLast30Days/30)) × 10) / 10` (días de cobertura tras la compra).
+- **Construcción de la agenda (fuentes y CONSTANTES de prioridad reales):**
+  | Fuente | `kind` | Condición de inclusión | `priority` | `urgency` | `tone` | `impactValue` | `to` |
+  |---|---|---|---|---|---|---|---|
+  | Riesgo de quiebre | `Compra` | todos los `riskRows` | `1000` si `availableStock<=0`; si no `900 − min(200, round(coverage))` | `CRÍTICO · HOY` / `ALTA PRIORIDAD` | red | `max(1,sales30) × price` | `/productos/{sku}` |
+  | Venta acelerando | `Inventario` | `salesPace.faster` (máx. 3) | `830` si `coverage ≤ lead×2`, si no `620` | `ALTA PRIORIDAD` / `HOY` | red / blue | `sales30 × price` | `/productos/{sku}` |
+  | Venta desacelerando | `Margen` | `salesPace.slower` (máx. 3) | `520` | `ESTA SEMANA` | amber | `availableStock × cost` | `/productos/{sku}` |
+  | OC sin recibir | `OC` | `myOpenOrders` | `880 + min(80, delayedDays)` si atrasada; si no `560` | `ATRASADO · {delayedDays} DÍAS` / `POR RECIBIR` | red / amber | `totalAmount` | `/comprar/seguimiento` |
+  | Proveedor por revisar | `Proveedor` | `mySuppliersToReview` | `760` si `delayed`; si no `470` | `ALTA PRIORIDAD` / `SEGUIMIENTO` | amber | `0` | `/proveedores` |
+  | Sobrestock | `Inventario` | `overstockProducts` | `390` | `DESPUÉS` | violet | `availableStock × cost` | `/productos/{sku}` |
+  | Aprobación | `Aprobación` | `myApprovals` | `780` | `REQUIERE DECISIÓN` | amber | `amount` | `/comprar/aprobaciones` |
+  - Orden final (`priorityAgenda`): por `priority` desc, luego `impactValue` desc, luego `days` asc.
+  - `days` de cada ítem = días entre `dueDate` y `TODAY_ISO` (`2026-07-13`); vencimientos: quiebre activo `hoy`, riesgo en `stockoutDate`, aceleración `hoy`, desaceleración `+7`, proveedor `+0/+14/+30` según `delayed/review/inactive`, sobrestock `+30`.
+  - El `kind` **`Catálogo`** está declarado en el tipo `AgendaItem` pero **ningún ítem lo usa** hoy (código muerto / previsto).
+- **Estadísticas del bloque:** *Decisiones* = `agenda.length`; *Impacto* = suma de `impactValue` de los **7 primeros por prioridad** (`agendaImpact`); *Críticas* = ítems con `days <= 0` (igual a la pestaña "Hoy").
+- **`salesPace` (ritmo de venta):** `expected30 = salesLast90Days / 3`; solo entran productos con `expected30 ≥ 8`. *faster* = `diffPct ≥ +0,15` (≥ +15%); *slower* = `diffPct ≤ −0,15` **y** `availableStock > 0`.
 - **Alcance personal:** todo se filtra por `buyer` (OC, aprobaciones) y por `myCategories` (productos, señales sin asignar, oportunidades perdidas).
-- **OC abierta:** OC del comprador cuyo estado no es `received` ni `cancelled`.
-- **Señales que "me tocan":** estado `new`/`in_review` y (asignadas a mí, o de mis categorías sin comprador asignado). Máximo 5, orden por prioridad y luego fecha desc.
+- **OC abierta (`myOpenOrders`):** `buyerName === buyer` y estado **no** en `["received","cancelled"]`.
+- **Proveedores por revisar (`mySuppliersToReview`):** categorías del proveedor intersectan `myCategories` **y** estado en `["review","delayed","inactive"]`. En la lista se ordenan por `deliveryCompliance` asc; el enlace de cada fila va a `/proveedores` (genérico, sin `id`).
+- **Sobrestock (`overstockProducts`):** `purchaseStatus === "overstock"` (orden por `availableStock × cost` desc).
+- **Señales que "me tocan":** estado `new`/`in_review` y (`assignedBuyer === buyer`, o `!assignedBuyer && myCategories.includes(category)`). Máximo 5, orden por prioridad (`high < medium < low`) y luego fecha desc.
 
 ## Validaciones necesarias
 - Botón "Agregar a OC" deshabilitado si el SKU ya está en el borrador (`hasItem`) o si la cantidad sugerida es ≤ 0. No hay más validaciones (no hay entradas de texto/números editables).
@@ -209,11 +236,20 @@ No aplica.
 5. Salta a los focos específicos (productos-clave, marcas, proveedores, oportunidades) o a otras vistas para actuar.
 
 ## Reglas de negocio inferibles
-- **Roles de producto (clasificación comercial):** Estrella (venta > 0, margen ≥ 34%, GMROI ≥ 4), Margen (venta > 0, margen ≥ 36%), Tractor (venta ≥ 40 u.), Emergente (crecimiento ≥ +25%), Deterioro (crecimiento ≤ −25% con stock), Detenido (venta 0 con stock), Riesgo (resto).
-- **GMROI** = utilidad bruta × 12 / valor de inventario; **Rotación** = costo vendido × 12 / valor de inventario; **Cobertura ponderada** por venta valorizada.
-- **Salud (6 dimensiones 0–100):** heurísticas acotadas a 0–100 (venta según aceleraciones/frenos; margen ≈ margen% × 2,4; inventario penaliza sobrestock; disponibilidad penaliza quiebres/cobertura corta; surtido penaliza detenidos; proveedores penaliza estado no activo).
-- **Metas:** venta = venta actual × 1,18 (redondeada a 500k); margen 33%; sobrestock < $3M; disponibilidad 96%.
-- **Base "mes anterior":** promedio de los dos meses previos derivado de venta 90d − 30d (no hay serie histórica real).
+- **Roles de producto (`portfolioInsights.productRows`), evaluados en este orden:** Detenido (`sales30 === 0 && availableStock > 0`) → Deterioro (`growthPct ≤ −0,25 && availableStock > 0`) → Emergente (`growthPct ≥ 0,25`) → Estrella (`salesValue > 0 && margin ≥ 34 && gmroi ≥ 4`) → Margen (`salesValue > 0 && margin ≥ 36`) → Tractor (`salesValue > 0 && sales30 ≥ 40`) → Riesgo (resto). `growthPct = (sales30 − sales90/3) / (sales90/3)`. Cada rol trae una `reason` textual fija.
+- **GMROI** = `grossProfit × 12 / max(1, availableStock × cost)`; **Rotación** = `Σ(sales30 × cost) × 12 / inventoryValue`; **Cobertura ponderada** = `Σ(inventoryDays × sales30 × price) / salesValue`.
+- **Sobrestock (`overstockValue`):** suma de `availableStock × cost` de productos con `purchaseStatus === "overstock"` **o** `inventoryDays > 180` (el segundo criterio no estaba antes documentado). Existe además `noSalesStockValue` (venta 90d = 0 con stock) que se **calcula pero no se renderiza** en la vista actual.
+- **Salud — 6 dimensiones (fórmulas reales, todas acotadas a 0–100):**
+  - `venta = min(100, round(65 + faster.length × 5 − slower.length × 3))`
+  - `margen = clamp(round(marginPct × 2,4))`
+  - `inventario = clamp(100 − round((overstockValue / inventoryValue) × 120))`
+  - `disponibilidad = clamp(100 − (nº SKU con sales30>0 y (availableStock≤0 o coverage≤lead×2)) × 8)`
+  - `surtido = clamp(85 − nº Detenidos × 4)`
+  - `proveedores = clamp(90 − nº proveedores con status ≠ "active" × 10)`
+  - `score` = promedio redondeado de las 6; *Fortaleza* = dimensión de mayor valor, *Mayor problema* = de menor valor. El texto **"↑ +3 vs mes anterior"** está **hardcodeado**.
+- **Metas del mes (`story.goals`):** *Venta* = `round(salesValue × 1,18 / 500000) × 500000` (barra "buena" si `actual ≥ meta × 0,9`); *Margen* = `33` (buena si `≥ 33`); *Sobrestock* = `3.000.000` (barra invertida, buena si `≤ meta`); *Disponibilidad* = `96` (buena si `≥ 96`), donde disponibilidad = `SKU con venta>0 y stock>0 / SKU con venta>0 × 100`.
+- **Resumen ejecutivo — 8 `TrendKpi`** con Δ: Venta 30d (Δ`salesTrendPct` %), Margen (Δ pp), GMROI (Δ), Rotación (Δ), Cobertura (Δ días, `invert`), y **sin Δ**: Sobrestock, Quiebres (`{riskRows.length} SKU`), Inventario. El `TrendKpi` **oculta la flecha** si `|Δ| < 0,05`.
+- **Base "mes anterior":** `prevBasis(p) = max(0, (salesLast90Days − salesLast30Days) / 2)` — promedio de los dos meses previos derivado del maestro (no hay serie histórica real).
 
 ## Validaciones necesarias
 No aplica (vista de lectura, sin entradas).
@@ -531,8 +567,8 @@ Página con 4 tarjetas de ranking (`RankCard` + `BarList`) y una tabla `DataTabl
 
 ## Información que muestra
 - **Encabezado:** título "Categorías", descripción, `ScopeToggle` y ayuda contextual.
-- **Rankings (top 5 cada uno):** Categorías críticas (quiebres + riesgo), Mayor venta 30d, Peor margen, Mayor inventario inmovilizado.
-- **Tabla "Detalle por categoría":** Categoría (nombre + comprador), SKUs activos, Venta 30/90 días, Margen (ámbar si < 28%), Inventario valorizado, Quiebre/Riesgo/Sobre (badges rojo/ámbar/violeta), Rotación, Compra sugerida, Estado (`StatusBadge`), y acciones "Reposición" / "Surtido".
+- **Rankings (`RankCard` + `BarList`, top 5 cada uno) con título/subtítulo EXACTOS:** "Categorías críticas" / "Más quiebres + riesgo" (tono rojo, valor = `stockoutSkus + riskSkus`); "Mayor venta (30d)" / "Categorías top" (verde); "Peor margen" / "Margen promedio más bajo" (ámbar, orden por `averageMargin` asc); "Mayor inventario inmovilizado" / "Inventario valorizado" (violeta).
+- **Tabla "Detalle por categoría"** (`CardHeader` con descripción "Categorías de tu cartera" / "Todas las categorías del surtido"). Columnas: **Categoría** (nombre + `buyer`), **SKUs** (`activeSkus`), **Venta 30 / 90 días** (compacta), **Margen** (ámbar negrita si `< 28`), **Inventario** (compacto), **Quiebre / Riesgo / Sobre** (`Badge` rojo/ámbar/violeta con `stockoutSkus`/`riskSkus`/`overstockSkus`), **Rotación** (`{averageRotation}x`), **Compra sugerida** (`formatCurrency`), **Estado** (`StatusBadge kind="category"`), **Acción** (enlaces "Reposición" / "Surtido"). Encabezado con título "Categorías" y descripción "Salud comercial por categoría: venta, margen, quiebres y rotación."
 
 ## Secciones/bloques
 Encabezado con toggle y ayuda · Grilla de 4 rankings · Tabla de detalle.
@@ -904,3 +940,41 @@ Inicio (qué decidir hoy) → agregar productos en riesgo al **borrador de OC** 
 - **Margen por canal:** `mockChannelMargin`, `/margen-canal`.
 - **Optimización de surtido:** `catalogOptimization`, `/surtido-redundante`.
 - **Identidad y permisos:** `BuyerContext` (comprador activo), `RoleContext` (rol y alcance por defecto), `DataContext` (colección de productos en memoria), `ToastContext` (confirmaciones), autenticación (`RequireAuth`) a nivel de router.
+
+---
+
+## Verificación de cobertura
+
+### Pantallas / componentes cubiertos (contrastados con el código)
+| # | Pantalla | Archivo(s) fuente | Estado |
+|---|---|---|---|
+| 1 | Inicio (portada del día) | `MyPanelPage.tsx` (`isPortfolioView=false`), `myPanel/components.tsx`, `myPanel/types.ts` | Verificado y ampliado |
+| 2 | Mi cartera · Resumen | `MyPanelPage.tsx` (`portfolioFocus="resumen"`) | Verificado y ampliado |
+| 3 | Mi cartera · Productos clave | `MyPanelPage.tsx` + `PortfolioFocusWorkspace` (rama `productos-clave`) | Verificado y ampliado |
+| 4 | Mi cartera · Marcas | `PortfolioFocusWorkspace` (rama `marcas`) | Verificado |
+| 5 | Mi cartera · Proveedores | `PortfolioFocusWorkspace` (rama `proveedores`) | Verificado |
+| 6 | Mi cartera · Oportunidades | `PortfolioFocusWorkspace` (rama por defecto) | Verificado |
+| 7 | Categorías (listado) | `CategoriesPage.tsx` | Verificado y ampliado |
+| 8 | Categoría (detalle) | `CategoryDetailPage.tsx` | Verificado |
+| 9 | Productos / SKUs (listado) | `ProductsPage.tsx` | Verificado |
+| 10 | Producto (detalle) | `ProductDetailPage.tsx`, `productDetail/components.tsx` | Verificado |
+
+- **No existen modales ni drawers** en ninguna de las 10 pantallas. La segmentación se hace por **ruta** (focos de cartera), por **pestañas** (`Tabs` con estado local en Categoría y Producto), por **chips** de estado local (agenda de Inicio) y por `ScopeToggle` / `FilterBar` (Categorías, Productos). No hay formularios de captura: la única mutación de datos es **"Agregar a OC"** (borrador), presente en Inicio (tabla de riesgo), Categoría · Reposición y Producto (encabezado + `DecisionBanner`).
+
+### Qué se amplió respecto de la versión previa
+- **Agenda de Inicio:** se añadió la **tabla completa de constantes de prioridad** (1000 / 900−cobertura / 880+atraso / 830 / 780 / 760 / 620 / 560 / 520 / 470 / 390), condiciones de inclusión por fuente, `impactValue`, `tone`, `urgency` textual exacta y destinos `to`. Se documentó que *Impacto* suma solo los **7 primeros** ítems y que el `kind` **`Catálogo`** está declarado pero no se usa.
+- **Umbrales reales de `salesPace`:** `expected30 ≥ 8`, aceleración `≥ +15%`, frenado `≤ −15%` con stock.
+- **Columnas exactas** de la tabla "Mis productos en riesgo de quiebre" y de la tabla "Detalle por categoría", con colores/condiciones.
+- **Mi cartera:** fórmulas **exactas** de las 6 dimensiones de Salud, de las 4 Metas del mes (incluido el umbral `× 0,9` de la barra de Venta) y de los 8 `TrendKpi` (cuáles llevan Δ y cuáles no; ocultación de Δ si `|Δ| < 0,05`).
+- **Sobrestock ampliado:** `overstockValue` incluye también `inventoryDays > 180` (antes solo `purchaseStatus === "overstock"`).
+- **Etiquetas textuales literales** de botones y tarjetas ("Borrador OC activo", "Sin prioridad crítica", "Ver reposición", subtítulos de `RankCard`, etc.).
+
+### Gaps / hallazgos e inconsistencias detectadas
+- **Umbral de "costo sin actualizar" divergente:** Inicio → "Calidad de cartera" usa `addDaysISO(TODAY, −90)` (**dinámico**, 90 días reales); Productos → toggle "Sin costo actualizado" usa la constante **fija** `"2026-04-01"`. Mismo concepto, dos umbrales distintos — **definición pendiente**.
+- **Roles de producto con dos definiciones:** en Mi cartera (`portfolioInsights`) el rol *Margen* usa `margin ≥ 36` y existe *Estrella*; en Categoría (detalle) *Margen* usa `margin ≥ 34` y **no** hay *Estrella*. Criterios a unificar.
+- **Enlace "Proveedores por revisar" genérico:** en Inicio y en la tarjeta de agenda de proveedor, el destino es `/proveedores` (sin `id`), no la ficha del proveedor concreto.
+- **Botón "Ver decisiones" en Mi cartera** navega a `/` (Inicio), no a `/comprar/decisiones` — posible inconsistencia etiqueta/destino.
+- **`noSalesStockValue`** (venta 90d = 0 con stock) se calcula en `portfolio` pero **no se renderiza** en ninguna vista.
+- **Sin `EmptyState` propio** en las pestañas "Productos clave" y "Marcas" del detalle de categoría, ni en las listas de Productos clave/Marcas/Proveedores de Mi cartera (quedarían vacías silenciosamente si no hay datos).
+- **"↑ +3 vs mes anterior"** (Salud) es un literal **hardcodeado**, sin cálculo real.
+- **Sin estados de carga/error de datos** en ninguna pantalla (mock síncrono); el único `Suspense`/`PageLoader` es del router para la carga diferida del bundle.
