@@ -164,7 +164,8 @@ export function DataTable<T>({
                         type="button"
                         onClick={() => onSortChange!(col.key)}
                         className={cn(
-                          "inline-flex items-center gap-1 select-none hover:text-slate-700 uppercase tracking-wide",
+                          "inline-flex items-center gap-1 select-none rounded hover:text-slate-700 uppercase tracking-wide",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300",
                           col.align === "right" && "flex-row-reverse"
                         )}
                       >

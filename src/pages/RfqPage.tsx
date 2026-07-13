@@ -520,9 +520,15 @@ function LineComparison({ line, responses }: { line: RfqLine; responses: RfqResp
                   </td>
                   <td className="px-3 py-2 text-center">
                     {r.disponible ? (
-                      <IconCheck className="w-4 h-4 text-emerald-500 inline" />
+                      <>
+                        <IconCheck className="w-4 h-4 text-emerald-500 inline" aria-hidden="true" />
+                        <span className="sr-only">Disponible</span>
+                      </>
                     ) : (
-                      <IconClose className="w-4 h-4 text-rose-400 inline" />
+                      <>
+                        <IconClose className="w-4 h-4 text-rose-400 inline" aria-hidden="true" />
+                        <span className="sr-only">No disponible</span>
+                      </>
                     )}
                   </td>
                 </tr>

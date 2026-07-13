@@ -3,8 +3,9 @@ import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
 import { BottomSheet } from "../ui/BottomSheet";
 import { Button } from "../ui/Button";
+import { Chip, RemovableChip } from "../ui/Chip";
 import { DateRangePicker } from "../ui/DateRangePicker";
-import { IconSearch, IconClose } from "../ui/icons";
+import { IconSearch } from "../ui/icons";
 import { cn } from "../../utils/cn";
 import { formatRangeLabel, type IsoRange } from "../../utils/dateRange";
 
@@ -132,6 +133,7 @@ export function FilterBar({
               onClick={() => setShowAdvanced((v) => !v)}
               className={cn(
                 "whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300",
                 showAdvanced || activeAdvanced > 0
                   ? "border-brand-300 bg-brand-50 text-brand-700"
                   : "border-slate-300 text-slate-600 hover:bg-slate-50"
@@ -179,17 +181,17 @@ export function FilterBar({
         {(dateActive || activeSelects.length > 0 || activeToggles.length > 0) && (
           <div className="flex items-center gap-2 flex-wrap border-t border-slate-100 pt-2.5">
             {dateActive && dateRange && (
-              <ActiveChip onRemove={clearDate}>{formatRangeLabel(dateRange.value)}</ActiveChip>
+              <RemovableChip onRemove={clearDate}>{formatRangeLabel(dateRange.value)}</RemovableChip>
             )}
             {activeSelects.map((s) => (
-              <ActiveChip key={s.key} onRemove={() => s.onChange("")}>
+              <RemovableChip key={s.key} onRemove={() => s.onChange("")}>
                 {s.placeholder}: {optionLabel(s)}
-              </ActiveChip>
+              </RemovableChip>
             ))}
             {activeToggles.map((t) => (
-              <ActiveChip key={t.key} onRemove={t.onToggle}>
+              <RemovableChip key={t.key} onRemove={t.onToggle}>
                 {t.label}
-              </ActiveChip>
+              </RemovableChip>
             ))}
           </div>
         )}
@@ -200,7 +202,7 @@ export function FilterBar({
           {activeCount > 0 && onClear && (
             <button
               onClick={onClear}
-              className="text-xs font-medium text-slate-500 hover:text-rose-600"
+              className="rounded text-xs font-medium text-slate-500 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
             >
               Limpiar filtros
             </button>
@@ -237,6 +239,7 @@ export function FilterBar({
               onClick={() => setSheetOpen(true)}
               className={cn(
                 "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium flex-shrink-0",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300",
                 activeFiltersOnly > 0
                   ? "border-brand-300 bg-brand-50 text-brand-700"
                   : "border-slate-300 text-slate-600"
@@ -256,17 +259,17 @@ export function FilterBar({
         {(dateActive || activeSelects.length > 0 || activeToggles.length > 0) && (
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5">
             {dateActive && dateRange && (
-              <ActiveChip onRemove={clearDate}>{formatRangeLabel(dateRange.value)}</ActiveChip>
+              <RemovableChip onRemove={clearDate}>{formatRangeLabel(dateRange.value)}</RemovableChip>
             )}
             {activeSelects.map((s) => (
-              <ActiveChip key={s.key} onRemove={() => s.onChange("")}>
+              <RemovableChip key={s.key} onRemove={() => s.onChange("")}>
                 {s.placeholder}: {optionLabel(s)}
-              </ActiveChip>
+              </RemovableChip>
             ))}
             {activeToggles.map((t) => (
-              <ActiveChip key={t.key} onRemove={t.onToggle}>
+              <RemovableChip key={t.key} onRemove={t.onToggle}>
                 {t.label}
-              </ActiveChip>
+              </RemovableChip>
             ))}
             {activeFiltersOnly > 1 && onClear && (
               <button
@@ -332,44 +335,3 @@ export function FilterBar({
   );
 }
 
-function Chip({
-  active,
-  onClick,
-  children,
-  nowrap,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  nowrap?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "rounded-full px-3 py-1.5 text-xs font-medium border transition-colors",
-        nowrap && "whitespace-nowrap flex-shrink-0",
-        active
-          ? "bg-brand-600 text-white border-brand-600"
-          : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ActiveChip({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
-  return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap flex-shrink-0 rounded-full bg-brand-50 border border-brand-200 text-brand-700 pl-2.5 pr-1.5 py-1 text-xs font-medium">
-      {children}
-      <button
-        onClick={onRemove}
-        className="rounded-full hover:bg-brand-100 p-0.5"
-        aria-label="Quitar filtro"
-      >
-        <IconClose className="w-3 h-3" />
-      </button>
-    </span>
-  );
-}

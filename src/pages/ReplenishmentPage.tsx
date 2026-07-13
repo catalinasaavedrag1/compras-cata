@@ -923,25 +923,25 @@ export function ReplenishmentPage() {
               setFoco("urgent");
               setViewMode("supplier");
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-1.5 text-sm font-medium"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             Revisar por proveedor
           </button>
           <button
             onClick={addSelectedToOc}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-1.5 text-sm font-medium"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <IconPlus className="w-4 h-4" /> Crear borradores ({selectedSupplierCount})
           </button>
           <button
             onClick={ignoreSelected}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-1.5 text-sm font-medium"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             Ignorar
           </button>
           <button
             onClick={() => setSelected([])}
-            className="inline-flex items-center gap-1 rounded-lg hover:bg-white/15 px-2 py-1.5 text-sm"
+            className="inline-flex items-center gap-1 rounded-lg hover:bg-white/15 px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             aria-label="Limpiar selección"
           >
             <IconClose className="w-4 h-4" />
