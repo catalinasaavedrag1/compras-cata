@@ -22,8 +22,6 @@ export interface IsoRange {
   to: string;
 }
 
-export const EMPTY_RANGE: IsoRange = { from: "", to: "" };
-
 /** "2026-06-30" -> Date local (medianoche local), sin corrimiento por zona horaria. */
 export function isoToDate(iso: string): Date | undefined {
   if (!iso) return undefined;

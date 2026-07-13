@@ -43,24 +43,6 @@ export const recommendationMeaning: Record<RecommendationStatus, StateMeaning> =
   },
 };
 
-export const priorityMeaning: Record<Priority, StateMeaning> = {
-  high: {
-    label: "Alta",
-    description: "Atender hoy. Impacto directo en venta o quiebre inminente.",
-    tone: "red",
-  },
-  medium: {
-    label: "Media",
-    description: "Atender esta semana. Riesgo moderado.",
-    tone: "amber",
-  },
-  low: {
-    label: "Baja",
-    description: "Puede esperar. Sin riesgo relevante en el corto plazo.",
-    tone: "neutral",
-  },
-};
-
 /** Orden de urgencia para ordenar tablas (menor = más urgente). */
 export const recommendationUrgency: Record<RecommendationStatus, number> = {
   critical: 0,

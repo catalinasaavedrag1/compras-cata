@@ -56,12 +56,6 @@ export interface NavModule {
   children: NavItem[];
 }
 
-// Compatibilidad con consumidores que esperan grupos {title, items}.
-export interface NavGroup {
-  title: string;
-  items: NavItem[];
-}
-
 // ----------------------------------------------------------------------------
 //  Módulos del Comprador (barra superior · sub-pestañas)
 // ----------------------------------------------------------------------------
@@ -459,16 +453,8 @@ export function activeModuleFor(modules: NavModule[], pathname: string): NavModu
 }
 
 // ----------------------------------------------------------------------------
-//  Compatibilidad: grupos {title, items} para el menú móvil y lista plana.
+//  Lista plana de todas las vistas (para títulos de ruta, recientes, etc.).
 // ----------------------------------------------------------------------------
-export function navGroupsFor(role: Role): NavGroup[] {
-  return modulesFor(role).map((m) => ({ title: m.label, items: m.children }));
-}
-
-/** Rutas que son exclusivas del líder (cross-comprador). Un comprador no entra. */
-export const LEADER_ONLY_PREFIXES = ["/equipo"];
-
-/** Lista plana de todas las vistas (para títulos de ruta, recientes, etc.). */
 export const navItems: NavItem[] = [...compradorModules, ...liderExtraModules]
   .flatMap((m) => m.children)
   .filter((item, i, arr) => arr.findIndex((x) => x.to === item.to) === i);

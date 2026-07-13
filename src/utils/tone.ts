@@ -26,6 +26,13 @@ export const DOT_TONE: Record<string, string> = {
   slate: "bg-slate-500",
 };
 
+/** Texto de valor por semáforo: métricas con umbral (bien / atención / mal). */
+export const VALUE_TONE: Record<"good" | "warn" | "bad", string> = {
+  good: "text-emerald-600",
+  warn: "text-amber-600",
+  bad: "text-rose-600",
+};
+
 /** Fondo/tono claro (bg-50) para chips e íconos de canal de campaña. */
 export const CHANNEL_BG: Record<string, string> = {
   violet: "bg-violet-50 text-violet-700",

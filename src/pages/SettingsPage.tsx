@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { VALUE_TONE } from "../utils/tone";
 import { supplierPath, categoryPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
@@ -734,8 +735,7 @@ function RuleEditDrawer({
 }
 
 function Row({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
-  const cls =
-    tone === "bad" ? "text-rose-600" : tone === "good" ? "text-emerald-600" : "text-slate-800";
+  const cls = tone ? VALUE_TONE[tone] : "text-slate-800";
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-slate-500">{label}</span>
