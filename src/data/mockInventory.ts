@@ -7,7 +7,6 @@ export interface InventoryKpis {
   deadStockValue: number;
   slowStockValue: number;
   overstockValue: number;
-  stockoutSkus: number;
   averageInventoryDays: number;
 }
 
@@ -18,7 +17,6 @@ export const inventoryKpis: InventoryKpis = {
   deadStockValue: 12800000,
   slowStockValue: 41700000,
   overstockValue: 58300000,
-  stockoutSkus: 18,
   averageInventoryDays: 62,
 };
 
