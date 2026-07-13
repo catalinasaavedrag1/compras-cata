@@ -72,3 +72,8 @@ export function productLabel(name: string | undefined, sku: string | undefined):
   if (name && sku) return `${name} - ${sku}`;
   return name || sku || "—";
 }
+
+/** Primera letra en mayúscula. */
+export function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
