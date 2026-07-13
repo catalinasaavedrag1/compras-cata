@@ -8,6 +8,7 @@ import {
   resolvePickupLines,
   planPickup,
   comparePickupScenarios,
+  truckEconomics,
   type PickupLineInput,
   type PickupPlan,
   type TruckLoad,
@@ -149,10 +150,119 @@ export function LogisticsInlineSummary({ plan }: { plan: PickupPlan }) {
 }
 
 // ----------------------------------------------------------------------------
+//  Optimizador de camión — el 3D + la decisión de compra (flete)
+// ----------------------------------------------------------------------------
+
+const VERDICT_STYLE = {
+  good: { box: "border-emerald-200 bg-emerald-50", text: "text-emerald-800", Icon: IconInfo, iconColor: "text-emerald-500" },
+  tip: { box: "border-brand-100 bg-brand-50/80", text: "text-brand-900", Icon: IconBulb, iconColor: "text-brand-500" },
+  warn: { box: "border-amber-200 bg-amber-50", text: "text-amber-900", Icon: IconAlerts, iconColor: "text-amber-500" },
+} as const;
+
+function FreightStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-2.5 py-1.5">
+      <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-sm font-semibold text-slate-800">{value}</p>
+      {sub && <p className="text-[11px] font-medium text-emerald-600">{sub}</p>}
+    </div>
+  );
+}
+
+/**
+ * Convierte el plan de retiro en una decisión de compra: muestra el camión que
+ * se llena y, sobre todo, cuánto flete se está aprovechando, cuánto más cabe
+ * "gratis" y qué conviene hacer. El flete se cobra por camión completo, así que
+ * llenar el camión que ya se paga baja el costo por unidad.
+ */
+export function TruckOptimizer({ plan }: { plan: PickupPlan }) {
+  const eco = truckEconomics(plan);
+  if (!eco || plan.truckCount === 0) return null;
+  const last = plan.trucks[plan.trucks.length - 1];
+  const v = VERDICT_STYLE[eco.verdict.tone];
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,190px)_1fr]">
+        <TruckLoad3D
+          fillPct={eco.lastFillPct}
+          height={158}
+          caption={
+            plan.truckCount > 1
+              ? `Camión que se está llenando (${plan.truckCount} en total)`
+              : undefined
+          }
+        />
+        <div className="space-y-2.5">
+          {/* Qué dimensión limita el camión */}
+          <div className="space-y-2">
+            <CapacityBar
+              label={eco.limitedBy === "peso" ? "Peso (te limita)" : "Peso"}
+              pct={last.weightPct}
+              detail={`${formatNumber(last.weightKg)} / ${formatNumber(last.capacityKg)} kg`}
+            />
+            <CapacityBar
+              label={eco.limitedBy === "volumen" ? "Volumen (te limita)" : "Volumen"}
+              pct={last.volumePct}
+              detail={`${formatNumber(last.volumeM3)} / ${formatNumber(last.capacityM3)} m³`}
+            />
+          </div>
+          {/* Economía del flete */}
+          <div className="grid grid-cols-3 gap-2">
+            <FreightStat label="Flete camión" value={formatCurrencyCompact(eco.committedFreight)} />
+            <FreightStat
+              label="Flete / unidad"
+              value={formatCurrency(eco.costPerUnitNow)}
+              sub={
+                eco.savingPerUnit > 0
+                  ? `→ ${formatCurrency(eco.costPerUnitIfFilled)} si llenas`
+                  : undefined
+              }
+            />
+            <FreightStat
+              label="Cabe aún"
+              value={`~${formatNumber(eco.headroomUnits)} u.`}
+              sub={`${formatNumber(eco.headroomKg)} kg`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Veredicto accionable */}
+      <div className={cn("flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm", v.box, v.text)}>
+        <v.Icon className={cn("mt-0.5 h-4 w-4 flex-shrink-0", v.iconColor)} />
+        <div>
+          <p className="font-semibold">{eco.verdict.label}</p>
+          <p className="mt-0.5 leading-snug">{eco.verdict.message}</p>
+        </div>
+      </div>
+
+      {/* Qué agregar para llenar sin pasarte */}
+      {eco.lastFillPct < 85 && (
+        <p className="flex items-start gap-1.5 text-[11px] text-slate-500">
+          <IconInfo className="mt-0.5 h-3 w-3 flex-shrink-0 text-slate-400" />
+          {eco.bindingHint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
 //  Nivel 2 — Detalle por vehículo
 // ----------------------------------------------------------------------------
 
 export function TruckLoadCard({ truck }: { truck: TruckLoad }) {
+  const units = truck.items.reduce((a, it) => a + it.units, 0);
+  const remKg = Math.max(0, truck.capacityKg - truck.weightKg);
+  const remM3 = Math.max(0, truck.capacityM3 - truck.volumeM3);
+  const avgKg = units > 0 ? truck.weightKg / units : 0;
+  const avgM3 = units > 0 ? truck.volumeM3 / units : 0;
+  const fitMore = Math.max(
+    0,
+    Math.floor(Math.min(avgKg > 0 ? remKg / avgKg : Infinity, avgM3 > 0 ? remM3 / avgM3 : Infinity))
+  );
+  const fillPct = Math.max(truck.weightPct, truck.volumePct);
   return (
     <div className="rounded-xl border border-slate-200 overflow-hidden">
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
@@ -204,6 +314,14 @@ export function TruckLoadCard({ truck }: { truck: TruckLoad }) {
       </div>
       <p className="bg-slate-50/70 px-3 py-1.5 text-[11px] text-slate-400">
         Se llena antes por <b className="text-slate-600">{truck.limitedBy}</b>.
+        {fillPct < 95 && fitMore > 0 && (
+          <>
+            {" "}
+            Espacio libre: <b className="text-slate-600">{formatNumber(remKg)} kg</b> ·{" "}
+            <b className="text-slate-600">{remM3} m³</b> · cabe ~
+            <b className="text-slate-600">{formatNumber(fitMore)} u.</b> más sin sumar flete.
+          </>
+        )}
       </p>
     </div>
   );
