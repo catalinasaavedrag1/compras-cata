@@ -141,7 +141,7 @@ export function InventoryAnalysisPage() {
         />
         <KpiCard
           title="SKUs con quiebre"
-          value={formatNumber(inventoryKpis.stockoutSkus)}
+          value={formatNumber(criticalStock.length)}
           tone="bad"
           icon={<IconAlerts className="w-4 h-4" />}
           description="Ver sin stock"
