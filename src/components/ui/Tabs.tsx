@@ -16,6 +16,7 @@ interface TabsProps {
 export function Tabs({ tabs, value, onChange, className }: TabsProps) {
   return (
     <div
+      role="tablist"
       className={cn("flex gap-1 border-b border-slate-200 overflow-x-auto no-scrollbar", className)}
     >
       {tabs.map((tab) => {
@@ -23,9 +24,12 @@ export function Tabs({ tabs, value, onChange, className }: TabsProps) {
         return (
           <button
             key={tab.value}
+            role="tab"
+            aria-selected={active}
             onClick={() => onChange(tab.value)}
             className={cn(
-              "relative px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+              "relative rounded-t-lg px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300",
               active ? "text-brand-700" : "text-slate-500 hover:text-slate-700"
             )}
           >
