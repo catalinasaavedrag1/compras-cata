@@ -3,6 +3,8 @@
 Documentación funcional **exhaustiva** del sistema, realizada **únicamente a partir del frontend existente** (React + TypeScript, en español). El producto es una plataforma de gestión de compras para un retailer chileno de mejoramiento del hogar (ferretería / construcción).
 
 > **Alcance y método.** Este levantamiento describe *qué hace* cada pantalla observando el código del frontend: componentes, textos, estados, handlers, filtros, navegación y formularios. **No** incluye backend, APIs ni base de datos. Los datos son *mock* deterministas cargados en memoria; por eso varios estados (cargando, error de red) no existen en la práctica y se marcan como tales. Donde el comportamiento no puede deducirse con certeza, se marca explícitamente como **Suposición** o **Definición pendiente**.
+>
+> **Profundidad y verificación.** Cada documento de módulo documenta cada pantalla con 18 campos (objetivo, usuario, secciones, filtros, acciones, controles, formularios y sus campos, estados, navegación, flujo, reglas de negocio, validaciones, permisos y dudas) usando **etiquetas, columnas, KPIs y umbrales/constantes reales** del código, y cierra con una sección **"Verificación de cobertura"** que contrasta 1:1 lo documentado contra el código y lista los hallazgos y definiciones pendientes.
 
 ## Cómo está organizada la documentación
 
