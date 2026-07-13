@@ -17,6 +17,15 @@ import {
 import type { PurchaseRecommendation } from "../../types/purchasing";
 import type { DecisionGroup, DecisionViewMode, OpenPoSignal } from "./types";
 import { decisionTypeLabel, purchaseMultiple, salesTrendPct } from "./helpers";
+import { buildRecommendationReasoning } from "../../utils/recommendationReasoning";
+import { buildBuyingAlerts, type BuyingAlert } from "../../utils/buyingAlerts";
+import {
+  skuProfileOf,
+  ABC_LABEL,
+  ABC_DESCRIPTION,
+  XYZ_LABEL,
+  XYZ_DESCRIPTION,
+} from "../../utils/skuProfile";
 
 // ============================================================================
 //  Componentes de la vista de Reposición: agrupación, tarjetas, drawer de
@@ -280,6 +289,19 @@ export function RecommendationDecisionDrawer({
   );
   const supplierOptions = buildSupplierComparison(rec, safeQty);
 
+  // Razonamiento de la cantidad recomendada (anclado a la sugerencia, no a la
+  // simulación) y alertas inteligentes de la cantidad que se agregará ahora.
+  const reasoning = buildRecommendationReasoning(rec, effectiveIncomingQty);
+  const alerts = buildBuyingAlerts({
+    sku: rec.sku,
+    supplierName: rec.supplierName,
+    quantity: safeQty,
+    availableStock: rec.availableStock,
+    incoming: effectiveIncomingQty,
+    salesLast30Days: rec.salesLast30Days,
+    openPo,
+  });
+
   return (
     <Drawer
       open={!!rec}
@@ -322,9 +344,8 @@ export function RecommendationDecisionDrawer({
           <h3 className="mt-1 text-lg font-semibold text-slate-900">
             {decisionTypeLabel(rec)} · {formatNumber(rec.suggestedQuantity)} unidades
           </h3>
-          <p className="mt-1 text-sm text-slate-600">
-            Equilibra riesgo de quiebre, cobertura objetivo y capital requerido.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">{reasoning.summary}</p>
+          <SkuProfileChips rec={rec} />
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div className="rounded-lg bg-white/70 px-3 py-2 text-sm">
               <p className="text-xs text-slate-500">Venta perdida en riesgo</p>
@@ -336,6 +357,8 @@ export function RecommendationDecisionDrawer({
             </div>
           </div>
         </section>
+
+        {alerts.length > 0 && <BuyingAlertsStrip alerts={alerts} />}
 
         <section>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Situación</p>
@@ -485,37 +508,7 @@ export function RecommendationDecisionDrawer({
           </div>
         </section>
 
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-            Por qué {formatNumber(rec.suggestedQuantity)} u.
-          </p>
-          <ul className="mt-2 space-y-1 text-sm text-slate-700">
-            <li>✓ Cubre el lead time de {formatDays(rec.supplierLeadTimeDays)}.</li>
-            <li>
-              ✓{" "}
-              {projectedCoverage <= 60
-                ? "Deja la cobertura dentro del objetivo 45-60 días."
-                : `Compra sola queda cerca del objetivo; con OC en curso proyecta ${formatDays(
-                    projectedCoverage
-                  )}.`}
-            </li>
-            <li>
-              ✓{" "}
-              {projectedCoverage <= 60
-                ? "Mantiene riesgo de sobrestock bajo frente a venta reciente."
-                : "Conviene validar si se espera la OC abierta o se reduce la cantidad."}
-            </li>
-            <li>✓ Requiere {formatCurrencyCompact(rec.suggestedPurchaseAmount)} de capital.</li>
-          </ul>
-          <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
-            <p>
-              <b>Por qué no menos:</b> menor colchón ante una aceleración de venta.
-            </p>
-            <p>
-              <b>Por qué no más:</b> aumenta capital inmovilizado y baja retorno de inventario.
-            </p>
-          </div>
-        </section>
+        <ReasoningSection reasoning={reasoning} capital={rec.suggestedPurchaseAmount} />
 
         <section className="rounded-xl border border-slate-200 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Demanda</p>
@@ -594,6 +587,173 @@ export function RecommendationDecisionDrawer({
         </Button>
       </div>
     </Drawer>
+  );
+}
+
+/** Chips de perfil del SKU: clase ABC, XYZ, rotación y rentabilidad. */
+function SkuProfileChips({ rec }: { rec: PurchaseRecommendation }) {
+  const profile = skuProfileOf(rec.sku);
+  const velocity =
+    rec.salesLast30Days >= 60
+      ? "Vende a diario"
+      : rec.salesLast30Days >= 12
+        ? "Vende cada semana"
+        : rec.salesLast30Days > 0
+          ? "Venta esporádica"
+          : "Sin venta reciente";
+  const marginTone = rec.margin >= 30 ? "green" : rec.margin >= 20 ? "amber" : "red";
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {profile && (
+        <span
+          title={ABC_DESCRIPTION[profile.abc]}
+          className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700"
+        >
+          {ABC_LABEL[profile.abc]} · {Math.round(profile.abcShare * 100)}% venta
+        </span>
+      )}
+      {profile && (
+        <span
+          title={XYZ_DESCRIPTION[profile.xyz]}
+          className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+        >
+          {profile.xyz} · {XYZ_LABEL[profile.xyz]}
+        </span>
+      )}
+      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+        {velocity}
+      </span>
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+          marginTone === "green"
+            ? "bg-emerald-50 text-emerald-700"
+            : marginTone === "amber"
+              ? "bg-amber-50 text-amber-700"
+              : "bg-rose-50 text-rose-700"
+        )}
+      >
+        Margen {formatPercent(rec.margin, 0)}
+      </span>
+    </div>
+  );
+}
+
+const ALERT_STYLE: Record<BuyingAlert["tone"], { box: string; dot: string; title: string }> = {
+  bad: { box: "border-rose-200 bg-rose-50", dot: "bg-rose-500", title: "text-rose-800" },
+  warn: { box: "border-amber-200 bg-amber-50", dot: "bg-amber-500", title: "text-amber-800" },
+  info: { box: "border-brand-200 bg-brand-50", dot: "bg-brand-500", title: "text-brand-800" },
+};
+
+/** Tira de alertas inteligentes sobre la decisión de compra. */
+function BuyingAlertsStrip({ alerts }: { alerts: BuyingAlert[] }) {
+  return (
+    <section>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Alertas ({alerts.length})
+      </p>
+      <div className="mt-2 space-y-2">
+        {alerts.map((alert) => {
+          const style = ALERT_STYLE[alert.tone];
+          return (
+            <div key={alert.id} className={cn("flex gap-2.5 rounded-lg border p-3", style.box)}>
+              <span className={cn("mt-1.5 h-2 w-2 flex-shrink-0 rounded-full", style.dot)} />
+              <div>
+                <p className={cn("text-sm font-semibold", style.title)}>{alert.title}</p>
+                {alert.detail && <p className="mt-0.5 text-xs text-slate-600">{alert.detail}</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Desglose "por qué N unidades": factores que suman la cantidad recomendada. */
+function ReasoningSection({
+  reasoning,
+  capital,
+}: {
+  reasoning: ReturnType<typeof buildRecommendationReasoning>;
+  capital: number;
+}) {
+  return (
+    <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+        Por qué {formatNumber(reasoning.suggested)} u.
+      </p>
+
+      <p className="mt-2 text-xs font-medium text-slate-500">Cuánto necesitas tener</p>
+      <ul className="mt-1 space-y-1">
+        {reasoning.needFactors.map((f) => (
+          <ReasoningRow key={f.key} label={f.label} detail={f.detail} sign={f.sign} units={f.units} />
+        ))}
+        <li className="flex items-baseline justify-between border-t border-emerald-200 pt-1.5 text-sm">
+          <span className="font-semibold text-slate-800">
+            Necesitas ≈ {formatNumber(reasoning.needUnits)} u.
+          </span>
+          <span className="text-xs text-slate-500">
+            ~{formatDays(Math.round(reasoning.projectedCoverageDays))} de cobertura
+          </span>
+        </li>
+      </ul>
+
+      <p className="mt-3 text-xs font-medium text-slate-500">Con qué ya cuentas</p>
+      <ul className="mt-1 space-y-1">
+        {reasoning.haveFactors.map((f) => (
+          <ReasoningRow key={f.key} label={f.label} detail={f.detail} sign={f.sign} units={f.units} />
+        ))}
+        <li className="flex items-baseline justify-between border-t border-emerald-300 pt-1.5">
+          <span className="text-base font-semibold text-emerald-800">
+            = Comprar {formatNumber(reasoning.suggested)} u.
+          </span>
+          <span className="text-xs text-slate-500">{formatCurrencyCompact(capital)}</span>
+        </li>
+      </ul>
+
+      {reasoning.promo && (
+        <div className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-xs text-slate-600">
+          <b className="text-slate-800">Promoción «{reasoning.promo.name}»</b> en{" "}
+          {formatDays(reasoning.promo.daysTo)}: +{formatPercent(reasoning.promo.upliftPct, 0)} de
+          demanda esperada, ya considerada en la cobertura objetivo.
+        </div>
+      )}
+
+      <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
+        <p>
+          <b>Por qué no menos:</b> menor colchón ante una aceleración de venta.
+        </p>
+        <p>
+          <b>Por qué no más:</b> aumenta capital inmovilizado y baja retorno de inventario.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ReasoningRow({
+  label,
+  detail,
+  sign,
+  units,
+}: {
+  label: string;
+  detail: string;
+  sign: "+" | "−";
+  units: number;
+}) {
+  return (
+    <li className="flex items-baseline justify-between gap-3 text-sm">
+      <span className="flex items-baseline gap-1.5">
+        <span className={cn("font-semibold", sign === "+" ? "text-emerald-600" : "text-slate-400")}>
+          {sign}
+        </span>
+        <span className="text-slate-700">{label}</span>
+        <span className="text-xs text-slate-400">· {detail}</span>
+      </span>
+      <span className="flex-shrink-0 font-medium text-slate-800">{formatNumber(units)} u.</span>
+    </li>
   );
 }
 
