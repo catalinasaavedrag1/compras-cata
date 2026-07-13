@@ -358,6 +358,105 @@ export function planPickup(parcels: PickupParcel[], opts: PlanOptions = {}): Pic
 }
 
 // ----------------------------------------------------------------------------
+//  Economía del flete — convierte el plan en decisión de compra
+//  ---------------------------------------------------------------------------
+//  El flete se cobra por camión completo, lo llenes o no. Entonces la palanca
+//  real al comprar es: aprovechar el camión que YA se paga (agregar carga que
+//  entra sin sumar flete) y no cruzar el umbral que dispara un camión extra.
+// ----------------------------------------------------------------------------
+
+export interface TruckEconomics {
+  truckCount: number;
+  committedFreight: number; // flete ya comprometido (todos los camiones)
+  costPerUnitNow: number; // flete por unidad hoy
+  costPerUnitIfFilled: number; // flete por unidad si se llena el camión marginal
+  savingPerUnit: number; // cuánto baja el flete/u. al llenar
+  // Camión marginal (el último, el que se está llenando):
+  lastFillPct: number; // ocupación de la dimensión que limita (0-100+)
+  limitedBy: "peso" | "volumen";
+  headroomUnits: number; // ~unidades más que caben sin abrir otro camión
+  headroomKg: number;
+  headroomM3: number;
+  nextTruckCost: number; // costo de flete si se abre otro camión
+  verdict: {
+    tone: "good" | "tip" | "warn";
+    label: string;
+    message: string;
+  };
+  bindingHint: string;
+}
+
+export function truckEconomics(plan: PickupPlan): TruckEconomics | null {
+  const { trucks, totalWeightKg, totalVolumeM3, estimatedCost } = plan;
+  if (trucks.length === 0) return null;
+  const totalUnits = plan.parcels.reduce((a, p) => a + p.quantity, 0);
+  if (totalUnits === 0) return null;
+
+  const last = trucks[trucks.length - 1];
+  const avgUnitKg = totalWeightKg / totalUnits;
+  const avgUnitM3 = totalVolumeM3 / totalUnits;
+  const remKg = Math.max(0, last.capacityKg - last.weightKg);
+  const remM3 = Math.max(0, last.capacityM3 - last.volumeM3);
+  const byKg = avgUnitKg > 0 ? remKg / avgUnitKg : Infinity;
+  const byM3 = avgUnitM3 > 0 ? remM3 / avgUnitM3 : Infinity;
+  const headroomUnits = Math.max(0, Math.floor(Math.min(byKg, byM3)));
+
+  const costPerUnitNow = plan.costPerUnit;
+  const costPerUnitIfFilled =
+    headroomUnits > 0 ? Math.round(estimatedCost / (totalUnits + headroomUnits)) : costPerUnitNow;
+  const savingPerUnit = Math.max(0, costPerUnitNow - costPerUnitIfFilled);
+  const nextTruckCost = TRUCKS[last.vehicle].baseCost;
+  const lastFillPct = Math.max(last.weightPct, last.volumePct);
+
+  const bindingHint =
+    last.limitedBy === "peso"
+      ? "Te limita el peso: para llenar sin pasarte, suma productos livianos y voluminosos (aislación, tubos, planchas)."
+      : "Te limita el volumen: para llenar el camión, suma productos densos y compactos (fierro, cemento, adhesivos).";
+
+  let verdict: TruckEconomics["verdict"];
+  if (lastFillPct >= 85) {
+    verdict = {
+      tone: "good",
+      label: "Camión bien aprovechado",
+      message:
+        "Usas casi toda la capacidad del camión. El flete por unidad es el mejor posible para este envío: no estás pagando viajes a medio llenar.",
+    };
+  } else if (trucks.length === 1) {
+    verdict = {
+      tone: "tip",
+      label: "Aprovecha el camión que ya pagas",
+      message: `El flete de este camión (${formatCLP(estimatedCost)}) ya está comprometido, vaya lleno o no. Caben ~${headroomUnits} u. más sin sumar flete: aprovecha el viaje para adelantar compra y bajar el flete de ${formatCLP(costPerUnitNow)} a ~${formatCLP(costPerUnitIfFilled)} por unidad.`,
+    };
+  } else {
+    verdict = {
+      tone: "warn",
+      label: `El ${trucks.length}° camión va al ${lastFillPct}%`,
+      message: `Ese camión cuesta ${formatCLP(nextTruckCost)} de flete pero va a medio llenar. Conviene decidir: súbele ~${headroomUnits} u. más para aprovecharlo, o baja del pedido lo que sobró para que todo entre en ${trucks.length - 1} camión${trucks.length - 1 === 1 ? "" : "es"} y ahorrar ese flete.`,
+    };
+  }
+
+  return {
+    truckCount: trucks.length,
+    committedFreight: estimatedCost,
+    costPerUnitNow,
+    costPerUnitIfFilled,
+    savingPerUnit,
+    lastFillPct,
+    limitedBy: last.limitedBy,
+    headroomUnits,
+    headroomKg: Math.round(remKg),
+    headroomM3: Math.round(remM3 * 10) / 10,
+    nextTruckCost,
+    verdict,
+    bindingHint,
+  };
+}
+
+function formatCLP(n: number): string {
+  return "$" + Math.round(n).toLocaleString("es-CL");
+}
+
+// ----------------------------------------------------------------------------
 //  Alertas y recomendaciones
 // ----------------------------------------------------------------------------
 

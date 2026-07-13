@@ -29,8 +29,8 @@ import {
   LogisticsSummary,
   LogisticsAdvice,
   LogisticsInlineSummary,
+  TruckOptimizer,
 } from "../components/business/LogisticsPlan";
-import { TruckLoad3D } from "../components/business/TruckLoad3D";
 import { draftBudgetImpact } from "../utils/openToBuy";
 import { LandedCostBreakdown } from "../components/business/LandedCost";
 import { purchaseOrders as mockPOs } from "../data/mockPurchaseOrders";
@@ -1153,15 +1153,10 @@ export function PurchaseOrdersPage() {
                       Ver detalle por camión →
                     </button>
                   </div>
-                  <div className="mb-3">
-                    <TruckLoad3D
-                      fillPct={pickupPlan.avgFillPct}
-                      caption={`${pickupPlan.avgFillPct}% de ocupación · ${pickupPlan.truckCount} camión${
-                        pickupPlan.truckCount === 1 ? "" : "es"
-                      } · ${formatNumber(pickupPlan.totalWeightKg)} kg`}
-                    />
+                  <TruckOptimizer plan={pickupPlan} />
+                  <div className="mt-3">
+                    <LogisticsSummary plan={pickupPlan} />
                   </div>
-                  <LogisticsSummary plan={pickupPlan} />
                   <div className="mt-3">
                     <LogisticsAdvice plan={pickupPlan} />
                   </div>
