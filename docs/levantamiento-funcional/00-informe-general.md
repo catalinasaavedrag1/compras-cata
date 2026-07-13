@@ -2,7 +2,9 @@
 
 Síntesis del levantamiento funcional realizado **solo a partir del frontend**. Para el detalle pantalla por pantalla, ver los archivos de cada módulo enlazados en el [README](./README.md).
 
-> **Naturaleza técnica observada.** Aplicación SPA React + TypeScript, en español. **No hay backend**: todos los datos provienen de archivos *mock* deterministas en memoria (`src/data/*`), con una fecha "hoy" fija. La **única persistencia** es `localStorage` del navegador, usada para: sesión, rol activo, borrador de OC, densidad de UI, y algunos *overrides* locales (estado de RFQ, estado de OC, acuerdos de proveedor, premios del ranking). La mayoría de las acciones "de escritura" (aprobar, enviar, reasignar, dar de baja) producen **toasts y navegación**, pero **no mutan los datos** de forma persistente. Esto se marca como tal a lo largo de la documentación.
+> **Naturaleza técnica observada.** Aplicación SPA React + TypeScript, en español. **No hay backend**: todos los datos provienen de archivos *mock* deterministas en memoria (`src/data/*`), con una fecha "hoy" fija (`TODAY_ISO = 2026-06-24`; la estacionalidad de proveedores usa además un "hoy" propio fijado en Junio 2026). La **única persistencia** es `localStorage` del navegador. Se detectaron ~23 claves `localStorage` en uso (sesión `compras:auth`, rol `compras:role`, alcance `compras:scope`, densidad, borrador de OC, y *overrides* locales: `po-created`, `po-status`, `rec-overrides`, `rec-ignored`, `alert-status`, `rfq`, `rfq-status`, `price-lists`, `campaign-plans`, `campaigns`, `rewards`, entre otras). La mayoría de las acciones "de escritura" (aprobar, enviar, reasignar, dar de baja, recepcionar) producen **toasts y navegación**, pero **no mutan los datos** de forma persistente. Esto se marca como tal a lo largo de la documentación.
+>
+> **Profundidad.** Cada documento de módulo incluye una sección final **"Verificación de cobertura"** con el contraste 1:1 contra el código (etiquetas exactas de controles, columnas, KPIs, umbrales/constantes reales) y los hallazgos/definiciones pendientes por pantalla.
 
 ---
 
@@ -122,6 +124,17 @@ Detectadas en el frontend (cada módulo detalla su ubicación):
 - **Inconsistencias de datos/nomenclatura:** alguna fecha "hoy" hardcodeada (p. ej. `2026-06-26`) y nomenclatura OTIF/cumplimiento no uniforme entre vistas.
 - **Estados de carga/error:** no existen (datos mock síncronos); habrá que diseñarlos al conectar backend (skeletons, errores, reintentos).
 - **Paginación:** las tablas renderizan todo el conjunto; sin paginación/virtualización para volúmenes reales.
+
+**Hallazgos puntuales detectados en la ampliación (a corregir/definir):**
+
+- **Presupuesto:** conviven dos reglas de estado (`deriveStatus` OTB vs proyección); la tabla usa la de OTB y `recibido` se calcula pero no se muestra.
+- **Campañas:** el plan reparte 4 canales pero el "rendimiento" atribuye a 6 (incluye Google Ads/Mailing) — modelos no alineados; faltan un tipo (`not_recommended`) y un canal (`b2b`) en los datos de oportunidades.
+- **Ranking (Equipo):** la anonimización de compradores (`String.fromCharCode(65+i)` con índice global) "salta" la letra en la posición del propio comprador — posible confusión.
+- **Reportes:** el CSV de "OC abiertas" exporta columnas (Comprador, Fecha creación) que no aparecen en la tabla en pantalla.
+- **Alertas / Señales:** el estado "Ignorada" existe en el modelo/tab/select pero no hay acción de UI para asignarlo; el `InfoHint` explicativo se pierde en el modo embebido de Aprendizaje.
+- **Cartera vs Detalle:** el rol "Margen" usa dos umbrales distintos (≥36% en cartera vs ≥34% en detalle de categoría) y el "costo sin actualizar" combina un umbral dinámico (−90d en Inicio) con uno fijo (`2026-04-01` en Productos).
+- **Proveedores:** `fillRate` por defecto = 100% cuando no hay recepciones (puede sobrestimar cumplimiento); "hoy" estacional fijado en Junio 2026.
+- **Fechas hardcodeadas** en varias vistas (p. ej. "↑ +3 vs mes anterior", `2026-06-26`) que deberán derivarse de datos reales.
 
 ---
 

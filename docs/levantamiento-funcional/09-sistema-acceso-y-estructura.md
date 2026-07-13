@@ -76,8 +76,13 @@ No aplica (pantalla sin listados ni filtros).
 - **Estado que NO existe (por diseño demo / dato mock)**: no hay estado de "credenciales inválidas", "cargando/autenticando", "bloqueo por intentos", "recuperar contraseña", ni "registro". Cualquier correo + contraseña no vacíos inician sesión de inmediato.
 
 ### Navegación hacia otras pantallas
-- Al iniciar sesión: navega a `location.state.from` (la ruta que el usuario intentaba abrir antes de ser redirigido) o, si no existe, a `/` (Inicio). Se usa `replace: true` para no dejar el login en el historial.
+- Al iniciar sesión: navega a `location.state.from` (un **string** con la ruta —`location.pathname`— que el usuario intentaba abrir antes de ser redirigido por `RequireAuth`) o, si no existe, a `/` (Inicio). Se usa `replace: true` para no dejar el login en el historial.
 - Si el usuario ya está autenticado y visita `/login`, `LoginGate` lo redirige a `/` sin mostrar el formulario.
+- **No** hay enlaces a "Recordarme", "Olvidé mi contraseña", "Registrarme" ni "Ayuda/soporte": la pantalla es solo el formulario + nota de demo (**dato mock**).
+
+### Identificadores y accesibilidad (detalle técnico)
+- Inputs con `id` `login-email` y `login-password`, cada uno con su `<label htmlFor>` asociado. El botón "ojito" es `type=button` con `aria-label`/`title` dinámico ("Mostrar contraseña" / "Ocultar contraseña") y `aria-pressed={showPassword}`.
+- Iconos de correo/candado son decorativos (`pointer-events-none`). El botón "Iniciar sesión" es el componente compartido `Button` con `type=submit` y ancho completo.
 
 ### Flujo funcional
 1. Usuario sin sesión abre cualquier ruta protegida → `RequireAuth` lo redirige a `/login` recordando el origen.
@@ -255,19 +260,26 @@ La navegación es de **dos niveles**:
 - **Navegación móvil**: `MobileBottomNav` fija (Inicio, Cartera, Comprar, Inventario, y "Más" que abre `MobileNav`). `MobileNav` muestra el módulo actual con sus vistas, un desplegable "Ver más vistas", y una grilla "Cambiar módulo".
 
 ### 3. Buscador global (`Topbar.tsx` = `TopbarActions`)
-- Existe un **buscador global** en la barra superior (visible desde breakpoint `xl`). Busca en **productos** (SKU, nombre, marca), **proveedores** (nombre, RUT), **categorías** (nombre) y **órdenes de compra** (número, proveedor), con resultados instantáneos agrupados (máx. 5 productos, 3 de cada otro tipo).
-- **Atajo global**: `⌘K` / `Ctrl+K` o la tecla `/` enfocan el buscador desde cualquier vista.
-- Al elegir un resultado navega a su detalle; al enviar sin selección va a `/productos?q=...`.
+- Existe un **buscador global** en la barra superior (visible desde breakpoint `xl`, ancho `w-64`/`2xl:w-80`). Placeholder: **"Buscar SKU, producto, proveedor, categoría u OC..."**; `aria-label` "Buscar en la plataforma".
+- Busca en **productos** (SKU + nombre + marca), **proveedores** (nombre + RUT), **categorías** (nombre) y **órdenes de compra** (número + proveedor), con resultados instantáneos agrupados en el orden Productos → Proveedores → Categorías → Órdenes de compra. Límites: máx. **5 productos** y **3** de cada otro tipo.
+- **Umbral**: solo busca con **≥ 2 caracteres** (`trim().toLowerCase()`); por debajo no muestra panel. Si no hay coincidencias muestra "Sin resultados para “{término}”.".
+- Subtítulos de cada resultado: producto → `marca · categoría · disp. {stock}`; proveedor → `RUT · categorías`; categoría → `Categoría · {n} SKU · {buyer}`; orden → `{proveedor} · espera {fecha}`.
+- Rutas al elegir: producto → `/productos/{sku}`; proveedor → `/proveedores/{id}`; categoría → `/categorias/{id}`; **orden → `/comprar/seguimiento`** (no a un detalle de OC). Al **enviar** (Enter) sin clic: si hay un primer resultado navega a él, si no y hay texto va a `/productos?q=...`.
+- **Atajo global**: `⌘K` / `Ctrl+K` o la tecla `/` enfocan y seleccionan el buscador desde cualquier vista (el atajo `/` se ignora si el foco está en un `input`/`textarea`/`select`/editable). Se muestra un `kbd` "⌘K" cuando el campo está vacío.
 - Los datos provienen de `useCollection(...)` (backend si está hidratado, si no el mock) — ver `DataContext`.
-- El **Sidebar** tiene además su propio buscador **de vistas/módulos** (distinto del global de entidades).
+- El **Sidebar** tiene además su propio buscador **de vistas/módulos** (distinto del global de entidades): también con umbral ≥ 2 caracteres, hasta **12** resultados deduplicados por ruta (`item.to`), buscando en `label + hint + to` de módulo e ítem; al enviar (Enter) navega al primer resultado. El buscador móvil (`MobileNav`) es más simple: envía siempre a `/productos?q=...`.
 
 ### 4. Cambio de rol Comprador / Líder (`RoleContext.tsx`, `Topbar.tsx`, `RoleGate.tsx`)
 - Conmutador manual en la barra superior (segmented control "Comprador" / "Líder"), visible desde `lg`. Al cambiar a líder navega a `/equipo`; a comprador, a `/`.
 - El rol se guarda en `localStorage` (`compras:role`, inicial "comprador") y define **qué módulos** se ven (`modulesFor`) y **qué páginas** son accesibles.
 - **Personas fijas (mock)**: comprador = "Catalina Saavedra" (CS), líder = "Tania Reyes" (TR). El avatar y el color cambian según rol (marca vs. violeta).
 - **`RoleGate`**: envuelve las vistas exclusivas del líder (`/equipo`, `/equipo/alertas`, `/equipo/compradores`, `/equipo/ranking`, `/equipo/metas`, `/equipo/carga`). Si el rol actual no coincide, muestra un `EmptyState` "Sección del Líder de Compras" con botón "Volver al inicio" (no redirige automáticamente; bloquea el contenido).
-- **Comprador actual (`BuyerContext`)**: en rol comprador, la barra permite además elegir entre los **compradores** disponibles (derivados del campo `buyer` de las categorías mock; inicial "Catalina Saavedra", persistido en `compras:buyer`). Define qué categorías/productos son "suyos" (`myCategories`). En rol líder se muestra la persona líder en vez del selector.
+- **Comprador actual (`BuyerContext`)**: en rol comprador, la barra (bloque visible desde `2xl`, junto a la fecha de hoy `formatDate(TODAY_ISO)`) permite elegir entre los **compradores** disponibles mediante un `<select>` nativo ("Cambiar de comprador"). La lista `buyers` se deriva del campo `buyer` de las categorías mock, deduplicada y ordenada con `localeCompare(...,"es")`; inicial "Catalina Saavedra", persistido en `compras:buyer`. Define qué categorías/productos son "suyos" (`myCategories` = categorías cuyo `buyer` coincide). En rol líder se muestra la persona líder (`persona.name`) en texto, sin selector.
+- **Menú de cuenta (avatar)**: botón circular con las **iniciales** (comprador → iniciales del comprador vía `initials(buyer)`, fondo marca; líder → `persona.initials` "TR", fondo violeta). Abre un dropdown (`role=menu`) que muestra el **nombre** (comprador seleccionado o persona líder) y, debajo, el **correo de la sesión** (`AuthContext.email`) o, si está vacío, el texto de rol ("Comprador" / "Líder de Compras"). Única acción: **"Cerrar sesión"** (`logout()` + navega a `/login`). Se cierra por clic-fuera o `Escape`.
 - **Suposición**: el cambio de rol y de comprador es una herramienta de demo; en producción vendría de la identidad del usuario. **Definición pendiente**.
+
+#### Alcance "Mi cartera / Todas" (`ScopeToggle.tsx` / `useCategoryScope`)
+Aunque no vive en la barra superior, es un **mecanismo transversal** consumido por varias vistas de surtido (Productos, Categorías, Surtido, Campañas): un segmentado **"Mi cartera · {n} cat." / "Todas"** que acota la vista al alcance del comprador. La preferencia se **comparte entre vistas** vía `localStorage` (`compras:scope`); su valor inicial depende del rol (**líder → "all"**, comprador → "mine"), pero cualquiera puede alternarlo. `inScope(categoría)` decide si un registro entra en el alcance actual (sin categoría → queda fuera cuando el filtro está activo).
 
 ### 5. Centro de notificaciones (`NotificationCenter.tsx`, `NotificationContext.tsx`)
 - Icono de campana en la barra superior con **badge de no leídas** (rojo). Dropdown en escritorio; pantalla completa (vía `portal`) en móvil.
@@ -315,9 +327,44 @@ Orden de anidamiento en `AppRoutes.tsx` (de fuera hacia dentro): `AuthProvider` 
 Los conteos de badges de navegación (`useNavBadges`) se derivan de: alertas críticas (`high`, no resueltas), aprobaciones pendientes, señales nuevas y alertas del equipo de severidad alta.
 
 ### 10. Persistencia en `localStorage` (`useLocalStorage.ts`)
-- Hook genérico que sincroniza estado con `localStorage` (lee al iniciar, escribe en cada cambio; ignora errores de cuota/modo privado).
-- **Claves usadas** (prefijo `compras:`): `auth`, `role`, `buyer`, `oc-draft`, `oc-draft-meta`, `notif-read`, `density`, `sidebar-panel-open`, `approvals-created`, `decisions-created`, `approvals`, `signals`.
-- **Implicancia funcional**: sesión, rol, comprador, borrador de OC, notificaciones leídas, densidad y estado del menú **sobreviven a recargas** en el mismo navegador. No hay sincronización entre dispositivos ni servidor (**dato mock / sin backend**). Nota: los cambios de **reglas** (`SettingsPage`) **no** usan este hook, por lo que no persisten.
+- Hook genérico que sincroniza estado con `localStorage` (lee al iniciar con `JSON.parse`; escribe en cada cambio con `JSON.stringify`; ignora errores de cuota/modo privado en `try/catch`). **No** hay serialización de fechas ni migración de versiones de esquema.
+- **Todas** las claves usan el prefijo `compras:`. Enumeración completa encontrada en el código (no solo las del shell):
+
+**A. Claves del shell / transversales** (contextos y layout descritos en este módulo):
+
+| Clave | Origen | Contenido |
+|---|---|---|
+| `compras:auth` | `AuthContext` | `{ authenticated, email }` de la sesión. |
+| `compras:role` | `RoleContext` | Rol activo ("comprador"/"lider"). |
+| `compras:buyer` | `BuyerContext` | Nombre del comprador seleccionado. |
+| `compras:scope` | `ScopeToggle` (`useCategoryScope`) | Alcance "mine"/"all" compartido entre vistas de surtido. |
+| `compras:oc-draft` | `OcDraftContext` | Líneas del borrador de OC. |
+| `compras:oc-draft-meta` | `OcDraftContext` | Cabecera del borrador (bodega, pago, fecha, notas). |
+| `compras:notif-read` | `NotificationContext` | IDs de notificaciones marcadas como leídas. |
+| `compras:density` | `DensityContext` | Densidad "comodo"/"compacto". |
+| `compras:sidebar-panel-open` | `Sidebar` | Panel expandido abierto/cerrado. |
+| `compras:approvals-created` | `PurchaseFlowContext` | Aprobaciones creadas en runtime. |
+| `compras:decisions-created` | `PurchaseFlowContext` | Decisiones de compra creadas en runtime. |
+| `compras:approvals` | `PurchaseFlowContext` | Estado por aprobación (pendiente/aprobada/rechazada). |
+| `compras:signals` | `SignalsContext` | Señales creadas + parches + mensajes + eventos. |
+
+**B. Claves de otros módulos** (fuera del alcance de este documento, pero **usan el mismo hook y prefijo** y por tanto también persisten; se listan para cobertura total):
+
+| Clave | Origen | Contenido |
+|---|---|---|
+| `compras:po-created` | `PurchaseOrdersPage` (leída por `BudgetPage`) | Órdenes de compra creadas. |
+| `compras:po-status` | `PurchaseOrdersPage` | Estado por OC. |
+| `compras:rec-overrides` | `ReplenishmentPage` | Ajustes manuales a recomendaciones. |
+| `compras:rec-ignored` | `ReplenishmentPage` | IDs de recomendaciones ignoradas. |
+| `compras:alert-status` | `AlertsPage` | Estado por alerta (resuelta/ignorada). |
+| `compras:rfq` / `compras:rfq-status` | `RfqPage` | Cotizaciones (RFQ) creadas y su estado. |
+| `compras:price-lists` | `PriceIncreasesPage` | Listas de precio / alzas. |
+| `compras:campaign-plans` | `CampaignsPage` | Planes de campaña. |
+| `compras:campaigns` | `CampaignOpportunitiesPage`, `CatalogRedundancy` | Campañas creadas. |
+| `compras:rewards` | `RankingPage` (leída por `MyPerformancePage`) | Reconocimientos/premios. |
+
+- **Implicancia funcional**: sesión, rol, comprador, alcance, borrador de OC, notificaciones leídas, densidad, estado del menú y la mayoría de las acciones de otros módulos **sobreviven a recargas** en el mismo navegador. No hay sincronización entre dispositivos ni servidor (**dato mock / sin backend**).
+- **Excepción importante**: los cambios de **reglas** (`SettingsPage`) **no** usan este hook (usan `useState` local con `seedRules`), por lo que **no persisten**: al recargar se pierden. El `updatedAt` ("2026-06-24") y `updatedBy` ("Catalina Saavedra") quedan **hardcodeados** al guardar (**dato mock**).
 
 ### Suposiciones y definiciones pendientes de la sección transversal
 - **Login mock**: no valida credenciales reales; cualquier correo/contraseña no vacíos inician sesión (declarado explícitamente en la UI y en `AuthContext`). — **Definición pendiente**: mecanismo real de autenticación.
@@ -366,3 +413,57 @@ Proveer el **shell y los mecanismos globales** que sostienen toda la aplicación
 
 ### Dependencias con otros módulos
 **Todos los módulos dependen de este shell**: se renderizan dentro de `AppLayout` (bajo `RequireAuth`) y consumen sus contextos —rol/comprador (qué datos ver), borrador de OC (agregar a compra), notificaciones y badges (alertas, aprobaciones, señales), densidad y datos (`useCollection`)—. En sentido inverso, el shell **lee** datos de los demás dominios para alimentar notificaciones, badges y el buscador (productos, proveedores, categorías, órdenes, alertas, señales, aprobaciones). La pantalla de Reglas de compra alimenta funcionalmente al módulo de **reposición/compra** (define la compra sugerida) y enlaza a Productos, Categorías y Proveedores.
+
+---
+
+## Verificación de cobertura
+
+Contraste 1:1 de lo documentado contra el **código real** leído (pantallas `LoginPage`, `SettingsPage`; layout completo `src/components/layout/*`; rutas `AppRoutes.tsx`; contextos `src/context/*`; `useLocalStorage.ts`; `ScopeToggle.tsx`).
+
+### Login (`LoginPage.tsx`) — controles con etiqueta exacta
+- **Campos**: "Correo" (`id=login-email`, `type=email`, `autoComplete=email`, placeholder `tucorreo@empresa.cl`) y "Contraseña" (`id=login-password`, `type=password|text`, `autoComplete=current-password`, placeholder `••••••••`). ✔ documentados.
+- **Botones**: "Iniciar sesión" (submit) y botón-ojito "Mostrar/Ocultar contraseña" (`aria-pressed`). ✔
+- **Mensaje de error**: "Ingresa tu correo y contraseña." (validación de no-vacíos con `trim()`). ✔
+- **Nota**: "Demo sin backend: cualquier correo y contraseña inician sesión." ✔
+- **Confirmado como inexistente (mock)**: sin validación de credenciales, sin estados de carga/error de servidor, sin "recordarme", "olvidé mi contraseña", "registro" ni bloqueo por intentos. `login(email)` solo marca `authenticated=true` y guarda el email. — **Suposición/Definición pendiente**: autenticación real.
+
+### Reglas de compra (`SettingsPage.tsx`) — controles con etiqueta exacta
+- **KPIs**: "Con regla propia" (desc. "+ 1 regla global"), "Requieren revisión" (toggle `onlyAlerts`, desc. "Filtrar"), "Días objetivo prom.", "Lead time prom.". ✔
+- **Simulador** "Simular días objetivo de inventario": botones deduplicados/ordenados de `{actual, 45, 60, 90}` (el actual se rotula "{d} d · actual"), "Compra sugerida proyectada", delta "vs actual", bloque "Impacto por categoría" (hasta 6 filas). ✔
+- **Alertas** "Qué reglas revisar" (solo si hay reglas con salud ≠ Correcta). ✔
+- **Tabs** de ámbito: "Todas", "Categoría", "Proveedor", "Marca", "Canal", "Global" con conteos. ✔
+- **Tabla** "Reglas" (desc. "Precedencia: proveedor › marca › categoría › global"), columnas: Ámbito, "Días obj.", "Stock mín/máx", "Margen mín.", "Lead time", "Impacto", "Modificada", "Estado", botón "Editar" (card móvil "Editar regla"). ✔
+- **Ayuda**: "Cómo se calcula" (fórmula) y "Excepciones y reglas especiales" (badges "Activa"). ✔
+- **Drawer** "Editar regla · {ámbito}": campos "Días objetivo", "Lead time (días)", "Stock mínimo", "Stock máximo", "Margen mínimo (%)"; bloque "Impacto estimado" ("SKU afectados", "Cambio en compra sugerida", "Riesgo"); enlaces "Ver productos afectados" y "Restaurar valores"; footer "Cancelar" + "Guardar cambios"/"Sin cambios". ✔
+- **ConfirmModal** "Descartar cambios" / "Seguir editando". ✔
+- **Toast** al guardar: "Regla de {ámbito} actualizada". ✔
+- **Confirmado mock**: `setRules` en memoria; `updatedAt`/`updatedBy` hardcodeados; sin persistencia ni control por rol. — **Definición pendiente**.
+
+### Estructura transversal — inventario de piezas verificadas
+- **Layout** (`AppLayout`): Sidebar + MobileNav + MobileBottomNav + AppHeader + `<Outlet/>` + ScrollToHash + Toaster + enlace "Saltar al contenido principal". ✔
+- **Navegación 2 niveles** (`navItems.tsx`): módulos comprador (Inicio, Mi cartera, Comprar, Inventario, Rentabilidad, Surtido, Proveedores, Mi plan) + extra líder (Líder, Equipo); sub-pestañas con `hint`, `badge`, `secondary`; `activeModuleFor` por coincidencia más larga. ✔
+- **Buscador global** (`Topbar`): ≥ 2 caracteres, 5+3+3+3, atajos `⌘K`/`Ctrl+K`/`/`, orden navega OC → `/comprar/seguimiento`. ✔ (ampliado)
+- **Buscador de vistas** (`Sidebar`): ≤ 12 resultados dedup por `to`. ✔ (ampliado)
+- **Conmutador de rol** (`Topbar`/`RoleContext`): "Comprador"/"Líder" desde `lg`; navega a `/equipo` o `/`. ✔
+- **Selector de comprador + fecha + menú de cuenta** (`Topbar`): `<select>` desde `2xl`, avatar con iniciales, dropdown con nombre + email/rol, "Cerrar sesión". ✔ (ampliado: menú de cuenta)
+- **Centro de notificaciones** (`NotificationCenter`/`NotificationContext`): badge rojo, dropdown/pantalla completa, derivadas de alertas + señales + OC atrasadas, "Marcar todas leídas", empty "No tienes notificaciones. Todo en orden.". ✔
+- **Badges dinámicos** (`useNavBadges`): `alertas` (high no resueltas, rojo), `aprobaciones` (pendientes, ámbar), `senales` (status "new", azul), `equipoAlertas` (leaderAlerts high, rojo). ✔
+- **Densidad** (`DensityContext`): "Cómodo"/"Compacto" desde `xl`, helper `dc()`. ✔
+- **Borrador de OC** (`OcDraftContext`): líneas + cabecera, `addItem/updateItem/updateQuantity/removeItem/clear/hasItem/setMeta`, totales, badge "Borrador OC". ✔
+- **Alcance Mi cartera/Todas** (`ScopeToggle`/`useCategoryScope`, `compras:scope`). ✔ (agregado, faltaba)
+- **Guardas** (`AppRoutes`): `RequireAuth`, `LoginGate`, `RoleGate`; comodín `*`→`/`; `lazy` + `Suspense`/`PageSkeleton` (login no-lazy). ✔
+- **Pila de providers**: Auth › Toast › Density › Data › Role › Buyer › Notification › OcDraft › PurchaseFlow › Signals. ✔ (verificada 1:1)
+- **`BackendStatus`**: "API conectada" / "Conectando…" / "Modo demo" (desde `md`). ✔
+
+### Qué se amplió respecto de la versión previa
+1. **Menú de cuenta** (avatar, dropdown, email/rol fallback, "Cerrar sesión") — antes solo mencionado en el flujo.
+2. **Buscador global y de vistas**: umbral ≥ 2 caracteres, límites por tipo, rutas exactas (OC → seguimiento), mensajes vacíos, tope de 12 en sidebar.
+3. **`ScopeToggle` / `compras:scope`**: mecanismo transversal de alcance no documentado antes.
+4. **Enumeración COMPLETA de `localStorage`**: además de las 13 claves del shell (incluida `compras:scope`), se listan 10 claves de otros módulos (`po-created`, `po-status`, `rec-overrides`, `rec-ignored`, `alert-status`, `rfq`, `rfq-status`, `price-lists`, `campaign-plans`, `campaigns`, `rewards`) que usan el mismo hook.
+5. Detalles técnicos de Login (ids, aria) y precisión de que `from` es un string (`location.pathname`).
+
+### Dudas / definiciones pendientes (consolidado)
+- **Autenticación real** (SSO/usuario-clave) y de dónde vendrá el **rol** (hoy manual). — Definición pendiente.
+- **`/reglas` sin entrada de menú** (`navItems`): acceso solo por URL/deep-link. — Suposición / Definición pendiente si debe exponerse.
+- **Persistencia y permisos de Reglas**: no persisten y no hay control por rol. — Definición pendiente.
+- **Selector de comprador y alcance**: hoy son herramientas de demo; en producción derivarían de la identidad y de asignaciones reales. — Definición pendiente.
