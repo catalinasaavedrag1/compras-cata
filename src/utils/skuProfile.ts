@@ -90,12 +90,6 @@ export const ABC_DESCRIPTION: Record<AbcClass, string> = {
   C: "Bajo impacto · gestión por excepción",
 };
 
-export const ABC_TONE: Record<AbcClass, "good" | "warn" | "bad" | "info" | "neutral"> = {
-  A: "info",
-  B: "neutral",
-  C: "neutral",
-};
-
 export const XYZ_LABEL: Record<XyzClass, string> = {
   X: "Demanda estable",
   Y: "Demanda variable",

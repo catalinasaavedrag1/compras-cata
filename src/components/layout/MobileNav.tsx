@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { activeModuleFor, modulesFor } from "./navItems";
+import { activeModuleFor, isPathActive, modulesFor } from "./navItems";
 import { Brand } from "./Brand";
 import { cn } from "../../utils/cn";
 import { Input } from "../ui/Input";
@@ -22,14 +22,11 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
   const { role } = useRole();
   const modules = modulesFor(role);
   const activeModule = activeModuleFor(modules, pathname) ?? modules[0];
-  const activeChildren = activeModule.children.filter((item) => {
-    if (!item.secondary) return true;
-    return pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/"));
-  });
+  const activeChildren = activeModule.children.filter(
+    (item) => !item.secondary || isPathActive(pathname, item.to)
+  );
   const secondaryChildren = activeModule.children.filter(
-    (item) =>
-      item.secondary &&
-      !(pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/")))
+    (item) => item.secondary && !isPathActive(pathname, item.to)
   );
   const badges = useNavBadges();
   const dialogRef = useDialogA11y(open, onClose);

@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { BrandLink } from "./Brand";
 import { TopbarActions } from "./Topbar";
-import { activeModuleFor, modulesFor } from "./navItems";
+import { activeModuleFor, isPathActive, modulesFor } from "./navItems";
 import { useNavBadges } from "./useNavBadges";
 import { useRole } from "../../context/RoleContext";
 import { cn } from "../../utils/cn";
@@ -18,10 +18,9 @@ export function AppHeader() {
   const modules = modulesFor(role);
   const activeModule = activeModuleFor(modules, pathname) ?? modules[0];
   const badges = useNavBadges();
-  const activeChildren = activeModule.children.filter((item) => {
-    if (!item.secondary) return true;
-    return pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/"));
-  });
+  const activeChildren = activeModule.children.filter(
+    (item) => !item.secondary || isPathActive(pathname, item.to)
+  );
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">

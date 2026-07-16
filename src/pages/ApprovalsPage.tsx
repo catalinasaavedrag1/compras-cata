@@ -16,7 +16,7 @@ import { useRole } from "../context/RoleContext";
 import type { ApprovalRequest, ApprovalCriterion } from "../data/mockApprovals";
 import { CRITERION_LABEL } from "../data/mockApprovals";
 import { IconCheck, IconAlerts, IconOrders, IconLock } from "../components/ui/icons";
-import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/formatters";
+import { formatCurrency, formatCurrencyCompact, formatDate, formatNumber } from "../utils/formatters";
 
 type Decision = ApprovalState;
 
@@ -139,7 +139,6 @@ export function ApprovalsPage() {
   const filtered = approvalRequests.filter((r) =>
     filter === "todas" ? true : stateOf(r.id) === filter
   );
-  const fmtDate = (iso: string) => iso.split("-").reverse().join("/");
 
   return (
     <div>
@@ -230,7 +229,7 @@ export function ApprovalsPage() {
                         )}
                       </div>
                       <p className="text-xs text-slate-400">
-                        {fmtDate(r.date)} · {r.buyerName} ·{" "}
+                        {formatDate(r.date)} · {r.buyerName} ·{" "}
                         <Link
                           to={supplierPath(r.supplierName)}
                           className="hover:text-brand-600 hover:underline"

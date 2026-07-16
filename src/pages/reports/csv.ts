@@ -73,5 +73,3 @@ export const perfCsv = [
   { label: "Monto pendiente", value: (s: (typeof suppliers)[number]) => s.pendingAmount },
   { label: "Estado", value: (s: (typeof suppliers)[number]) => s.status },
 ];
-
-// Botón de exportación del encabezado: exporta el reporte visible.

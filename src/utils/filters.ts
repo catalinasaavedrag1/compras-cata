@@ -3,6 +3,7 @@
 // ============================================================================
 
 import type { CommercialAlert, Product, PurchaseRecommendation } from "../types/purchasing";
+import { LOW_MARGIN_THRESHOLD } from "../data/mockPriceLists";
 
 function matchesText(haystack: string[], query: string): boolean {
   if (!query.trim()) return true;
@@ -32,7 +33,7 @@ export function filterProducts(products: Product[], f: ProductFilters): Product[
     if (f.supplier && p.supplierName !== f.supplier) return false;
     if (f.productStatus && p.productStatus !== f.productStatus) return false;
     if (f.purchaseStatus && p.purchaseStatus !== f.purchaseStatus) return false;
-    if (f.lowMargin && p.margin >= 20) return false;
+    if (f.lowMargin && p.margin >= LOW_MARGIN_THRESHOLD) return false;
     if (f.noSupplier && p.supplierName) return false;
     if (f.noSales && p.salesLast30Days > 0) return false;
     return true;
@@ -68,7 +69,7 @@ export function filterRecommendations(
     if (f.stockout && r.availableStock > 0) return false;
     if (f.stockoutRisk && r.status !== "critical" && r.status !== "buy_now") return false;
     if (f.overstock && r.status !== "overstock") return false;
-    if (f.lowMargin && r.margin >= 20) return false;
+    if (f.lowMargin && r.margin >= LOW_MARGIN_THRESHOLD) return false;
     if (f.highRotation && r.rotation < 8) return false;
     if (f.lowRotation && r.rotation >= 4) return false;
     return true;

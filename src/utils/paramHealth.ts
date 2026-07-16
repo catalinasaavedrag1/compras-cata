@@ -1,4 +1,5 @@
 import type { Product, PurchaseRule } from "../types/purchasing";
+import { DEFAULT_TARGET_COVERAGE_DAYS } from "./constants";
 
 // ============================================================================
 //  Diagnóstico de parámetros de reposición.
@@ -86,8 +87,8 @@ export function ruleParamIssues(rule: PurchaseRule, scopeProducts: Product[]): P
       severity: "medium",
       title: "Cobertura objetivo alta",
       detail: `Objetivo de ${rule.targetInventoryDays} días para ${selling.length} SKU con venta: inmoviliza capital y arriesga sobrestock.`,
-      suggestion: "Bajar la cobertura objetivo (p. ej. a 45 días)",
-      fix: { targetInventoryDays: 45 },
+      suggestion: `Bajar la cobertura objetivo (p. ej. a ${DEFAULT_TARGET_COVERAGE_DAYS} días)`,
+      fix: { targetInventoryDays: DEFAULT_TARGET_COVERAGE_DAYS },
     });
   }
 

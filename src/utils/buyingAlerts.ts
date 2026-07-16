@@ -16,6 +16,7 @@ import { getProductBySku } from "../data/mockProducts";
 import { getSupplierByName } from "../data/mockSuppliers";
 import { productLogistics } from "../data/logistics";
 import { getWarehouseCapacity, warehouseHeadroomM3 } from "../data/mockWarehouses";
+import { formatNumber } from "./formatters";
 
 export type BuyingAlertTone = "bad" | "warn" | "info";
 
@@ -44,9 +45,6 @@ function fmtM3(n: number): string {
   return `${n.toLocaleString("es-CL", { maximumFractionDigits: 1 })} m³`;
 }
 
-function fmtNum(n: number): string {
-  return Math.round(n).toLocaleString("es-CL");
-}
 
 /** Bodega principal del SKU = ubicación con más stock. */
 function primaryLocation(sku: string): string | null {
@@ -86,7 +84,7 @@ export function buildBuyingAlerts(input: BuyingAlertInput): BuyingAlert[] {
       id: "open-po",
       tone: delayed ? "warn" : "info",
       title: `Ya existe una OC abierta para este SKU (${input.openPo.number})`,
-      detail: `${fmtNum(input.openPo.quantity)} u. con entrega esperada ${input.openPo.expectedDate}${
+      detail: `${formatNumber(input.openPo.quantity)} u. con entrega esperada ${input.openPo.expectedDate}${
         delayed ? " · actualmente atrasada" : ""
       }. Evita duplicar la compra.`,
     });

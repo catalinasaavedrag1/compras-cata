@@ -42,6 +42,7 @@ import {
 import { useClaims } from "../context/ClaimsContext";
 import { CLAIM_OPEN_STATES } from "../data/mockClaims";
 import { supplierScore, SUPPLIER_CLASS } from "../utils/supplierScore";
+import { SUPPLIER_PENDING_WARN_CLP } from "../utils/constants";
 
 export function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -190,7 +191,7 @@ export function SupplierDetailPage() {
         <KpiCard
           title="Monto pendiente"
           value={formatCurrencyCompact(supplier.pendingAmount)}
-          tone={supplier.pendingAmount > 20000000 ? "warn" : "neutral"}
+          tone={supplier.pendingAmount > SUPPLIER_PENDING_WARN_CLP ? "warn" : "neutral"}
           icon={<IconOrders className="w-4 h-4" />}
           info={<MetricHint metric="pendiente" />}
         />

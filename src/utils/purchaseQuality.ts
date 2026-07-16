@@ -1,6 +1,7 @@
 import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { getProductBySku } from "../data/mockProducts";
 import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
+import { DEFAULT_TARGET_COVERAGE_DAYS } from "./constants";
 
 // ============================================================================
 //  Calidad de compra (sección 3 del spec).
@@ -46,7 +47,7 @@ export function purchaseQualityLines(): PurchaseQualityLine[] {
       const p = getProductBySku(l.sku);
       const dailyDemand = p ? p.monthlySales / 30 : 0;
       const rule = p ? resolveRuleForProduct(p, purchaseRules) : null;
-      const obj = rule?.targetInventoryDays ?? 45;
+      const obj = rule?.targetInventoryDays ?? DEFAULT_TARGET_COVERAGE_DAYS;
       const objMin = Math.round(obj * 0.7);
       const objMax = Math.round(obj * 1.3);
       const diasComprados = dailyDemand > 0 ? Math.round(l.quantity / dailyDemand) : 0;

@@ -14,7 +14,7 @@ import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
 import { supplierPath } from "../utils/entityLinks";
 import { IconBulb, IconCheck, IconAlerts, IconClose } from "../components/ui/icons";
-import { formatNumber, formatCurrencyCompact } from "../utils/formatters";
+import { formatNumber, formatCurrencyCompact, formatDate } from "../utils/formatters";
 import { evaluateDecision } from "../utils/decisionEval";
 
 export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {}) {
@@ -40,7 +40,6 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
   });
 
   const countOf = (o: DecisionOutcome) => all.filter((d) => d.outcome === o).length;
-  const fmtDate = (iso: string) => iso.split("-").reverse().join("/");
 
   const selects = useMemo(
     () => [
@@ -154,7 +153,7 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
                         </Badge>
                       </div>
                       <p className="text-xs text-slate-400">
-                        {fmtDate(d.date)} · {d.buyerName}
+                        {formatDate(d.date)} · {d.buyerName}
                         {d.approvedBy !== "—" && <> · aprobó {d.approvedBy}</>} ·{" "}
                         <Link
                           to={supplierPath(d.supplierName)}

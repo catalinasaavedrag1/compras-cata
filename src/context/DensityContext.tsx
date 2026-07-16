@@ -41,8 +41,3 @@ export function DensityProvider({ children }: { children: ReactNode }) {
 export function useDensity(): DensityValue {
   return useContext(DensityContext);
 }
-
-/** Helper: elige clase según densidad. */
-export function dc(compact: boolean, comodo: string, compacto: string): string {
-  return compact ? compacto : comodo;
-}

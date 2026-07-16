@@ -22,6 +22,7 @@ import {
 import { IconSuppliers, IconAlerts, IconOrders } from "../components/ui/icons";
 import { supplierFulfillment } from "../utils/supplierPerf";
 import { supplierSeasonality } from "../utils/seasonality";
+import { SUPPLIER_PENDING_WARN_CLP } from "../utils/constants";
 import { Link } from "react-router-dom";
 import type { Supplier } from "../types/purchasing";
 
@@ -193,7 +194,11 @@ export function SuppliersPage() {
       align: "right",
       render: (s) => (
         <span
-          className={s.pendingAmount > 20000000 ? "text-amber-600 font-medium" : "text-slate-700"}
+          className={
+            s.pendingAmount > SUPPLIER_PENDING_WARN_CLP
+              ? "text-amber-600 font-medium"
+              : "text-slate-700"
+          }
         >
           {formatCurrency(s.pendingAmount)}
         </span>
