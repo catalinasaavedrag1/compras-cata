@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useClickOutside } from "../../utils/useClickOutside";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { es } from "react-day-picker/locale";
 import "react-day-picker/style.css";
@@ -71,21 +72,7 @@ export function DateRangePicker({
   }, [open, value]);
 
   // Cerrar por clic-fuera y Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useClickOutside(ref, open, () => setOpen(false));
 
   const hasValue = !!(value.from || value.to);
   const triggerText = hasValue ? formatRangeLabel(value) : placeholder;

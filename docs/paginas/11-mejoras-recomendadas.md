@@ -149,8 +149,9 @@ Extraíbles a helper/constante compartida cuando se retome cada módulo:
   `ARRIVED_STATUSES`, `EMITTED_STATUSES`).
 - **Markup de diálogos** (header/footer) casi idéntico en `Modal`/`Drawer`/`BottomSheet`:
   extraer `DialogHeader`/`DialogFooter`. `FieldLabel`/`useFieldId` para `Input`/`Select`.
-  `useClickOutside` para `MoreActions`/`DateRangePicker` (hoy reimplementan el
-  `useEffect` que ya centraliza `useDialogA11y`).
+- ~~**`useClickOutside`** para `MoreActions`/`DateRangePicker`~~ ✓ aplicado
+  (`utils/useClickOutside.ts`; el callback se lee desde un ref para conservar las
+  mismas dependencias `[active]` del efecto original — cierre por clic-fuera/Escape idéntico).
 
 ---
 

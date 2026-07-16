@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { IconDots } from "./icons";
+import { useClickOutside } from "../../utils/useClickOutside";
 
 export interface MoreAction {
   label: string;
@@ -20,21 +21,7 @@ export function MoreActions({
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Cierre por clic-fuera y por Escape (más robusto que onBlur + setTimeout).
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useClickOutside(wrapRef, open, () => setOpen(false));
 
   if (actions.length === 0) return null;
 
