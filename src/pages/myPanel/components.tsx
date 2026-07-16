@@ -7,6 +7,7 @@ import { StatusBadge } from "../../components/business/StatusBadge";
 import {
   capitalize,
   formatCurrencyCompact,
+  formatDays,
   formatNumber,
   formatPercent,
 } from "../../utils/formatters";
@@ -585,5 +586,229 @@ export function SignalSummary({
       <p className="text-[11px] font-semibold uppercase tracking-wide opacity-75">{label}</p>
       <p className="mt-1 text-lg font-semibold leading-none">{value}</p>
     </div>
+  );
+}
+
+/**
+ * Cabecera de "Mi cartera": categorías administradas y accesos rápidos a
+ * categorías / marcas / proveedores. (Extraído de MyPanelPage.)
+ */
+export function PortfolioHeaderCard({
+  catNames,
+  skuCount,
+  subcatCount,
+  supplierCount,
+  brandCount,
+}: {
+  catNames: string[];
+  skuCount: number;
+  subcatCount: number;
+  supplierCount: number;
+  brandCount: number;
+}) {
+  return (
+    <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-card">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Mi cartera</p>
+          <h2 className="mt-0.5 truncate text-lg font-semibold text-slate-900">
+            {catNames.join(" • ") || "Sin categorías asignadas"}
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {skuCount} SKU · {subcatCount} subcategorías · {supplierCount} proveedores ·{" "}
+            {brandCount} marcas
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <PortfolioCountLink to="/categorias" label="Categorías" count={catNames.length} />
+          <PortfolioCountLink to="/productos" label="Marcas" count={brandCount} />
+          <PortfolioCountLink to="/proveedores" label="Proveedores" count={supplierCount} />
+          <Link
+            to="/mi-cartera/productos-clave"
+            className="font-medium text-brand-600 hover:text-brand-700"
+          >
+            Ver detalle →
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface Goal {
+  actual: number;
+  meta: number;
+}
+
+/**
+ * "Objetivos del mes": venta, margen, sobrestock y disponibilidad vs su meta.
+ * (Extraído de MyPanelPage.)
+ */
+export function MonthGoalsCard({
+  goals,
+}: {
+  goals: { venta: Goal; margen: Goal; sobrestock: Goal; disponibilidad: Goal };
+}) {
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title="Objetivos del mes"
+        description="Un comprador trabaja contra metas, no solo mirando el estado actual."
+      />
+      <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <GoalBar
+          label="Venta"
+          valueText={formatCurrencyCompact(goals.venta.actual)}
+          metaText={`meta ${formatCurrencyCompact(goals.venta.meta)}`}
+          pct={goals.venta.meta > 0 ? (goals.venta.actual / goals.venta.meta) * 100 : 0}
+          good={goals.venta.actual >= goals.venta.meta * 0.9}
+        />
+        <GoalBar
+          label="Margen"
+          valueText={formatPercent(goals.margen.actual)}
+          metaText={`meta ${goals.margen.meta}%`}
+          pct={(goals.margen.actual / goals.margen.meta) * 100}
+          good={goals.margen.actual >= goals.margen.meta}
+        />
+        <GoalBar
+          label="Sobrestock"
+          valueText={formatCurrencyCompact(goals.sobrestock.actual)}
+          metaText={`meta < ${formatCurrencyCompact(goals.sobrestock.meta)}`}
+          pct={Math.min(100, (goals.sobrestock.actual / goals.sobrestock.meta) * 100)}
+          good={goals.sobrestock.actual <= goals.sobrestock.meta}
+          invert
+        />
+        <GoalBar
+          label="Disponibilidad"
+          valueText={formatPercent(goals.disponibilidad.actual, 0)}
+          metaText={`meta ${goals.disponibilidad.meta}%`}
+          pct={(goals.disponibilidad.actual / goals.disponibilidad.meta) * 100}
+          good={goals.disponibilidad.actual >= goals.disponibilidad.meta}
+        />
+      </CardBody>
+    </Card>
+  );
+}
+
+/**
+ * "Resumen ejecutivo": KPIs de cartera con tendencia (venta, margen, GMROI,
+ * rotación, cobertura, sobrestock, quiebres, inventario). (Extraído de MyPanelPage.)
+ */
+export function ExecutiveSummary({
+  portfolio,
+  story,
+  riskCount,
+}: {
+  portfolio: {
+    salesValue: number;
+    marginPct: number;
+    gmroi: number;
+    rotation: number;
+    coverageWeighted: number;
+    overstockValue: number;
+    inventoryValue: number;
+  };
+  story: {
+    salesTrendPct: number;
+    marginDelta: number;
+    gmroiDelta: number;
+    rotationDelta: number;
+    coverageDelta: number;
+  };
+  riskCount: number;
+}) {
+  return (
+    <section className="mb-4">
+      <SectionLabel>Resumen ejecutivo</SectionLabel>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <TrendKpi
+          label="Venta 30d"
+          value={formatCurrencyCompact(portfolio.salesValue)}
+          delta={story.salesTrendPct}
+          unit="%"
+        />
+        <TrendKpi
+          label="Margen"
+          value={formatPercent(portfolio.marginPct)}
+          delta={story.marginDelta}
+          unit="pp"
+        />
+        <TrendKpi
+          label="GMROI"
+          value={portfolio.gmroi.toFixed(1).replace(".", ",")}
+          delta={story.gmroiDelta}
+        />
+        <TrendKpi
+          label="Rotación"
+          value={`${formatNumber(portfolio.rotation)}x`}
+          delta={story.rotationDelta}
+        />
+        <TrendKpi
+          label="Cobertura"
+          value={formatDays(Math.round(portfolio.coverageWeighted))}
+          delta={story.coverageDelta}
+          unit="d"
+          invert
+        />
+        <TrendKpi label="Sobrestock" value={formatCurrencyCompact(portfolio.overstockValue)} />
+        <TrendKpi label="Quiebres" value={`${formatNumber(riskCount)} SKU`} />
+        <TrendKpi label="Inventario" value={formatCurrencyCompact(portfolio.inventoryValue)} />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * "Productos estratégicos": top 3 por aporte a la utilidad, con GMROI y margen.
+ * (Extraído de MyPanelPage.)
+ */
+export function StrategicProductsCard({
+  strategic,
+}: {
+  strategic: { row: KeyProductRow; utilShare: number }[];
+}) {
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title="Productos estratégicos"
+        description="Los que más aportan a tu utilidad."
+        action={
+          <Link
+            to="/mi-cartera/productos-clave"
+            className="text-xs font-medium text-brand-600 hover:text-brand-700"
+          >
+            Ver todos
+          </Link>
+        }
+      />
+      <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {strategic.map(({ row, utilShare }) => (
+          <Link
+            key={row.product.sku}
+            to={`/productos/${row.product.sku}`}
+            className="rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
+          >
+            <p className="truncate text-sm font-medium text-slate-800">{row.product.name}</p>
+            <p className="mt-0.5 text-xs text-slate-400">{row.role}</p>
+            <div className="mt-2 grid grid-cols-3 gap-1 text-center">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{formatPercent(utilShare, 0)}</p>
+                <p className="text-[10px] text-slate-400">utilidad</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{row.gmroi.toFixed(1)}</p>
+                <p className="text-[10px] text-slate-400">GMROI</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {formatPercent(row.product.margin, 0)}
+                </p>
+                <p className="text-[10px] text-slate-400">margen</p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </CardBody>
+    </Card>
   );
 }

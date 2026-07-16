@@ -68,14 +68,15 @@ import type {
 } from "./myPanel/types";
 import {
   Delta,
+  ExecutiveSummary,
   FocoCard,
-  GoalBar,
   MiniDim,
-  PortfolioCountLink,
+  MonthGoalsCard,
   PortfolioFocusWorkspace,
+  PortfolioHeaderCard,
   QualityItem,
   SectionLabel,
-  TrendKpi,
+  StrategicProductsCard,
   TrendRow,
 } from "./myPanel/components";
 
@@ -990,126 +991,21 @@ export function MyPanelPage() {
 
       {/* 1 · Mi cartera — ¿qué administro? */}
       {isPortfolioView && (
-        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-card">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Mi cartera
-              </p>
-              <h2 className="mt-0.5 truncate text-lg font-semibold text-slate-900">
-                {myCats.map((c) => c.name).join(" • ") || "Sin categorías asignadas"}
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                {myProducts.length} SKU · {portfolio.subcategories.length} subcategorías ·{" "}
-                {portfolio.supplierNames.length} proveedores · {portfolio.brands.length} marcas
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <PortfolioCountLink to="/categorias" label="Categorías" count={myCats.length} />
-              <PortfolioCountLink to="/productos" label="Marcas" count={portfolio.brands.length} />
-              <PortfolioCountLink
-                to="/proveedores"
-                label="Proveedores"
-                count={portfolio.supplierNames.length}
-              />
-              <Link
-                to="/mi-cartera/productos-clave"
-                className="font-medium text-brand-600 hover:text-brand-700"
-              >
-                Ver detalle →
-              </Link>
-            </div>
-          </div>
-        </section>
+        <PortfolioHeaderCard
+          catNames={myCats.map((c) => c.name)}
+          skuCount={myProducts.length}
+          subcatCount={portfolio.subcategories.length}
+          supplierCount={portfolio.supplierNames.length}
+          brandCount={portfolio.brands.length}
+        />
       )}
 
       {/* 2 · Objetivos del mes — ¿voy en camino a mis metas? */}
-      {isPortfolioView && portfolioFocus === "resumen" && (
-        <Card className="mb-4">
-          <CardHeader
-            title="Objetivos del mes"
-            description="Un comprador trabaja contra metas, no solo mirando el estado actual."
-          />
-          <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <GoalBar
-              label="Venta"
-              valueText={formatCurrencyCompact(story.goals.venta.actual)}
-              metaText={`meta ${formatCurrencyCompact(story.goals.venta.meta)}`}
-              pct={
-                story.goals.venta.meta > 0
-                  ? (story.goals.venta.actual / story.goals.venta.meta) * 100
-                  : 0
-              }
-              good={story.goals.venta.actual >= story.goals.venta.meta * 0.9}
-            />
-            <GoalBar
-              label="Margen"
-              valueText={formatPercent(story.goals.margen.actual)}
-              metaText={`meta ${story.goals.margen.meta}%`}
-              pct={(story.goals.margen.actual / story.goals.margen.meta) * 100}
-              good={story.goals.margen.actual >= story.goals.margen.meta}
-            />
-            <GoalBar
-              label="Sobrestock"
-              valueText={formatCurrencyCompact(story.goals.sobrestock.actual)}
-              metaText={`meta < ${formatCurrencyCompact(story.goals.sobrestock.meta)}`}
-              pct={Math.min(
-                100,
-                (story.goals.sobrestock.actual / story.goals.sobrestock.meta) * 100
-              )}
-              good={story.goals.sobrestock.actual <= story.goals.sobrestock.meta}
-              invert
-            />
-            <GoalBar
-              label="Disponibilidad"
-              valueText={formatPercent(story.goals.disponibilidad.actual, 0)}
-              metaText={`meta ${story.goals.disponibilidad.meta}%`}
-              pct={(story.goals.disponibilidad.actual / story.goals.disponibilidad.meta) * 100}
-              good={story.goals.disponibilidad.actual >= story.goals.disponibilidad.meta}
-            />
-          </CardBody>
-        </Card>
-      )}
+      {isPortfolioView && portfolioFocus === "resumen" && <MonthGoalsCard goals={story.goals} />}
 
       {/* 3 · Resumen ejecutivo — ¿cómo está funcionando? (con tendencia) */}
       {isPortfolioView && portfolioFocus === "resumen" && (
-        <section className="mb-4">
-          <SectionLabel>Resumen ejecutivo</SectionLabel>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <TrendKpi
-              label="Venta 30d"
-              value={formatCurrencyCompact(portfolio.salesValue)}
-              delta={story.salesTrendPct}
-              unit="%"
-            />
-            <TrendKpi
-              label="Margen"
-              value={formatPercent(portfolio.marginPct)}
-              delta={story.marginDelta}
-              unit="pp"
-            />
-            <TrendKpi
-              label="GMROI"
-              value={portfolio.gmroi.toFixed(1).replace(".", ",")}
-              delta={story.gmroiDelta}
-            />
-            <TrendKpi
-              label="Rotación"
-              value={`${formatNumber(portfolio.rotation)}x`}
-              delta={story.rotationDelta}
-            />
-            <TrendKpi
-              label="Cobertura"
-              value={formatDays(Math.round(portfolio.coverageWeighted))}
-              delta={story.coverageDelta}
-              unit="d"
-              invert
-            />
-            <TrendKpi label="Sobrestock" value={formatCurrencyCompact(portfolio.overstockValue)} />
-            <TrendKpi label="Quiebres" value={`${formatNumber(riskRows.length)} SKU`} />
-            <TrendKpi label="Inventario" value={formatCurrencyCompact(portfolio.inventoryValue)} />
-          </div>
-        </section>
+        <ExecutiveSummary portfolio={portfolio} story={story} riskCount={riskRows.length} />
       )}
 
       {isPortfolioView && portfolioFocus !== "resumen" && (
@@ -1204,50 +1100,7 @@ export function MyPanelPage() {
 
       {/* 6 · Productos estratégicos (top 3 por utilidad) */}
       {isPortfolioView && portfolioFocus === "resumen" && (
-        <Card className="mb-4">
-          <CardHeader
-            title="Productos estratégicos"
-            description="Los que más aportan a tu utilidad."
-            action={
-              <Link
-                to="/mi-cartera/productos-clave"
-                className="text-xs font-medium text-brand-600 hover:text-brand-700"
-              >
-                Ver todos
-              </Link>
-            }
-          />
-          <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {story.strategic.map(({ row, utilShare }) => (
-              <Link
-                key={row.product.sku}
-                to={`/productos/${row.product.sku}`}
-                className="rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
-              >
-                <p className="truncate text-sm font-medium text-slate-800">{row.product.name}</p>
-                <p className="mt-0.5 text-xs text-slate-400">{row.role}</p>
-                <div className="mt-2 grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {formatPercent(utilShare, 0)}
-                    </p>
-                    <p className="text-[10px] text-slate-400">utilidad</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{row.gmroi.toFixed(1)}</p>
-                    <p className="text-[10px] text-slate-400">GMROI</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {formatPercent(row.product.margin, 0)}
-                    </p>
-                    <p className="text-[10px] text-slate-400">margen</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </CardBody>
-        </Card>
+        <StrategicProductsCard strategic={story.strategic} />
       )}
 
       {/* 7 · Marcas + 8 · Proveedores (tablas compactas) */}
