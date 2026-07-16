@@ -393,6 +393,12 @@ export const compradorModules: NavModule[] = [
         icon: IconRules,
         hint: "Cómo se calcula la compra sugerida y detección de parámetros mal configurados",
       },
+      {
+        to: "/gobierno",
+        label: "Gobierno y bitácora",
+        icon: IconCheck,
+        hint: "Roles y permisos, matriz de aprobación y registro de cambios",
+      },
     ],
   },
 ];

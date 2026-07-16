@@ -27,6 +27,7 @@ import { IconRules, IconAlerts, IconArrowRight, IconCheck } from "../components/
 import { cn } from "../utils/cn";
 import { ruleParamIssues } from "../utils/paramHealth";
 import { TODAY_ISO } from "../utils/constants";
+import { useTrace } from "../context/TraceContext";
 import type { PurchaseRule } from "../types/purchasing";
 
 type RuleHealth = "ok" | "incoherent" | "high_lead" | "overstock_risk" | "stockout_risk";
@@ -87,6 +88,7 @@ const affectedPurchase = (r: PurchaseRule) => {
 
 export function SettingsPage() {
   const toast = useToast();
+  const { log } = useTrace();
   const [rules, setRules] = useState<PurchaseRule[]>(seedRules);
   const [onlyAlerts, setOnlyAlerts] = useState(false);
   const [scopeFilter, setScopeFilter] = useState<string>("all");
@@ -112,6 +114,19 @@ export function SettingsPage() {
         x.id === rule.id ? { ...x, ...fix, updatedAt: TODAY_ISO, updatedBy: "Catalina Saavedra" } : x
       )
     );
+    // Registrar el cambio en la bitácora (antes → después).
+    const [field, after] = Object.entries(fix)[0] ?? [];
+    if (field) {
+      log({
+        actor: "Catalina Saavedra",
+        entity: `Regla · ${rule.scope}`,
+        action: "Corrigió parámetro",
+        field,
+        before: String(rule[field as keyof PurchaseRule] ?? "—"),
+        after: String(after),
+        reason: label,
+      });
+    }
     toast.success(`Corregido: ${label}`);
   };
   const propias = rules.filter((r) => !isGlobal(r)).length;

@@ -13,6 +13,7 @@ import { PurchaseFlowProvider } from "../context/PurchaseFlowContext";
 import { DataProvider } from "../context/DataContext";
 import { DensityProvider } from "../context/DensityContext";
 import { ClaimsProvider } from "../context/ClaimsContext";
+import { TraceProvider } from "../context/TraceContext";
 import { RoleGate } from "../components/layout/RoleGate";
 import { PageSkeleton } from "../components/ui/Skeleton";
 
@@ -94,6 +95,7 @@ const BudgetPage = lazy(() => named(import("../pages/BudgetPage"), "BudgetPage")
 const DocumentsPage = lazy(() => named(import("../pages/DocumentsPage"), "DocumentsPage"));
 const ReportsPage = lazy(() => named(import("../pages/ReportsPage"), "ReportsPage"));
 const ClaimsPage = lazy(() => named(import("../pages/ClaimsPage"), "ClaimsPage"));
+const GovernancePage = lazy(() => named(import("../pages/GovernancePage"), "GovernancePage"));
 
 function PageLoader() {
   return <PageSkeleton />;
@@ -126,6 +128,7 @@ export default function AppRoutes() {
                   <OcDraftProvider>
                     <PurchaseFlowProvider>
                       <ClaimsProvider>
+                      <TraceProvider>
                       <SignalsProvider>
                         <Routes>
                           <Route path="/login" element={<LoginGate />} />
@@ -264,11 +267,13 @@ export default function AppRoutes() {
                               <Route path="/margen-canal" element={<ChannelMarginPage />} />
                               <Route path="/temporadas" element={<SeasonsChannelsPage />} />
                               <Route path="/reglas" element={<SettingsPage />} />
+                              <Route path="/gobierno" element={<GovernancePage />} />
                               <Route path="*" element={<Navigate to="/" replace />} />
                             </Route>
                           </Route>
                         </Routes>
                       </SignalsProvider>
+                      </TraceProvider>
                       </ClaimsProvider>
                     </PurchaseFlowProvider>
                   </OcDraftProvider>

@@ -11,6 +11,7 @@ import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Chip } from "../components/ui/Chip";
 import { useClaims } from "../context/ClaimsContext";
+import { useTrace } from "../context/TraceContext";
 import {
   CLAIM_TYPE,
   CLAIM_STATUS,
@@ -33,6 +34,7 @@ const RESUELTO_RECUPERA: ClaimResolution[] = ["nota_credito", "reposicion", "des
 
 export function ClaimsPage() {
   const { claims, updateClaim, addClaim } = useClaims();
+  const { log } = useTrace();
   const toast = useToast();
   const [filter, setFilter] = useState<"abiertos" | "todos" | "resueltos">("abiertos");
   const [managing, setManaging] = useState<SupplierClaim | null>(null);
@@ -244,6 +246,17 @@ export function ClaimsPage() {
           onClose={() => setManaging(null)}
           onSave={(patch) => {
             updateClaim(managing.id, patch);
+            if (patch.estado && patch.estado !== managing.estado) {
+              log({
+                actor: "Catalina Saavedra",
+                entity: `Reclamo · ${managing.productName}`,
+                action: "Actualizó reclamo",
+                field: "estado",
+                before: managing.estado,
+                after: patch.estado,
+                reason: patch.notaCredito ? `Nota de crédito ${patch.notaCredito}` : undefined,
+              });
+            }
             toast.success("Reclamo actualizado");
             setManaging(null);
           }}
@@ -255,6 +268,15 @@ export function ClaimsPage() {
           onClose={() => setCreating(false)}
           onCreate={(claim) => {
             addClaim(claim);
+            log({
+              actor: claim.responsable,
+              entity: `Reclamo · ${claim.productName}`,
+              action: "Creó reclamo",
+              field: "estado",
+              before: "—",
+              after: "abierto",
+              reason: claim.motivo,
+            });
             toast.success("Reclamo creado");
             setCreating(false);
           }}
