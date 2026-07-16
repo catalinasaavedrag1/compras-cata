@@ -41,6 +41,7 @@ import {
 } from "../components/ui/icons";
 import { useClaims } from "../context/ClaimsContext";
 import { CLAIM_OPEN_STATES } from "../data/mockClaims";
+import { supplierScore, SUPPLIER_CLASS } from "../utils/supplierScore";
 
 export function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -67,6 +68,7 @@ export function SupplierDetailPage() {
   const openStates = new Set(CLAIM_OPEN_STATES);
   const openClaims = supClaims.filter((c) => openStates.has(c.estado));
   const claimsValue = openClaims.reduce((a, c) => a + c.valorReclamado, 0);
+  const score = supplierScore(supplier, supClaims);
 
   const supProducts = products.filter((p) => p.supplierName === supplier.name);
   const supSkus = new Set(supProducts.map((p) => p.sku));
@@ -222,6 +224,48 @@ export function SupplierDetailPage() {
           <IconChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
         </button>
       )}
+
+      {/* Evaluación de desempeño (OTIF, lead time prometido vs real, reclamos) */}
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-card">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-800">Evaluación de desempeño</p>
+          <Badge tone={SUPPLIER_CLASS[score.classification].tone} dot>
+            {SUPPLIER_CLASS[score.classification].label}
+          </Badge>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <ScoreStat
+            label="OTIF"
+            value={`${score.otif}%`}
+            tone={score.otif >= 90 ? "good" : score.otif >= 80 ? "warn" : "bad"}
+            hint="A tiempo y completo"
+          />
+          <ScoreStat label="Fill rate" value={`${score.fillRate}%`} hint="Despacho completo" />
+          <ScoreStat
+            label="Lead time prometido→real"
+            value={
+              score.leadPromised !== null
+                ? `${score.leadPromised}→${score.leadReal} d`
+                : `${score.leadReal} d`
+            }
+            tone={score.leadGap >= 5 ? "bad" : score.leadGap >= 2 ? "warn" : "good"}
+            hint={score.leadGap > 0 ? `+${score.leadGap} d más lento` : "En plazo"}
+          />
+          <ScoreStat
+            label="Reclamos abiertos"
+            value={
+              score.claimsOpen > 0
+                ? `${score.claimsOpen} · ${formatCurrencyCompact(score.claimsValue)}`
+                : "0"
+            }
+            tone={score.claimsOpen > 0 ? "bad" : "good"}
+            hint="Pérdidas operativas"
+          />
+        </div>
+        {score.reasons.length > 0 && (
+          <p className="mt-2 text-xs text-slate-500">{score.reasons.join(" ")}</p>
+        )}
+      </div>
 
       {/* Motivo de revisión si aplica */}
       {(supplier.status === "delayed" ||
@@ -692,6 +736,34 @@ function SupplierCockpitMetric({ label, value }: { label: string; value: string 
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="mt-1 text-base font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function ScoreStat({
+  label,
+  value,
+  hint,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "good" | "warn" | "bad" | "neutral";
+}) {
+  const color =
+    tone === "bad"
+      ? "text-rose-700"
+      : tone === "warn"
+        ? "text-amber-700"
+        : tone === "good"
+          ? "text-emerald-700"
+          : "text-slate-900";
+  return (
+    <div className="rounded-lg border border-slate-200 px-3 py-2">
+      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className={`text-base font-semibold ${color}`}>{value}</p>
+      {hint && <p className="text-[11px] text-slate-400">{hint}</p>}
     </div>
   );
 }
