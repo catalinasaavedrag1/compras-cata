@@ -8,11 +8,9 @@ import {
   AdSpacesView,
   CampaignProductsTable,
 } from "./CampaignsSections";
+import { ProductFormModal, CreateCampaignModal } from "./CampaignsModals";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Button } from "../components/ui/Button";
-import { Modal } from "../components/ui/Modal";
-import { Input } from "../components/ui/Input";
-import { Select } from "../components/ui/Select";
 import { Tabs } from "../components/ui/Tabs";
 import { IconPlus } from "../components/ui/icons";
 import { useToast } from "../context/ToastContext";
@@ -422,238 +420,37 @@ export function CampaignsPage() {
       )}
 
       {/* Modal agregar/editar producto */}
-      <Modal
-        open={!!form}
-        onClose={() => setForm(null)}
-        title={
-          form?.mode === "edit" ? "Editar producto en descuento" : "Agregar producto en descuento"
-        }
-        description="Define el producto, la vigencia y el precio antes y después."
-        size="lg"
-        footer={
-          <>
-            {form?.mode === "edit" && (
-              <Button
-                variant="danger"
-                onClick={() => {
-                  const i = form.index;
-                  updateProducts((arr) => arr.filter((_, j) => j !== i));
-                  setForm(null);
-                  toast.success(`Producto quitado de ${camp.name}`);
-                }}
-              >
-                Quitar
-              </Button>
-            )}
-            <span className="flex-1" />
-            <Button variant="secondary" onClick={() => setForm(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={submitForm} disabled={!fValid}>
-              {form?.mode === "edit" ? "Guardar cambios" : "Agregar a la campaña"}
-            </Button>
-          </>
-        }
-      >
-        {form && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Producto</label>
-              {form.mode === "edit" ? (
-                <div className="flex items-center gap-2.5 h-10 border border-slate-200 rounded-lg px-3 bg-slate-50">
-                  <span className="text-[11px] font-mono text-slate-400">{form.sku}</span>
-                  <span className="text-sm font-medium text-slate-700">{form.name}</span>
-                </div>
-              ) : (
-                <Select
-                  value={form.sku}
-                  onChange={(e) => {
-                    const sku = e.target.value;
-                    const r = retailPrice(sku);
-                    setForm(
-                      (f) =>
-                        f && {
-                          ...f,
-                          sku,
-                          name: r?.name ?? "",
-                          category: r?.category ?? "",
-                          normal: r ? String(r.normal) : f.normal,
-                          promo: r ? String(r.promo) : f.promo,
-                        }
-                    );
-                  }}
-                  options={[{ value: "", label: "Selecciona un producto…" }, ...productOptions]}
-                />
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Descuento desde
-                </label>
-                <Input
-                  type="date"
-                  value={form.from}
-                  onChange={(e) => setForm((f) => f && { ...f, from: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Descuento hasta
-                </label>
-                <Input
-                  type="date"
-                  value={form.to}
-                  onChange={(e) => setForm((f) => f && { ...f, to: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-3.5 items-end">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Precio antes
-                </label>
-                <Input
-                  inputMode="numeric"
-                  value={form.normal}
-                  onChange={(e) =>
-                    setForm((f) => f && { ...f, normal: e.target.value.replace(/[^0-9]/g, "") })
-                  }
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Precio con descuento
-                </label>
-                <Input
-                  inputMode="numeric"
-                  value={form.promo}
-                  onChange={(e) =>
-                    setForm((f) => f && { ...f, promo: e.target.value.replace(/[^0-9]/g, "") })
-                  }
-                  placeholder="0"
-                />
-              </div>
-              <div className="text-center pb-0.5">
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Descuento
-                </label>
-                <span
-                  className={`inline-flex items-center justify-center min-w-[62px] h-10 rounded-lg bg-rose-50 text-base font-bold ${fDiscount > 0 ? "text-rose-600" : "text-slate-300"}`}
-                >
-                  {fDiscount > 0 ? `-${fDiscount}%` : "—"}
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Canal</label>
-                <Select
-                  value={form.channel}
-                  onChange={(e) =>
-                    setForm((f) => f && { ...f, channel: e.target.value as PromoChannelKey })
-                  }
-                  options={[
-                    { value: "redes", label: "Redes Sociales" },
-                    { value: "ml", label: "Mercado Libre" },
-                    { value: "web", label: "Web / Banner" },
-                    { value: "tienda", label: "Tienda física" },
-                  ]}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  Ubicación / exhibición
-                </label>
-                <Select
-                  value={form.placement}
-                  onChange={(e) =>
-                    setForm((f) => f && { ...f, placement: e.target.value as PlacementKey })
-                  }
-                  options={(Object.keys(PLACEMENT_LABELS) as PlacementKey[]).map((k) => ({
-                    value: k,
-                    label: PLACEMENT_LABELS[k],
-                  }))}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                Presupuesto de publicidad
-              </label>
-              <div className="max-w-[220px]">
-                <Input
-                  inputMode="numeric"
-                  value={form.budget}
-                  onChange={(e) =>
-                    setForm((f) => f && { ...f, budget: e.target.value.replace(/[^0-9]/g, "") })
-                  }
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <ProductFormModal
+        form={form}
+        setForm={setForm}
+        onSubmit={submitForm}
+        onRemove={() => {
+          if (!form) return;
+          const i = form.index;
+          updateProducts((arr) => arr.filter((_, j) => j !== i));
+          setForm(null);
+          toast.success(`Producto quitado de ${camp.name}`);
+        }}
+        fValid={fValid}
+        fDiscount={fDiscount}
+        retailPrice={retailPrice}
+        productOptions={productOptions}
+      />
 
       {/* Modal crear campaña */}
-      <Modal
+      <CreateCampaignModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Crear campaña"
-        description="Define el evento y su presupuesto. Luego agrega los productos en descuento."
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setCreateOpen(false)}>
-              Cancelar
-            </Button>
-            <Button icon={<IconPlus className="w-4 h-4" />} onClick={submitCreate}>
-              Crear campaña
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Nombre de la campaña
-            </label>
-            <Input
-              value={cmName}
-              onChange={(e) => setCmName(e.target.value)}
-              placeholder="Ej: Cyber Septiembre"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Desde</label>
-              <Input type="date" value={cmFrom} onChange={(e) => setCmFrom(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Hasta</label>
-              <Input type="date" value={cmTo} onChange={(e) => setCmTo(e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Presupuesto total de la campaña
-            </label>
-            <div className="max-w-[240px]">
-              <Input
-                inputMode="numeric"
-                value={cmBudget}
-                onChange={(e) => setCmBudget(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="0"
-              />
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1.5">
-              Se reparte automáticamente: 40% Redes, 30% Mercado Libre, 20% Web, 10% Tienda. Lo
-              puedes ajustar después.
-            </p>
-          </div>
-        </div>
-      </Modal>
+        cmName={cmName}
+        setCmName={setCmName}
+        cmFrom={cmFrom}
+        setCmFrom={setCmFrom}
+        cmTo={cmTo}
+        setCmTo={setCmTo}
+        cmBudget={cmBudget}
+        setCmBudget={setCmBudget}
+        onCreate={submitCreate}
+      />
     </div>
   );
 }
