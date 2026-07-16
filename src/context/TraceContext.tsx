@@ -66,7 +66,7 @@ export function TraceProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<TraceContextValue>(() => {
     const log: TraceContextValue["log"] = (entry) => {
-      const id = entry.id ?? `TR-${Date.now()}`;
+      const id = entry.id ?? `TR-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const date = entry.date ?? new Date().toISOString().slice(0, 10);
       setEntries((prev) => [{ ...entry, id, date }, ...prev].slice(0, 200));
     };

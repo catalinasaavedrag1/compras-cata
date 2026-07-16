@@ -30,7 +30,7 @@ export function ClaimsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ClaimsContextValue>(() => {
     const addClaim: ClaimsContextValue["addClaim"] = (claim) => {
-      const id = claim.id ?? `CLM-${Date.now()}`;
+      const id = claim.id ?? `CLM-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       setClaims((prev) =>
         prev.some((c) => c.id === id) ? prev : [{ ...claim, id }, ...prev]
       );

@@ -13,7 +13,7 @@ import { coverageDays } from "../../utils/calculations";
 
 import { formatDate, formatNumber } from "../../utils/formatters";
 import { IconPlus, IconAlerts } from "../../components/ui/icons";
-import type { Reception, ReceptionItem } from "../../types/purchasing";
+import type { ClaimType, Reception, ReceptionItem } from "../../types/purchasing";
 import { lineStatus } from "./helpers";
 import { useClaims, suggestedResolution } from "../../context/ClaimsContext";
 import { useToast } from "../../context/ToastContext";
@@ -37,7 +37,11 @@ export function ReceptionDetail({
   const createClaim = (it: ReceptionItem) => {
     const missing = it.expected - it.received;
     const cost = getProductBySku(it.sku)?.cost ?? 0;
-    const tipo = missing > 0 ? "faltante" : it.issue ? "dano" : "calidad";
+    // El botón solo aparece con faltante o incidencia, así que el tipo es
+    // "faltante" (llegó de menos) o "dano" (incidencia reportada en la línea).
+    const issue = (it.issue ?? "").toLowerCase();
+    const tipo: ClaimType =
+      missing > 0 ? "faltante" : /(calidad|humedad|manch|defect|vary|separaci)/.test(issue) ? "calidad" : "dano";
     const cantidad = missing > 0 ? missing : Math.max(1, Math.round(it.received * 0.1));
     addClaim({
       poNumber: detail.poNumber,

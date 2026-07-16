@@ -17,6 +17,9 @@ import {
   CLAIM_STATUS,
   CLAIM_RESOLUTION,
   CLAIM_OPEN_STATES,
+  claimTypeMeta,
+  claimStatusMeta,
+  claimResolutionLabel,
 } from "../data/mockClaims";
 import { useToast } from "../context/ToastContext";
 import { supplierPath } from "../utils/entityLinks";
@@ -96,7 +99,7 @@ export function ClaimsPage() {
       header: "Motivo",
       render: (c) => (
         <div className="min-w-[180px]">
-          <Badge tone={CLAIM_TYPE[c.tipo].tone}>{CLAIM_TYPE[c.tipo].label}</Badge>
+          <Badge tone={claimTypeMeta(c.tipo).tone}>{claimTypeMeta(c.tipo).label}</Badge>
           <p className="mt-1 text-xs text-slate-500 line-clamp-2">{c.motivo}</p>
         </div>
       ),
@@ -129,11 +132,11 @@ export function ClaimsPage() {
       header: "Estado",
       render: (c) => (
         <div>
-          <Badge tone={CLAIM_STATUS[c.estado].tone} dot>
-            {CLAIM_STATUS[c.estado].label}
+          <Badge tone={claimStatusMeta(c.estado).tone} dot>
+            {claimStatusMeta(c.estado).label}
           </Badge>
           <p className="mt-1 text-xs text-slate-500">
-            {CLAIM_RESOLUTION[c.resolucion]}
+            {claimResolutionLabel(c.resolucion)}
             {c.notaCredito ? ` · ${c.notaCredito}` : ""}
           </p>
         </div>
@@ -216,12 +219,12 @@ export function ClaimsPage() {
                     {c.poNumber} · {c.supplierName}
                   </p>
                 </div>
-                <Badge tone={CLAIM_STATUS[c.estado].tone} dot={false}>
-                  {CLAIM_STATUS[c.estado].label}
+                <Badge tone={claimStatusMeta(c.estado).tone} dot={false}>
+                  {claimStatusMeta(c.estado).label}
                 </Badge>
               </div>
               <div className="mt-1.5 flex items-center gap-2">
-                <Badge tone={CLAIM_TYPE[c.tipo].tone}>{CLAIM_TYPE[c.tipo].label}</Badge>
+                <Badge tone={claimTypeMeta(c.tipo).tone}>{claimTypeMeta(c.tipo).label}</Badge>
                 <span className="text-sm font-semibold text-rose-600">
                   {formatCurrency(c.valorReclamado)}
                 </span>

@@ -114,9 +114,8 @@ export function SettingsPage() {
         x.id === rule.id ? { ...x, ...fix, updatedAt: TODAY_ISO, updatedBy: "Catalina Saavedra" } : x
       )
     );
-    // Registrar el cambio en la bitácora (antes → después).
-    const [field, after] = Object.entries(fix)[0] ?? [];
-    if (field) {
+    // Registrar cada campo cambiado en la bitácora (antes → después).
+    for (const [field, after] of Object.entries(fix)) {
       log({
         actor: "Catalina Saavedra",
         entity: `Regla · ${rule.scope}`,
@@ -628,7 +627,7 @@ export function SettingsPage() {
           setRules((prev) =>
             prev.map((x) =>
               x.id === updated.id
-                ? { ...updated, updatedAt: "2026-06-24", updatedBy: "Catalina Saavedra" }
+                ? { ...updated, updatedAt: TODAY_ISO, updatedBy: "Catalina Saavedra" }
                 : x
             )
           );

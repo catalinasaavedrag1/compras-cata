@@ -27,22 +27,28 @@ export interface ParamIssue {
 
 export function ruleParamIssues(rule: PurchaseRule, scopeProducts: Product[]): ParamIssue[] {
   const issues: ParamIssue[] = [];
+  // Las reglas de canal gobiernan precio/margen, no parámetros de inventario:
+  // no tiene sentido diagnosticar su lead time o stock de seguridad.
+  if (rule.scopeType === "channel") return issues;
   const selling = scopeProducts.filter((p) => p.salesLast30Days > 0);
   const leadTimes = scopeProducts.map((p) => p.supplierLeadTimeDays).filter((n) => n > 0);
-  const realMax = leadTimes.length ? Math.max(...leadTimes) : 0;
-  const realAvg = leadTimes.length
-    ? Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length)
+  const sortedLead = [...leadTimes].sort((a, b) => a - b);
+  const realMax = sortedLead.length ? sortedLead[sortedLead.length - 1] : 0;
+  // Referencia robusta a outliers (p90): la sugerencia cubre al 90% de los
+  // proveedores del ámbito sin inflar el parámetro por un único caso extremo.
+  const realP90 = sortedLead.length
+    ? sortedLead[Math.min(sortedLead.length - 1, Math.floor(sortedLead.length * 0.9))]
     : 0;
 
   // 1 · Lead time configurado muy por debajo del real.
-  if (rule.leadTimeDays > 0 && realMax >= rule.leadTimeDays + 5 && realMax >= rule.leadTimeDays * 1.3) {
+  if (rule.leadTimeDays > 0 && realP90 >= rule.leadTimeDays + 5 && realP90 >= rule.leadTimeDays * 1.3) {
     issues.push({
       kind: "lead_time",
       severity: "high",
       title: "Lead time subestimado",
-      detail: `Configurado en ${rule.leadTimeDays} días, pero los proveedores del ámbito tardan hasta ${realMax} días (promedio ${realAvg}). La reposición se emite tarde y llega con quiebre.`,
-      suggestion: `Subir lead time a ${realMax} días`,
-      fix: { leadTimeDays: realMax },
+      detail: `Configurado en ${rule.leadTimeDays} días, pero los proveedores del ámbito tardan hasta ${realMax} días. La reposición se emite tarde y llega con quiebre.`,
+      suggestion: `Subir lead time a ${realP90} días (cubre al 90%)`,
+      fix: { leadTimeDays: realP90 },
     });
   }
 
@@ -63,7 +69,7 @@ export function ruleParamIssues(rule: PurchaseRule, scopeProducts: Product[]): P
 
   // 3 · Productos estacionales bajo una regla de cobertura permanente.
   const seasonal = scopeProducts.filter((p) => p.productStatus === "seasonal");
-  if (seasonal.length > 0 && rule.scopeType !== "channel") {
+  if (seasonal.length > 0) {
     issues.push({
       kind: "seasonal_permanent",
       severity: "medium",

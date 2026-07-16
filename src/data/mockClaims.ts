@@ -42,6 +42,14 @@ export const CLAIM_RESOLUTION: Record<ClaimResolution, string> = {
 /** Un reclamo está cerrado (no cuenta como abierto) si está resuelto o rechazado. */
 export const CLAIM_OPEN_STATES: ClaimStatus[] = ["abierto", "en_gestion", "aceptado"];
 
+// Accesores seguros: si un reclamo persistido trae un valor fuera de rango
+// (datos antiguos/corruptos en localStorage), no rompen la UI.
+export const claimTypeMeta = (t: ClaimType) =>
+  CLAIM_TYPE[t] ?? { label: t, tone: "neutral" as BadgeTone };
+export const claimStatusMeta = (s: ClaimStatus) =>
+  CLAIM_STATUS[s] ?? { label: s, tone: "neutral" as BadgeTone };
+export const claimResolutionLabel = (r: ClaimResolution) => CLAIM_RESOLUTION[r] ?? String(r);
+
 export const claims: SupplierClaim[] = [
   {
     id: "REC-CLM-001",
