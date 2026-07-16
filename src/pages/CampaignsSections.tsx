@@ -1,10 +1,42 @@
 import { Card, CardBody } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { IconPlus, IconArrowUp, IconArrowDown } from "../components/ui/icons";
 import { Svg } from "./campaignsShared";
 import { CHANNEL_BG } from "../utils/tone";
 import { formatCurrency, formatCurrencyCompact } from "../utils/formatters";
 import { daysUntil, rangeText } from "./campaignsHelpers";
-import { CHANNEL_META, type CampaignPlan, type PromoChannelKey } from "../data/mockCampaignPlans";
+import {
+  CHANNEL_META,
+  PLACEMENT_ICON,
+  type CampaignPlan,
+  type PromoChannelKey,
+  type PlacementKey,
+  type SpaceType,
+} from "../data/mockCampaignPlans";
+
+/** Un producto asignado a un espacio, con su posición de exhibición. */
+export interface AdSpaceAssignment {
+  sku: string;
+  name: string;
+  disc: string;
+  position: number;
+  groupTotal: number;
+  isFirst: boolean;
+  isLast: boolean;
+}
+
+/** Espacio publicitario con su ocupación y asignaciones ya calculadas. */
+export interface AdSpace extends SpaceType {
+  filterKey: string;
+  used: number;
+  avail: number;
+  assigned: AdSpaceAssignment[];
+  statusLabel: string;
+  statusTone: "red" | "amber" | "green";
+  occPct: number;
+  occBar: string;
+}
 
 /**
  * Tarjeta de resumen de la campaña seleccionada: nombre, rango, número de
@@ -244,5 +276,217 @@ export function ChannelFilterChips({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Espacios publicitarios de la campaña en dos vistas: tarjetas (con reorden de
+ * banner ▲▼ y asignación) y calendario (fila compacta). (Extraído de CampaignsPage.)
+ */
+export function AdSpacesView({
+  spaces,
+  spaceView,
+  campFrom,
+  campTo,
+  moveProduct,
+  openAdd,
+  onInfo,
+}: {
+  spaces: AdSpace[];
+  spaceView: "grid" | "calendar";
+  campFrom: string;
+  campTo: string;
+  moveProduct: (sku: string, placement: PlacementKey, dir: -1 | 1) => void;
+  openAdd: (preset: { channel: PromoChannelKey; placement: PlacementKey }) => void;
+  onInfo: (message: string) => void;
+}) {
+  if (spaceView === "grid") {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 mb-6">
+        {spaces.map((s) => {
+          const meta = CHANNEL_META[s.channel];
+          return (
+            <Card key={s.placement}>
+              <CardBody className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${CHANNEL_BG[meta.tone]}`}
+                    >
+                      <Svg path={PLACEMENT_ICON[s.placement]} className="w-4 h-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{s.label}</p>
+                      <p className="text-xs text-slate-400">{meta.label}</p>
+                    </div>
+                  </div>
+                  <Badge tone={s.statusTone}>{s.statusLabel}</Badge>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold text-slate-900">{s.avail}</span>
+                    <span className="text-xs text-slate-400">libres de {s.total}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${s.occPct}%`, background: s.occBar }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      {s.used} ocupado{s.used === 1 ? "" : "s"} · {s.avail} libre
+                      {s.avail === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 border-t border-slate-100 pt-2.5 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <Svg
+                      path="M12 21s-7-4.4-7-10a7 7 0 0 1 14 0c0 5.6-7 10-7 10z"
+                      className="w-3.5 h-3.5 text-slate-400"
+                    />{" "}
+                    {s.position}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Svg
+                      path="M3 3h18v18H3zM3 9h18M9 21V9"
+                      className="w-3.5 h-3.5 text-slate-400"
+                    />{" "}
+                    {s.size}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Svg
+                      path="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM16 2v4M8 2v4M3 10h18"
+                      className="w-3.5 h-3.5 text-slate-400"
+                    />{" "}
+                    {rangeText(campFrom, campTo)}
+                  </span>
+                </div>
+                {s.assigned.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">
+                      Asignados · orden de exhibición
+                    </p>
+                    {s.assigned.map((a) => (
+                      <div
+                        key={a.sku}
+                        className="flex items-center gap-2 bg-slate-50 rounded-md px-2 py-1.5"
+                      >
+                        <Badge
+                          tone={
+                            a.position === 1 ? "green" : a.position === 2 ? "amber" : "neutral"
+                          }
+                        >
+                          {a.position}º
+                        </Badge>
+                        <span
+                          className="flex-1 min-w-0 text-xs text-slate-700 truncate"
+                          title={`${a.name} · Posición ${a.position} de ${a.groupTotal}`}
+                        >
+                          {a.name}
+                        </span>
+                        <span className="text-[11px] font-bold text-rose-600">{a.disc}</span>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            aria-label={`Subir ${a.name}`}
+                            disabled={a.isFirst}
+                            onClick={() => moveProduct(a.sku, s.placement, -1)}
+                            className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-slate-400 enabled:hover:border-brand-300 enabled:hover:text-brand-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <IconArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Bajar ${a.name}`}
+                            disabled={a.isLast}
+                            onClick={() => moveProduct(a.sku, s.placement, 1)}
+                            className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-slate-400 enabled:hover:border-brand-300 enabled:hover:text-brand-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <IconArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-slate-50 border border-dashed border-slate-300 rounded-lg px-2.5 py-2 text-xs text-slate-400">
+                    <IconPlus className="w-3.5 h-3.5" /> Sin asignaciones todavía
+                  </div>
+                )}
+                <Button
+                  variant={s.avail > 0 ? "primary" : "secondary"}
+                  size="sm"
+                  className="w-full"
+                  icon={s.avail > 0 ? <IconPlus className="w-3.5 h-3.5" /> : undefined}
+                  onClick={() =>
+                    s.avail > 0
+                      ? openAdd({ channel: s.channel, placement: s.placement })
+                      : onInfo(`${s.label}: ${s.assigned.map((x) => x.name).join(", ")}`)
+                  }
+                >
+                  {s.avail === 0
+                    ? "Ver asignaciones"
+                    : s.used === 0
+                      ? "Asignar primer producto"
+                      : s.avail === 1
+                        ? "Asignar último cupo"
+                        : "Asignar producto"}
+                </Button>
+              </CardBody>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <Card className="mb-6">
+      {spaces.map((s) => {
+        const meta = CHANNEL_META[s.channel];
+        return (
+          <div
+            key={s.placement}
+            className="flex items-center gap-3.5 px-4 py-3 border-b border-slate-100 last:border-0"
+          >
+            <span
+              className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${CHANNEL_BG[meta.tone]}`}
+            >
+              <Svg path={PLACEMENT_ICON[s.placement]} className="w-4 h-4" />
+            </span>
+            <div className="w-40 flex-shrink-0 min-w-0">
+              <p className="text-sm font-semibold text-slate-800 truncate">{s.label}</p>
+              <p className="text-[11px] text-slate-400">{meta.label}</p>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div
+                className="rounded-md bg-slate-100 overflow-hidden relative"
+                style={{ height: 22 }}
+              >
+                <div
+                  className="h-full"
+                  style={{ width: `${s.occPct}%`, background: s.occBar, opacity: 0.22 }}
+                />
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-600">
+                  {s.used} ocupado{s.used === 1 ? "" : "s"} · {s.avail} libre
+                  {s.avail === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+            <Badge tone={s.statusTone}>{s.statusLabel}</Badge>
+            <button
+              onClick={() =>
+                s.avail > 0 ? openAdd({ channel: s.channel, placement: s.placement }) : undefined
+              }
+              className="text-xs font-semibold text-brand-600 whitespace-nowrap"
+            >
+              {s.avail === 0 ? "Completo" : "Asignar"}
+            </button>
+          </div>
+        );
+      })}
+    </Card>
   );
 }
