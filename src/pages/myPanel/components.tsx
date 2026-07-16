@@ -4,15 +4,17 @@ import { Card, CardBody, CardHeader } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { StatusBadge } from "../../components/business/StatusBadge";
+import { IconCheck } from "../../components/ui/icons";
 import {
   capitalize,
   formatCurrencyCompact,
+  formatDate,
   formatDays,
   formatNumber,
   formatPercent,
 } from "../../utils/formatters";
 import { cn } from "../../utils/cn";
-import type { Category } from "../../types/purchasing";
+import type { Category, Product, PurchaseOrder, Supplier } from "../../types/purchasing";
 import type {
   BrandPortfolioRow,
   KeyProductRow,
@@ -1194,5 +1196,124 @@ export function PortfolioQualityCard({
         />
       </CardBody>
     </Card>
+  );
+}
+
+/** "Órdenes de compra sin recibir": lista con proveedor, fecha y atraso. (Extraído de MyPanelPage.) */
+export function OpenOrdersList({ orders }: { orders: PurchaseOrder[] }) {
+  return (
+    <div id="ordenes">
+      <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Órdenes de compra sin recibir</h3>
+      <Card>
+        <CardBody className="space-y-2">
+          {orders.length === 0 ? (
+            <EmptyState
+              icon={<IconCheck className="w-6 h-6" />}
+              title="Sin órdenes pendientes"
+              description="No tienes mercadería por recibir."
+            />
+          ) : (
+            [...orders]
+              .sort((a, b) => b.delayedDays - a.delayedDays)
+              .map((o) => (
+                <Link
+                  key={o.id}
+                  to={`/comprar/seguimiento?oc=${encodeURIComponent(o.number)}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800">{o.number}</p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {o.supplierName} · espera {formatDate(o.expectedDate)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {o.delayedDays > 0 && <Badge tone="red">{o.delayedDays} d atraso</Badge>}
+                    <StatusBadge kind="purchaseOrder" value={o.status} dot={false} />
+                  </div>
+                </Link>
+              ))
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+/** "Proveedores por revisar": lista ordenada por cumplimiento. (Extraído de MyPanelPage.) */
+export function SuppliersToReviewList({ suppliers }: { suppliers: Supplier[] }) {
+  return (
+    <div id="proveedores">
+      <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Proveedores por revisar</h3>
+      <Card>
+        <CardBody className="space-y-2">
+          {suppliers.length === 0 ? (
+            <EmptyState
+              icon={<IconCheck className="w-6 h-6" />}
+              title="Proveedores al día"
+              description="Ninguno de tus proveedores requiere revisión ahora."
+            />
+          ) : (
+            [...suppliers]
+              .sort((a, b) => a.deliveryCompliance - b.deliveryCompliance)
+              .map((s) => (
+                <Link
+                  key={s.id}
+                  to="/proveedores"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{s.name}</p>
+                    <p className="text-xs text-slate-500">
+                      Cumple {s.deliveryCompliance}% · última compra {formatDate(s.lastPurchaseDate)}
+                    </p>
+                  </div>
+                  <StatusBadge kind="supplier" value={s.status} dot={false} />
+                </Link>
+              ))
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+/** "Mi inventario con sobrestock": lista por capital inmovilizado. (Extraído de MyPanelPage.) */
+export function OverstockList({ products }: { products: Product[] }) {
+  return (
+    <div id="sobrestock">
+      <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Mi inventario con sobrestock</h3>
+      <Card>
+        <CardBody className="space-y-2">
+          {products.length === 0 ? (
+            <EmptyState
+              icon={<IconCheck className="w-6 h-6" />}
+              title="Sin sobrestock"
+              description="No tienes capital inmovilizado relevante."
+            />
+          ) : (
+            [...products]
+              .sort((a, b) => b.availableStock * b.cost - a.availableStock * a.cost)
+              .map((p) => (
+                <Link
+                  key={p.sku}
+                  to={`/productos/${p.sku}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
+                    <p className="text-xs text-slate-500">
+                      Disp. {formatNumber(p.availableStock)} · {formatNumber(p.inventoryDays)} días inv.
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold text-violet-600 flex-shrink-0">
+                    {formatCurrencyCompact(p.availableStock * p.cost)}
+                  </span>
+                </Link>
+              ))
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }
