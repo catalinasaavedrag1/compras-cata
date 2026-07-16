@@ -1,5 +1,5 @@
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { productPath } from "../../utils/entityLinks";
 
 import { Badge } from "../../components/ui/Badge";
@@ -12,9 +12,12 @@ import { supplierFulfillment } from "../../utils/supplierPerf";
 import { coverageDays } from "../../utils/calculations";
 
 import { formatDate, formatNumber } from "../../utils/formatters";
-import { IconPlus } from "../../components/ui/icons";
-import type { Reception } from "../../types/purchasing";
+import { IconPlus, IconAlerts } from "../../components/ui/icons";
+import type { Reception, ReceptionItem } from "../../types/purchasing";
 import { lineStatus } from "./helpers";
+import { useClaims, suggestedResolution } from "../../context/ClaimsContext";
+import { useToast } from "../../context/ToastContext";
+import { TODAY_ISO } from "../../utils/constants";
 
 export function ReceptionDetail({
   detail,
@@ -26,6 +29,39 @@ export function ReceptionDetail({
   hasItem: (sku: string) => boolean;
 }) {
   const perf = supplierFulfillment(detail.supplierName);
+  const { addClaim, exists } = useClaims();
+  const toast = useToast();
+  const navigate = useNavigate();
+
+  // Crea un reclamo prellenado desde una diferencia de la recepción.
+  const createClaim = (it: ReceptionItem) => {
+    const missing = it.expected - it.received;
+    const cost = getProductBySku(it.sku)?.cost ?? 0;
+    const tipo = missing > 0 ? "faltante" : it.issue ? "dano" : "calidad";
+    const cantidad = missing > 0 ? missing : Math.max(1, Math.round(it.received * 0.1));
+    addClaim({
+      poNumber: detail.poNumber,
+      receptionId: detail.id,
+      supplierName: detail.supplierName,
+      sku: it.sku,
+      productName: it.productName,
+      tipo,
+      cantidad,
+      valorReclamado: Math.round(cantidad * cost),
+      motivo:
+        missing > 0
+          ? `Llegaron ${it.received} de ${it.expected} u. · faltan ${missing}.`
+          : (it.issue ?? "Diferencia de calidad detectada en recepción."),
+      responsable: detail.buyer,
+      fecha: TODAY_ISO,
+      estado: "abierto",
+      resolucion: suggestedResolution(tipo),
+    });
+    toast.success(`Reclamo creado para ${it.productName}`, {
+      label: "Ver reclamos",
+      onClick: () => navigate("/reclamos"),
+    });
+  };
 
   // Impacto de la recepción parcial: SKUs que quedan bajo cobertura mínima
   const impacted = (detail.items ?? [])
@@ -169,19 +205,33 @@ export function ReceptionDetail({
                         </p>
                       );
                     })()}
-                  {missing > 0 && (
-                    <Button
-                      size="sm"
-                      className="mt-2"
-                      variant={hasItem(it.sku) ? "secondary" : "primary"}
-                      disabled={hasItem(it.sku)}
-                      icon={<IconPlus className="w-3.5 h-3.5" />}
-                      onClick={() => reorder(it.sku, it.productName, detail.supplierName, missing)}
-                    >
-                      {hasItem(it.sku)
-                        ? "En borrador de OC"
-                        : `Reordenar ${formatNumber(missing)} u.`}
-                    </Button>
+                  {(missing > 0 || it.issue) && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {missing > 0 && (
+                        <Button
+                          size="sm"
+                          variant={hasItem(it.sku) ? "secondary" : "primary"}
+                          disabled={hasItem(it.sku)}
+                          icon={<IconPlus className="w-3.5 h-3.5" />}
+                          onClick={() =>
+                            reorder(it.sku, it.productName, detail.supplierName, missing)
+                          }
+                        >
+                          {hasItem(it.sku)
+                            ? "En borrador de OC"
+                            : `Reordenar ${formatNumber(missing)} u.`}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={exists(detail.poNumber, it.sku)}
+                        icon={<IconAlerts className="w-3.5 h-3.5" />}
+                        onClick={() => createClaim(it)}
+                      >
+                        {exists(detail.poNumber, it.sku) ? "Reclamo creado" : "Crear reclamo"}
+                      </Button>
+                    </div>
                   )}
                 </div>
               );

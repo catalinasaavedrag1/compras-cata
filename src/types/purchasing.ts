@@ -446,6 +446,55 @@ export interface Reception {
 }
 
 // ----------------------------------------------------------------------------
+//  Reclamos al proveedor (faltantes, daños, calidad, costo, etc.)
+//  Cierran el ciclo recepción → diferencia → reclamo → evaluación del proveedor.
+// ----------------------------------------------------------------------------
+
+export type ClaimType =
+  | "faltante" // llegó menos de lo pedido
+  | "dano" // mercadería dañada
+  | "calidad" // calidad insuficiente
+  | "vencimiento" // fecha de vencimiento inadecuada
+  | "costo" // costo facturado distinto al pactado
+  | "empaque" // empaque diferente
+  | "sobrante" // llegó de más
+  | "documento"; // documento incorrecto
+
+export type ClaimStatus =
+  | "abierto" // recién creado
+  | "en_gestion" // en conversación con el proveedor
+  | "aceptado" // el proveedor aceptó el reclamo
+  | "resuelto" // cerrado con una resolución
+  | "rechazado"; // el proveedor rechazó el reclamo
+
+export type ClaimResolution =
+  | "pendiente"
+  | "nota_credito"
+  | "reposicion"
+  | "descuento"
+  | "aceptado_sin_ajuste";
+
+export interface SupplierClaim {
+  id: string;
+  poNumber: string;
+  receptionId?: string;
+  supplierName: string;
+  sku: string;
+  productName: string;
+  tipo: ClaimType;
+  cantidad: number;
+  motivo: string;
+  valorReclamado: number; // CLP en juego
+  responsable: string;
+  fecha: string; // ISO
+  fechaLimite?: string; // compromiso del proveedor
+  estado: ClaimStatus;
+  resolucion: ClaimResolution;
+  notaCredito?: string; // N° de nota de crédito si aplica
+  evidencia?: string; // nombre del documento adjunto
+}
+
+// ----------------------------------------------------------------------------
 //  Margen por canal de venta (marketplace / web / tienda)
 // ----------------------------------------------------------------------------
 

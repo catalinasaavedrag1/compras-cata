@@ -35,13 +35,18 @@ import {
   IconSuppliers,
   IconSales,
   IconBox,
+  IconAlerts,
+  IconChevronRight,
 } from "../components/ui/icons";
+import { useClaims } from "../context/ClaimsContext";
+import { CLAIM_OPEN_STATES } from "../data/mockClaims";
 
 export function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "ficha");
+  const { forSupplier } = useClaims();
 
   const supplier = suppliers.find((s) => s.id === id);
 
@@ -56,6 +61,11 @@ export function SupplierDetailPage() {
       </div>
     );
   }
+
+  const supClaims = forSupplier(supplier.name);
+  const openStates = new Set(CLAIM_OPEN_STATES);
+  const openClaims = supClaims.filter((c) => openStates.has(c.estado));
+  const claimsValue = openClaims.reduce((a, c) => a + c.valorReclamado, 0);
 
   const supProducts = products.filter((p) => p.supplierName === supplier.name);
   const supSkus = new Set(supProducts.map((p) => p.sku));
@@ -182,6 +192,35 @@ export function SupplierDetailPage() {
           info={<MetricHint metric="pendiente" />}
         />
       </div>
+
+      {/* Reclamos: el desempeño operativo también pesa en la evaluación */}
+      {supClaims.length > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate("/reclamos")}
+          className={`mb-4 flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+            openClaims.length > 0
+              ? "border-rose-200 bg-rose-50 hover:bg-rose-100/60"
+              : "border-slate-200 bg-white hover:bg-slate-50"
+          }`}
+        >
+          <IconAlerts
+            className={`h-5 w-5 flex-shrink-0 ${openClaims.length > 0 ? "text-rose-600" : "text-slate-400"}`}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-slate-800">
+              {openClaims.length > 0
+                ? `${openClaims.length} reclamo${openClaims.length === 1 ? "" : "s"} abierto${openClaims.length === 1 ? "" : "s"} · ${formatCurrencyCompact(claimsValue)} en juego`
+                : "Sin reclamos abiertos"}
+            </span>
+            <span className="block text-xs text-slate-500">
+              {supClaims.length} reclamo{supClaims.length === 1 ? "" : "s"} histórico
+              {supClaims.length === 1 ? "" : "s"} — buen precio no compensa pérdidas operativas.
+            </span>
+          </span>
+          <IconChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
+        </button>
+      )}
 
       {/* Motivo de revisión si aplica */}
       {(supplier.status === "delayed" ||

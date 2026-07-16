@@ -319,6 +319,12 @@ export const compradorModules: NavModule[] = [
         icon: IconSuppliers,
         hint: "Cumplimiento, lead time, venta, margen y monto pendiente para negociar mejor",
       },
+      {
+        to: "/reclamos",
+        label: "Reclamos",
+        icon: IconAlerts,
+        hint: "Faltantes, daños, calidad y costos: qué se reclama, cuánto está en juego y cómo se resuelve",
+      },
     ],
   },
   {

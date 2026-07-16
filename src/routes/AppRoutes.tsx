@@ -12,6 +12,7 @@ import { SignalsProvider } from "../context/SignalsContext";
 import { PurchaseFlowProvider } from "../context/PurchaseFlowContext";
 import { DataProvider } from "../context/DataContext";
 import { DensityProvider } from "../context/DensityContext";
+import { ClaimsProvider } from "../context/ClaimsContext";
 import { RoleGate } from "../components/layout/RoleGate";
 import { PageSkeleton } from "../components/ui/Skeleton";
 
@@ -92,6 +93,7 @@ const PriceIncreasesPage = lazy(() =>
 const BudgetPage = lazy(() => named(import("../pages/BudgetPage"), "BudgetPage"));
 const DocumentsPage = lazy(() => named(import("../pages/DocumentsPage"), "DocumentsPage"));
 const ReportsPage = lazy(() => named(import("../pages/ReportsPage"), "ReportsPage"));
+const ClaimsPage = lazy(() => named(import("../pages/ClaimsPage"), "ClaimsPage"));
 
 function PageLoader() {
   return <PageSkeleton />;
@@ -123,6 +125,7 @@ export default function AppRoutes() {
                 <NotificationProvider>
                   <OcDraftProvider>
                     <PurchaseFlowProvider>
+                      <ClaimsProvider>
                       <SignalsProvider>
                         <Routes>
                           <Route path="/login" element={<LoginGate />} />
@@ -217,6 +220,7 @@ export default function AppRoutes() {
                               />
                               <Route path="/proveedores" element={<SuppliersPage />} />
                               <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
+                              <Route path="/reclamos" element={<ClaimsPage />} />
                               <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
                               <Route path="/comprar/borradores" element={<PurchaseOrdersPage />} />
                               <Route path="/comprar/ordenes" element={<PurchaseOrdersPage />} />
@@ -265,6 +269,7 @@ export default function AppRoutes() {
                           </Route>
                         </Routes>
                       </SignalsProvider>
+                      </ClaimsProvider>
                     </PurchaseFlowProvider>
                   </OcDraftProvider>
                 </NotificationProvider>
