@@ -28,6 +28,10 @@ import { signalService } from "../services";
 import { SIGNAL_TYPE, SIGNAL_STATUS, SIGNAL_PRIORITY, SIGNAL_CHANNEL } from "../components/business/signalLabels";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { useOcDraft } from "../context/OcDraftContext";
+import { useToast } from "../context/ToastContext";
+import { useTrace } from "../context/TraceContext";
+import { MoreActions, type MoreAction } from "../components/ui/MoreActions";
+import { TODAY_ISO } from "../utils/constants";
 
 import { DecisionBanner, MiniStat, NegotiationPanel, Row } from "./productDetail/components";
 import { formatCurrency, formatDate, formatNumber, formatPercent } from "../utils/formatters";
@@ -36,6 +40,8 @@ export function ProductDetailPage() {
   const { sku } = useParams<{ sku: string }>();
   const navigate = useNavigate();
   const { addItem, hasItem } = useOcDraft();
+  const toast = useToast();
+  const { log } = useTrace();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "resumen");
 
@@ -129,6 +135,53 @@ export function ProductDetailPage() {
     });
   };
 
+  // Acciones contextuales sobre el producto (inventario). Registran en bitácora.
+  const runAction = (action: string, detail?: string) => {
+    log({
+      actor: "Catalina Saavedra",
+      entity: `Producto · ${product.name}`,
+      action,
+      reason: detail,
+      date: TODAY_ISO,
+    });
+    toast.success(`${action}${detail ? ` · ${detail}` : ""}`);
+  };
+  const isOverstock =
+    product.purchaseStatus === "overstock" ||
+    product.productStatus === "no_sales" ||
+    product.inventoryDays > 180;
+  const multiLocation = (product.stockByLocation?.length ?? 0) > 1;
+  const productActions: MoreAction[] = [
+    ...(multiLocation
+      ? [{ label: "Transferir stock entre ubicaciones", onClick: () => runAction("Transferencia solicitada") }]
+      : []),
+    ...(isOverstock
+      ? [
+          { label: "Solicitar liquidación", onClick: () => runAction("Liquidación solicitada") },
+          { label: "Pedir devolución al proveedor", onClick: () => runAction("Devolución solicitada al proveedor") },
+          { label: "Solicitar acción comercial", onClick: () => runAction("Acción comercial solicitada a ventas") },
+        ]
+      : []),
+    {
+      label: product.purchaseStatus === "do_not_buy" ? "Reactivar compra" : "Detener nuevas compras",
+      onClick: () =>
+        runAction(
+          product.purchaseStatus === "do_not_buy" ? "Compra reactivada" : "Compra detenida",
+          "cambio de estado de compra"
+        ),
+    },
+    { label: "Cambiar parámetros de reposición", onClick: () => navigate("/reglas") },
+    {
+      label: "Marcar como estacional",
+      onClick: () => runAction("Marcado como estacional", "planificar por temporada"),
+    },
+    {
+      label: "Marcar como descontinuado",
+      danger: true,
+      onClick: () => runAction("Marcado como descontinuado", "bloquear nuevas compras"),
+    },
+  ];
+
   return (
     <div>
       <PageHeader
@@ -136,16 +189,19 @@ export function ProductDetailPage() {
         title={product.name}
         description={`${product.category} · ${product.subcategory} · ${product.brand}`}
         action={
-          rec && rec.suggestedQuantity > 0 ? (
-            <Button
-              onClick={handleAdd}
-              disabled={hasItem(product.sku)}
-              variant={hasItem(product.sku) ? "secondary" : "primary"}
-              icon={<IconPlus className="w-4 h-4" />}
-            >
-              {hasItem(product.sku) ? "Agregado a OC" : "Agregar a OC"}
-            </Button>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {rec && rec.suggestedQuantity > 0 && (
+              <Button
+                onClick={handleAdd}
+                disabled={hasItem(product.sku)}
+                variant={hasItem(product.sku) ? "secondary" : "primary"}
+                icon={<IconPlus className="w-4 h-4" />}
+              >
+                {hasItem(product.sku) ? "Agregado a OC" : "Agregar a OC"}
+              </Button>
+            )}
+            <MoreActions actions={productActions} label="Acciones del producto" />
+          </div>
         }
       />
 
