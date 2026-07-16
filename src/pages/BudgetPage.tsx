@@ -16,6 +16,10 @@ import {
   type BudgetStatus,
 } from "../data/mockBudgets";
 import { computeOtb, type CategoryOtb } from "../utils/openToBuy";
+import { suppliers } from "../data/mockSuppliers";
+import { supplierPath } from "../utils/entityLinks";
+import { Link } from "react-router-dom";
+import { CardHeader, CardBody } from "../components/ui/Card";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import type { PurchaseOrder } from "../types/purchasing";
@@ -67,6 +71,25 @@ export function BudgetPage() {
     () => computeOtb(month, draftItems, createdOrders),
     [month, draftItems, createdOrders]
   );
+
+  // Compra por proveedor (90 días) y concentración: presupuesto por proveedor y
+  // alerta de dependencia excesiva.
+  const supplierSpend = useMemo(() => {
+    const active = suppliers.filter((s) => s.purchasedAmountLast90Days > 0);
+    const total = active.reduce((a, s) => a + s.purchasedAmountLast90Days, 0);
+    return {
+      total,
+      rows: active
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          amount: s.purchasedAmountLast90Days,
+          share: total > 0 ? s.purchasedAmountLast90Days / total : 0,
+        }))
+        .sort((a, b) => b.amount - a.amount),
+    };
+  }, []);
+  const topSupplier = supplierSpend.rows[0];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -328,6 +351,53 @@ export function BudgetPage() {
             </div>
           )}
         />
+      </Card>
+
+      {/* Presupuesto / gasto por proveedor + concentración */}
+      <Card className="mt-4">
+        <CardHeader
+          title="Compra por proveedor (90 días)"
+          description="En qué proveedores se concentra el gasto. La dependencia excesiva es un riesgo."
+        />
+        <CardBody>
+          {topSupplier && topSupplier.share > 0.3 && (
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <IconAlerts className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
+              <span>
+                Concentración alta: <b>{topSupplier.name}</b> representa el{" "}
+                {formatPercent(topSupplier.share * 100, 0)} de la compra. Evalúa alternativas para
+                reducir dependencia.
+              </span>
+            </div>
+          )}
+          <div className="space-y-2">
+            {supplierSpend.rows.slice(0, 8).map((s) => (
+              <div key={s.id} className="flex items-center gap-3">
+                <Link
+                  to={supplierPath(s.name)}
+                  className="w-40 flex-shrink-0 truncate text-sm font-medium text-slate-700 hover:text-brand-700 hover:underline"
+                >
+                  {s.name}
+                </Link>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      s.share > 0.3 ? "bg-amber-400" : "bg-brand-500"
+                    )}
+                    style={{ width: `${Math.round(s.share * 100)}%` }}
+                  />
+                </div>
+                <span className="w-12 flex-shrink-0 text-right text-xs font-medium text-slate-500">
+                  {formatPercent(s.share * 100, 0)}
+                </span>
+                <span className="w-20 flex-shrink-0 text-right text-sm font-semibold text-slate-900">
+                  {formatCurrencyCompact(s.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardBody>
       </Card>
     </div>
   );
