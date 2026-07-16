@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
@@ -10,15 +10,23 @@ import { StatusBadge } from "../components/business/StatusBadge";
 import { CollapsibleSection } from "../components/ui/CollapsibleSection";
 import {
   IconAlerts,
-  IconOrders,
   IconReplenish,
   IconCheck,
   IconPlus,
-  IconChevronRight,
+  IconTruck,
+  IconClock,
+  IconCampaign,
 } from "../components/ui/icons";
 import { products } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
 import { suppliers } from "../data/mockSuppliers";
+import { campaignOpportunities } from "../data/mockCampaignOpportunities";
+import { orderBySignal } from "../utils/orderConsolidation";
+import {
+  InicioPortada,
+  type AgendaEntry,
+  type PendingWork,
+} from "./myPanel/InicioPortada";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { categories } from "../data/mockCategories";
 import { useBuyer } from "../context/BuyerContext";
@@ -46,9 +54,9 @@ import {
   formatNumber,
   formatPercent,
 } from "../utils/formatters";
-import { cn } from "../utils/cn";
 import type { Product } from "../types/purchasing";
 import type {
+  AgendaItem,
   BrandPortfolioRow,
   KeyProductRow,
   PortfolioFocus,
@@ -59,7 +67,6 @@ import type {
   SupplierPortfolioRow,
 } from "./myPanel/types";
 import {
-  AgendaStat,
   Delta,
   FocoCard,
   GoalBar,
@@ -68,7 +75,6 @@ import {
   PortfolioFocusWorkspace,
   QualityItem,
   SectionLabel,
-  SignalSummary,
   TrendKpi,
   TrendRow,
 } from "./myPanel/components";
@@ -105,13 +111,7 @@ export function MyPanelPage() {
       })
       .slice(0, 5);
   }, [signals, buyer, myCategories]);
-  const {
-    addItem,
-    hasItem,
-    items: draftItems,
-    count: draftCount,
-    totalAmount: draftTotal,
-  } = useOcDraft();
+  const { addItem, hasItem, count: draftCount, totalAmount: draftTotal } = useOcDraft();
   const toast = useToast();
 
   const myProducts = useMemo(
@@ -499,31 +499,11 @@ export function MyPanelPage() {
   ]);
 
   // ---- Agenda de decisiones: prioridad + impacto + urgencia ----
-  const [agendaView, setAgendaView] = useState<"prioridad" | "hoy" | "semana" | "despues">(
-    "prioridad"
-  );
   const daysTo = (iso: string) =>
     Math.round(
       (new Date(`${iso}T00:00:00`).getTime() - new Date(`${TODAY_ISO}T00:00:00`).getTime()) /
         86400000
     );
-
-  interface AgendaItem {
-    id: string;
-    dueDate: string;
-    days: number;
-    kind: "Compra" | "OC" | "Proveedor" | "Aprobación" | "Inventario" | "Margen" | "Catálogo";
-    urgency: string;
-    title: string;
-    meta: string;
-    impact: string;
-    recommendation: string;
-    actionLabel: string;
-    to: string;
-    tone: "red" | "amber" | "violet" | "blue";
-    priority: number;
-    impactValue: number;
-  }
 
   const agenda: AgendaItem[] = [];
   riskRows.forEach((r) => {
@@ -676,27 +656,160 @@ export function MyPanelPage() {
     semana: agenda.filter((a) => a.days > 0 && a.days <= 7).length,
     despues: agenda.filter((a) => a.days > 7).length,
   };
-  const agendaItems = priorityAgenda.filter((a) => {
-    if (agendaView === "hoy") return a.days <= 0;
-    if (agendaView === "semana") return a.days > 0 && a.days <= 7;
-    if (agendaView === "despues") return a.days > 7;
-    return true;
-  });
-  const featuredAgenda = agendaItems[0];
-  const secondaryAgenda = agendaItems.slice(1, 5);
-  const agendaImpact = priorityAgenda.slice(0, 7).reduce((sum, item) => sum + item.impactValue, 0);
-  const agendaTabItems = [
-    { value: "prioridad", label: "Prioridad", count: agendaCounts.prioridad },
-    { value: "hoy", label: "Hoy", count: agendaCounts.hoy },
-    { value: "semana", label: "Semana", count: agendaCounts.semana },
-    { value: "despues", label: "Después", count: agendaCounts.despues },
-  ] satisfies Array<{ value: typeof agendaView; label: string; count: number }>;
-  const agendaCardTone = {
-    red: "border-rose-200 bg-rose-50/80",
-    amber: "border-amber-200 bg-amber-50/80",
-    blue: "border-brand-200 bg-brand-50/80",
-    violet: "border-violet-200 bg-violet-50/80",
-  } satisfies Record<AgendaItem["tone"], string>;
+  // ==========================================================================
+  //  Portada de Inicio (bandeja diaria del comprador).
+  //  Prioridades + agenda + resumen + trabajo pendiente, en vez de un dashboard.
+  // ==========================================================================
+  const portadaPriorities = priorityAgenda.slice(0, 6);
+
+  const portadaSummary = {
+    categorias: myCategories.length,
+    quiebres: riskRows.filter((r) => r.product.availableStock <= 0).length,
+    riesgos: riskRows.length,
+    sobrestock: formatCurrencyCompact(portfolio.overstockValue),
+    ocAtrasadas: myOpenOrders.filter((o) => o.delayedDays > 0).length,
+  };
+
+  const whenLabel = (days: number): string =>
+    days <= 0 ? "hoy" : days === 1 ? "mañana" : days <= 30 ? `${days}d` : formatDate(addDaysISO(TODAY_ISO, days)).slice(0, 5);
+
+  const portadaAgenda = useMemo<AgendaEntry[]>(() => {
+    const entries: AgendaEntry[] = [];
+
+    // Fechas límite para emitir órdenes (quiebre − lead time).
+    riskRows
+      .map((r) => ({
+        r,
+        sig: orderBySignal(
+          r.product.availableStock,
+          r.product.salesLast30Days,
+          r.product.supplierLeadTimeDays,
+          TODAY_ISO
+        ),
+      }))
+      .filter(({ sig }) => sig.orderByDate && sig.status !== "ok" && sig.status !== "none")
+      .sort((a, b) => (a.sig.daysToOrderBy ?? 0) - (b.sig.daysToOrderBy ?? 0))
+      .slice(0, 2)
+      .forEach(({ r, sig }) => {
+        entries.push({
+          id: `ob-${r.product.sku}`,
+          icon: IconReplenish,
+          title: `Emitir OC · ${r.product.name}`,
+          detail:
+            sig.status === "overdue"
+              ? "Ya deberías haberla emitido — llegaría con quiebre"
+              : `Emitir antes del ${formatDate(sig.orderByDate!)}`,
+          when: whenLabel(sig.daysToOrderBy ?? 0),
+          tone: sig.status === "overdue" ? "red" : "amber",
+          to: `/productos/${r.product.sku}`,
+        });
+      });
+
+    // Órdenes atrasadas que requieren seguimiento.
+    myOpenOrders
+      .filter((o) => o.delayedDays > 0)
+      .slice(0, 1)
+      .forEach((o) => {
+        entries.push({
+          id: `fu-${o.id}`,
+          icon: IconClock,
+          title: `Seguir OC atrasada · ${o.supplierName}`,
+          detail: `${o.number} · ${o.delayedDays} días de atraso`,
+          when: `${o.delayedDays}d`,
+          tone: "red",
+          to: "/comprar/seguimiento",
+        });
+      });
+
+    // Llegadas próximas (OC por recibir a tiempo).
+    myOpenOrders
+      .filter((o) => o.delayedDays <= 0)
+      .sort((a, b) => (a.expectedDate < b.expectedDate ? -1 : 1))
+      .slice(0, 2)
+      .forEach((o) => {
+        entries.push({
+          id: `arr-${o.id}`,
+          icon: IconTruck,
+          title: `Llega ${o.number}`,
+          detail: `${o.supplierName} · ${formatCurrencyCompact(o.totalAmount)}`,
+          when: whenLabel(daysTo(o.expectedDate)),
+          tone: "blue",
+          to: "/comprar/seguimiento",
+        });
+      });
+
+    // Promociones/campañas próximas en mis categorías (una entrada por campaña).
+    const seenCampaigns = new Set<string>();
+    campaignOpportunities
+      .filter((c) => myCategories.includes(c.category) && c.daysToCampaign >= 0 && c.daysToCampaign <= 21)
+      .sort((a, b) => a.daysToCampaign - b.daysToCampaign)
+      .forEach((c) => {
+        if (seenCampaigns.has(c.campaignName) || seenCampaigns.size >= 2) return;
+        seenCampaigns.add(c.campaignName);
+        entries.push({
+          id: `promo-${c.id}`,
+          icon: IconCampaign,
+          title: `Campaña · ${c.campaignName}`,
+          detail: `Prepara stock en ${c.category} (+${Math.round(c.growthRate)}%)`,
+          when: whenLabel(c.daysToCampaign),
+          tone: "violet",
+          to: "/anticipacion",
+        });
+      });
+
+    return entries.slice(0, 7);
+  }, [riskRows, myOpenOrders, myCategories]);
+
+  const portadaPending = useMemo<PendingWork[]>(() => {
+    const proposals = recommendations.filter(
+      (r) => (r.status === "critical" || r.status === "buy_now") && r.suggestedQuantity > 0
+    ).length;
+    return [
+      {
+        id: "propuestas",
+        label: "Propuestas de compra por revisar",
+        detail: "Quiebres y recomendaciones que inician la compra",
+        count: proposals,
+        tone: "red",
+        to: "/comprar/decisiones",
+      },
+      {
+        id: "borrador",
+        label: "Órdenes en preparación",
+        detail: draftCount > 0 ? `${formatCurrencyCompact(draftTotal)} en borrador` : "Sin borrador activo",
+        count: draftCount,
+        tone: "blue",
+        to: "/comprar/borradores",
+      },
+      {
+        id: "aprobaciones",
+        label: "Esperando aprobación",
+        detail: "Compras fuera de criterio",
+        count: myApprovals.length,
+        tone: "amber",
+        to: "/comprar/aprobaciones",
+      },
+      {
+        id: "proveedores",
+        label: "Proveedores por contactar",
+        detail: "Bajo cumplimiento o sin respuesta",
+        count: mySuppliersToReview.length,
+        tone: "amber",
+        to: "/proveedores",
+      },
+      {
+        id: "senales",
+        label: "Señales de ventas por resolver",
+        detail: "Reportes del equipo de ventas en tus categorías",
+        count: mySignals.length,
+        tone: "violet",
+        to: "/senales-ventas",
+      },
+    ];
+  }, [draftCount, draftTotal, myApprovals.length, mySuppliersToReview.length, mySignals.length]);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Buenos días" : hour < 20 ? "Buenas tardes" : "Buenas noches";
 
   const handleAdd = (p: Product, qty: number) => {
     addItem({
@@ -838,12 +951,16 @@ export function MyPanelPage() {
     <div>
       <PageHeader
         title={
-          isPortfolioView ? portfolioHeader[portfolioFocus].title : `Hola, ${buyer.split(" ")[0]}`
+          isPortfolioView
+            ? portfolioHeader[portfolioFocus].title
+            : `${greeting}, ${buyer.split(" ")[0]}`
         }
         description={
           isPortfolioView
             ? portfolioHeader[portfolioFocus].description
-            : `${formatDate(TODAY_ISO)} · ${formatNumber(agenda.length)} decisiones pendientes · ${formatNumber(agendaCounts.hoy)} requieren atención hoy.`
+            : agenda.length > 0
+              ? `Esto requiere tu atención hoy · ${formatNumber(agendaCounts.hoy)} para hoy · ${formatNumber(agendaCounts.semana)} esta semana`
+              : "Esto requiere tu atención hoy"
         }
         action={
           <Button
@@ -863,239 +980,12 @@ export function MyPanelPage() {
       />
 
       {!isPortfolioView && (
-        <section className="mb-4 space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Tu agenda de decisiones
-                </p>
-                <h2 className="mt-1 text-xl font-semibold text-slate-900">
-                  {agendaCounts.hoy} requieren atención hoy · {agendaCounts.semana} esta semana
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Resuelve primero las decisiones con mayor impacto y después tus vencimientos.
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-2 sm:min-w-[280px]">
-                <AgendaStat label="Decisiones" value={formatNumber(agenda.length)} />
-                <AgendaStat label="Impacto" value={formatCurrencyCompact(agendaImpact)} />
-                <AgendaStat label="Críticas" value={formatNumber(agendaCounts.hoy)} />
-              </div>
-            </div>
-
-            <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-              {agendaTabItems.map((tab) => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => setAgendaView(tab.value)}
-                  className={cn(
-                    "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold whitespace-nowrap",
-                    agendaView === tab.value
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
-                  )}
-                >
-                  {tab.label}
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px] leading-none",
-                      agendaView === tab.value
-                        ? "bg-white/20 text-white"
-                        : "bg-white text-slate-500"
-                    )}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {featuredAgenda ? (
-              <div className="mt-4 space-y-2">
-                <div className={cn("rounded-xl border p-4", agendaCardTone[featuredAgenda.tone])}>
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge tone={featuredAgenda.tone} dot>
-                          {featuredAgenda.kind}
-                        </Badge>
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          {featuredAgenda.urgency}
-                        </span>
-                      </div>
-                      <h3 className="mt-2 text-lg font-semibold leading-snug text-slate-950">
-                        {featuredAgenda.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-700">{featuredAgenda.meta}</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">
-                        {featuredAgenda.impact}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-600">{featuredAgenda.recommendation}</p>
-                    </div>
-                    <Button
-                      className="w-full md:w-auto"
-                      size="sm"
-                      variant="primary"
-                      onClick={() => navigate(featuredAgenda.to)}
-                      icon={<IconChevronRight className="w-3.5 h-3.5" />}
-                    >
-                      {featuredAgenda.actionLabel}
-                    </Button>
-                  </div>
-                </div>
-
-                {secondaryAgenda.map((item) => (
-                  <Link
-                    key={item.id}
-                    to={item.to}
-                    className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-brand-300 hover:bg-brand-50/40 sm:flex-row sm:items-center"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge tone={item.tone}>{item.kind}</Badge>
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                          {item.urgency}
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-sm font-semibold text-slate-900">
-                        {item.title}
-                      </p>
-                      <p className="truncate text-xs text-slate-500">{item.meta}</p>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 sm:flex-shrink-0">
-                      <span className="text-xs font-semibold text-slate-700">{item.impact}</span>
-                      <span className="text-xs font-semibold text-brand-600">
-                        {item.actionLabel}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-
-                <Link
-                  to="/comprar/decisiones"
-                  className="inline-flex items-center gap-1.5 px-1 pt-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
-                >
-                  Ver agenda completa
-                  <IconChevronRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            ) : (
-              <EmptyState
-                icon={<IconCheck className="w-6 h-6" />}
-                title="Sin decisiones pendientes"
-                description="Tu agenda está limpia. Revisa señales de cartera para anticiparte."
-              />
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Prioridad recomendada
-              </p>
-              {featuredAgenda ? (
-                <>
-                  <h3 className="mt-1 text-base font-semibold leading-snug text-slate-900">
-                    {featuredAgenda.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500">{featuredAgenda.impact}</p>
-                  <p className="mt-1 text-sm text-slate-500">{featuredAgenda.recommendation}</p>
-                  <Button
-                    className="mt-3"
-                    size="sm"
-                    variant="primary"
-                    onClick={() => navigate(featuredAgenda.to)}
-                    icon={<IconChevronRight className="w-3.5 h-3.5" />}
-                  >
-                    Revisar
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <h3 className="mt-1 text-base font-semibold text-slate-900">
-                    Sin prioridad crítica
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Revisa señales de cartera para anticipar próximos riesgos.
-                  </p>
-                </>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Continuar trabajo
-              </p>
-              {draftCount > 0 ? (
-                <>
-                  <h3 className="mt-1 text-base font-semibold text-slate-900">
-                    Borrador OC activo
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {formatNumber(draftCount)} SKU · {formatCurrencyCompact(draftTotal)} preparados
-                    para compra.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => navigate("/comprar/borradores")}
-                      icon={<IconOrders className="w-3.5 h-3.5" />}
-                    >
-                      Continuar
-                    </Button>
-                    <span className="text-xs text-slate-400">
-                      Último SKU: {draftItems[draftItems.length - 1]?.productName}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h3 className="mt-1 text-base font-semibold text-slate-900">
-                    Sin borrador activo
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Parte desde la prioridad recomendada o revisa reposición.
-                  </p>
-                  <Button
-                    className="mt-3"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => navigate("/comprar/decisiones")}
-                  >
-                    Ir a decisiones
-                  </Button>
-                </>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Señales de cartera
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <SignalSummary label="Riesgos" value={formatNumber(riskRows.length)} tone="red" />
-                <SignalSummary
-                  label="OC pendientes"
-                  value={formatNumber(myOpenOrders.length)}
-                  tone="amber"
-                />
-                <SignalSummary
-                  label="Proveedor"
-                  value={formatNumber(mySuppliersToReview.length)}
-                  tone="blue"
-                />
-                <SignalSummary
-                  label="Sobrestock"
-                  value={formatCurrencyCompact(portfolio.overstockValue)}
-                  tone="violet"
-                />
-              </div>
-            </div>
-          </div>
-        </section>
+        <InicioPortada
+          priorities={portadaPriorities}
+          agenda={portadaAgenda}
+          summary={portadaSummary}
+          pending={portadaPending}
+        />
       )}
 
       {/* 1 · Mi cartera — ¿qué administro? */}

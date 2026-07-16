@@ -14,6 +14,24 @@ export interface RiskRow {
   coverageAfter: number;
 }
 
+/** Una decisión priorizada de la portada de Inicio (bandeja del comprador). */
+export interface AgendaItem {
+  id: string;
+  dueDate: string;
+  days: number;
+  kind: "Compra" | "OC" | "Proveedor" | "Aprobación" | "Inventario" | "Margen" | "Catálogo";
+  urgency: string;
+  title: string;
+  meta: string;
+  impact: string;
+  recommendation: string;
+  actionLabel: string;
+  to: string;
+  tone: "red" | "amber" | "violet" | "blue";
+  priority: number;
+  impactValue: number;
+}
+
 export interface SalesPaceRow {
   product: Product;
   expected30: number;
