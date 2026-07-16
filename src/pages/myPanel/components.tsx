@@ -4,7 +4,9 @@ import { Card, CardBody, CardHeader } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { StatusBadge } from "../../components/business/StatusBadge";
-import { IconCheck } from "../../components/ui/icons";
+import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
+import { SIGNAL_TYPE, SIGNAL_STATUS, SIGNAL_PRIORITY } from "../../components/business/signalLabels";
+import { IconCheck, IconSignal } from "../../components/ui/icons";
 import {
   capitalize,
   formatCurrencyCompact,
@@ -14,7 +16,8 @@ import {
   formatPercent,
 } from "../../utils/formatters";
 import { cn } from "../../utils/cn";
-import type { Category, Product, PurchaseOrder, Supplier } from "../../types/purchasing";
+import type { LostOpportunity } from "../../utils/lostOpportunities";
+import type { Category, Product, PurchaseOrder, SalesSignal, Supplier } from "../../types/purchasing";
 import type {
   BrandPortfolioRow,
   KeyProductRow,
@@ -1315,5 +1318,102 @@ export function OverstockList({ products }: { products: Product[] }) {
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/** "Venta no capturada": top 4 oportunidades perdidas por no reponer. (Extraído de MyPanelPage.) */
+export function LostSalesCard({
+  lostOpps,
+  lostRevenue,
+}: {
+  lostOpps: LostOpportunity[];
+  lostRevenue: number;
+}) {
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title="Venta no capturada"
+        description={`${formatCurrencyCompact(lostRevenue)}/mes que dejas de vender por no reponer`}
+        action={
+          <Link to="/venta-no-capturada">
+            <span className="text-xs font-medium text-brand-600 hover:text-brand-700">
+              Ver todas
+            </span>
+          </Link>
+        }
+      />
+      <CardBody className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+        {lostOpps.slice(0, 4).map((o) => (
+          <Link
+            key={o.sku}
+            to={`/productos/${o.sku}`}
+            className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-slate-800">{o.name}</span>
+              <span className="block text-xs text-slate-400">
+                {o.motivo} · vendía ~{formatNumber(o.histMonthly)}/mes
+              </span>
+            </span>
+            <span className="flex-shrink-0 text-sm font-semibold text-rose-600">
+              {formatCurrencyCompact(o.ventaPerdida)}/mes
+            </span>
+          </Link>
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
+
+/** "Señales de ventas para mí": lo que ventas reportó y espera decisión. (Extraído de MyPanelPage.) */
+export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
+  return (
+    <CollapsibleSection
+      id="panel-senales"
+      className="mb-4"
+      title="Señales de ventas para mí"
+      description="Lo que ventas reportó en tus categorías y aún espera tu decisión"
+      hint={`${signals.length} pendiente${signals.length === 1 ? "" : "s"}`}
+      action={
+        <Link to="/senales-ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
+          Ver todas
+        </Link>
+      }
+    >
+      {signals.length === 0 ? (
+        <EmptyState
+          title="Todo al día"
+          description="No tienes señales de ventas pendientes en tus categorías."
+          icon={<IconCheck className="w-6 h-6" />}
+        />
+      ) : (
+        <div className="space-y-2">
+          {signals.map((s) => (
+            <Link
+              key={s.id}
+              to="/senales-ventas"
+              className="flex items-start gap-2 rounded-lg border border-slate-200 p-2.5 hover:border-brand-300 hover:bg-brand-50/40"
+            >
+              <IconSignal className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge tone={SIGNAL_PRIORITY[s.priority].tone}>
+                    {SIGNAL_PRIORITY[s.priority].label}
+                  </Badge>
+                  <Badge tone={SIGNAL_TYPE[s.type].tone}>{SIGNAL_TYPE[s.type].short}</Badge>
+                  <span className="text-sm font-medium text-slate-800 truncate">
+                    {s.productName}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 truncate mt-0.5">{s.comment}</p>
+              </div>
+              <Badge tone={SIGNAL_STATUS[s.status].tone} dot>
+                {SIGNAL_STATUS[s.status].label}
+              </Badge>
+            </Link>
+          ))}
+        </div>
+      )}
+    </CollapsibleSection>
   );
 }
