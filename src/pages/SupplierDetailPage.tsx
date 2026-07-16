@@ -19,6 +19,7 @@ import {
   SupplierNegotiation,
   SeasonView,
   SupplierTermsAgreements,
+  SupplierNegotiationRecord,
   SupplierMaster,
 } from "./SupplierDetailSections";
 import {
@@ -460,6 +461,7 @@ export function SupplierDetailPage() {
       {tab === "negociacion" && (
         <div className="space-y-4">
           <SupplierNegotiation supplier={supplier} />
+          <SupplierNegotiationRecord supplier={supplier} />
           <SupplierTermsAgreements supplier={supplier} />
         </div>
       )}

@@ -265,6 +265,47 @@ export interface PurchaseOrder {
   confirmedDate?: string; // fecha confirmada por el proveedor
 }
 
+// ----------------------------------------------------------------------------
+//  Registro estructurado de negociación con el proveedor.
+//  No todo es un único porcentaje: distingue ahorro real, bonificación futura,
+//  mejora de plazo, beneficio logístico y aporte promocional.
+// ----------------------------------------------------------------------------
+
+export type NegotiationLever =
+  | "precio"
+  | "descuento"
+  | "volumen"
+  | "plazo_pago"
+  | "flete"
+  | "bonificacion"
+  | "rebate"
+  | "devoluciones"
+  | "marketing"
+  | "exclusividad";
+
+export type NegotiationBenefit =
+  | "ahorro_real" // baja de costo directa
+  | "bonificacion" // producto/nota de crédito futura
+  | "plazo" // mejora de plazo de pago (financiero)
+  | "logistico" // flete / entrega
+  | "promo"; // aporte promocional / marketing
+
+export type NegotiationStatus = "propuesta" | "en_curso" | "acordado" | "rechazado";
+
+export interface NegotiationRound {
+  id: string;
+  date: string; // ISO
+  lever: NegotiationLever;
+  initial: string; // condición inicial
+  target: string; // objetivo del comprador
+  supplierOffer: string; // propuesta del proveedor
+  final: string; // condición final
+  benefit: NegotiationBenefit;
+  valueClp: number; // valor estimado del beneficio (CLP/año)
+  status: NegotiationStatus;
+  responsible: string;
+}
+
 export interface CommercialAlert {
   id: string;
   type: AlertType;
