@@ -67,16 +67,17 @@ import type {
 } from "./myPanel/types";
 import {
   BrandsSuppliersTables,
+  CategoriesCard,
   ExecutiveSummary,
   MonthGoalsCard,
   OpportunitiesSummary,
   PortfolioFocusWorkspace,
   PortfolioHeaderCard,
   PortfolioHealthFocus,
-  QualityItem,
+  PortfolioQualityCard,
   SectionLabel,
   StrategicProductsCard,
-  TrendRow,
+  TrendsCard,
 } from "./myPanel/components";
 
 export function MyPanelPage() {
@@ -1051,139 +1052,19 @@ export function MyPanelPage() {
       )}
 
       {/* 10 · Tendencias — acelerando vs desacelerando (unificado) */}
-      {isPortfolioView && (
-        <Card className="mb-4">
-          <CardHeader
-            title="Tendencias"
-            description="Qué acelera y qué se frena en tus categorías."
-            action={
-              <Link
-                to="/ventas"
-                className="text-xs font-medium text-brand-600 hover:text-brand-700"
-              >
-                Ver análisis →
-              </Link>
-            }
-          />
-          <CardBody className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div>
-              <p className="mb-1.5 text-sm font-medium text-emerald-700">
-                ⬆ {formatNumber(salesPace.faster.length)} acelerando
-              </p>
-              {salesPace.faster.length === 0 ? (
-                <p className="text-sm text-slate-400">Sin aceleraciones relevantes.</p>
-              ) : (
-                <div className="space-y-1">
-                  {salesPace.faster.slice(0, 3).map((r) => (
-                    <TrendRow key={r.product.sku} row={r} up />
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              <p className="mb-1.5 text-sm font-medium text-amber-700">
-                ⬇ {formatNumber(salesPace.slower.length)} desacelerando
-              </p>
-              {salesPace.slower.length === 0 ? (
-                <p className="text-sm text-slate-400">Sin frenos relevantes.</p>
-              ) : (
-                <div className="space-y-1">
-                  {salesPace.slower.slice(0, 3).map((r) => (
-                    <TrendRow key={r.product.sku} row={r} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardBody>
-        </Card>
-      )}
+      {isPortfolioView && <TrendsCard faster={salesPace.faster} slower={salesPace.slower} />}
 
-      {/* Oportunidades no capturadas */}
       {/* 11 · Categorías — comparar venta, margen e indicadores */}
-      {isPortfolioView && (
-        <Card className="mb-4">
-          <CardHeader
-            title="Categorías"
-            description="Compara tus categorías: venta, margen, quiebres y riesgo."
-          />
-          <CardBody>
-            {myCats.length === 0 ? (
-              <EmptyState
-                title="Sin categorías asignadas"
-                description="Cambia de comprador en la barra superior para ver sus categorías."
-              />
-            ) : (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {myCats.map((c) => (
-                  <Link
-                    key={c.id}
-                    to={`/categorias/${c.id}`}
-                    className="group rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-slate-800">{c.name}</span>
-                      <StatusBadge kind="category" value={c.status} dot={false} />
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="flex gap-4 text-sm">
-                        <span>
-                          <span className="text-xs text-slate-400">Venta </span>
-                          <b className="text-slate-800">
-                            {formatCurrencyCompact(c.salesLast30Days)}
-                          </b>
-                        </span>
-                        <span>
-                          <span className="text-xs text-slate-400">Margen </span>
-                          <b className="text-slate-800">{formatPercent(c.averageMargin, 0)}</b>
-                        </span>
-                      </div>
-                      <div className="flex gap-1.5">
-                        {c.stockoutSkus > 0 && <Badge tone="red">{c.stockoutSkus}</Badge>}
-                        {c.riskSkus > 0 && <Badge tone="amber">{c.riskSkus}</Badge>}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      )}
+      {isPortfolioView && <CategoriesCard cats={myCats} />}
 
       {/* 12 · Calidad de cartera — qué mejorar estructuralmente (datos y mantenimiento) */}
       {isPortfolioView && (
-        <Card className="mb-4">
-          <CardHeader
-            title="Calidad de cartera"
-            description="Mantenimiento de datos: lo que conviene corregir para decidir mejor."
-          />
-          <CardBody className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <QualityItem
-              label="Costo sin actualizar"
-              value={outdatedCostProducts.length}
-              hint="más de 90 días"
-              to="/productos"
-            />
-            <QualityItem
-              label="Margen bajo"
-              value={lowMarginProducts.length}
-              hint="bajo 20%"
-              to="/analisis-compra"
-            />
-            <QualityItem
-              label="Productos nuevos"
-              value={newProductsToReview.length}
-              hint="por revisar surtido"
-              to="/productos"
-            />
-            <QualityItem
-              label="Atributos incompletos"
-              value={story.atributosIncompletos}
-              hint="sin código o unidad"
-              to="/productos"
-            />
-          </CardBody>
-        </Card>
+        <PortfolioQualityCard
+          outdatedCostCount={outdatedCostProducts.length}
+          lowMarginCount={lowMarginProducts.length}
+          newProductsCount={newProductsToReview.length}
+          incompleteAttributes={story.atributosIncompletos}
+        />
       )}
 
       {/* Trabajo del día: riesgo de quiebre y pendientes operativos */}

@@ -12,6 +12,7 @@ import {
   formatPercent,
 } from "../../utils/formatters";
 import { cn } from "../../utils/cn";
+import type { Category } from "../../types/purchasing";
 import type {
   BrandPortfolioRow,
   KeyProductRow,
@@ -1032,5 +1033,166 @@ export function OpportunitiesSummary({
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * "Tendencias": productos acelerando vs desacelerando (top 3 cada uno).
+ * (Extraído de MyPanelPage.)
+ */
+export function TrendsCard({
+  faster,
+  slower,
+}: {
+  faster: SalesPaceRow[];
+  slower: SalesPaceRow[];
+}) {
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title="Tendencias"
+        description="Qué acelera y qué se frena en tus categorías."
+        action={
+          <Link to="/ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
+            Ver análisis →
+          </Link>
+        }
+      />
+      <CardBody className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-emerald-700">
+            ⬆ {formatNumber(faster.length)} acelerando
+          </p>
+          {faster.length === 0 ? (
+            <p className="text-sm text-slate-400">Sin aceleraciones relevantes.</p>
+          ) : (
+            <div className="space-y-1">
+              {faster.slice(0, 3).map((r) => (
+                <TrendRow key={r.product.sku} row={r} up />
+              ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-amber-700">
+            ⬇ {formatNumber(slower.length)} desacelerando
+          </p>
+          {slower.length === 0 ? (
+            <p className="text-sm text-slate-400">Sin frenos relevantes.</p>
+          ) : (
+            <div className="space-y-1">
+              {slower.slice(0, 3).map((r) => (
+                <TrendRow key={r.product.sku} row={r} />
+              ))}
+            </div>
+          )}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+/**
+ * "Categorías": tarjetas comparables (venta, margen, quiebres y riesgo) con
+ * enlace a la ficha de cada categoría. (Extraído de MyPanelPage.)
+ */
+export function CategoriesCard({ cats }: { cats: Category[] }) {
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title="Categorías"
+        description="Compara tus categorías: venta, margen, quiebres y riesgo."
+      />
+      <CardBody>
+        {cats.length === 0 ? (
+          <EmptyState
+            title="Sin categorías asignadas"
+            description="Cambia de comprador en la barra superior para ver sus categorías."
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {cats.map((c) => (
+              <Link
+                key={c.id}
+                to={`/categorias/${c.id}`}
+                className="group rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-800">{c.name}</span>
+                  <StatusBadge kind="category" value={c.status} dot={false} />
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="flex gap-4 text-sm">
+                    <span>
+                      <span className="text-xs text-slate-400">Venta </span>
+                      <b className="text-slate-800">{formatCurrencyCompact(c.salesLast30Days)}</b>
+                    </span>
+                    <span>
+                      <span className="text-xs text-slate-400">Margen </span>
+                      <b className="text-slate-800">{formatPercent(c.averageMargin, 0)}</b>
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {c.stockoutSkus > 0 && <Badge tone="red">{c.stockoutSkus}</Badge>}
+                    {c.riskSkus > 0 && <Badge tone="amber">{c.riskSkus}</Badge>}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+/**
+ * "Calidad de cartera": mantenimiento de datos (costo sin actualizar, margen
+ * bajo, productos nuevos, atributos incompletos). (Extraído de MyPanelPage.)
+ */
+export function PortfolioQualityCard({
+  outdatedCostCount,
+  lowMarginCount,
+  newProductsCount,
+  incompleteAttributes,
+}: {
+  outdatedCostCount: number;
+  lowMarginCount: number;
+  newProductsCount: number;
+  incompleteAttributes: number;
+}) {
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title="Calidad de cartera"
+        description="Mantenimiento de datos: lo que conviene corregir para decidir mejor."
+      />
+      <CardBody className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <QualityItem
+          label="Costo sin actualizar"
+          value={outdatedCostCount}
+          hint="más de 90 días"
+          to="/productos"
+        />
+        <QualityItem
+          label="Margen bajo"
+          value={lowMarginCount}
+          hint="bajo 20%"
+          to="/analisis-compra"
+        />
+        <QualityItem
+          label="Productos nuevos"
+          value={newProductsCount}
+          hint="por revisar surtido"
+          to="/productos"
+        />
+        <QualityItem
+          label="Atributos incompletos"
+          value={incompleteAttributes}
+          hint="sin código o unidad"
+          to="/productos"
+        />
+      </CardBody>
+    </Card>
   );
 }
