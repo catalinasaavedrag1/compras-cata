@@ -9,7 +9,15 @@ import { suppliers as mockSuppliers } from "../../data/mockSuppliers";
 import { coverageDays } from "../../utils/calculations";
 import { formatCurrency, formatCurrencyCompact, formatNumber } from "../../utils/formatters";
 import { lineNet, type OcDraftItem } from "../../context/OcDraftContext";
+import { buyScenarios, type RiskLevel } from "../../utils/buyScenarios";
+import { cn } from "../../utils/cn";
 import type { PurchaseOrder } from "../../types/purchasing";
+
+const RISK_TONE: Record<RiskLevel, "green" | "amber" | "red"> = {
+  bajo: "green",
+  medio: "amber",
+  alto: "red",
+};
 
 export function DraftLineContext({
   item,
@@ -71,6 +79,7 @@ export function DraftLineContext({
         onChange={onTabChange}
         tabs={[
           { value: "resumen", label: "Resumen" },
+          { value: "escenarios", label: "Escenarios" },
           { value: "inventario", label: "Inventario" },
           { value: "venta", label: "Venta" },
           { value: "proveedor", label: "Proveedor" },
@@ -93,6 +102,71 @@ export function DraftLineContext({
                 : "0 u."
             }
           />
+        </div>
+      )}
+
+      {tab === "escenarios" && product && (
+        <div className="mt-3">
+          <p className="mb-2 text-xs text-slate-500">
+            Compara el costo completo de cada opción antes de decidir. Un descuento por volumen
+            inmoviliza más capital y arriesga sobrestock.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {buyScenarios(product, suggestedQty, item.unitCost, item.discountPct ?? 0).map((s) => {
+              const active = item.quantity === s.qty;
+              return (
+                <div
+                  key={s.key}
+                  className={cn(
+                    "flex flex-col rounded-lg border p-3",
+                    s.recommended
+                      ? "border-brand-300 bg-white ring-1 ring-brand-100"
+                      : "border-slate-200 bg-white"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900">{s.label}</p>
+                    {s.recommended && <Badge tone="blue">Sugerido</Badge>}
+                  </div>
+                  <p className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(s.qty)} u.
+                  </p>
+                  <dl className="mt-2 space-y-1 text-xs">
+                    <ScenarioRow label="Inversión" value={formatCurrencyCompact(s.investment)} />
+                    <ScenarioRow label="Cobertura" value={`${s.coverageDays} d`} />
+                    <div className="flex items-center justify-between">
+                      <dt className="text-slate-500">Riesgo quiebre</dt>
+                      <Badge tone={RISK_TONE[s.stockoutRisk]}>{s.stockoutRisk}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-slate-500">Riesgo sobrestock</dt>
+                      <Badge tone={RISK_TONE[s.overstockRisk]}>{s.overstockRisk}</Badge>
+                    </div>
+                    <ScenarioRow
+                      label="Descuento"
+                      value={s.discountPct > 0 ? `${s.discountPct}%` : "—"}
+                    />
+                    {s.volumeSaving > 0 && (
+                      <ScenarioRow
+                        label="Ahorro volumen"
+                        value={formatCurrencyCompact(s.volumeSaving)}
+                      />
+                    )}
+                  </dl>
+                  <p className="mt-2 text-[11px] leading-snug text-slate-400">{s.note}</p>
+                  <Button
+                    size="sm"
+                    variant={active ? "secondary" : "primary"}
+                    disabled={active}
+                    className="mt-2"
+                    onClick={() => onQuantityChange(s.qty)}
+                  >
+                    {active ? "Aplicado" : "Aplicar"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -185,6 +259,15 @@ export function DraftLineContext({
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ScenarioRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="font-medium text-slate-800">{value}</dd>
     </div>
   );
 }
