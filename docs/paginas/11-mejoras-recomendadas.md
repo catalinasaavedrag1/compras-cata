@@ -157,8 +157,10 @@ Extraíbles a helper/constante compartida cuando se retome cada módulo:
 
 ## 5. Observaciones de consistencia (no bugs, revisar con producto)
 
-- `SettingsPage` — la edición manual de una regla **no** registra en la bitácora,
-  mientras que el auto-fix sí. Alinear para trazar ambos.
+- ~~`SettingsPage` — la edición manual de una regla **no** registra en la bitácora~~
+  ✓ aplicado: `onSave` ahora compara la regla original vs la editada y registra en la
+  bitácora cada parámetro cambiado (`targetInventoryDays`/`minStock`/`maxStock`/`minMargin`/
+  `leadTimeDays`/`notes`), igual que el auto-fix (acción "Editó parámetro").
 - `PurchaseOrdersPage` — los umbrales de aprobación en `createOrder`
   (`>= $5M`, cobertura `> obj×1.3`) no coinciden con el texto de política en
   `GovernancePage` ("OC sobre $10M", "> 90 días"). Unificar en constantes compartidas.

@@ -624,6 +624,7 @@ export function SettingsPage() {
         rule={editing}
         onClose={() => setEditing(null)}
         onSave={(updated) => {
+          const original = editing;
           setRules((prev) =>
             prev.map((x) =>
               x.id === updated.id
@@ -631,6 +632,30 @@ export function SettingsPage() {
                 : x
             )
           );
+          // Registrar en la bitácora cada parámetro cambiado (igual que el auto-fix).
+          if (original) {
+            const fields: (keyof PurchaseRule)[] = [
+              "targetInventoryDays",
+              "minStock",
+              "maxStock",
+              "minMargin",
+              "leadTimeDays",
+              "notes",
+            ];
+            for (const field of fields) {
+              if (original[field] !== updated[field]) {
+                log({
+                  actor: "Catalina Saavedra",
+                  entity: `Regla · ${updated.scope}`,
+                  action: "Editó parámetro",
+                  field,
+                  before: String(original[field] ?? "—"),
+                  after: String(updated[field] ?? "—"),
+                  reason: "Edición manual de la regla",
+                });
+              }
+            }
+          }
           setEditing(null);
           toast.success(`Regla de ${updated.scope} actualizada`);
         }}
