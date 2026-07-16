@@ -536,7 +536,7 @@ function FlowStrip() {
     "Queda registrado",
   ];
   return (
-    <div className="mb-4 flex items-center gap-1 overflow-x-auto no-scrollbar text-xs">
+    <div className="mb-4 flex flex-wrap items-center gap-1 text-xs">
       {steps.map((s, i) => (
         <div key={s} className="flex items-center gap-1 flex-shrink-0">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 text-slate-600 px-2.5 py-1">

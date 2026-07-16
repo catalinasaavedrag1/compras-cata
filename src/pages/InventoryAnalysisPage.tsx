@@ -150,7 +150,7 @@ export function InventoryAnalysisPage() {
       </div>
 
       {/* Detalle de capital en chips compactos */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-4 pb-0.5 text-xs">
+      <div className="flex flex-wrap items-center gap-2 -mx-1 px-1 mb-4 text-xs">
         <span className="whitespace-nowrap flex-shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-slate-600">
           Disponible: <b>{formatCurrencyCompact(inventoryKpis.availableStockValue)}</b>
         </span>

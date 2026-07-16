@@ -18,23 +18,18 @@ export function PurchaseProcessBar({ stages }: { stages: PurchaseProcessStage[] 
         <p className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Proceso de compra
         </p>
-        <div className="flex gap-1.5 overflow-x-auto pb-1 lg:flex-1 lg:pb-0">
-          {stages.map((stage, index) => (
+        <div className="flex flex-wrap gap-1.5 lg:flex-1">
+          {stages.map((stage) => (
             <Link
               key={stage.label}
               to={stage.to}
               className={cn(
-                "group relative inline-flex min-h-10 min-w-max items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors",
+                "group inline-flex min-h-10 min-w-max items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors",
                 stage.active
                   ? "border-brand-300 bg-brand-50"
                   : "border-slate-200 bg-slate-50 hover:border-brand-200 hover:bg-white"
               )}
             >
-              {index < stages.length - 1 && (
-                <span className="hidden text-slate-300 lg:absolute lg:right-[-12px] lg:block">
-                  →
-                </span>
-              )}
               <span
                 className={cn(
                   "text-xs font-semibold",

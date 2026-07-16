@@ -17,7 +17,7 @@ export function Tabs({ tabs, value, onChange, className }: TabsProps) {
   return (
     <div
       role="tablist"
-      className={cn("flex gap-1 border-b border-slate-200 overflow-x-auto no-scrollbar", className)}
+      className={cn("flex flex-wrap gap-x-1 gap-y-0 border-b border-slate-200", className)}
     >
       {tabs.map((tab) => {
         const active = tab.value === value;

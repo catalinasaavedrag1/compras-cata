@@ -519,7 +519,7 @@ export function CampaignsPage() {
           </Card>
 
           {/* filtros por canal */}
-          <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-0.5">
+          <div className="flex flex-wrap gap-2 mb-4">
             {chips.map((ch) => {
               const active = chFilter === ch.id;
               return (

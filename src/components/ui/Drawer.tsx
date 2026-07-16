@@ -26,7 +26,7 @@ export function Drawer({ open, onClose, title, description, children, footer }: 
         tabIndex={-1}
         className="relative w-full max-w-xl bg-white shadow-2xl h-full flex flex-col animate-[slideIn_0.2s_ease-out] focus:outline-none"
       >
-        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100">
+        <div className="flex items-start justify-between gap-4 px-4 sm:px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-semibold text-slate-800">{title}</h2>
             {description && <p className="text-sm text-slate-500 mt-0.5">{description}</p>}
@@ -39,9 +39,11 @@ export function Drawer({ open, onClose, title, description, children, footer }: 
             <IconClose />
           </button>
         </div>
-        <div className="overflow-y-auto scrollbar-thin px-6 py-5 flex-1">{children}</div>
+        <div className="overflow-y-auto scrollbar-thin px-4 sm:px-6 py-5 flex-1">{children}</div>
         {footer && (
-          <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">{footer}</div>
+          <div className="px-4 sm:px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            {footer}
+          </div>
         )}
       </div>
     </div>

@@ -538,7 +538,7 @@ export function CampaignOpportunitiesPage() {
       ) : (
         <>
           {/* Campañas próximas (chips compactos) */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 mb-3 pb-0.5">
+          <div className="flex flex-wrap items-center gap-2 -mx-1 px-1 mb-3">
             <span className="text-xs font-medium text-slate-500 flex-shrink-0">Próximas:</span>
             {upcoming.map((c) => (
               <span
