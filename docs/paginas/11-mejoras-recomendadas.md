@@ -142,9 +142,9 @@ Extraíbles a helper/constante compartida cuando se retome cada módulo:
   otros 2 niveles) y producen salidas visibles distintas.
 - ~~**Umbrales de proveedor** repetidos como literales~~ ✓ aplicado
   (`SUPPLIER_COMPLIANCE_CRITICAL`/`WARN`, `SUPPLIER_LEAD_TIME_WARN_DAYS`).
-- **Colisión de nombre `CHANNEL_META`**: `utils/channelDemand.ts` (canales de
-  demanda) y `data/mockCampaignPlans.ts` (canales de promo) exportan el mismo
-  nombre con formas distintas. Renombrar uno (p. ej. `PROMO_CHANNEL_META`).
+- ~~**Colisión de nombre `CHANNEL_META`**~~ ✓ aplicado: el de `data/mockCampaignPlans.ts`
+  (canales de promo) se renombró a `PROMO_CHANNEL_META`; el de `utils/channelDemand.ts`
+  (canales de demanda) queda como `CHANNEL_META`. Ya no colisionan.
 - ~~**Arrays de estado** duplicados~~ ✓ aplicado (`CLOSED_ORDER_STATUSES`,
   `ARRIVED_STATUSES`, `EMITTED_STATUSES`).
 - **Markup de diálogos** (header/footer) casi idéntico en `Modal`/`Drawer`/`BottomSheet`:

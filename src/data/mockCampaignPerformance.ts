@@ -19,7 +19,7 @@ export type PerfChannelKey = PromoChannelKey | "google_ads" | "email";
 export interface PerfChannelMeta {
   label: string;
   tone: "violet" | "amber" | "blue" | "green" | "red" | "neutral";
-  /** Path de icono SVG (viewBox 0 0 24 24), consistente con CHANNEL_META. */
+  /** Path de icono SVG (viewBox 0 0 24 24), consistente con PROMO_CHANNEL_META. */
   icon: string;
 }
 

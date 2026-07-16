@@ -9,7 +9,7 @@ import { productPath, categoryPath } from "../utils/entityLinks";
 import { formatCurrency, formatCurrencyCompact } from "../utils/formatters";
 import { daysUntil, discountPct, rangeText, STATUS_CFG } from "./campaignsHelpers";
 import {
-  CHANNEL_META,
+  PROMO_CHANNEL_META,
   PLACEMENT_ICON,
   type CampaignPlan,
   type CampaignProduct,
@@ -141,7 +141,7 @@ export function ChannelBudgetGrid({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       {channelOrder.map((ch) => {
-        const meta = CHANNEL_META[ch];
+        const meta = PROMO_CHANNEL_META[ch];
         const budget = camp.channelBudget[ch] || 0;
         const used = camp.products
           .filter((p) => p.channel === ch)
@@ -315,7 +315,7 @@ export function AdSpacesView({
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 mb-6">
         {spaces.map((s) => {
-          const meta = CHANNEL_META[s.channel];
+          const meta = PROMO_CHANNEL_META[s.channel];
           return (
             <Card key={s.placement}>
               <CardBody className="flex flex-col gap-3">
@@ -456,7 +456,7 @@ export function AdSpacesView({
   return (
     <Card className="mb-6">
       {spaces.map((s) => {
-        const meta = CHANNEL_META[s.channel];
+        const meta = PROMO_CHANNEL_META[s.channel];
         return (
           <div
             key={s.placement}
@@ -569,7 +569,7 @@ export function CampaignProductsTable({
           </thead>
           <tbody>
             {products.map((p, idx) => {
-              const meta = CHANNEL_META[p.channel];
+              const meta = PROMO_CHANNEL_META[p.channel];
               const st = STATUS_CFG[p.status];
               const disc = discountPct(p.normal, p.promo);
               const pos = positionBySku[p.sku];

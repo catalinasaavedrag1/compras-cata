@@ -36,7 +36,7 @@ export interface CampaignPlan {
   products: CampaignProduct[];
 }
 
-export const CHANNEL_META: Record<
+export const PROMO_CHANNEL_META: Record<
   PromoChannelKey,
   { label: string; tone: "violet" | "amber" | "blue" | "green"; icon: string }
 > = {
