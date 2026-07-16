@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
-import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { Tabs } from "../components/ui/Tabs";
-import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { StatusBadge } from "../components/business/StatusBadge";
@@ -20,6 +18,8 @@ import {
   PerformanceScoreCard,
   SupplierReviewBanner,
   SupplierSummaryStrip,
+  NegotiationCockpit,
+  SupplierTopProducts,
 } from "./supplierDetail/overview";
 import { suppliers } from "../data/mockSuppliers";
 import { products } from "../data/mockProducts";
@@ -39,13 +39,7 @@ import {
   formatNumber,
   formatPercent,
 } from "../utils/formatters";
-import {
-  IconOrders,
-  IconInventory,
-  IconSuppliers,
-  IconSales,
-  IconBox,
-} from "../components/ui/icons";
+import { IconOrders, IconInventory, IconSuppliers } from "../components/ui/icons";
 import { useClaims } from "../context/ClaimsContext";
 import { CLAIM_OPEN_STATES } from "../data/mockClaims";
 import { supplierScore } from "../utils/supplierScore";
@@ -233,169 +227,29 @@ export function SupplierDetailPage() {
         onOpenOrders={() => setTab("ordenes")}
       />
 
-      <div className="grid grid-cols-1 gap-4 mb-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardHeader
-            title="Cockpit de negociación"
-            description="Lo que conviene llevar preparado a la reunión con este proveedor."
-          />
-          <CardBody className="space-y-3">
-            <NegotiationAgendaItem
-              index={1}
-              title="Costo"
-              detail={`${costIncreaseProducts.length} SKU subieron más de 5%. Impacto potencial en margen: ${formatCurrencyCompact(costIncreaseProducts.reduce((sum, p) => sum + p.salesLast30Days * (p.cost - (p.costoAnterior ?? p.cost)), 0))}.`}
-              ask="Pedir recuperación de margen, descuento por volumen o lista escalonada."
-              tone={costIncreaseProducts.length > 0 ? "amber" : "green"}
-            />
-            <NegotiationAgendaItem
-              index={2}
-              title="Productos detenidos"
-              detail={`${detenidos.length} SKU · ${formatCurrencyCompact(stalledCapital)} inmovilizados.`}
-              ask="Solicitar devolución, nota de crédito, apoyo promocional o cambio por otros SKU."
-              tone={detenidos.length > 0 ? "red" : "green"}
-            />
-            <NegotiationAgendaItem
-              index={3}
-              title="Cumplimiento"
-              detail={`OTIF ${formatPercent(supplier.deliveryCompliance, 0)} · ${delayedPOs.length} OC atrasadas.`}
-              ask="Acordar objetivo de servicio, lead time realista y plan para atrasos."
-              tone={delayedPOs.length > 0 || supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_WARN ? "amber" : "green"}
-            />
-            <NegotiationAgendaItem
-              index={4}
-              title="Oportunidad"
-              detail={`${growingConstrained.length} SKU crecen sobre 25% con cobertura corta.`}
-              ask="Negociar capacidad, prioridad de despacho y precio por volumen."
-              tone={growingConstrained.length > 0 ? "blue" : "neutral"}
-            />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Posición negociadora"
-            description="Dependencia, alternativas y concentración real del proveedor."
-          />
-          <CardBody className="space-y-3">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Posición
-              </p>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="text-xl font-semibold text-slate-900">{negotiationPower}</p>
-                <Badge tone={negotiationPower === "Media-alta" ? "green" : "amber"}>
-                  {formatPercent(
-                    (alternativeProducts.length / Math.max(1, supProducts.length)) * 100,
-                    0
-                  )}{" "}
-                  con alternativa
-                </Badge>
-              </div>
-              <p className="mt-1 text-sm text-slate-500">
-                {topSupplierProducts.length} productos concentran{" "}
-                {formatPercent(topSalesShare * 100, 0)} de la venta y{" "}
-                {formatPercent(topProfitShare * 100, 0)} de la utilidad del proveedor.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <SupplierCockpitMetric
-                label="Compras 90d"
-                value={formatCurrencyCompact(supplier.purchasedAmountLast90Days)}
-              />
-              <SupplierCockpitMetric
-                label="Productos activos"
-                value={formatNumber(supProducts.length)}
-              />
-              <SupplierCockpitMetric
-                label="Alternativas"
-                value={formatNumber(alternativeProducts.length)}
-              />
-              <SupplierCockpitMetric label="Detenidos" value={formatNumber(detenidos.length)} />
-            </div>
-          </CardBody>
-        </Card>
-      </div>
+      <NegotiationCockpit
+        costIncreaseCount={costIncreaseProducts.length}
+        costImpact={costIncreaseProducts.reduce(
+          (sum, p) => sum + p.salesLast30Days * (p.cost - (p.costoAnterior ?? p.cost)),
+          0
+        )}
+        detenidosCount={detenidos.length}
+        stalledCapital={stalledCapital}
+        compliance={supplier.deliveryCompliance}
+        delayedCount={delayedPOs.length}
+        growingCount={growingConstrained.length}
+        negotiationPower={negotiationPower}
+        altCount={alternativeProducts.length}
+        activeCount={supProducts.length}
+        purchased90={supplier.purchasedAmountLast90Days}
+        topCount={topSupplierProducts.length}
+        topSalesShare={topSalesShare}
+        topProfitShare={topProfitShare}
+        complianceWarn={SUPPLIER_COMPLIANCE_WARN}
+      />
 
       {/* Más vendidos / Productos detenidos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <Card>
-          <CardBody>
-            <div className="flex items-center gap-2 mb-2.5">
-              <IconSales className="w-4 h-4 text-emerald-600" />
-              <p className="text-sm font-semibold text-slate-800">Más vendidos (30 días)</p>
-            </div>
-            {topSold.length === 0 ? (
-              <p className="text-sm text-slate-400">Sin ventas registradas.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {topSold.map((p, i) => (
-                  <Link
-                    key={p.sku}
-                    to={`/productos/${p.sku}`}
-                    className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50"
-                  >
-                    <span className="w-5 text-center text-xs font-bold text-slate-400">
-                      {i + 1}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium text-slate-800 truncate">
-                        {p.name}
-                      </span>
-                      <span className="block text-xs text-slate-400">
-                        {formatNumber(p.salesLast30Days)} u. · margen {formatPercent(p.margin, 0)}
-                      </span>
-                    </span>
-                    <span className="text-sm font-semibold text-slate-700 flex-shrink-0">
-                      {formatCurrencyCompact(sales30Amount(p))}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody>
-            <div className="flex items-center gap-2 mb-2.5">
-              <IconBox className="w-4 h-4 text-violet-600" />
-              <p className="text-sm font-semibold text-slate-800">Productos detenidos</p>
-              {detenidos.length > 0 && <Badge tone="violet">{detenidos.length}</Badge>}
-            </div>
-            {detenidos.length === 0 ? (
-              <p className="text-sm text-slate-400">Sin sobrestock ni productos sin venta. 👍</p>
-            ) : (
-              <div className="space-y-1.5">
-                {detenidos.slice(0, 5).map((p) => (
-                  <Link
-                    key={p.sku}
-                    to={`/productos/${p.sku}`}
-                    className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50"
-                  >
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium text-slate-800 truncate">
-                        {p.name}
-                      </span>
-                      <span className="block text-xs text-slate-400">
-                        disp. {formatNumber(p.availableStock)} · vende{" "}
-                        {formatNumber(p.salesLast30Days)}/mes
-                      </span>
-                    </span>
-                    <Badge tone={p.salesLast30Days === 0 ? "red" : "violet"}>
-                      {p.salesLast30Days === 0 ? "Sin venta" : "Sobrestock"}
-                    </Badge>
-                  </Link>
-                ))}
-                {detenidos.length > 5 && (
-                  <p className="text-xs text-slate-400 pt-0.5">
-                    +{detenidos.length - 5} más · ver pestaña Productos
-                  </p>
-                )}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      </div>
+      <SupplierTopProducts topSold={topSold} detenidos={detenidos} />
 
       <Tabs
         className="mb-4"
@@ -435,49 +289,4 @@ export function SupplierDetailPage() {
   );
 }
 
-function NegotiationAgendaItem({
-  index,
-  title,
-  detail,
-  ask,
-  tone,
-}: {
-  index: number;
-  title: string;
-  detail: string;
-  ask: string;
-  tone: "green" | "amber" | "red" | "blue" | "neutral";
-}) {
-  const toneClass = {
-    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
-    red: "border-rose-200 bg-rose-50 text-rose-700",
-    blue: "border-brand-200 bg-brand-50 text-brand-700",
-    neutral: "border-slate-200 bg-slate-50 text-slate-600",
-  }[tone];
-
-  return (
-    <div className={`rounded-lg border p-3 ${toneClass}`}>
-      <div className="flex items-start gap-3">
-        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold">
-          {index}
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="mt-0.5 text-sm text-slate-700">{detail}</p>
-          <p className="mt-1 text-xs font-medium text-slate-600">Pedir: {ask}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SupplierCockpitMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-base font-semibold text-slate-900">{value}</p>
-    </div>
-  );
-}
 
