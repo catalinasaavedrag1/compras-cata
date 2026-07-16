@@ -5,8 +5,9 @@ import { Tabs } from "../components/ui/Tabs";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useTrace } from "../context/TraceContext";
-import { formatDate } from "../utils/formatters";
+import { formatDate, formatCurrencyCompact } from "../utils/formatters";
 import { IconCheck, IconClose } from "../components/ui/icons";
+import { APPROVAL_ORDER_AMOUNT_CLP, APPROVAL_COVERAGE_DAYS } from "../utils/constants";
 
 // ============================================================================
 //  Gobierno: roles y permisos, matriz de aprobación y bitácora de cambios.
@@ -27,7 +28,7 @@ const PERMISOS = [
 const MATRIZ = [
   {
     criterio: "Monto alto",
-    umbral: "OC sobre $10M",
+    umbral: `OC sobre ${formatCurrencyCompact(APPROVAL_ORDER_AMOUNT_CLP)}`,
     aprobador: "Líder de Compras",
     tone: "amber" as const,
   },
@@ -39,7 +40,7 @@ const MATRIZ = [
   },
   {
     criterio: "Cobertura excesiva",
-    umbral: "Compra deja > 90 días de cobertura",
+    umbral: `Compra deja > ${APPROVAL_COVERAGE_DAYS} días de cobertura`,
     aprobador: "Líder de Compras",
     tone: "violet" as const,
   },

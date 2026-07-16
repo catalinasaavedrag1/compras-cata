@@ -34,7 +34,7 @@ import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
 import { coverageDays, addDaysISO } from "../utils/calculations";
 import { inRange, type IsoRange } from "../utils/dateRange";
-import { TODAY_ISO } from "../utils/constants";
+import { TODAY_ISO, APPROVAL_ORDER_AMOUNT_CLP, APPROVAL_COVERAGE_DAYS } from "../utils/constants";
 import type { ApprovalCriterion } from "../data/mockApprovals";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
@@ -389,6 +389,12 @@ export function PurchaseOrdersPage() {
       seq++;
       let orderApprovals = 0;
 
+      // "Monto alto" es a nivel de OC (política de Gobierno: OC sobre $10M),
+      // no por línea: se evalúa contra el total neto de la orden.
+      const grossGroup = groupItems.reduce((a, i) => a + i.quantity * i.unitCost, 0);
+      const netGroup = groupItems.reduce((a, i) => a + lineNet(i), 0);
+      const montoAltoOC = netGroup >= APPROVAL_ORDER_AMOUNT_CLP;
+
       groupItems.forEach((i, idx) => {
         const rec = recommendations.find((r) => r.sku === i.sku);
         const p = getProductBySku(i.sku);
@@ -408,8 +414,8 @@ export function PurchaseOrdersPage() {
 
         const criteria: ApprovalCriterion[] = [];
         if (suggested === 0 || diffPct > 0.2) criteria.push("desvio_sugerido");
-        if (lineAmount >= 5000000) criteria.push("monto_alto");
-        if (coverAfter > objetivo * 1.3) criteria.push("cobertura_excesiva");
+        if (montoAltoOC) criteria.push("monto_alto");
+        if (coverAfter > APPROVAL_COVERAGE_DAYS) criteria.push("cobertura_excesiva");
         if (margin < minMargin) criteria.push("margen_bajo");
 
         addDecision({
@@ -457,8 +463,6 @@ export function PurchaseOrdersPage() {
         }
       });
 
-      const grossGroup = groupItems.reduce((a, i) => a + i.quantity * i.unitCost, 0);
-      const netGroup = groupItems.reduce((a, i) => a + lineNet(i), 0);
       const effDisc = grossGroup > 0 ? Math.round(((grossGroup - netGroup) / grossGroup) * 100) : 0;
 
       const newOrder: PurchaseOrder = {

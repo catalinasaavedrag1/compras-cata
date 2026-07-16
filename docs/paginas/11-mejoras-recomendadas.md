@@ -161,8 +161,12 @@ Extraíbles a helper/constante compartida cuando se retome cada módulo:
   ✓ aplicado: `onSave` ahora compara la regla original vs la editada y registra en la
   bitácora cada parámetro cambiado (`targetInventoryDays`/`minStock`/`maxStock`/`minMargin`/
   `leadTimeDays`/`notes`), igual que el auto-fix (acción "Editó parámetro").
-- `PurchaseOrdersPage` — los umbrales de aprobación en `createOrder`
-  (`>= $5M`, cobertura `> obj×1.3`) no coinciden con el texto de política en
-  `GovernancePage` ("OC sobre $10M", "> 90 días"). Unificar en constantes compartidas.
+- ~~`PurchaseOrdersPage` — los umbrales de aprobación en `createOrder`
+  (`>= $5M`, cobertura `> obj×1.3`) no coinciden con la política en `GovernancePage`~~
+  ✓ aplicado: `APPROVAL_ORDER_AMOUNT_CLP = 10_000_000` y `APPROVAL_COVERAGE_DAYS = 90`
+  en `utils/constants.ts` son la fuente única. `createOrder` marca `monto_alto`
+  cuando el **total de la OC** ≥ $10M (antes era por línea ≥ $5M) y `cobertura_excesiva`
+  cuando la cobertura resultante > 90 días (antes `objetivo × 1.3`). La matriz de
+  `GovernancePage` deriva su texto de las mismas constantes.
 - `MobileBottomNav` y `AppRoutes`/`navItems` mantienen listas de navegación por
   separado: pueden divergir. Centralizar la fuente de verdad de rutas.
