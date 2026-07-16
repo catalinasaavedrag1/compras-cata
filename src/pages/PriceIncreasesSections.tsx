@@ -1,11 +1,17 @@
 import { Link } from "react-router-dom";
 import { Card, CardBody } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Modal } from "../components/ui/Modal";
+import { Select } from "../components/ui/Select";
+import { HelpNote } from "../components/business/HelpNote";
+import { EmptyState } from "../components/ui/EmptyState";
 import { DataTable, type Column } from "../components/ui/Table";
 import { productPath, categoryPath, supplierPath } from "../utils/entityLinks";
-import { IconArrowUp, IconArrowDown } from "../components/ui/icons";
+import { IconArrowUp, IconArrowDown, IconPlus } from "../components/ui/icons";
 import { formatCurrency, formatPercent, formatDelta, formatDate } from "../utils/formatters";
 import {
+  SUPPLIERS_WITH_PRODUCTS,
   TARGET_MARGIN_BY_CATEGORY,
   LOW_MARGIN_THRESHOLD,
   summarizeList,
@@ -16,6 +22,13 @@ import {
 
 type SortState = { key: string | null; dir: "asc" | "desc" };
 type PriceListSummary = ReturnType<typeof summarizeList>;
+
+const ALZA_OPTIONS = [
+  { value: "4", label: "Alza moderada (~4%)" },
+  { value: "8", label: "Alza media (~8%)" },
+  { value: "12", label: "Alza fuerte (~12%)" },
+  { value: "-3", label: "Baja general (~-3%)" },
+];
 
 const ESTADO_CFG: Record<PriceListEstado, { label: string; tone: "amber" | "green" | "red" }> = {
   pendiente: { label: "Pendiente", tone: "amber" },
@@ -306,5 +319,109 @@ export function PriceItemsTable({
         mobileCard={mobileCard}
       />
     </Card>
+  );
+}
+
+/** Modal (demo) para cargar una lista de precios: elige proveedor y alza base
+ *  y muestra una vista previa del impacto antes de generarla. */
+export function UploadPriceListModal({
+  open,
+  onClose,
+  onUpload,
+  proveedor,
+  onProveedorChange,
+  alza,
+  onAlzaChange,
+  previewCount,
+  previewSummary,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onUpload: () => void;
+  proveedor: string;
+  onProveedorChange: (value: string) => void;
+  alza: string;
+  onAlzaChange: (value: string) => void;
+  previewCount: number;
+  previewSummary: PriceListSummary;
+}) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Cargar lista de precios"
+      description="Simula la recepción de una nueva lista de un proveedor."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button icon={<IconPlus className="w-4 h-4" />} onClick={onUpload} disabled={previewCount === 0}>
+            Cargar lista
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <HelpNote variant="tip">
+          Demo: en producción se subiría un archivo (Excel/CSV) o se recibiría por integración. Aquí
+          elegimos un proveedor y un alza base para <b>generar una vista previa</b> a partir del
+          catálogo.
+        </HelpNote>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Proveedor</label>
+            <Select
+              value={proveedor}
+              onChange={(e) => onProveedorChange(e.target.value)}
+              options={SUPPLIERS_WITH_PRODUCTS.map((s) => ({ value: s, label: s }))}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              Alza base de la lista
+            </label>
+            <Select value={alza} onChange={(e) => onAlzaChange(e.target.value)} options={ALZA_OPTIONS} />
+          </div>
+        </div>
+
+        {previewCount === 0 ? (
+          <EmptyState
+            title="Sin productos"
+            description={`El proveedor "${proveedor}" no tiene productos en el catálogo.`}
+          />
+        ) : (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold text-slate-600 mb-2">Vista previa</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <p className="text-[11px] text-slate-400">Productos</p>
+                <p className="text-base font-semibold text-slate-800">{previewSummary.productos}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-400">Alza prom.</p>
+                <p
+                  className={`text-base font-semibold ${previewSummary.alzaPromedioPct > 0 ? "text-rose-600" : "text-emerald-600"}`}
+                >
+                  {formatDelta(previewSummary.alzaPromedioPct)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-400">En alza</p>
+                <p className="text-base font-semibold text-slate-800">{previewSummary.enAlza}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-400">Margen bajo</p>
+                <p
+                  className={`text-base font-semibold ${previewSummary.conMargenBajo > 0 ? "text-rose-600" : "text-emerald-600"}`}
+                >
+                  {previewSummary.conMargenBajo}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }

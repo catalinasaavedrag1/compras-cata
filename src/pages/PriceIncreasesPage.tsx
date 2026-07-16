@@ -2,10 +2,7 @@ import { useMemo, useState } from "react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Modal } from "../components/ui/Modal";
-import { Select } from "../components/ui/Select";
 import { KpiCard } from "../components/business/KpiCard";
-import { HelpNote } from "../components/business/HelpNote";
 import { InfoHint } from "../components/business/InfoHint";
 import { FilterBar } from "../components/business/FilterBar";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -28,14 +25,8 @@ import {
   PriceListSelector,
   PriceListSummaryCard,
   PriceItemsTable,
+  UploadPriceListModal,
 } from "./PriceIncreasesSections";
-
-const ALZA_OPTIONS = [
-  { value: "4", label: "Alza moderada (~4%)" },
-  { value: "8", label: "Alza media (~8%)" },
-  { value: "12", label: "Alza fuerte (~12%)" },
-  { value: "-3", label: "Baja general (~-3%)" },
-];
 
 export function PriceIncreasesPage() {
   const toast = useToast();
@@ -320,93 +311,17 @@ export function PriceIncreasesPage() {
       )}
 
       {/* Modal: cargar lista de precios (demo) */}
-      <Modal
+      <UploadPriceListModal
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
-        title="Cargar lista de precios"
-        description="Simula la recepción de una nueva lista de un proveedor."
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setUploadOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              icon={<IconPlus className="w-4 h-4" />}
-              onClick={handleUpload}
-              disabled={previewItems.length === 0}
-            >
-              Cargar lista
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <HelpNote variant="tip">
-            Demo: en producción se subiría un archivo (Excel/CSV) o se recibiría por integración.
-            Aquí elegimos un proveedor y un alza base para <b>generar una vista previa</b> a partir
-            del catálogo.
-          </HelpNote>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Proveedor</label>
-              <Select
-                value={upProveedor}
-                onChange={(e) => setUpProveedor(e.target.value)}
-                options={SUPPLIERS_WITH_PRODUCTS.map((s) => ({ value: s, label: s }))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                Alza base de la lista
-              </label>
-              <Select
-                value={upAlza}
-                onChange={(e) => setUpAlza(e.target.value)}
-                options={ALZA_OPTIONS}
-              />
-            </div>
-          </div>
-
-          {previewItems.length === 0 ? (
-            <EmptyState
-              title="Sin productos"
-              description={`El proveedor "${upProveedor}" no tiene productos en el catálogo.`}
-            />
-          ) : (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-semibold text-slate-600 mb-2">Vista previa</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
-                  <p className="text-[11px] text-slate-400">Productos</p>
-                  <p className="text-base font-semibold text-slate-800">
-                    {previewSummary.productos}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-slate-400">Alza prom.</p>
-                  <p
-                    className={`text-base font-semibold ${previewSummary.alzaPromedioPct > 0 ? "text-rose-600" : "text-emerald-600"}`}
-                  >
-                    {formatDelta(previewSummary.alzaPromedioPct)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-slate-400">En alza</p>
-                  <p className="text-base font-semibold text-slate-800">{previewSummary.enAlza}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-slate-400">Margen bajo</p>
-                  <p
-                    className={`text-base font-semibold ${previewSummary.conMargenBajo > 0 ? "text-rose-600" : "text-emerald-600"}`}
-                  >
-                    {previewSummary.conMargenBajo}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
+        onUpload={handleUpload}
+        proveedor={upProveedor}
+        onProveedorChange={setUpProveedor}
+        alza={upAlza}
+        onAlzaChange={setUpAlza}
+        previewCount={previewItems.length}
+        previewSummary={previewSummary}
+      />
     </div>
   );
 }
