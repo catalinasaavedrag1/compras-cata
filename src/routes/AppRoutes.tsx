@@ -97,6 +97,7 @@ const ReportsPage = lazy(() => named(import("../pages/ReportsPage"), "ReportsPag
 const ClaimsPage = lazy(() => named(import("../pages/ClaimsPage"), "ClaimsPage"));
 const GovernancePage = lazy(() => named(import("../pages/GovernancePage"), "GovernancePage"));
 const ImportsPage = lazy(() => named(import("../pages/ImportsPage"), "ImportsPage"));
+const NewProductsPage = lazy(() => named(import("../pages/NewProductsPage"), "NewProductsPage"));
 
 function PageLoader() {
   return <PageSkeleton />;
@@ -213,6 +214,7 @@ export default function AppRoutes() {
                               <Route path="/categorias" element={<CategoriesPage />} />
                               <Route path="/categorias/:id" element={<CategoryDetailPage />} />
                               <Route path="/surtido" element={<AssortmentPage />} />
+                              <Route path="/nuevos-productos" element={<NewProductsPage />} />
                               {/* Renombrada: "Catálogo optimizado" → "Surtido redundante". */}
                               <Route
                                 path="/surtido-redundante"

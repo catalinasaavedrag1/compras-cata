@@ -136,6 +136,13 @@ export const compradorModules: NavModule[] = [
         secondary: true,
       },
       {
+        to: "/nuevos-productos",
+        label: "Nuevos productos",
+        icon: IconBulb,
+        hint: "Incorporación (piloto → escalado) y salidas del surtido",
+        secondary: true,
+      },
+      {
         to: "/surtido-redundante",
         label: "Duplicidad de surtido",
         icon: IconBulb,
