@@ -1,31 +1,28 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { Card, CardHeader } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
-import { DataTable, type Column, type SortState } from "../components/ui/Table";
+import { type SortState } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 import { Tabs } from "../components/ui/Tabs";
-import { Badge } from "../components/ui/Badge";
-import { StatusBadge } from "../components/business/StatusBadge";
-import { HelpNote } from "../components/business/HelpNote";
-import { ExportButton } from "../components/business/ExportButton";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { products, getProductBySku } from "../data/mockProducts";
 import { suppliers } from "../data/mockSuppliers";
 import { coverageDays } from "../utils/calculations";
 import { inRange, type IsoRange } from "../utils/dateRange";
 import { TODAY_ISO } from "../utils/constants";
-import { formatCurrency, formatCurrencyCompact, formatNumber, formatPercent, formatDays } from "../utils/formatters";
-import { IconOrders, IconCart, IconSuppliers, IconCategories, IconAlerts, IconBox } from "../components/ui/icons";
-import type { Product } from "../types/purchasing";
-import { daysBetween, makeToggleSort, OPEN_PO_STATUSES, REPORTS, type BuyerBuyRow, type CategoryBuyRow, type CategoryMarginRow, type OpenOrderRow, type ProductAlertRow, type ReportKey, type SupplierBuyRow } from "./reports/definitions";
+import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/formatters";
+import { IconOrders, IconCart, IconSuppliers, IconCategories } from "../components/ui/icons";
+import { daysBetween, OPEN_PO_STATUSES, REPORTS, type BuyerBuyRow, type CategoryBuyRow, type CategoryMarginRow, type OpenOrderRow, type ProductAlertRow, type ReportKey, type SupplierBuyRow } from "./reports/definitions";
 import { ExportLauncher } from "./reports/ExportLauncher";
-import { alertCsv, marginCsv, perfCsv, rotationCsv } from "./reports/csv";
 import {
   SupplierBuyReport,
   CategoryBuyReport,
   BuyerBuyReport,
   OpenOrdersReport,
+  RotationReport,
+  MarginReport,
+  ProductAlertsReport,
+  SupplierPerfReport,
 } from "./reports/sections";
 
 // ============================================================================
@@ -240,238 +237,6 @@ export function ReportsPage() {
   // =====================================================================
   const supplierPerfRows = useMemo(() => [...suppliers], []);
 
-  // ====================== Columnas por reporte ==========================
-  const rotationColumns: Column<Product>[] = [
-    {
-      key: "product",
-      header: "Producto",
-      sortable: true,
-      sortValue: (p) => p.name,
-      render: (p) => (
-        <div className="min-w-[180px]">
-          <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
-          <p className="text-xs font-mono text-slate-400">{p.sku}</p>
-        </div>
-      ),
-    },
-    {
-      key: "category",
-      header: "Categoría",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (p) => p.category,
-      render: (p) => <span className="text-sm text-slate-600">{p.category}</span>,
-    },
-    {
-      key: "rotation",
-      header: "Rotación (año)",
-      align: "right",
-      sortable: true,
-      sortValue: (p) => p.rotation,
-      render: (p) => (
-        <span className="font-semibold text-slate-900">
-          {p.rotation.toLocaleString("es-CL", { maximumFractionDigits: 1 })}
-        </span>
-      ),
-    },
-    {
-      key: "inventoryDays",
-      header: "Días inventario",
-      align: "right",
-      sortable: true,
-      sortValue: (p) => p.inventoryDays,
-      render: (p) => (
-        <span className={p.inventoryDays >= 180 ? "text-amber-600 font-medium" : "text-slate-700"}>
-          {p.inventoryDays >= 999 ? "+999 d" : formatDays(p.inventoryDays)}
-        </span>
-      ),
-    },
-    {
-      key: "stock",
-      header: "Stock disp.",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (p) => p.availableStock,
-      render: (p) => <span className="text-slate-700">{formatNumber(p.availableStock)}</span>,
-    },
-    {
-      key: "sales",
-      header: "Venta 30d",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (p) => p.salesLast30Days,
-      render: (p) => <span className="text-slate-700">{formatNumber(p.salesLast30Days)}</span>,
-    },
-  ];
-
-  const marginColumns: Column<CategoryMarginRow>[] = [
-    {
-      key: "category",
-      header: "Categoría",
-      sortable: true,
-      sortValue: (r) => r.category,
-      render: (r) => <span className="font-medium text-slate-800">{r.category}</span>,
-    },
-    {
-      key: "skuCount",
-      header: "Nº SKUs",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (r) => r.skuCount,
-      render: (r) => formatNumber(r.skuCount),
-    },
-    {
-      key: "avgMargin",
-      header: "Margen prom.",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.avgMargin,
-      render: (r) => (
-        <span
-          className={
-            r.avgMargin < 20 ? "text-amber-600 font-medium" : "text-slate-900 font-semibold"
-          }
-        >
-          {formatPercent(r.avgMargin)}
-        </span>
-      ),
-    },
-    {
-      key: "inventoryValue",
-      header: "Valor inventario",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (r) => r.inventoryValue,
-      render: (r) => <span className="text-slate-700">{formatCurrency(r.inventoryValue)}</span>,
-    },
-  ];
-
-  const alertColumns: Column<ProductAlertRow>[] = [
-    {
-      key: "product",
-      header: "Producto",
-      sortable: true,
-      sortValue: (r) => r.product.name,
-      render: (r) => (
-        <div className="min-w-[180px]">
-          <p className="font-medium text-slate-800 leading-snug">{r.product.name}</p>
-          <p className="text-xs font-mono text-slate-400">
-            {r.product.sku} · {r.product.category}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: "type",
-      header: "Motivo",
-      sortable: true,
-      sortValue: (r) => r.type,
-      render: (r) => (
-        <Badge tone={r.type === "sin_venta" ? "violet" : "red"} dot>
-          {r.reasonLabel}
-        </Badge>
-      ),
-    },
-    {
-      key: "stock",
-      header: "Stock disp.",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (r) => r.product.availableStock,
-      render: (r) => (
-        <span className="text-slate-700">{formatNumber(r.product.availableStock)}</span>
-      ),
-    },
-    {
-      key: "coverage",
-      header: "Cobertura",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (r) => r.coverage,
-      render: (r) => (
-        <span className="text-slate-700">
-          {r.coverage >= 999 ? "+999 d" : formatDays(r.coverage)}
-        </span>
-      ),
-    },
-    {
-      key: "frozen",
-      header: "Capital detenido",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.frozenCapital,
-      render: (r) => (
-        <span className={r.frozenCapital > 0 ? "font-semibold text-rose-600" : "text-slate-400"}>
-          {r.frozenCapital > 0 ? formatCurrency(r.frozenCapital) : "—"}
-        </span>
-      ),
-    },
-  ];
-
-  const perfColumns: Column<(typeof suppliers)[number]>[] = [
-    {
-      key: "name",
-      header: "Proveedor",
-      sortable: true,
-      sortValue: (s) => s.name,
-      render: (s) => <span className="font-medium text-slate-800">{s.name}</span>,
-    },
-    {
-      key: "compliance",
-      header: "Cumplimiento",
-      align: "right",
-      sortable: true,
-      sortValue: (s) => s.deliveryCompliance,
-      render: (s) => (
-        <Badge
-          tone={s.deliveryCompliance >= 85 ? "green" : s.deliveryCompliance >= 70 ? "amber" : "red"}
-        >
-          {formatPercent(s.deliveryCompliance, 0)}
-        </Badge>
-      ),
-    },
-    {
-      key: "leadTime",
-      header: "Lead time",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (s) => s.averageLeadTimeDays,
-      render: (s) => <span className="text-slate-700">{formatDays(s.averageLeadTimeDays)}</span>,
-    },
-    {
-      key: "openOc",
-      header: "OC abiertas",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (s) => s.openPurchaseOrders,
-      render: (s) => formatNumber(s.openPurchaseOrders),
-    },
-    {
-      key: "pending",
-      header: "Monto pendiente",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (s) => s.pendingAmount,
-      render: (s) => <span className="text-slate-700">{formatCurrency(s.pendingAmount)}</span>,
-    },
-    {
-      key: "status",
-      header: "Estado",
-      sortable: true,
-      sortValue: (s) => s.status,
-      render: (s) => <StatusBadge kind="supplier" value={s.status} />,
-    },
-  ];
-
   return (
     <div>
       <PageHeader
@@ -580,203 +345,28 @@ export function ReportsPage() {
 
       {/* =================== 5. Rotación e inventario =================== */}
       {report === "rotacion" && (
-        <Card>
-          <CardHeader
-            title="Rotación y días de inventario por producto"
-            description="Ordena por rotación o días de inventario para ver top/bottom: lo que más gira y lo que está detenido."
-            action={
-              <ExportButton
-                filename="rotacion-inventario"
-                rows={rotationRows}
-                columns={rotationCsv}
-              />
-            }
-          />
-          <DataTable
-            columns={rotationColumns}
-            data={rotationRows}
-            rowKey={(p) => p.sku}
-            sort={rotationSort}
-            onSortChange={makeToggleSort(setRotationSort)}
-            mobileCard={(p) => (
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-800 truncate">{p.name}</p>
-                    <p className="text-xs text-slate-500">{p.category}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-slate-900 flex-shrink-0">
-                    {p.rotation.toLocaleString("es-CL", { maximumFractionDigits: 1 })}x
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  {p.inventoryDays >= 999 ? "+999 d" : formatDays(p.inventoryDays)} de inventario ·
-                  vende {formatNumber(p.salesLast30Days)} u./mes
-                </p>
-              </div>
-            )}
-          />
-        </Card>
+        <RotationReport rows={rotationRows} sort={rotationSort} setSort={setRotationSort} />
       )}
 
       {/* =================== 6. Margen por categoría =================== */}
       {report === "margen_categoria" && (
-        <Card>
-          <CardHeader
-            title="Margen por categoría"
-            description="Margen promedio de los productos de cada categoría y valor de inventario asociado."
-            action={
-              <ExportButton
-                filename="margen-por-categoria"
-                rows={categoryMarginRows}
-                columns={marginCsv}
-              />
-            }
-          />
-          <DataTable
-            columns={marginColumns}
-            data={categoryMarginRows}
-            rowKey={(r) => r.category}
-            sort={marginSort}
-            onSortChange={makeToggleSort(setMarginSort)}
-            mobileCard={(r) => (
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-800 truncate">{r.category}</p>
-                  <p className="text-xs text-slate-500">
-                    {formatNumber(r.skuCount)} SKUs · inv. {formatCurrencyCompact(r.inventoryValue)}
-                  </p>
-                </div>
-                <span
-                  className={`text-sm font-semibold flex-shrink-0 ${r.avgMargin < 20 ? "text-amber-600" : "text-slate-900"}`}
-                >
-                  {formatPercent(r.avgMargin)}
-                </span>
-              </div>
-            )}
-          />
-        </Card>
+        <MarginReport rows={categoryMarginRows} sort={marginSort} setSort={setMarginSort} />
       )}
 
       {/* =================== 7. Productos sin venta / críticos =================== */}
       {report === "alertas_producto" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <KpiCard
-              title="Sin venta (30d)"
-              value={formatNumber(noSalesCount)}
-              tone={noSalesCount ? "warn" : "good"}
-              icon={<IconBox className="w-4 h-4" />}
-              description="Con stock detenido"
-            />
-            <KpiCard
-              title="Críticos"
-              value={formatNumber(criticalCount)}
-              tone={criticalCount ? "bad" : "good"}
-              icon={<IconAlerts className="w-4 h-4" />}
-              description="Cobertura ≤ lead time"
-            />
-          </div>
-          <Card>
-            <CardHeader
-              title="Productos sin venta y críticos"
-              description="Sin venta: 0 ventas en 30 días con stock (capital detenido). Críticos: con venta pero cobertura por debajo del lead time del proveedor."
-              action={
-                <ExportButton
-                  filename="productos-sin-venta-criticos"
-                  rows={productAlertRows}
-                  columns={alertCsv}
-                />
-              }
-            />
-            <DataTable
-              columns={alertColumns}
-              data={productAlertRows}
-              rowKey={(r) => r.product.sku}
-              sort={alertSort}
-              onSortChange={makeToggleSort(setAlertSort)}
-              emptyMessage="No hay productos sin venta ni críticos."
-              mobileCard={(r) => (
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-800 truncate">{r.product.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {r.product.sku} · {r.product.category}
-                      </p>
-                    </div>
-                    <Badge tone={r.type === "sin_venta" ? "violet" : "red"} dot>
-                      {r.type === "sin_venta" ? "Sin venta" : "Crítico"}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Stock {formatNumber(r.product.availableStock)} ·{" "}
-                    {r.coverage >= 999 ? "+999 d" : formatDays(r.coverage)}
-                    {r.frozenCapital > 0 && (
-                      <span className="text-rose-600">
-                        {" "}
-                        · {formatCurrencyCompact(r.frozenCapital)} detenido
-                      </span>
-                    )}
-                  </p>
-                </div>
-              )}
-            />
-          </Card>
-        </div>
+        <ProductAlertsReport
+          rows={productAlertRows}
+          sort={alertSort}
+          setSort={setAlertSort}
+          noSalesCount={noSalesCount}
+          criticalCount={criticalCount}
+        />
       )}
 
       {/* =================== 8. Cumplimiento de proveedores =================== */}
       {report === "peores_proveedores" && (
-        <div className="space-y-4">
-          <HelpNote title="Cómo leerlo:">
-            Ordenado por <b>cumplimiento de entrega</b> ascendente: arriba quedan los proveedores
-            con peor cumplimiento, candidatos a revisar o reemplazar. Verde ≥ 85%, ámbar 70–84%,
-            rojo &lt; 70%.
-          </HelpNote>
-          <Card>
-            <CardHeader
-              title="Cumplimiento de proveedores"
-              description="Cumplimiento de entrega, lead time, OC abiertas y monto pendiente por proveedor."
-              action={
-                <ExportButton
-                  filename="cumplimiento-proveedores"
-                  rows={supplierPerfRows}
-                  columns={perfCsv}
-                />
-              }
-            />
-            <DataTable
-              columns={perfColumns}
-              data={supplierPerfRows}
-              rowKey={(s) => s.id}
-              sort={perfSort}
-              onSortChange={makeToggleSort(setPerfSort)}
-              mobileCard={(s) => (
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-800 truncate">{s.name}</p>
-                    <p className="text-xs text-slate-500">
-                      Lead {formatDays(s.averageLeadTimeDays)} ·{" "}
-                      {formatNumber(s.openPurchaseOrders)} OC abiertas
-                    </p>
-                  </div>
-                  <Badge
-                    tone={
-                      s.deliveryCompliance >= 85
-                        ? "green"
-                        : s.deliveryCompliance >= 70
-                          ? "amber"
-                          : "red"
-                    }
-                  >
-                    {formatPercent(s.deliveryCompliance, 0)}
-                  </Badge>
-                </div>
-              )}
-            />
-          </Card>
-        </div>
+        <SupplierPerfReport rows={supplierPerfRows} sort={perfSort} setSort={setPerfSort} />
       )}
     </div>
   );
