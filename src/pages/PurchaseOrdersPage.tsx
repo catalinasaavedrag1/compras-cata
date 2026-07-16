@@ -44,6 +44,7 @@ import {
   supplierMinimumStatus,
   consolidationCandidates,
   earliestOrderBy,
+  orderSalesAtRisk,
   type ConsolidationCandidate,
 } from "../utils/orderConsolidation";
 import { OcDetailModal } from "./PurchaseOrdersSections";
@@ -67,6 +68,12 @@ import {
   formatNumber,
 } from "../utils/formatters";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
+
+/** Días desde hoy hasta una fecha ISO (negativo si ya pasó). */
+const daysToDate = (iso: string) =>
+  Math.round(
+    (new Date(`${iso}T00:00:00`).getTime() - new Date(`${TODAY_ISO}T00:00:00`).getTime()) / 86400000
+  );
 
 const TABS = [
   { value: "all", label: "Todas" },
@@ -210,6 +217,27 @@ export function PurchaseOrdersPage() {
     };
   }, [visible]);
 
+  // Venta en riesgo por OC: prioriza el seguimiento por impacto comercial, no
+  // solo por días de atraso (una OC con 1 día de atraso que evita un quiebre
+  // masivo pesa más que una muy atrasada de un producto sin venta).
+  const riskByOrder = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof orderSalesAtRisk>>();
+    visible.forEach((o) => {
+      const arrivalDays = o.delayedDays > 0 ? o.delayedDays : Math.max(0, daysToDate(o.expectedDate));
+      map.set(
+        o.id,
+        orderSalesAtRisk(o.lines, arrivalDays, (sku) => {
+          const p = getProductBySku(sku);
+          return p
+            ? { availableStock: p.availableStock, salesLast30Days: p.salesLast30Days, price: p.price }
+            : undefined;
+        })
+      );
+    });
+    return map;
+  }, [visible]);
+  const riskValue = (o: PurchaseOrder) => riskByOrder.get(o.id)?.value ?? 0;
+
   const filtered = useMemo(() => {
     const open: PurchaseOrderStatus[] = [
       "sent",
@@ -217,19 +245,23 @@ export function PurchaseOrdersPage() {
       "partially_received",
       "with_difference",
     ];
+    // En seguimiento (en curso / atrasadas) ordena por venta en riesgo y luego
+    // por días de atraso: primero lo que más venta protege.
+    const rv = (o: PurchaseOrder) => riskByOrder.get(o.id)?.value ?? 0;
+    const byRisk = (a: PurchaseOrder, b: PurchaseOrder) => rv(b) - rv(a) || b.delayedDays - a.delayedDays;
     switch (tab) {
       case "draft":
         return visible.filter((o) => o.status === "draft");
       case "open":
-        return visible.filter((o) => open.includes(o.status));
+        return visible.filter((o) => open.includes(o.status)).sort(byRisk);
       case "delayed":
-        return visible.filter((o) => o.status === "delayed");
+        return visible.filter((o) => o.status === "delayed").sort(byRisk);
       case "received":
         return visible.filter((o) => o.status === "received" || o.status === "closed");
       default:
         return visible;
     }
-  }, [visible, tab]);
+  }, [visible, tab, riskByOrder]);
 
   const totalOpenAmount = visible
     .filter((o) => !["received", "cancelled"].includes(o.status))
@@ -590,6 +622,26 @@ export function PurchaseOrdersPage() {
         ),
     },
     {
+      key: "risk",
+      header: "Venta en riesgo",
+      align: "right",
+      sortable: true,
+      sortValue: (o) => riskValue(o),
+      render: (o) => {
+        const r = riskByOrder.get(o.id);
+        if (!r || r.value <= 0)
+          return <span className="text-slate-300">—</span>;
+        return (
+          <div className="text-sm">
+            <p className="font-semibold text-rose-600">{formatCurrencyCompact(r.value)}/mes</p>
+            <p className="text-xs text-slate-400">
+              {formatNumber(r.skus)} SKU por quebrar
+            </p>
+          </div>
+        );
+      },
+    },
+    {
       key: "status",
       header: "Estado",
       render: (o) => <StatusBadge kind="purchaseOrder" value={o.status} />,
@@ -906,6 +958,17 @@ export function PurchaseOrdersPage() {
                   <p className="text-slate-700">{formatCurrencyCompact(o.totalAmount)}</p>
                 </div>
               </div>
+              {(() => {
+                const r = riskByOrder.get(o.id);
+                if (!r || r.value <= 0) return null;
+                return (
+                  <p className="mt-2 text-xs font-medium text-rose-600">
+                    Venta en riesgo: {formatCurrencyCompact(r.value)}/mes · {formatNumber(r.skus)} SKU
+                    por quebrar
+                    {o.delayedDays > 0 ? ` · atraso ${o.delayedDays} d` : ""}
+                  </p>
+                );
+              })()}
             </div>
           )}
         />

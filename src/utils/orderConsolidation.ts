@@ -175,6 +175,52 @@ export function orderBySignal(
   return { stockoutDate, orderByDate, daysToOrderBy, status };
 }
 
+// ----------------------------------------------------------------------------
+//  4. Venta en riesgo de una orden de compra (para priorizar el seguimiento)
+// ----------------------------------------------------------------------------
+export interface OrderRiskProduct {
+  availableStock: number;
+  salesLast30Days: number;
+  price: number;
+}
+
+export interface OrderSalesAtRisk {
+  /** Venta mensual (CLP) de los SKU de la OC que se quiebran antes de que llegue. */
+  value: number;
+  /** Cuántos SKU de la OC están expuestos a quiebre. */
+  skus: number;
+}
+
+/**
+ * Venta en riesgo de una OC en curso: suma de la venta mensual de los SKU cuya
+ * cobertura se agota antes de que la orden llegue. Así el seguimiento prioriza
+ * por impacto comercial (una OC con 1 día de atraso que evita un quiebre masivo
+ * pesa más que una OC muy atrasada de un producto sin venta), no solo por días
+ * de atraso.
+ *
+ * @param arrivalDays días hasta que llega la orden (o días de atraso si ya venció).
+ * @param resolve función que entrega los datos del producto por SKU.
+ */
+export function orderSalesAtRisk(
+  lines: { sku: string }[] | undefined,
+  arrivalDays: number,
+  resolve: (sku: string) => OrderRiskProduct | undefined
+): OrderSalesAtRisk {
+  if (!lines || lines.length === 0) return { value: 0, skus: 0 };
+  let value = 0;
+  let skus = 0;
+  for (const line of lines) {
+    const p = resolve(line.sku);
+    if (!p || p.salesLast30Days <= 0) continue;
+    const coverage = p.availableStock / (p.salesLast30Days / 30);
+    if (coverage <= arrivalDays) {
+      value += Math.round(p.salesLast30Days * p.price);
+      skus += 1;
+    }
+  }
+  return { value, skus };
+}
+
 /**
  * Fecha límite de emisión más urgente entre un conjunto de líneas (para mostrar
  * a nivel de grupo de proveedor). Devuelve la señal con menor `daysToOrderBy`.
