@@ -1,19 +1,30 @@
+import { Link } from "react-router-dom";
 import { Card, CardBody } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
-import { IconPlus, IconArrowUp, IconArrowDown } from "../components/ui/icons";
+import { IconPlus, IconCampaign, IconArrowUp, IconArrowDown } from "../components/ui/icons";
 import { Svg } from "./campaignsShared";
 import { CHANNEL_BG } from "../utils/tone";
+import { productPath, categoryPath } from "../utils/entityLinks";
 import { formatCurrency, formatCurrencyCompact } from "../utils/formatters";
-import { daysUntil, rangeText } from "./campaignsHelpers";
+import { daysUntil, discountPct, rangeText, STATUS_CFG } from "./campaignsHelpers";
 import {
   CHANNEL_META,
   PLACEMENT_ICON,
   type CampaignPlan,
+  type CampaignProduct,
   type PromoChannelKey,
   type PlacementKey,
   type SpaceType,
 } from "../data/mockCampaignPlans";
+
+/** Posición de exhibición de un producto dentro de su placement. */
+export interface PositionInfo {
+  position: number;
+  total: number;
+  isFirst: boolean;
+  isLast: boolean;
+}
 
 /** Un producto asignado a un espacio, con su posición de exhibición. */
 export interface AdSpaceAssignment {
@@ -487,6 +498,199 @@ export function AdSpacesView({
           </div>
         );
       })}
+    </Card>
+  );
+}
+
+/**
+ * Tabla de productos en descuento de la campaña (o estado vacío): precio
+ * antes/después, vigencia, canal, posición con reorden ▲▼, presupuesto, venta
+ * estimada, estado y edición por fila. (Extraído de CampaignsPage.)
+ */
+export function CampaignProductsTable({
+  products,
+  positionBySku,
+  moveProduct,
+  openEdit,
+  onAdd,
+}: {
+  products: CampaignProduct[];
+  positionBySku: Record<string, PositionInfo>;
+  moveProduct: (sku: string, placement: PlacementKey, dir: -1 | 1) => void;
+  openEdit: (idx: number) => void;
+  onAdd: () => void;
+}) {
+  if (products.length === 0) {
+    return (
+      <Card>
+        <CardBody className="py-12 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 inline-flex items-center justify-center mb-3.5">
+            <IconCampaign className="w-6 h-6" />
+          </div>
+          <p className="text-base font-semibold text-slate-800">
+            Aún no hay productos en esta campaña
+          </p>
+          <p className="text-sm text-slate-500 mt-1 mb-4">
+            Agrega los productos que estarán en descuento, con su vigencia y precio.
+          </p>
+          <Button icon={<IconPlus className="w-4 h-4" />} onClick={onAdd}>
+            Agregar producto
+          </Button>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse min-w-[920px]">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200 text-left">
+              {[
+                "Producto",
+                "Precio antes / después",
+                "Vigencia",
+                "Canal y ubicación",
+                "Posición",
+                "Presupuesto",
+                "Venta estim.",
+                "Estado",
+                "",
+              ].map((h, i) => (
+                <th
+                  key={i}
+                  className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 ${i >= 5 && i <= 6 ? "text-right" : ""}`}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p, idx) => {
+              const meta = CHANNEL_META[p.channel];
+              const st = STATUS_CFG[p.status];
+              const disc = discountPct(p.normal, p.promo);
+              const pos = positionBySku[p.sku];
+              return (
+                <tr key={`${p.sku}-${idx}`} className="border-b border-slate-100">
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        to={productPath(p.sku)}
+                        className="text-sm font-medium text-slate-800 hover:text-brand-700 hover:underline"
+                      >
+                        {p.name}
+                      </Link>
+                      {p.isNew && (
+                        <span className="rounded-full px-1.5 py-px text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700">
+                          Nuevo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      {p.sku} ·{" "}
+                      <Link
+                        to={categoryPath(p.category)}
+                        className="hover:text-brand-700 hover:underline"
+                      >
+                        {p.category}
+                      </Link>
+                    </p>
+                  </td>
+                  <td className="px-3 py-3 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span className="text-[11px] text-slate-400 line-through">
+                        {formatCurrency(p.normal)}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">
+                        {formatCurrency(p.promo)}
+                      </span>
+                    </div>
+                    <span className="inline-flex rounded-full px-1.5 py-px text-[11px] font-bold bg-rose-50 text-rose-600 mt-0.5">
+                      -{disc}%
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-xs text-slate-600">{rangeText(p.from, p.to)}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 ${CHANNEL_BG[meta.tone]}`}
+                      >
+                        <Svg path={meta.icon} className="w-3.5 h-3.5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-700">{meta.label}</p>
+                        <p className="text-[11px] text-slate-400">{p.placementLabel}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    {pos ? (
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          tone={
+                            pos.position === 1 ? "green" : pos.position === 2 ? "amber" : "neutral"
+                          }
+                        >
+                          {pos.position}º
+                        </Badge>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            aria-label="Subir"
+                            disabled={pos.isFirst}
+                            onClick={() => moveProduct(p.sku, p.placement, -1)}
+                            className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 enabled:hover:border-brand-300 enabled:hover:text-brand-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <IconArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Bajar"
+                            disabled={pos.isLast}
+                            onClick={() => moveProduct(p.sku, p.placement, 1)}
+                            className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 enabled:hover:border-brand-300 enabled:hover:text-brand-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <IconArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <span className="text-[11px] text-slate-400 whitespace-nowrap">
+                          de {pos.total}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-right text-sm font-semibold text-slate-700">
+                    {formatCurrency(p.budget)}
+                  </td>
+                  <td className="px-3 py-3 text-right text-sm font-semibold text-emerald-600">
+                    {formatCurrencyCompact(p.estSale)}
+                  </td>
+                  <td className="px-3 py-3">
+                    <Badge tone={st.tone}>{st.label}</Badge>
+                  </td>
+                  <td className="px-3 py-3">
+                    <button
+                      onClick={() => openEdit(idx)}
+                      title="Editar"
+                      className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:border-brand-300 hover:text-brand-600"
+                    >
+                      <Svg
+                        path="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"
+                        className="w-4 h-4"
+                      />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
