@@ -13,8 +13,9 @@ import { usePurchaseFlow } from "../context/PurchaseFlowContext";
 import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
 import { supplierPath } from "../utils/entityLinks";
-import { IconBulb, IconCheck, IconAlerts } from "../components/ui/icons";
-import { formatNumber } from "../utils/formatters";
+import { IconBulb, IconCheck, IconAlerts, IconClose } from "../components/ui/icons";
+import { formatNumber, formatCurrencyCompact } from "../utils/formatters";
+import { evaluateDecision } from "../utils/decisionEval";
 
 export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { decisions } = usePurchaseFlow();
@@ -135,6 +136,7 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
           {filtered.map((d) => {
             const diff = d.purchasedQty - d.suggestedQty;
             const diffPct = d.suggestedQty > 0 ? Math.round((diff / d.suggestedQty) * 100) : 0;
+            const evalr = evaluateDecision(d);
             return (
               <Card key={d.id}>
                 <CardBody>
@@ -194,6 +196,67 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
                     </div>
                   </div>
 
+                  {evalr.measured && (
+                    <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Evaluación de la compra
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <EvalMetric
+                          label="Pronóstico vs real"
+                          value={`${evalr.forecastErrorPct! > 0 ? "+" : ""}${evalr.forecastErrorPct}%`}
+                          tone={Math.abs(evalr.forecastErrorPct!) <= 15 ? "good" : "bad"}
+                        />
+                        <EvalMetric
+                          label="Sobrestock generado"
+                          value={
+                            evalr.overstockValue > 0 ? formatCurrencyCompact(evalr.overstockValue) : "—"
+                          }
+                          tone={evalr.overstockValue > 0 ? "bad" : "good"}
+                        />
+                        <EvalMetric
+                          label="Margen prev→real"
+                          value={
+                            d.marginPlanned !== undefined && d.marginActual !== undefined
+                              ? `${d.marginPlanned}%→${d.marginActual}%`
+                              : "—"
+                          }
+                          tone={(evalr.marginDelta ?? 0) < 0 ? "bad" : "good"}
+                        />
+                        <EvalMetric
+                          label="Ajuste vs sugerido"
+                          value={`${evalr.qtyDeviationPct > 0 ? "+" : ""}${evalr.qtyDeviationPct}%`}
+                          tone={Math.abs(evalr.qtyDeviationPct) < 25 ? "good" : "warn"}
+                        />
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {evalr.checks.map((c) => (
+                          <span
+                            key={c.label}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
+                              c.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                            }`}
+                          >
+                            {c.ok ? (
+                              <IconCheck className="h-3 w-3" />
+                            ) : (
+                              <IconClose className="h-3 w-3" />
+                            )}
+                            {c.label}
+                          </span>
+                        ))}
+                      </div>
+                      {evalr.ruleToChange && (
+                        <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800">
+                          <IconAlerts className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+                          <span>
+                            <span className="font-semibold">Qué ajustar:</span> {evalr.ruleToChange}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-1.5 text-sm">
                     <p className="text-slate-700">
                       <span className="text-slate-400">Motivo:</span> {d.reason}
@@ -216,6 +279,25 @@ export function DecisionsPage({ embedded = false }: { embedded?: boolean } = {})
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function EvalMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "good" | "bad" | "warn";
+}) {
+  const color =
+    tone === "bad" ? "text-rose-700" : tone === "warn" ? "text-amber-700" : "text-slate-800";
+  return (
+    <div className="rounded-lg bg-white px-2.5 py-1.5">
+      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className={`text-sm font-semibold ${color}`}>{value}</p>
     </div>
   );
 }

@@ -23,6 +23,14 @@ export interface PurchaseDecision {
   outcome: DecisionOutcome;
   resultText: string;
   learning: string;
+  // Datos para evaluar la compra (sección 20): previsto vs real. Opcionales
+  // porque una compra "en medición" aún no los tiene.
+  demandForecast?: number; // venta proyectada en resultDays
+  demandActual?: number; // venta real en resultDays
+  remainingUnits?: number; // remanente al medir
+  marginPlanned?: number; // margen % previsto
+  marginActual?: number; // margen % real (tras descuentos/liquidación)
+  onTime?: boolean; // el proveedor entregó a tiempo/completo
 }
 
 export const OUTCOME_META: Record<
@@ -54,6 +62,12 @@ export const purchaseDecisions: PurchaseDecision[] = [
       "90 días después quedaron 380 u. sin vender; capital inmovilizado ~$2,5M al pasar la temporada de jardín.",
     learning:
       "Negociar el descuento sin obligar a comprar tan alto, o exigir devolución/campaña de liquidación post-temporada.",
+    demandForecast: 210,
+    demandActual: 220,
+    remainingUnits: 380,
+    marginPlanned: 32,
+    marginActual: 24,
+    onTime: true,
   },
   {
     id: "DEC-002",
@@ -72,6 +86,12 @@ export const purchaseDecisions: PurchaseDecision[] = [
     resultText: "Quiebre 8 días después; venta perdida estimada ~$2,8M y reclamos de tienda.",
     learning:
       "En productos de alta rotación no recortar bajo el sugerido por caja: el costo del quiebre supera el ahorro.",
+    demandForecast: 300,
+    demandActual: 100,
+    remainingUnits: 0,
+    marginPlanned: 28,
+    marginActual: 28,
+    onTime: true,
   },
   {
     id: "DEC-003",
@@ -91,6 +111,12 @@ export const purchaseDecisions: PurchaseDecision[] = [
       "Cobertura saludable durante la campaña, sin quiebre y sin sobrestock; margen sostenido en 38%.",
     learning:
       "Comprar dentro del rango objetivo + pequeño colchón para campañas funciona bien con este proveedor.",
+    demandForecast: 42,
+    demandActual: 44,
+    remainingUnits: 1,
+    marginPlanned: 38,
+    marginActual: 38,
+    onTime: true,
   },
   {
     id: "DEC-004",
@@ -110,6 +136,12 @@ export const purchaseDecisions: PurchaseDecision[] = [
       "Igual hubo quiebre: el proveedor despachó solo 180 de 240 (fill 75%). Causa: proveedor, no la decisión de compra.",
     learning:
       "El sugerido fue correcto; el problema fue el fill rate del proveedor. Exigir 95% o asegurar proveedor alternativo.",
+    demandForecast: 200,
+    demandActual: 180,
+    remainingUnits: 0,
+    marginPlanned: 30,
+    marginActual: 30,
+    onTime: false,
   },
   {
     id: "DEC-005",
@@ -127,6 +159,12 @@ export const purchaseDecisions: PurchaseDecision[] = [
     outcome: "bueno",
     resultText: "Rotación dentro de lo esperado, cobertura ~45 días, sin quiebres.",
     learning: "Compra alineada al sugerido y a la regla de la categoría: resultado saludable.",
+    demandForecast: 95,
+    demandActual: 98,
+    remainingUnits: 22,
+    marginPlanned: 34,
+    marginActual: 34,
+    onTime: true,
   },
   {
     id: "DEC-006",
