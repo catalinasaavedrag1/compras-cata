@@ -4,6 +4,8 @@ import { Modal } from "../components/ui/Modal";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
+import { DataTable, type Column } from "../components/ui/Table";
+import { supplierPath } from "../utils/entityLinks";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { KpiCard } from "../components/business/KpiCard";
 import { LogisticsInlineSummary } from "../components/business/LogisticsPlan";
@@ -395,5 +397,189 @@ export function OrdersKpiRow({
         onClick={() => onTabChange("all")}
       />
     </div>
+  );
+}
+
+interface OrderRisk {
+  value: number;
+  skus: number;
+}
+
+/**
+ * Tabla de órdenes de compra (lista + mobileCard). Construye las columnas dentro
+ * y recibe el acceso al riesgo y la acción de abrir detalle. (Extraído de PurchaseOrdersPage.)
+ */
+export function OrdersTable({
+  orders,
+  riskOf,
+  tab,
+  onOpenDetail,
+}: {
+  orders: PurchaseOrder[];
+  riskOf: (id: string) => OrderRisk | undefined;
+  tab: string;
+  onOpenDetail: (o: PurchaseOrder) => void;
+}) {
+  const columns: Column<PurchaseOrder>[] = [
+    {
+      key: "number",
+      header: "N° OC",
+      render: (o) => (
+        <div>
+          <p className="font-medium text-slate-800">{o.number}</p>
+          <p className="text-xs text-slate-400">{o.buyerName}</p>
+        </div>
+      ),
+    },
+    {
+      key: "supplier",
+      header: "Proveedor",
+      render: (o) => (
+        <Link
+          to={supplierPath(o.supplierName)}
+          className="text-sm text-slate-700 hover:text-brand-700 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {o.supplierName}
+        </Link>
+      ),
+    },
+    {
+      key: "dates",
+      header: "Creación / Esperada",
+      hideOnMobile: true,
+      render: (o) => (
+        <div className="text-sm">
+          <p className="text-slate-700">{formatDate(o.createdAt)}</p>
+          <p className="text-xs text-slate-400">espera {formatDate(o.expectedDate)}</p>
+        </div>
+      ),
+    },
+    {
+      key: "skus",
+      header: "SKUs",
+      align: "right",
+      hideOnMobile: true,
+      render: (o) => formatNumber(o.skuCount),
+    },
+    {
+      key: "warehouse",
+      header: "Bodega destino",
+      hideOnMobile: true,
+      render: (o) => <span className="text-sm text-slate-600">{o.destinationWarehouse}</span>,
+    },
+    {
+      key: "amount",
+      header: "Monto total",
+      align: "right",
+      render: (o) => (
+        <span className="font-semibold text-slate-900">{formatCurrency(o.totalAmount)}</span>
+      ),
+    },
+    {
+      key: "delay",
+      header: "Atraso",
+      align: "center",
+      render: (o) =>
+        o.delayedDays > 0 ? (
+          <Badge tone="red">{o.delayedDays} d</Badge>
+        ) : (
+          <span className="text-slate-300">—</span>
+        ),
+    },
+    {
+      key: "risk",
+      header: "Venta en riesgo",
+      align: "right",
+      sortable: true,
+      sortValue: (o) => riskOf(o.id)?.value ?? 0,
+      render: (o) => {
+        const r = riskOf(o.id);
+        if (!r || r.value <= 0) return <span className="text-slate-300">—</span>;
+        return (
+          <div className="text-sm">
+            <p className="font-semibold text-rose-600">{formatCurrencyCompact(r.value)}/mes</p>
+            <p className="text-xs text-slate-400">{formatNumber(r.skus)} SKU por quebrar</p>
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Estado",
+      render: (o) => <StatusBadge kind="purchaseOrder" value={o.status} />,
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (o) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDetail(o);
+          }}
+          className="text-xs font-medium text-brand-600 hover:text-brand-700"
+        >
+          Ver detalle
+        </button>
+      ),
+    },
+  ];
+
+  return (
+    <Card>
+      <DataTable
+        columns={columns}
+        data={orders}
+        rowKey={(o) => o.id}
+        onRowClick={(o) => onOpenDetail(o)}
+        rowClassName={(o) => (o.status === "delayed" ? "bg-rose-50/40" : undefined)}
+        emptyMessage={
+          tab === "delayed"
+            ? "No hay órdenes de compra atrasadas. Todas están dentro de su fecha esperada de entrega."
+            : tab === "draft"
+              ? "No tienes borradores. Crea uno desde las sugerencias de reposición."
+              : "No hay órdenes de compra en esta vista."
+        }
+        mobileCard={(o) => (
+          <div>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-medium text-slate-800">{o.number}</p>
+                <p className="text-xs text-slate-400">
+                  {o.supplierName} · {o.buyerName}
+                </p>
+              </div>
+              <StatusBadge kind="purchaseOrder" value={o.status} dot={false} />
+            </div>
+            <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+              <div>
+                <p className="text-xs text-slate-400">Esperada</p>
+                <p className="text-slate-700">{formatDate(o.expectedDate)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">SKUs</p>
+                <p className="text-slate-700">{formatNumber(o.skuCount)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Monto</p>
+                <p className="text-slate-700">{formatCurrencyCompact(o.totalAmount)}</p>
+              </div>
+            </div>
+            {(() => {
+              const r = riskOf(o.id);
+              if (!r || r.value <= 0) return null;
+              return (
+                <p className="mt-2 text-xs font-medium text-rose-600">
+                  Venta en riesgo: {formatCurrencyCompact(r.value)}/mes · {formatNumber(r.skus)} SKU
+                  por quebrar
+                  {o.delayedDays > 0 ? ` · atraso ${o.delayedDays} d` : ""}
+                </p>
+              );
+            })()}
+          </div>
+        )}
+      />
+    </Card>
   );
 }

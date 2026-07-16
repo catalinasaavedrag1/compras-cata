@@ -1,17 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
-import { supplierPath } from "../utils/entityLinks";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
-import { Card } from "../components/ui/Card";
-import { DataTable, type Column } from "../components/ui/Table";
-import { StatusBadge } from "../components/business/StatusBadge";
 import { Tabs } from "../components/ui/Tabs";
 import { Button } from "../components/ui/Button";
 import { Drawer } from "../components/ui/Drawer";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { DateRangePicker } from "../components/ui/DateRangePicker";
-import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { InfoHint } from "../components/business/InfoHint";
 import { PurchaseProcessBar } from "../components/business/PurchaseProcessBar";
@@ -43,7 +38,7 @@ import {
   orderSalesAtRisk,
   type ConsolidationCandidate,
 } from "../utils/orderConsolidation";
-import { OcDetailModal, DraftSummaryCard, OrdersKpiRow } from "./PurchaseOrdersSections";
+import { OcDetailModal, DraftSummaryCard, OrdersKpiRow, OrdersTable } from "./PurchaseOrdersSections";
 import { buildOrderProcessStages } from "./purchaseOrders/processStages";
 import { lineNet, type OcDraftItem } from "../context/OcDraftContext";
 import { DraftLineContext } from "./purchaseOrders/DraftLineContext";
@@ -58,12 +53,7 @@ import { inRange, type IsoRange } from "../utils/dateRange";
 import { TODAY_ISO } from "../utils/constants";
 import type { ApprovalCriterion } from "../data/mockApprovals";
 import { useLocalStorage } from "../utils/useLocalStorage";
-import {
-  formatCurrency,
-  formatCurrencyCompact,
-  formatDate,
-  formatNumber,
-} from "../utils/formatters";
+import { formatCurrency, formatNumber } from "../utils/formatters";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
 import { CLOSED_ORDER_STATUSES } from "../types/purchasing";
 
@@ -236,7 +226,6 @@ export function PurchaseOrdersPage() {
     });
     return map;
   }, [visible]);
-  const riskValue = (o: PurchaseOrder) => riskByOrder.get(o.id)?.value ?? 0;
 
   const filtered = useMemo(() => {
     // En seguimiento (en curso / atrasadas) ordena por venta en riesgo y luego
@@ -546,114 +535,6 @@ export function PurchaseOrdersPage() {
     );
   };
 
-  const columns: Column<PurchaseOrder>[] = [
-    {
-      key: "number",
-      header: "N° OC",
-      render: (o) => (
-        <div>
-          <p className="font-medium text-slate-800">{o.number}</p>
-          <p className="text-xs text-slate-400">{o.buyerName}</p>
-        </div>
-      ),
-    },
-    {
-      key: "supplier",
-      header: "Proveedor",
-      render: (o) => (
-        <Link
-          to={supplierPath(o.supplierName)}
-          className="text-sm text-slate-700 hover:text-brand-700 hover:underline"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {o.supplierName}
-        </Link>
-      ),
-    },
-    {
-      key: "dates",
-      header: "Creación / Esperada",
-      hideOnMobile: true,
-      render: (o) => (
-        <div className="text-sm">
-          <p className="text-slate-700">{formatDate(o.createdAt)}</p>
-          <p className="text-xs text-slate-400">espera {formatDate(o.expectedDate)}</p>
-        </div>
-      ),
-    },
-    {
-      key: "skus",
-      header: "SKUs",
-      align: "right",
-      hideOnMobile: true,
-      render: (o) => formatNumber(o.skuCount),
-    },
-    {
-      key: "warehouse",
-      header: "Bodega destino",
-      hideOnMobile: true,
-      render: (o) => <span className="text-sm text-slate-600">{o.destinationWarehouse}</span>,
-    },
-    {
-      key: "amount",
-      header: "Monto total",
-      align: "right",
-      render: (o) => (
-        <span className="font-semibold text-slate-900">{formatCurrency(o.totalAmount)}</span>
-      ),
-    },
-    {
-      key: "delay",
-      header: "Atraso",
-      align: "center",
-      render: (o) =>
-        o.delayedDays > 0 ? (
-          <Badge tone="red">{o.delayedDays} d</Badge>
-        ) : (
-          <span className="text-slate-300">—</span>
-        ),
-    },
-    {
-      key: "risk",
-      header: "Venta en riesgo",
-      align: "right",
-      sortable: true,
-      sortValue: (o) => riskValue(o),
-      render: (o) => {
-        const r = riskByOrder.get(o.id);
-        if (!r || r.value <= 0)
-          return <span className="text-slate-300">—</span>;
-        return (
-          <div className="text-sm">
-            <p className="font-semibold text-rose-600">{formatCurrencyCompact(r.value)}/mes</p>
-            <p className="text-xs text-slate-400">
-              {formatNumber(r.skus)} SKU por quebrar
-            </p>
-          </div>
-        );
-      },
-    },
-    {
-      key: "status",
-      header: "Estado",
-      render: (o) => <StatusBadge kind="purchaseOrder" value={o.status} />,
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (o) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setDetail(o);
-          }}
-          className="text-xs font-medium text-brand-600 hover:text-brand-700"
-        >
-          Ver detalle
-        </button>
-      ),
-    },
-  ];
 
   return (
     <div>
@@ -763,60 +644,12 @@ export function PurchaseOrdersPage() {
         </div>
       </div>
 
-      <Card>
-        <DataTable
-          columns={columns}
-          data={filtered}
-          rowKey={(o) => o.id}
-          onRowClick={(o) => setDetail(o)}
-          rowClassName={(o) => (o.status === "delayed" ? "bg-rose-50/40" : undefined)}
-          emptyMessage={
-            tab === "delayed"
-              ? "No hay órdenes de compra atrasadas. Todas están dentro de su fecha esperada de entrega."
-              : tab === "draft"
-                ? "No tienes borradores. Crea uno desde las sugerencias de reposición."
-                : "No hay órdenes de compra en esta vista."
-          }
-          mobileCard={(o) => (
-            <div>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-800">{o.number}</p>
-                  <p className="text-xs text-slate-400">
-                    {o.supplierName} · {o.buyerName}
-                  </p>
-                </div>
-                <StatusBadge kind="purchaseOrder" value={o.status} dot={false} />
-              </div>
-              <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                <div>
-                  <p className="text-xs text-slate-400">Esperada</p>
-                  <p className="text-slate-700">{formatDate(o.expectedDate)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">SKUs</p>
-                  <p className="text-slate-700">{formatNumber(o.skuCount)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Monto</p>
-                  <p className="text-slate-700">{formatCurrencyCompact(o.totalAmount)}</p>
-                </div>
-              </div>
-              {(() => {
-                const r = riskByOrder.get(o.id);
-                if (!r || r.value <= 0) return null;
-                return (
-                  <p className="mt-2 text-xs font-medium text-rose-600">
-                    Venta en riesgo: {formatCurrencyCompact(r.value)}/mes · {formatNumber(r.skus)} SKU
-                    por quebrar
-                    {o.delayedDays > 0 ? ` · atraso ${o.delayedDays} d` : ""}
-                  </p>
-                );
-              })()}
-            </div>
-          )}
-        />
-      </Card>
+      <OrdersTable
+        orders={filtered}
+        riskOf={(id) => riskByOrder.get(id)}
+        tab={tab}
+        onOpenDetail={setDetail}
+      />
 
       {/* Editor del borrador de orden de compra */}
       <Drawer
