@@ -23,7 +23,7 @@ export function AppHeader() {
   );
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
       <div className="flex items-center gap-2 lg:gap-3 h-16 px-4 lg:px-6">
         {/* En móvil mostramos la marca; en desktop vive en el sidebar. */}
         <div className="lg:hidden">
