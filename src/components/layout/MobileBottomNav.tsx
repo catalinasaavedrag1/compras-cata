@@ -1,13 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "../../utils/cn";
-import { IconDashboard, IconCategories, IconReplenish, IconInventory, IconMenu } from "../ui/icons";
-
-const items = [
-  { to: "/", label: "Inicio", icon: IconDashboard, end: true },
-  { to: "/mi-cartera", label: "Cartera", icon: IconCategories },
-  { to: "/comprar/decisiones", label: "Comprar", icon: IconReplenish },
-  { to: "/inventario", label: "Inventario", icon: IconInventory },
-];
+import { IconMenu } from "../ui/icons";
+import { mobilePrimaryNav } from "./navItems";
 
 interface MobileBottomNavProps {
   /** El menú completo ("Más") está abierto. */
@@ -26,7 +20,7 @@ interface MobileBottomNavProps {
 export function MobileBottomNav({ menuOpen, onToggleMenu, onNavigate }: MobileBottomNavProps) {
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200 flex items-stretch h-16 pb-[env(safe-area-inset-bottom)]">
-      {items.map((item) => (
+      {mobilePrimaryNav.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}

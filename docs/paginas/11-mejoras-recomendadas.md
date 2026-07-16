@@ -168,5 +168,8 @@ Extraíbles a helper/constante compartida cuando se retome cada módulo:
   cuando el **total de la OC** ≥ $10M (antes era por línea ≥ $5M) y `cobertura_excesiva`
   cuando la cobertura resultante > 90 días (antes `objetivo × 1.3`). La matriz de
   `GovernancePage` deriva su texto de las mismas constantes.
-- `MobileBottomNav` y `AppRoutes`/`navItems` mantienen listas de navegación por
-  separado: pueden divergir. Centralizar la fuente de verdad de rutas.
+- ~~`MobileBottomNav` mantenía su propia lista de navegación separada de `navItems`~~
+  ✓ aplicado: la barra inferior de móvil ahora se deriva de `compradorModules`
+  (campos `mobileOrder`/`mobileLabel` en cada módulo → export `mobilePrimaryNav`).
+  Misma fuente de verdad `to`/icono que la barra superior de escritorio; ambos
+  diseños quedan idénticos y ya no pueden divergir en rutas/iconos.

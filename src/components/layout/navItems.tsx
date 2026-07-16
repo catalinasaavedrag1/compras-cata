@@ -54,6 +54,13 @@ export interface NavModule {
   badgeKeys?: NavBadgeKey[];
   /** Sub-pestañas del módulo (≥ 1). */
   children: NavItem[];
+  /**
+   * Si está definido, este módulo aparece como acceso principal en la barra
+   * inferior de móvil, en esta posición (menor = más a la izquierda).
+   */
+  mobileOrder?: number;
+  /** Etiqueta corta para la barra inferior de móvil (si difiere de `label`). */
+  mobileLabel?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -67,6 +74,7 @@ export const compradorModules: NavModule[] = [
     to: "/",
     end: true,
     hint: "Qué resolver hoy: prioridades, agenda y trabajo pendiente",
+    mobileOrder: 1,
     children: [
       {
         to: "/",
@@ -83,6 +91,7 @@ export const compradorModules: NavModule[] = [
     icon: IconCategories,
     to: "/mi-cartera",
     hint: "Categorías, marcas, proveedores, productos y surtido bajo tu responsabilidad",
+    mobileOrder: 2,
     children: [
       {
         to: "/mi-cartera",
@@ -156,6 +165,7 @@ export const compradorModules: NavModule[] = [
     label: "Inventario",
     icon: IconInventory,
     to: "/inventario",
+    mobileOrder: 4,
     hint: "Diagnóstico de salud: cobertura, sobrestock, sin movimiento y venta perdida",
     children: [
       {
@@ -178,6 +188,8 @@ export const compradorModules: NavModule[] = [
     icon: IconReplenish,
     to: "/comprar/decisiones",
     hint: "Qué reponer y con qué presupuesto: necesidades que inician la compra",
+    mobileOrder: 3,
+    mobileLabel: "Comprar",
     children: [
       {
         to: "/comprar/decisiones",
@@ -507,3 +519,18 @@ export function activeModuleFor(modules: NavModule[], pathname: string): NavModu
 export const navItems: NavItem[] = [...compradorModules, ...liderExtraModules]
   .flatMap((m) => m.children)
   .filter((item, i, arr) => arr.findIndex((x) => x.to === item.to) === i);
+
+/** Acceso principal de la barra inferior de móvil (derivado de los módulos). */
+export interface MobileNavItem {
+  to: string;
+  label: string;
+  icon: (props: { className?: string }) => JSX.Element;
+  end?: boolean;
+}
+
+// Accesos "al alcance del pulgar" en móvil: los módulos con `mobileOrder`,
+// ordenados. Fuente única con la barra superior de escritorio (mismo `to`/icono).
+export const mobilePrimaryNav: MobileNavItem[] = compradorModules
+  .filter((m) => m.mobileOrder !== undefined)
+  .sort((a, b) => a.mobileOrder! - b.mobileOrder!)
+  .map((m) => ({ to: m.to, label: m.mobileLabel ?? m.label, icon: m.icon, end: m.end }));
