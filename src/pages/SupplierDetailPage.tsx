@@ -15,6 +15,12 @@ import {
   SupplierReceptionsTab,
   SupplierAlertsTab,
 } from "./supplierDetail/tabs";
+import {
+  SupplierClaimsAlert,
+  PerformanceScoreCard,
+  SupplierReviewBanner,
+  SupplierSummaryStrip,
+} from "./supplierDetail/overview";
 import { suppliers } from "../data/mockSuppliers";
 import { products } from "../data/mockProducts";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
@@ -29,7 +35,6 @@ import {
 } from "./SupplierDetailSections";
 import {
   formatCurrencyCompact,
-  formatDate,
   formatDays,
   formatNumber,
   formatPercent,
@@ -40,12 +45,10 @@ import {
   IconSuppliers,
   IconSales,
   IconBox,
-  IconAlerts,
-  IconChevronRight,
 } from "../components/ui/icons";
 import { useClaims } from "../context/ClaimsContext";
 import { CLAIM_OPEN_STATES } from "../data/mockClaims";
-import { supplierScore, SUPPLIER_CLASS } from "../utils/supplierScore";
+import { supplierScore } from "../utils/supplierScore";
 import {
   SUPPLIER_PENDING_WARN_CLP,
   SUPPLIER_COMPLIANCE_CRITICAL,
@@ -207,129 +210,28 @@ export function SupplierDetailPage() {
       </div>
 
       {/* Reclamos: el desempeño operativo también pesa en la evaluación */}
-      {supClaims.length > 0 && (
-        <button
-          type="button"
-          onClick={() => navigate("/reclamos")}
-          className={`mb-4 flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-            openClaims.length > 0
-              ? "border-rose-200 bg-rose-50 hover:bg-rose-100/60"
-              : "border-slate-200 bg-white hover:bg-slate-50"
-          }`}
-        >
-          <IconAlerts
-            className={`h-5 w-5 flex-shrink-0 ${openClaims.length > 0 ? "text-rose-600" : "text-slate-400"}`}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-slate-800">
-              {openClaims.length > 0
-                ? `${openClaims.length} reclamo${openClaims.length === 1 ? "" : "s"} abierto${openClaims.length === 1 ? "" : "s"} · ${formatCurrencyCompact(claimsValue)} en juego`
-                : "Sin reclamos abiertos"}
-            </span>
-            <span className="block text-xs text-slate-500">
-              {supClaims.length} reclamo{supClaims.length === 1 ? "" : "s"} histórico
-              {supClaims.length === 1 ? "" : "s"} — buen precio no compensa pérdidas operativas.
-            </span>
-          </span>
-          <IconChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
-        </button>
-      )}
+      <SupplierClaimsAlert
+        totalClaims={supClaims.length}
+        openCount={openClaims.length}
+        claimsValue={claimsValue}
+        onNavigate={() => navigate("/reclamos")}
+      />
 
       {/* Evaluación de desempeño (OTIF, lead time prometido vs real, reclamos) */}
-      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-card">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-slate-800">Evaluación de desempeño</p>
-          <Badge tone={SUPPLIER_CLASS[score.classification].tone} dot>
-            {SUPPLIER_CLASS[score.classification].label}
-          </Badge>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <ScoreStat
-            label="OTIF"
-            value={`${score.otif}%`}
-            tone={score.otif >= 90 ? "good" : score.otif >= 80 ? "warn" : "bad"}
-            hint="A tiempo y completo"
-          />
-          <ScoreStat label="Fill rate" value={`${score.fillRate}%`} hint="Despacho completo" />
-          <ScoreStat
-            label="Lead time prometido→real"
-            value={
-              score.leadPromised !== null
-                ? `${score.leadPromised}→${score.leadReal} d`
-                : `${score.leadReal} d`
-            }
-            tone={score.leadGap >= 5 ? "bad" : score.leadGap >= 2 ? "warn" : "good"}
-            hint={score.leadGap > 0 ? `+${score.leadGap} d más lento` : "En plazo"}
-          />
-          <ScoreStat
-            label="Reclamos abiertos"
-            value={
-              score.claimsOpen > 0
-                ? `${score.claimsOpen} · ${formatCurrencyCompact(score.claimsValue)}`
-                : "0"
-            }
-            tone={score.claimsOpen > 0 ? "bad" : "good"}
-            hint="Pérdidas operativas"
-          />
-        </div>
-        {score.reasons.length > 0 && (
-          <p className="mt-2 text-xs text-slate-500">{score.reasons.join(" ")}</p>
-        )}
-      </div>
+      <PerformanceScoreCard score={score} />
 
       {/* Motivo de revisión si aplica */}
-      {(supplier.status === "delayed" ||
-        supplier.status === "review" ||
-        supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL) && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <b>Revisar proveedor:</b> cumplimiento {formatPercent(supplier.deliveryCompliance, 0)}
-          {supplier.averageLeadTimeDays >= SUPPLIER_LEAD_TIME_WARN_DAYS && (
-            <> · lead time alto ({formatDays(supplier.averageLeadTimeDays)})</>
-          )}
-          {riskProducts > 0 && <> · {riskProducts} SKU en quiebre</>}
-          {" · "}última compra {formatDate(supplier.lastPurchaseDate)}.
-        </div>
-      )}
+      <SupplierReviewBanner supplier={supplier} riskProducts={riskProducts} />
 
       {/* Resumen para atender al proveedor */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-card p-4 mb-4">
-        <p className="text-sm font-semibold text-slate-800 mb-3">Para atender al proveedor</p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="text-xs text-slate-400">Importancia</p>
-            <div className="mt-1">
-              <Badge tone={importance.tone}>{importance.label}</Badge>
-            </div>
-          </div>
-          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="text-xs text-slate-400">Venta 30 días</p>
-            <p className="text-lg font-semibold text-slate-800">
-              {formatCurrencyCompact(ventas30)}
-            </p>
-          </div>
-          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="text-xs text-slate-400">Margen promedio</p>
-            <p className="text-lg font-semibold text-emerald-700">{formatPercent(margenProm, 1)}</p>
-          </div>
-          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="text-xs text-slate-400">Utilidad 30 días</p>
-            <p className="text-lg font-semibold text-emerald-700">
-              {formatCurrencyCompact(utilidad30)}
-            </p>
-          </div>
-          <button
-            onClick={() => setTab("ordenes")}
-            className="rounded-lg bg-slate-50 px-3 py-2.5 text-left hover:bg-slate-100"
-          >
-            <p className="text-xs text-slate-400">OC atrasadas</p>
-            <p
-              className={`text-lg font-semibold ${delayedPOs.length > 0 ? "text-rose-600" : "text-slate-800"}`}
-            >
-              {formatNumber(delayedPOs.length)}
-            </p>
-          </button>
-        </div>
-      </div>
+      <SupplierSummaryStrip
+        importance={importance}
+        ventas30={ventas30}
+        margenProm={margenProm}
+        utilidad30={utilidad30}
+        delayedCount={delayedPOs.length}
+        onOpenOrders={() => setTab("ordenes")}
+      />
 
       <div className="grid grid-cols-1 gap-4 mb-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card>
@@ -579,30 +481,3 @@ function SupplierCockpitMetric({ label, value }: { label: string; value: string 
   );
 }
 
-function ScoreStat({
-  label,
-  value,
-  hint,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "good" | "warn" | "bad" | "neutral";
-}) {
-  const color =
-    tone === "bad"
-      ? "text-rose-700"
-      : tone === "warn"
-        ? "text-amber-700"
-        : tone === "good"
-          ? "text-emerald-700"
-          : "text-slate-900";
-  return (
-    <div className="rounded-lg border border-slate-200 px-3 py-2">
-      <p className="text-[11px] text-slate-400">{label}</p>
-      <p className={`text-base font-semibold ${color}`}>{value}</p>
-      {hint && <p className="text-[11px] text-slate-400">{hint}</p>}
-    </div>
-  );
-}
