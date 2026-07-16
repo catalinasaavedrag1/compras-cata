@@ -5,10 +5,12 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { StatusBadge } from "../components/business/StatusBadge";
+import { KpiCard } from "../components/business/KpiCard";
 import { LogisticsInlineSummary } from "../components/business/LogisticsPlan";
 import { DraftMetric, DraftWarning } from "./purchaseOrders/DraftLineContext";
 import { buildOcAudit } from "../data/mockOcHistory";
 import { formatCurrency, formatCurrencyCompact, formatDate, formatNumber } from "../utils/formatters";
+import { IconOrders, IconReplenish, IconPlus } from "../components/ui/icons";
 import type { PickupPlan } from "../utils/logistics";
 import type { PurchaseOrder } from "../types/purchasing";
 
@@ -332,5 +334,66 @@ export function DraftSummaryCard({
         </div>
       </div>
     </Card>
+  );
+}
+
+/**
+ * Fila de KPIs de órdenes (monto en curso, atrasadas, borradores, total) que
+ * también actúan como selector de pestaña. (Extraído de PurchaseOrdersPage.)
+ */
+export function OrdersKpiRow({
+  totalOpenAmount,
+  delayedCount,
+  draftCount,
+  totalCount,
+  tab,
+  onTabChange,
+}: {
+  totalOpenAmount: number;
+  delayedCount: number;
+  draftCount: number;
+  totalCount: number;
+  tab: string;
+  onTabChange: (tab: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <KpiCard
+        title="Monto en curso"
+        value={formatCurrencyCompact(totalOpenAmount)}
+        tone="info"
+        icon={<IconOrders className="w-4 h-4" />}
+        description="Ver en curso"
+        active={tab === "open"}
+        onClick={() => onTabChange("open")}
+      />
+      <KpiCard
+        title="Atrasadas"
+        value={formatNumber(delayedCount)}
+        tone="bad"
+        icon={<IconReplenish className="w-4 h-4" />}
+        description="Ver atrasadas"
+        active={tab === "delayed"}
+        onClick={() => onTabChange("delayed")}
+      />
+      <KpiCard
+        title="Borradores"
+        value={formatNumber(draftCount)}
+        tone="warn"
+        icon={<IconPlus className="w-4 h-4" />}
+        description="Ver borradores"
+        active={tab === "draft"}
+        onClick={() => onTabChange("draft")}
+      />
+      <KpiCard
+        title="Total OC"
+        value={formatNumber(totalCount)}
+        tone="neutral"
+        icon={<IconOrders className="w-4 h-4" />}
+        description="Ver todas"
+        active={tab === "all"}
+        onClick={() => onTabChange("all")}
+      />
+    </div>
   );
 }

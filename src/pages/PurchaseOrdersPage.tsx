@@ -13,13 +13,10 @@ import { Select } from "../components/ui/Select";
 import { DateRangePicker } from "../components/ui/DateRangePicker";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
-import { KpiCard } from "../components/business/KpiCard";
 import { InfoHint } from "../components/business/InfoHint";
 import { PurchaseProcessBar } from "../components/business/PurchaseProcessBar";
 import {
   IconPlus,
-  IconReplenish,
-  IconOrders,
   IconSearch,
   IconClose,
   IconTruck,
@@ -46,7 +43,8 @@ import {
   orderSalesAtRisk,
   type ConsolidationCandidate,
 } from "../utils/orderConsolidation";
-import { OcDetailModal, DraftSummaryCard } from "./PurchaseOrdersSections";
+import { OcDetailModal, DraftSummaryCard, OrdersKpiRow } from "./PurchaseOrdersSections";
+import { buildOrderProcessStages } from "./purchaseOrders/processStages";
 import { lineNet, type OcDraftItem } from "../context/OcDraftContext";
 import { DraftLineContext } from "./purchaseOrders/DraftLineContext";
 import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
@@ -701,73 +699,19 @@ export function PurchaseOrdersPage() {
       />
 
       <PurchaseProcessBar
-        stages={[
-          {
-            label: "Necesidad",
-            detail: "Decidir qué comprar",
-            count: recommendations.filter((r) => r.status === "critical" || r.status === "buy_now")
-              .length,
-            to: "/comprar/decisiones",
-            tone: "red",
-          },
-          {
-            label: "Preparación",
-            detail: "Cotizar y negociar",
-            count: openRfqs.length,
-            to: "/comprar/cotizaciones",
-            tone: openRfqs.length > 0 ? "amber" : "neutral",
-          },
-          {
-            label: "Borrador",
-            detail: "Construir OC",
-            count,
-            to: "/comprar/borradores",
-            active: pathname.includes("/comprar/borradores"),
-            tone: count > 0 ? "blue" : "neutral",
-          },
-          {
-            label: "Retiro",
-            detail: "Planificar transporte",
-            count: pickupPlan.truckCount,
-            to: "/comprar/plan-retiro",
-            active: pathname.includes("/comprar/plan-retiro"),
-            tone: pickupPlan.alerts.some((a) => a.level === "warning")
-              ? "amber"
-              : pickupPlan.truckCount > 0
-                ? "blue"
-                : "neutral",
-          },
-          {
-            label: "Aprobación",
-            detail: "Validar desvíos",
-            count: pendingApprovals.length,
-            to: "/comprar/aprobaciones",
-            tone: pendingApprovals.length > 0 ? "amber" : "green",
-          },
-          {
-            label: "Órdenes",
-            detail: "Emitidas",
-            count: visible.length,
-            to: "/comprar/ordenes",
-            active: pathname.includes("/comprar/ordenes"),
-            tone: visible.length > 0 ? "blue" : "neutral",
-          },
-          {
-            label: "Emitidas",
-            detail: "OC en curso",
-            count: emittedOrders.length,
-            to: "/comprar/seguimiento",
-            active: pathname.includes("/comprar/seguimiento"),
-            tone: emittedOrders.length > 0 ? "blue" : "neutral",
-          },
-          {
-            label: "Por recibir",
-            detail: "Recepción",
-            count: receivingOrders.length,
-            to: "/comprar/recepciones",
-            tone: receivingOrders.some((o) => o.status === "delayed") ? "red" : "blue",
-          },
-        ]}
+        stages={buildOrderProcessStages({
+          necesidadCount: recommendations.filter(
+            (r) => r.status === "critical" || r.status === "buy_now"
+          ).length,
+          rfqCount: openRfqs.length,
+          draftCount: count,
+          pathname,
+          pickupPlan,
+          pendingCount: pendingApprovals.length,
+          ordersCount: visible.length,
+          emittedCount: emittedOrders.length,
+          receivingOrders,
+        })}
       />
 
       {createdNumber && (
@@ -797,44 +741,14 @@ export function PurchaseOrdersPage() {
         />
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard
-          title="Monto en curso"
-          value={formatCurrencyCompact(totalOpenAmount)}
-          tone="info"
-          icon={<IconOrders className="w-4 h-4" />}
-          description="Ver en curso"
-          active={tab === "open"}
-          onClick={() => setTab("open")}
-        />
-        <KpiCard
-          title="Atrasadas"
-          value={formatNumber(delayedCount)}
-          tone="bad"
-          icon={<IconReplenish className="w-4 h-4" />}
-          description="Ver atrasadas"
-          active={tab === "delayed"}
-          onClick={() => setTab("delayed")}
-        />
-        <KpiCard
-          title="Borradores"
-          value={formatNumber(draftCount)}
-          tone="warn"
-          icon={<IconPlus className="w-4 h-4" />}
-          description="Ver borradores"
-          active={tab === "draft"}
-          onClick={() => setTab("draft")}
-        />
-        <KpiCard
-          title="Total OC"
-          value={formatNumber(visible.length)}
-          tone="neutral"
-          icon={<IconOrders className="w-4 h-4" />}
-          description="Ver todas"
-          active={tab === "all"}
-          onClick={() => setTab("all")}
-        />
-      </div>
+      <OrdersKpiRow
+        totalOpenAmount={totalOpenAmount}
+        delayedCount={delayedCount}
+        draftCount={draftCount}
+        totalCount={visible.length}
+        tab={tab}
+        onTabChange={setTab}
+      />
 
       <div className="mb-3 flex flex-col sm:flex-row sm:items-center gap-2">
         <div className="flex-1 min-w-0">
