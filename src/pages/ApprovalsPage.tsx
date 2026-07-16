@@ -5,25 +5,39 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { InfoHint } from "../components/business/InfoHint";
-import { Badge } from "../components/ui/Badge";
+import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { Modal } from "../components/ui/Modal";
 import { EmptyState } from "../components/ui/EmptyState";
 import { useToast } from "../context/ToastContext";
 import { usePurchaseFlow, type ApprovalState } from "../context/PurchaseFlowContext";
 import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
+import type { ApprovalRequest } from "../data/mockApprovals";
 import { CRITERION_LABEL } from "../data/mockApprovals";
 import { IconCheck, IconAlerts, IconOrders, IconLock } from "../components/ui/icons";
 import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/formatters";
 
 type Decision = ApprovalState;
 
+const STATE_META: Record<ApprovalState, { label: string; tone: BadgeTone }> = {
+  pendiente: { label: "Pendiente", tone: "amber" },
+  en_analisis: { label: "En análisis", tone: "blue" },
+  observada: { label: "Observada", tone: "violet" },
+  aprobada: { label: "Aprobada", tone: "green" },
+  rechazada: { label: "Rechazada", tone: "red" },
+};
+
+// Estados que aún esperan una decisión del líder (bandeja activa).
+const OPEN_STATES: ApprovalState[] = ["pendiente", "en_analisis", "observada"];
+
 export function ApprovalsPage() {
   const toast = useToast();
-  const { approvals, approvalState, setApprovalState } = usePurchaseFlow();
+  const { approvals, approvalState, observations, setApprovalState } = usePurchaseFlow();
   const { buyer } = useBuyer();
   const { role } = useRole();
   const [filter, setFilter] = useState<Decision | "todas">("pendiente");
+  const [observeTarget, setObserveTarget] = useState<ApprovalRequest | null>(null);
 
   // Flujo de roles explícito: el comprador solicita, el líder aprueba.
   const canApprove = role === "lider";
@@ -35,12 +49,19 @@ export function ApprovalsPage() {
   const stateOf = (id: string): Decision => approvalState[id] ?? "pendiente";
   const decide = (id: string, d: Decision, name: string) => {
     setApprovalState(id, d);
-    toast[d === "aprobada" ? "success" : "warning"](
-      `${name}: ${d === "aprobada" ? "aprobada" : "rechazada"}`
-    );
+    if (d === "aprobada") toast.success(`${name}: aprobada`);
+    else if (d === "rechazada") toast.warning(`${name}: rechazada`);
+    else if (d === "en_analisis") toast.info(`${name}: puesta en análisis`);
+    else toast.info(`${name}: reabierta`);
+  };
+  const submitObservation = (note: string) => {
+    if (!observeTarget) return;
+    setApprovalState(observeTarget.id, "observada", note);
+    toast.info(`${observeTarget.productName}: devuelta con observación`);
+    setObserveTarget(null);
   };
 
-  const pendientes = approvalRequests.filter((r) => stateOf(r.id) === "pendiente");
+  const pendientes = approvalRequests.filter((r) => OPEN_STATES.includes(stateOf(r.id)));
   const montoPendiente = pendientes.reduce((a, r) => a + r.amount, 0);
   const aprobadas = approvalRequests.filter((r) => stateOf(r.id) === "aprobada").length;
 
@@ -72,7 +93,7 @@ export function ApprovalsPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard
-          title="Pendientes"
+          title="En bandeja"
           value={formatNumber(pendientes.length)}
           tone={pendientes.length > 0 ? "warn" : "good"}
           icon={<IconAlerts className="w-4 h-4" />}
@@ -97,16 +118,18 @@ export function ApprovalsPage() {
         />
       </div>
 
-      <div className="flex gap-2 mb-4">
-        {(["pendiente", "aprobada", "rechazada", "todas"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`text-sm px-3 py-1.5 rounded-full ring-1 ring-inset capitalize ${filter === f ? "bg-brand-50 text-brand-700 ring-brand-200" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"}`}
-          >
-            {f === "todas" ? "Todas" : f}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {(["pendiente", "en_analisis", "observada", "aprobada", "rechazada", "todas"] as const).map(
+          (f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`text-sm px-3 py-1.5 rounded-full ring-1 ring-inset ${filter === f ? "bg-brand-50 text-brand-700 ring-brand-200" : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"}`}
+            >
+              {f === "todas" ? "Todas" : STATE_META[f].label}
+            </button>
+          )
+        )}
       </div>
 
       {filtered.length === 0 ? (
@@ -134,9 +157,7 @@ export function ApprovalsPage() {
                           {r.productName}
                         </Link>
                         {state !== "pendiente" && (
-                          <Badge tone={state === "aprobada" ? "green" : "red"}>
-                            {state === "aprobada" ? "Aprobada" : "Rechazada"}
-                          </Badge>
+                          <Badge tone={STATE_META[state].tone}>{STATE_META[state].label}</Badge>
                         )}
                       </div>
                       <p className="text-xs text-slate-400">
@@ -210,9 +231,23 @@ export function ApprovalsPage() {
                     {r.justification}
                   </p>
 
-                  {state === "pendiente" ? (
+                  {observations[r.id] && (state === "observada" || OPEN_STATES.includes(state)) && (
+                    <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                        Observación del líder
+                      </p>
+                      <p className="mt-0.5 text-sm text-violet-900">{observations[r.id]}</p>
+                      {state === "observada" && r.buyerName === buyer && (
+                        <p className="mt-1 text-xs text-violet-600">
+                          Ajusta la solicitud según la observación y vuelve a enviarla.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {OPEN_STATES.includes(state) ? (
                     canApprove ? (
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           onClick={() => decide(r.id, "aprobada", r.productName)}
@@ -227,6 +262,18 @@ export function ApprovalsPage() {
                         >
                           Rechazar
                         </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setObserveTarget(r)}>
+                          Observar
+                        </Button>
+                        {state !== "en_analisis" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => decide(r.id, "en_analisis", r.productName)}
+                          >
+                            Poner en análisis
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
@@ -234,7 +281,7 @@ export function ApprovalsPage() {
                         <span>
                           {r.buyerName === buyer ? "Tú solicitaste esta compra. " : ""}
                           La aprobación requiere rol <b className="text-slate-700">Líder</b> —
-                          cámbialo arriba a la derecha para aprobar o rechazar.
+                          cámbialo arriba a la derecha para aprobar, rechazar u observar.
                         </span>
                       </div>
                     )
@@ -252,6 +299,67 @@ export function ApprovalsPage() {
           })}
         </div>
       )}
+
+      {observeTarget && (
+        <ObserveModal
+          request={observeTarget}
+          initial={observations[observeTarget.id] ?? ""}
+          onClose={() => setObserveTarget(null)}
+          onSubmit={submitObservation}
+        />
+      )}
     </div>
+  );
+}
+
+function ObserveModal({
+  request,
+  initial,
+  onClose,
+  onSubmit,
+}: {
+  request: ApprovalRequest;
+  initial: string;
+  onClose: () => void;
+  onSubmit: (note: string) => void;
+}) {
+  const [note, setNote] = useState(initial);
+  const trimmed = note.trim();
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      title="Devolver con observación"
+      description={`${request.productName} · ${request.buyerName}`}
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-slate-600">
+          La solicitud vuelve al comprador con tu observación. Podrá ajustarla y reenviarla sin
+          perder la traza del desvío.
+        </p>
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            ¿Qué debe ajustar? <span className="text-rose-500">*</span>
+          </label>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            autoFocus
+            placeholder="Ej: La cobertura queda muy alta para esta rotación. Baja a ~60 días o justifica la temporada."
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button disabled={!trimmed} onClick={() => onSubmit(trimmed)}>
+            Devolver con observación
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
