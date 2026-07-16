@@ -1,6 +1,5 @@
-import { receptions } from "../data/mockReceptions";
+import { receptions, ARRIVED_STATUSES } from "../data/mockReceptions";
 import { getSupplierByName } from "../data/mockSuppliers";
-import type { Reception } from "../types/purchasing";
 
 // ============================================================================
 //  Rendimiento de despacho del proveedor, calculado desde las recepciones.
@@ -8,8 +7,6 @@ import type { Reception } from "../types/purchasing";
 //  "fill / despacho" (qué % de lo pedido realmente envió). Deja en evidencia
 //  cuando un proveedor no cumple siempre.
 // ============================================================================
-
-const ARRIVED: Reception["status"][] = ["received", "partial", "with_issues"];
 
 export interface SupplierFulfillment {
   arrivedOrders: number;
@@ -25,7 +22,7 @@ export interface SupplierFulfillment {
 }
 
 export function supplierFulfillment(name: string): SupplierFulfillment {
-  const rs = receptions.filter((r) => r.supplierName === name && ARRIVED.includes(r.status));
+  const rs = receptions.filter((r) => r.supplierName === name && ARRIVED_STATUSES.includes(r.status));
   let unitsExpected = 0;
   let unitsReceived = 0;
   let undeliveredSkus = 0;

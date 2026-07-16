@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useLocalStorage } from "../utils/useLocalStorage";
+import { genId } from "../utils/genId";
 
 // ============================================================================
 //  Bitácora / trazabilidad. Registra quién cambió qué, valor anterior → nuevo,
@@ -66,7 +67,7 @@ export function TraceProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<TraceContextValue>(() => {
     const log: TraceContextValue["log"] = (entry) => {
-      const id = entry.id ?? `TR-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const id = entry.id ?? genId("TR-");
       const date = entry.date ?? new Date().toISOString().slice(0, 10);
       setEntries((prev) => [{ ...entry, id, date }, ...prev].slice(0, 200));
     };

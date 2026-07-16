@@ -68,6 +68,7 @@ import {
   formatNumber,
 } from "../utils/formatters";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
+import { CLOSED_ORDER_STATUSES } from "../types/purchasing";
 
 /** Días desde hoy hasta una fecha ISO (negativo si ya pasó). */
 const daysToDate = (iso: string) =>
@@ -81,6 +82,14 @@ const TABS = [
   { value: "open", label: "En curso" },
   { value: "delayed", label: "Atrasadas" },
   { value: "received", label: "Recibidas" },
+];
+
+// OCs emitidas y aún en curso (emitidas, no cerradas ni recibidas del todo).
+const EMITTED_STATUSES: PurchaseOrderStatus[] = [
+  "sent",
+  "confirmed",
+  "partially_received",
+  "with_difference",
 ];
 
 const WAREHOUSES = [
@@ -202,16 +211,10 @@ export function PurchaseOrdersPage() {
   const visible = useMemo(() => orders.filter((o) => inRange(o.createdAt, dates)), [orders, dates]);
 
   const counts = useMemo(() => {
-    const open: PurchaseOrderStatus[] = [
-      "sent",
-      "confirmed",
-      "partially_received",
-      "with_difference",
-    ];
     return {
       all: visible.length,
       draft: visible.filter((o) => o.status === "draft").length,
-      open: visible.filter((o) => open.includes(o.status)).length,
+      open: visible.filter((o) => EMITTED_STATUSES.includes(o.status)).length,
       delayed: visible.filter((o) => o.status === "delayed").length,
       received: visible.filter((o) => o.status === "received" || o.status === "closed").length,
     };
@@ -239,12 +242,6 @@ export function PurchaseOrdersPage() {
   const riskValue = (o: PurchaseOrder) => riskByOrder.get(o.id)?.value ?? 0;
 
   const filtered = useMemo(() => {
-    const open: PurchaseOrderStatus[] = [
-      "sent",
-      "confirmed",
-      "partially_received",
-      "with_difference",
-    ];
     // En seguimiento (en curso / atrasadas) ordena por venta en riesgo y luego
     // por días de atraso: primero lo que más venta protege.
     const rv = (o: PurchaseOrder) => riskByOrder.get(o.id)?.value ?? 0;
@@ -253,7 +250,7 @@ export function PurchaseOrdersPage() {
       case "draft":
         return visible.filter((o) => o.status === "draft");
       case "open":
-        return visible.filter((o) => open.includes(o.status)).sort(byRisk);
+        return visible.filter((o) => EMITTED_STATUSES.includes(o.status)).sort(byRisk);
       case "delayed":
         return visible.filter((o) => o.status === "delayed").sort(byRisk);
       case "received":
@@ -272,9 +269,7 @@ export function PurchaseOrdersPage() {
   const pendingApprovals = approvals.filter(
     (a) => (approvalState[a.id] ?? "pendiente") === "pendiente"
   );
-  const emittedOrders = visible.filter((o) =>
-    ["sent", "confirmed", "partially_received", "with_difference"].includes(o.status)
-  );
+  const emittedOrders = visible.filter((o) => EMITTED_STATUSES.includes(o.status));
   const receivingOrders = visible.filter((o) =>
     ["sent", "confirmed", "partially_received", "delayed"].includes(o.status)
   );
@@ -310,7 +305,7 @@ export function PurchaseOrdersPage() {
       orders.some(
         (o) =>
           suppliers.has(o.supplierName) &&
-          !["received", "closed", "cancelled"].includes(o.status) &&
+          !CLOSED_ORDER_STATUSES.includes(o.status) &&
           o.lines?.some((line) => line.sku === i.sku)
       )
     ).length;

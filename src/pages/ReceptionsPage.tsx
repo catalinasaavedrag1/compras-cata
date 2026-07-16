@@ -16,7 +16,7 @@ import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
-import { receptions, RECEPTION_STATUS } from "../data/mockReceptions";
+import { receptions, RECEPTION_STATUS, ARRIVED_STATUSES } from "../data/mockReceptions";
 import { getProductBySku } from "../data/mockProducts";
 import { supplierFulfillment } from "../utils/supplierPerf";
 import { CollapsibleSection } from "../components/ui/CollapsibleSection";
@@ -29,7 +29,6 @@ import { lineStatus } from "./receptions/helpers";
 import { ReceptionDetail } from "./receptions/ReceptionDetail";
 
 const ARRIVING: Reception["status"][] = ["in_transit", "scheduled"];
-const ARRIVED: Reception["status"][] = ["received", "partial", "with_issues"];
 
 /** Nombre legible de cada vista (las KPIs son el selector; esto da contexto). */
 const VIEW_LABELS: Record<string, string> = {
@@ -109,7 +108,7 @@ export function ReceptionsPage() {
   const undeliveredLines = useMemo<MissingLine[]>(
     () =>
       byFilters
-        .filter((r) => ARRIVED.includes(r.status))
+        .filter((r) => ARRIVED_STATUSES.includes(r.status))
         .flatMap((r) =>
           (r.items ?? [])
             .filter((it) => it.received < it.expected)
@@ -233,7 +232,7 @@ export function ReceptionsPage() {
                 style={{ width: `${Math.max(3, p)}%` }}
               />
             </div>
-            {miss.length > 0 && ARRIVED.includes(r.status) && (
+            {miss.length > 0 && ARRIVED_STATUSES.includes(r.status) && (
               <p className="text-[11px] text-rose-600 mt-1">
                 {miss.length} SKU{miss.length === 1 ? "" : "s"} sin despachar
               </p>
@@ -605,7 +604,7 @@ export function ReceptionsPage() {
                         </p>
                       </div>
                     </div>
-                    {miss.length > 0 && ARRIVED.includes(r.status) && (
+                    {miss.length > 0 && ARRIVED_STATUSES.includes(r.status) && (
                       <p className="text-xs text-rose-600 mt-1.5 font-medium">
                         {miss.length} SKU{miss.length === 1 ? "" : "s"} sin despachar · toca para
                         ver

@@ -18,6 +18,9 @@ export const RECEPTION_STATUS: Record<
   delayed: { label: "Atrasada", tone: "red" },
 };
 
+/** Estados en que la mercadería ya llegó (completa, parcial o con problemas). */
+export const ARRIVED_STATUSES: ReceptionStatus[] = ["received", "partial", "with_issues"];
+
 export const receptions: Reception[] = [
   {
     id: "REC-001",

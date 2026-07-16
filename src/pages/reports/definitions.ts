@@ -1,6 +1,8 @@
-import type { Dispatch, SetStateAction } from "react";
-import type { SortState } from "../../components/ui/Table";
 import type { PurchaseOrder, PurchaseOrderStatus, Product } from "../../types/purchasing";
+
+// Reexportado para mantener el punto de importación de los reportes; la
+// implementación vive junto a SortState en components/ui/Table.
+export { makeToggleSort } from "../../components/ui/Table";
 
 export type ReportKey =
   | "compras_proveedor"
@@ -83,13 +85,5 @@ export function daysBetween(aIso: string, bIso: string): number {
   const a = new Date(`${aIso}T00:00:00`).getTime();
   const b = new Date(`${bIso}T00:00:00`).getTime();
   return Math.round((a - b) / 86_400_000);
-}
-
-// Alterna la dirección de orden de una columna (desc por defecto).
-export function makeToggleSort(setter: Dispatch<SetStateAction<SortState>>) {
-  return (key: string) =>
-    setter((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
-    );
 }
 

@@ -4,7 +4,7 @@ import { supplierPath, categoryPath, productPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
-import { DataTable, type Column, type SortState } from "../components/ui/Table";
+import { DataTable, makeToggleSort, type Column, type SortState } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 
 import { Badge } from "../components/ui/Badge";
@@ -224,10 +224,7 @@ export function CampaignOpportunitiesPage() {
     setBuilderOpen(true);
   };
 
-  const handleSort = (key: string) =>
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
-    );
+  const handleSort = makeToggleSort(setSort);
 
   const clearFilters = () => {
     setQuery("");

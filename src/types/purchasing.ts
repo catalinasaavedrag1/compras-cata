@@ -24,6 +24,9 @@ export type PurchaseOrderStatus =
   | "delayed"
   | "cancelled";
 
+/** Estados terminales de una OC: ya no cuenta como abierta/pendiente de recepción. */
+export const CLOSED_ORDER_STATUSES: PurchaseOrderStatus[] = ["received", "closed", "cancelled"];
+
 export type AlertSeverity = "high" | "medium" | "low";
 
 export type AlertStatus = "new" | "in_review" | "resolved" | "ignored";

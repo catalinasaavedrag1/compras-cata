@@ -5,7 +5,7 @@ import { Card, CardBody } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
-import { DataTable, type Column } from "../components/ui/Table";
+import { DataTable, makeToggleSort, type Column, type SortState } from "../components/ui/Table";
 import { IconCampaign } from "../components/ui/icons";
 import { formatCurrencyCompact, formatNumber, formatPercent } from "../utils/formatters";
 import {
@@ -210,26 +210,8 @@ export function CampaignPerformance({ camp }: { camp: CampaignPlan }) {
     },
   ];
 
-  const [chSort, setChSort] = useState<{ key: string | null; dir: "asc" | "desc" }>({
-    key: "revenue",
-    dir: "desc",
-  });
-  const [prSort, setPrSort] = useState<{ key: string | null; dir: "asc" | "desc" }>({
-    key: "revenue",
-    dir: "desc",
-  });
-  const cycleSort = (
-    setter: (
-      fn: (s: { key: string | null; dir: "asc" | "desc" }) => {
-        key: string | null;
-        dir: "asc" | "desc";
-      }
-    ) => void,
-    key: string
-  ) =>
-    setter((s) =>
-      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
-    );
+  const [chSort, setChSort] = useState<SortState>({ key: "revenue", dir: "desc" });
+  const [prSort, setPrSort] = useState<SortState>({ key: "revenue", dir: "desc" });
 
   return (
     <>
@@ -311,7 +293,7 @@ export function CampaignPerformance({ camp }: { camp: CampaignPlan }) {
                 data={perf.byChannel}
                 rowKey={(r) => r.channel}
                 sort={chSort}
-                onSortChange={(k) => cycleSort(setChSort, k)}
+                onSortChange={makeToggleSort(setChSort)}
                 emptyMessage="Sin actividad por canal todavía."
               />
             </Card>
@@ -326,7 +308,7 @@ export function CampaignPerformance({ camp }: { camp: CampaignPlan }) {
                 data={perf.byProduct}
                 rowKey={(r) => r.sku}
                 sort={prSort}
-                onSortChange={(k) => cycleSort(setPrSort, k)}
+                onSortChange={makeToggleSort(setPrSort)}
                 emptyMessage="Sin productos en la campaña."
               />
             </Card>

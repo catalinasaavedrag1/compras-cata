@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
-import { DataTable, type Column, type SortState } from "../components/ui/Table";
+import { DataTable, makeToggleSort, type Column, type SortState } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { Tabs } from "../components/ui/Tabs";
@@ -139,11 +139,6 @@ export function PurchaseAnalysisPage() {
   const [productSort, setProductSort] = useState<SortState>({ key: "sales", dir: "desc" });
   const [supplierSort, setSupplierSort] = useState<SortState>({ key: "sales30", dir: "desc" });
   const [brandSort, setBrandSort] = useState<SortState>({ key: "sales30", dir: "desc" });
-  const toggleSort = (setter: React.Dispatch<React.SetStateAction<SortState>>) => (key: string) =>
-    setter((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
-    );
-
   // --- KPIs sobre el alcance ---
   const totalSales30 = useMemo(
     () => scoped.reduce((acc, p) => acc + p.salesLast30Days * p.price, 0),
@@ -558,7 +553,7 @@ export function PurchaseAnalysisPage() {
               data={topProducts}
               rowKey={(p) => p.sku}
               sort={productSort}
-              onSortChange={toggleSort(setProductSort)}
+              onSortChange={makeToggleSort(setProductSort)}
               onRowClick={(p) => navigate(productPath(p.sku))}
               mobileCard={(p) => (
                 <div>
@@ -613,7 +608,7 @@ export function PurchaseAnalysisPage() {
             data={supplierRows}
             rowKey={(r) => r.key}
             sort={supplierSort}
-            onSortChange={toggleSort(setSupplierSort)}
+            onSortChange={makeToggleSort(setSupplierSort)}
             onRowClick={(r) => r.name !== "Sin asignar" && navigate(supplierPath(r.name))}
             mobileCard={(r) => (
               <div className="flex items-start justify-between gap-2">
@@ -643,7 +638,7 @@ export function PurchaseAnalysisPage() {
             data={brandRows}
             rowKey={(r) => r.key}
             sort={brandSort}
-            onSortChange={toggleSort(setBrandSort)}
+            onSortChange={makeToggleSort(setBrandSort)}
             mobileCard={(r) => (
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">

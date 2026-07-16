@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { cn } from "../../utils/cn";
 import { EmptyState } from "./EmptyState";
 import { useDensity } from "../../context/DensityContext";
@@ -21,6 +21,17 @@ export interface Column<T> {
 export interface SortState {
   key: string | null;
   dir: "asc" | "desc";
+}
+
+/**
+ * Handler para ordenar por columna: alterna asc/desc al repetir la columna,
+ * y estrena en "desc" al cambiar de columna. Compartido por todas las tablas.
+ */
+export function makeToggleSort(setter: Dispatch<SetStateAction<SortState>>) {
+  return (key: string) =>
+    setter((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
+    );
 }
 
 export interface SelectionConfig {

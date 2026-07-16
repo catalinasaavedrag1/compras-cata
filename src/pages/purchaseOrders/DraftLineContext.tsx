@@ -12,6 +12,7 @@ import { lineNet, type OcDraftItem } from "../../context/OcDraftContext";
 import { buyScenarios, type RiskLevel } from "../../utils/buyScenarios";
 import { cn } from "../../utils/cn";
 import type { PurchaseOrder } from "../../types/purchasing";
+import { CLOSED_ORDER_STATUSES } from "../../types/purchasing";
 
 const RISK_TONE: Record<RiskLevel, "green" | "amber" | "red"> = {
   bajo: "green",
@@ -40,7 +41,7 @@ export function DraftLineContext({
   const openOrders = orders.filter(
     (o) =>
       o.supplierName === item.supplierName &&
-      !["received", "closed", "cancelled"].includes(o.status) &&
+      !CLOSED_ORDER_STATUSES.includes(o.status) &&
       o.lines?.some((line) => line.sku === item.sku)
   );
   const currentCoverage = product

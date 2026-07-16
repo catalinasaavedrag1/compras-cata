@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useLocalStorage } from "../utils/useLocalStorage";
+import { genId } from "../utils/genId";
 import { claims as seedClaims, CLAIM_OPEN_STATES } from "../data/mockClaims";
 import type { ClaimResolution, ClaimStatus, SupplierClaim } from "../types/purchasing";
 
@@ -30,7 +31,7 @@ export function ClaimsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ClaimsContextValue>(() => {
     const addClaim: ClaimsContextValue["addClaim"] = (claim) => {
-      const id = claim.id ?? `CLM-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const id = claim.id ?? genId("CLM-");
       setClaims((prev) =>
         prev.some((c) => c.id === id) ? prev : [{ ...claim, id }, ...prev]
       );

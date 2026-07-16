@@ -48,6 +48,23 @@ para no arriesgar regresiones en la app desplegada.
 - `src/components/ui/Table.tsx` — la fila clicable de escritorio solo respondía a
   Enter; ahora también a Space, igual que la mobile-card (rol `button` consistente).
 
+### Segunda pasada — consolidación interna (sin cambio visual)
+- **Arrays de estado a constantes compartidas**:
+  - `EMITTED_STATUSES` (módulo en `PurchaseOrdersPage.tsx`) reemplaza el literal
+    `["sent","confirmed","partially_received","with_difference"]` repetido 3 veces.
+  - `CLOSED_ORDER_STATUSES` (en `types/purchasing.ts`) reemplaza
+    `["received","closed","cancelled"]` en `PurchaseOrdersPage` y `DraftLineContext`.
+  - `ARRIVED_STATUSES` (en `data/mockReceptions.ts`) reemplaza el `ARRIVED` local
+    duplicado en `ReceptionsPage` y `utils/supplierPerf` (se elimina un import de
+    tipo `Reception` que quedó sin uso).
+- **`genId(prefix)`** (`utils/genId.ts`): un solo generador de IDs para runtime;
+  reemplaza las expresiones inline en `ClaimsContext` y `TraceContext`.
+- **`makeToggleSort` + `SortState` compartidos** (`components/ui/Table.tsx`): se
+  centraliza el handler de orden por columna; `reports/definitions.ts` lo reexporta
+  y `PurchaseAnalysisPage`, `CampaignOpportunitiesPage` y `CampaignPerformance`
+  dejan de reimplementar `toggleSort`/`handleSort`/`cycleSort` (este último además
+  reemplaza su tipo de estado inline por `SortState`).
+
 ---
 
 ## 2. Recomendado — cambia salida visual (documentado, no aplicado)
@@ -103,12 +120,11 @@ Extraíbles a helper/constante compartida cuando se retome cada módulo:
   (`new Date().toISOString()`), `SupplierTermsAgreements` (`"2026-06-26"`),
   `ProductsPage` (`"2026-04-01"`), `RfqPage` (`"2026-07-08"` y el año `"2026"` en
   la generación de IDs).
-- **Generación de IDs** duplicada (`ClaimsContext`, `TraceContext` usan
-  `` `${Date.now()}-${Math.random()...}` ``; `SignalsContext` usa otra): extraer
-  `genId(prefix)` a `utils/`.
-- **Lógica de orden de sort** reimplementada: existe `makeToggleSort`
-  (`reports/definitions.ts`); `PurchaseAnalysisPage`, `CampaignOpportunitiesPage` y
-  `CampaignPerformance` la reescriben. Reusar el helper y el tipo `SortState`.
+- ~~**Generación de IDs** duplicada~~ ✓ aplicado (`genId` en `utils/genId.ts`).
+  Queda `SignalsContext` con su propia estrategia `uid()` (secuencial): se deja
+  como está para no cambiar el formato de sus IDs.
+- ~~**Lógica de orden de sort** reimplementada~~ ✓ aplicado (`makeToggleSort` +
+  `SortState` compartidos desde `Table.tsx`).
 - **Fórmulas de cobertura/riesgo** repetidas en `replenishment/components.tsx`
   (riesgo de quiebre ×5, cobertura proyectada ×3): extraer helpers.
 - **Umbrales de proveedor** repetidos como literales: cumplimiento `70`/`85`,
@@ -117,9 +133,8 @@ Extraíbles a helper/constante compartida cuando se retome cada módulo:
 - **Colisión de nombre `CHANNEL_META`**: `utils/channelDemand.ts` (canales de
   demanda) y `data/mockCampaignPlans.ts` (canales de promo) exportan el mismo
   nombre con formas distintas. Renombrar uno (p. ej. `PROMO_CHANNEL_META`).
-- **Arrays de estado** duplicados: `["received","closed","cancelled"]`
-  (`PurchaseOrdersPage`/`DraftLineContext`), `ARRIVED` (`ReceptionsPage`/`supplierPerf`),
-  estados abiertos de OC (×3 en `PurchaseOrdersPage`): hoistear a constante.
+- ~~**Arrays de estado** duplicados~~ ✓ aplicado (`CLOSED_ORDER_STATUSES`,
+  `ARRIVED_STATUSES`, `EMITTED_STATUSES`).
 - **Markup de diálogos** (header/footer) casi idéntico en `Modal`/`Drawer`/`BottomSheet`:
   extraer `DialogHeader`/`DialogFooter`. `FieldLabel`/`useFieldId` para `Input`/`Select`.
   `useClickOutside` para `MoreActions`/`DateRangePicker` (hoy reimplementan el
