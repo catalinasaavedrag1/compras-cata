@@ -28,7 +28,6 @@ import {
   usePickupPlan,
   LogisticsSummary,
   LogisticsAdvice,
-  LogisticsInlineSummary,
   TruckOptimizer,
 } from "../components/business/LogisticsPlan";
 import { draftBudgetImpact } from "../utils/openToBuy";
@@ -47,9 +46,9 @@ import {
   orderSalesAtRisk,
   type ConsolidationCandidate,
 } from "../utils/orderConsolidation";
-import { OcDetailModal } from "./PurchaseOrdersSections";
+import { OcDetailModal, DraftSummaryCard } from "./PurchaseOrdersSections";
 import { lineNet, type OcDraftItem } from "../context/OcDraftContext";
-import { DraftLineContext, DraftMetric, DraftWarning } from "./purchaseOrders/DraftLineContext";
+import { DraftLineContext } from "./purchaseOrders/DraftLineContext";
 import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
@@ -787,79 +786,15 @@ export function PurchaseOrdersPage() {
       )}
 
       {count > 0 && (
-        <Card className="mb-4 border-brand-200">
-          <div className="grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
-                Compra en curso
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                Borrador · {draftSummary.mainSupplier}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {count} SKU · {formatCurrency(totalAmount)} · cobertura futura promedio{" "}
-                {draftSummary.avgCoverage > 0 ? `${draftSummary.avgCoverage} días` : "sin venta"}
-              </p>
-              {pickupPlan.truckCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => navigate("/comprar/plan-retiro")}
-                  className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-left hover:border-brand-200 hover:bg-brand-50/40"
-                >
-                  <LogisticsInlineSummary plan={pickupPlan} />
-                  <span className="flex-shrink-0 text-xs font-medium text-brand-600">
-                    Ver plan de retiro →
-                  </span>
-                </button>
-              )}
-              <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Link to="/presupuesto" className="block" title="Ver Open-to-Buy por categoría">
-                  <DraftMetric
-                    label="Presupuesto disp. (OTB)"
-                    value={formatCurrencyCompact(budget.availableBefore)}
-                  />
-                </Link>
-                <DraftMetric
-                  label="Cobertura futura"
-                  value={draftSummary.avgCoverage > 0 ? `${draftSummary.avgCoverage} d` : "n/a"}
-                />
-                <DraftMetric label="SKU críticos" value={formatNumber(draftSummary.critical)} />
-                <DraftMetric label="Valor OC" value={formatCurrencyCompact(totalAmount)} />
-              </div>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Observaciones antes de formalizar
-              </p>
-              <div className="mt-2 space-y-2 text-sm">
-                <DraftWarning
-                  count={draftSummary.openOverlap}
-                  text="productos tienen OC abiertas"
-                />
-                <DraftWarning
-                  count={draftSummary.overSuggested}
-                  text="cantidades superan la recomendación"
-                />
-                <DraftWarning
-                  count={draftSummary.highCoverage}
-                  text="productos quedarían con cobertura mayor a 90 días"
-                />
-                <DraftWarning
-                  count={budget.over}
-                  text={
-                    budget.overCategories.length > 0
-                      ? `sobre OTB en ${budget.overCategories.map((c) => c.categoria).join(", ")}`
-                      : "sobre presupuesto disponible (OTB)"
-                  }
-                  currency
-                />
-              </div>
-              <Button className="mt-3 w-full" size="sm" onClick={() => setDrawerOpen(true)}>
-                Continuar trabajando
-              </Button>
-            </div>
-          </div>
-        </Card>
+        <DraftSummaryCard
+          draftSummary={draftSummary}
+          count={count}
+          totalAmount={totalAmount}
+          pickupPlan={pickupPlan}
+          budget={budget}
+          onOpenPlan={() => navigate("/comprar/plan-retiro")}
+          onContinue={() => setDrawerOpen(true)}
+        />
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">

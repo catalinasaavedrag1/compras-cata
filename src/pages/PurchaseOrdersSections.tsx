@@ -1,11 +1,15 @@
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Modal } from "../components/ui/Modal";
+import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { StatusBadge } from "../components/business/StatusBadge";
+import { LogisticsInlineSummary } from "../components/business/LogisticsPlan";
+import { DraftMetric, DraftWarning } from "./purchaseOrders/DraftLineContext";
 import { buildOcAudit } from "../data/mockOcHistory";
-import { formatCurrency, formatDate, formatNumber } from "../utils/formatters";
+import { formatCurrency, formatCurrencyCompact, formatDate, formatNumber } from "../utils/formatters";
+import type { PickupPlan } from "../utils/logistics";
 import type { PurchaseOrder } from "../types/purchasing";
 
 /** Detalle de una orden de compra: datos, documentos, líneas, factura e historial. */
@@ -218,5 +222,115 @@ function DetailField({ label, value }: { label: string; value: ReactNode }) {
       <p className="text-xs text-slate-500">{label}</p>
       <div className="text-sm text-slate-800 mt-0.5">{value}</div>
     </div>
+  );
+}
+
+interface DraftSummaryData {
+  mainSupplier: string;
+  avgCoverage: number;
+  critical: number;
+  openOverlap: number;
+  overSuggested: number;
+  highCoverage: number;
+}
+
+interface DraftBudgetData {
+  availableBefore: number;
+  over: number;
+  overCategories: { categoria: string }[];
+}
+
+/**
+ * Tarjeta "Compra en curso": resumen del borrador (proveedor, cobertura, OTB) y
+ * observaciones antes de formalizar. (Extraído de PurchaseOrdersPage.)
+ */
+export function DraftSummaryCard({
+  draftSummary,
+  count,
+  totalAmount,
+  pickupPlan,
+  budget,
+  onOpenPlan,
+  onContinue,
+}: {
+  draftSummary: DraftSummaryData;
+  count: number;
+  totalAmount: number;
+  pickupPlan: PickupPlan;
+  budget: DraftBudgetData;
+  onOpenPlan: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <Card className="mb-4 border-brand-200">
+      <div className="grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+            Compra en curso
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900">
+            Borrador · {draftSummary.mainSupplier}
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {count} SKU · {formatCurrency(totalAmount)} · cobertura futura promedio{" "}
+            {draftSummary.avgCoverage > 0 ? `${draftSummary.avgCoverage} días` : "sin venta"}
+          </p>
+          {pickupPlan.truckCount > 0 && (
+            <button
+              type="button"
+              onClick={onOpenPlan}
+              className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-left hover:border-brand-200 hover:bg-brand-50/40"
+            >
+              <LogisticsInlineSummary plan={pickupPlan} />
+              <span className="flex-shrink-0 text-xs font-medium text-brand-600">
+                Ver plan de retiro →
+              </span>
+            </button>
+          )}
+          <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Link to="/presupuesto" className="block" title="Ver Open-to-Buy por categoría">
+              <DraftMetric
+                label="Presupuesto disp. (OTB)"
+                value={formatCurrencyCompact(budget.availableBefore)}
+              />
+            </Link>
+            <DraftMetric
+              label="Cobertura futura"
+              value={draftSummary.avgCoverage > 0 ? `${draftSummary.avgCoverage} d` : "n/a"}
+            />
+            <DraftMetric label="SKU críticos" value={formatNumber(draftSummary.critical)} />
+            <DraftMetric label="Valor OC" value={formatCurrencyCompact(totalAmount)} />
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Observaciones antes de formalizar
+          </p>
+          <div className="mt-2 space-y-2 text-sm">
+            <DraftWarning count={draftSummary.openOverlap} text="productos tienen OC abiertas" />
+            <DraftWarning
+              count={draftSummary.overSuggested}
+              text="cantidades superan la recomendación"
+            />
+            <DraftWarning
+              count={draftSummary.highCoverage}
+              text="productos quedarían con cobertura mayor a 90 días"
+            />
+            <DraftWarning
+              count={budget.over}
+              text={
+                budget.overCategories.length > 0
+                  ? `sobre OTB en ${budget.overCategories.map((c) => c.categoria).join(", ")}`
+                  : "sobre presupuesto disponible (OTB)"
+              }
+              currency
+            />
+          </div>
+          <Button className="mt-3 w-full" size="sm" onClick={onContinue}>
+            Continuar trabajando
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
