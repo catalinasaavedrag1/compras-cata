@@ -38,6 +38,14 @@ import { apiCreate, backendEnabled } from "../services/apiClient";
 import { recommendations } from "../data/mockRecommendations";
 import { rfqs } from "../data/mockRfq";
 import { getProductBySku, products as allProducts } from "../data/mockProducts";
+import { suppliers as mockSuppliers } from "../data/mockSuppliers";
+import { SupplierOrderCoach } from "../components/business/SupplierOrderCoach";
+import {
+  supplierMinimumStatus,
+  consolidationCandidates,
+  earliestOrderBy,
+  type ConsolidationCandidate,
+} from "../utils/orderConsolidation";
 import { OcDetailModal } from "./PurchaseOrdersSections";
 import { lineNet, type OcDraftItem } from "../context/OcDraftContext";
 import { DraftLineContext, DraftMetric, DraftWarning } from "./purchaseOrders/DraftLineContext";
@@ -356,6 +364,26 @@ export function PurchaseOrdersPage() {
     });
     toast.success(`${p.name} agregado al borrador`);
     setProdSearch("");
+  };
+
+  // Proveedor por nombre (para leer su mínimo de compra en el coach).
+  const supplierByName = useMemo(() => {
+    const m = new Map<string, (typeof mockSuppliers)[number]>();
+    mockSuppliers.forEach((s) => m.set(s.name, s));
+    return m;
+  }, []);
+
+  // Agrega al borrador un candidato de consolidación con su cantidad sugerida.
+  const addCandidate = (supplierName: string, c: ConsolidationCandidate) => {
+    addItem({
+      sku: c.sku,
+      productName: c.productName,
+      supplierName,
+      quantity: c.suggestedQty,
+      unitCost: c.unitCost,
+      discountPct: c.discountPct,
+    });
+    toast.success(`${c.productName} agregado — consolidado con ${supplierName}`);
   };
 
   const createOrder = () => {
@@ -1018,6 +1046,33 @@ export function PurchaseOrdersPage() {
               {/* Líneas agrupadas por proveedor */}
               {supplierGroups.map(([supplierName, groupItems]) => {
                 const net = groupItems.reduce((a, i) => a + lineNet(i), 0);
+                const units = groupItems.reduce((a, i) => a + i.quantity, 0);
+                const supplier = supplierByName.get(supplierName);
+                const leadTime =
+                  supplier?.averageLeadTimeDays ??
+                  getProductBySku(groupItems[0]?.sku)?.supplierLeadTimeDays ??
+                  7;
+                const minimum = supplierMinimumStatus(supplier, net, units);
+                const candidates = consolidationCandidates({
+                  supplierName,
+                  draftSkus: new Set(items.map((i) => i.sku)),
+                  products: allProducts,
+                  recommendations,
+                  horizonDays: leadTime + 30,
+                  todayISO: TODAY_ISO,
+                  limit: 3,
+                });
+                const orderBy = earliestOrderBy(
+                  groupItems
+                    .map((i) => getProductBySku(i.sku))
+                    .filter((p): p is NonNullable<typeof p> => !!p)
+                    .map((p) => ({
+                      availableStock: p.availableStock,
+                      salesLast30Days: p.salesLast30Days,
+                      leadTimeDays: p.supplierLeadTimeDays,
+                    })),
+                  TODAY_ISO
+                );
                 return (
                   <div
                     key={supplierName}
@@ -1104,6 +1159,13 @@ export function PurchaseOrdersPage() {
                         </div>
                       ))}
                     </div>
+                    <SupplierOrderCoach
+                      supplierName={supplierName}
+                      minimum={minimum}
+                      candidates={candidates}
+                      orderBy={orderBy}
+                      onAdd={(c) => addCandidate(supplierName, c)}
+                    />
                   </div>
                 );
               })}
