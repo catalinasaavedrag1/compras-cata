@@ -13,7 +13,7 @@ import { useToast } from "../context/ToastContext";
 import { usePurchaseFlow, type ApprovalState } from "../context/PurchaseFlowContext";
 import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
-import type { ApprovalRequest } from "../data/mockApprovals";
+import type { ApprovalRequest, ApprovalCriterion } from "../data/mockApprovals";
 import { CRITERION_LABEL } from "../data/mockApprovals";
 import { IconCheck, IconAlerts, IconOrders, IconLock } from "../components/ui/icons";
 import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/formatters";
@@ -30,6 +30,77 @@ const STATE_META: Record<ApprovalState, { label: string; tone: BadgeTone }> = {
 
 // Estados que aún esperan una decisión del líder (bandeja activa).
 const OPEN_STATES: ApprovalState[] = ["pendiente", "en_analisis", "observada"];
+
+// ----------------------------------------------------------------------------
+//  Cada solicitud llega aquí porque rompió una o más reglas. En vez de mostrar
+//  todos los indicadores por igual, mostramos SOLO lo que se salió de criterio,
+//  uniendo la regla rota con su magnitud: "por qué está aquí" + "cuánto se pasó".
+// ----------------------------------------------------------------------------
+type DeltaTone = "bad" | "warn" | "info";
+interface Breach {
+  dot: string; // color del punto (severidad de la regla)
+  value: string; // valor solicitado / observado
+  limit?: string; // límite o referencia contra la que se compara
+  delta?: string; // cuánto se pasó
+  deltaTone?: DeltaTone;
+}
+
+const DELTA_CLASS: Record<DeltaTone, string> = {
+  bad: "text-rose-600",
+  warn: "text-amber-600",
+  info: "text-violet-600",
+};
+
+function criterionBreach(r: ApprovalRequest, c: ApprovalCriterion): Breach {
+  switch (c) {
+    case "desvio_sugerido": {
+      if (r.suggestedQty === 0)
+        return {
+          dot: "bg-violet-500",
+          value: `${formatNumber(r.requestedQty)} u.`,
+          limit: "no estaba sugerida",
+          delta: "compra nueva",
+          deltaTone: "warn",
+        };
+      const pct = Math.round(((r.requestedQty - r.suggestedQty) / r.suggestedQty) * 100);
+      return {
+        dot: "bg-violet-500",
+        value: `${formatNumber(r.requestedQty)} u.`,
+        limit: `sugerido ${formatNumber(r.suggestedQty)} u.`,
+        delta: `${pct > 0 ? "+" : ""}${pct}%`,
+        deltaTone: "info",
+      };
+    }
+    case "cobertura_excesiva": {
+      const d = r.coberturaResultante - r.coberturaObjetivo;
+      return {
+        dot: "bg-violet-500",
+        value: `${formatNumber(r.coberturaResultante)} d`,
+        limit: `objetivo ${formatNumber(r.coberturaObjetivo)} d`,
+        delta: `${d > 0 ? "+" : ""}${formatNumber(d)} d`,
+        deltaTone: "warn",
+      };
+    }
+    case "margen_bajo": {
+      const d = r.margin - r.minMargin;
+      return {
+        dot: "bg-rose-500",
+        value: `${formatNumber(r.margin)}%`,
+        limit: `mín. ${formatNumber(r.minMargin)}%`,
+        delta: `${d > 0 ? "+" : ""}${formatNumber(d)} pts`,
+        deltaTone: "bad",
+      };
+    }
+    case "monto_alto":
+      return { dot: "bg-amber-500", value: formatCurrency(r.amount), limit: "sobre tu alzada" };
+    case "proveedor_revision":
+      return { dot: "bg-amber-500", value: "Desempeño en revisión", limit: r.supplierName };
+    case "fuera_temporada":
+      return { dot: "bg-amber-500", value: "Fuera de la ventana de temporada" };
+    case "producto_nuevo":
+      return { dot: "bg-blue-500", value: "Alta de producto nuevo" };
+  }
+}
 
 export function ApprovalsPage() {
   const toast = useToast();
@@ -142,8 +213,6 @@ export function ApprovalsPage() {
         <div className="space-y-3">
           {filtered.map((r) => {
             const state = stateOf(r.id);
-            const diff = r.requestedQty - r.suggestedQty;
-            const diffPct = r.suggestedQty > 0 ? Math.round((diff / r.suggestedQty) * 100) : 100;
             return (
               <Card key={r.id}>
                 <CardBody>
@@ -170,59 +239,48 @@ export function ApprovalsPage() {
                         </Link>
                       </p>
                     </div>
-                    <p className="text-sm font-semibold text-slate-800 flex-shrink-0">
-                      {formatCurrency(r.amount)}
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {formatCurrency(r.amount)}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {formatNumber(r.requestedQty)} u. · {formatCurrency(r.unitCost)}/u
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mb-3 rounded-lg border border-slate-200">
+                    <p className="border-b border-slate-100 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Fuera de criterio
                     </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {r.criteria.map((c) => (
-                      <Badge key={c} tone="amber">
-                        {CRITERION_LABEL[c]}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
-                    <div className="rounded-lg bg-slate-50 px-3 py-2">
-                      <p className="text-xs text-slate-400">Sugerido → Solicitado</p>
-                      <p className="text-sm font-semibold text-slate-800">
-                        {formatNumber(r.suggestedQty)} → {formatNumber(r.requestedQty)} u.{" "}
-                        <span
-                          className={`text-xs font-normal ${diff > 0 ? "text-violet-600" : "text-rose-600"}`}
-                        >
-                          ({diff > 0 ? "+" : ""}
-                          {diffPct}%)
-                        </span>
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 px-3 py-2">
-                      <p className="text-xs text-slate-400">Cobertura resultante</p>
-                      <p
-                        className={`text-sm font-semibold ${r.coberturaResultante > r.coberturaObjetivo * 1.3 ? "text-violet-600" : "text-slate-800"}`}
-                      >
-                        {formatNumber(r.coberturaResultante)} d{" "}
-                        <span className="text-xs font-normal text-slate-400">
-                          obj. {r.coberturaObjetivo}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 px-3 py-2">
-                      <p className="text-xs text-slate-400">Margen</p>
-                      <p
-                        className={`text-sm font-semibold ${r.margin < r.minMargin ? "text-rose-600" : "text-emerald-700"}`}
-                      >
-                        {formatNumber(r.margin)}%{" "}
-                        <span className="text-xs font-normal text-slate-400">
-                          mín. {r.minMargin}%
-                        </span>
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 px-3 py-2">
-                      <p className="text-xs text-slate-400">Costo unitario</p>
-                      <p className="text-sm font-semibold text-slate-800">
-                        {formatCurrency(r.unitCost)}
-                      </p>
+                    <div className="divide-y divide-slate-100">
+                      {r.criteria.map((c) => {
+                        const b = criterionBreach(r, c);
+                        return (
+                          <div
+                            key={c}
+                            className="flex items-baseline justify-between gap-3 px-3 py-2"
+                          >
+                            <span className="flex items-center gap-2 text-sm text-slate-600">
+                              <span className={`h-1.5 w-1.5 rounded-full ${b.dot}`} />
+                              {CRITERION_LABEL[c]}
+                            </span>
+                            <span className="text-right text-sm text-slate-800">
+                              <span className="font-semibold">{b.value}</span>
+                              {b.limit && (
+                                <span className="font-normal text-slate-400"> vs {b.limit}</span>
+                              )}
+                              {b.delta && (
+                                <span
+                                  className={`ml-1.5 font-semibold ${b.deltaTone ? DELTA_CLASS[b.deltaTone] : "text-slate-500"}`}
+                                >
+                                  {b.delta}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
