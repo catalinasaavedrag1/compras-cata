@@ -390,6 +390,12 @@ export function SeasonPlannerPage() {
             <HeaderField label="Lead time" value={`${season.leadTimeDays} días`} />
             <HeaderField label="Presupuesto" value={formatCurrencyCompact(season.budget)} />
             <HeaderField label="Crecimiento esp." value={`+${season.expectedGrowthPct}%`} />
+            {plan.prior && (
+              <HeaderField
+                label="Precisión pronóstico ant."
+                value={`${Math.max(0, Math.round(100 - plan.prior.quiebrePct - plan.prior.sobrestockPct))}%`}
+              />
+            )}
           </div>
           <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3 text-xs">
             <ChipRow label="Categorías" items={season.categories} />

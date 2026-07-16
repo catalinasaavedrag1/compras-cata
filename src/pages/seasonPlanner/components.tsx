@@ -1,14 +1,19 @@
 
 
+import { useState } from "react";
 import { Card, CardBody, CardHeader } from "../../components/ui/Card";
 
 import { DataTable, type Column } from "../../components/ui/Table";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 
 import { MonthlyBars } from "../../components/business/SeasonalityChart";
 
 import { useToast } from "../../context/ToastContext";
+import { useTrace } from "../../context/TraceContext";
+import { useLocalStorage } from "../../utils/useLocalStorage";
+import { TODAY_ISO } from "../../utils/constants";
 
 import { planSeason, SCENARIOS, type ScenarioKey, type SeasonProductPlan } from "../../utils/seasonPlan";
 import { type SeasonTracking, type ChannelTracking, type ProductTracking, type AlertTone } from "../../utils/seasonTracking";
@@ -224,6 +229,152 @@ function ScStat({ label, value, warn }: { label: string; value: string; warn?: b
 //  Detalle del producto (nivel 4)
 // ----------------------------------------------------------------------------
 
+interface ForecastAdjustment {
+  qty: number;
+  reason: string;
+  author: string;
+  date: string;
+}
+
+/** Ajuste manual del pronóstico con motivo y responsable (queda en bitácora). */
+function ForecastAdjust({ p }: { p: SeasonProductPlan }) {
+  const toast = useToast();
+  const { log } = useTrace();
+  const [adj, setAdj] = useLocalStorage<ForecastAdjustment | null>(
+    `compras:forecast-adj:${p.sku}`,
+    null
+  );
+  const [editing, setEditing] = useState(false);
+  const [qty, setQty] = useState(adj?.qty ?? p.suggested);
+  const [reason, setReason] = useState(adj?.reason ?? "");
+  const [error, setError] = useState("");
+
+  const open = () => {
+    setQty(adj?.qty ?? p.suggested);
+    setReason(adj?.reason ?? "");
+    setError("");
+    setEditing(true);
+  };
+
+  const save = () => {
+    if (!reason.trim()) {
+      setError("Indica el motivo del ajuste.");
+      return;
+    }
+    const next: ForecastAdjustment = {
+      qty: Math.max(0, Math.round(qty)),
+      reason: reason.trim(),
+      author: "Catalina Saavedra",
+      date: TODAY_ISO,
+    };
+    setAdj(next);
+    log({
+      actor: next.author,
+      entity: `Pronóstico · ${p.name}`,
+      action: "Ajustó el pronóstico",
+      field: "cantidad",
+      before: String(p.suggested),
+      after: String(next.qty),
+      reason: next.reason,
+    });
+    toast.success("Pronóstico ajustado");
+    setEditing(false);
+  };
+
+  const clear = () => {
+    setAdj(null);
+    setEditing(false);
+    toast.info("Ajuste eliminado; vuelve al pronóstico del sistema");
+  };
+
+  const delta = adj ? adj.qty - p.suggested : 0;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Ajuste manual del pronóstico
+        </p>
+        {!editing && (
+          <Button size="sm" variant="secondary" onClick={open}>
+            {adj ? "Editar" : "Ajustar"}
+          </Button>
+        )}
+      </div>
+
+      {!editing && adj && (
+        <div className="mt-2 text-sm">
+          <p>
+            <span className="font-semibold text-slate-900">{formatNumber(adj.qty)} u.</span>{" "}
+            <span
+              className={cn(
+                "text-xs font-medium",
+                delta > 0 ? "text-violet-600" : delta < 0 ? "text-rose-600" : "text-slate-400"
+              )}
+            >
+              ({delta > 0 ? "+" : ""}
+              {formatNumber(delta)} vs sistema {formatNumber(p.suggested)})
+            </span>
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {adj.reason} · {adj.author} · {formatDate(adj.date)}
+          </p>
+          <button
+            onClick={clear}
+            className="mt-1 text-xs font-medium text-rose-600 hover:text-rose-700"
+          >
+            Quitar ajuste
+          </button>
+        </div>
+      )}
+
+      {!editing && !adj && (
+        <p className="mt-1 text-xs text-slate-500">
+          Usando el pronóstico del sistema ({formatNumber(p.suggested)} u.). Ajústalo si tienes
+          información de terreno (evento, cliente, quiebre reciente).
+        </p>
+      )}
+
+      {editing && (
+        <div className="mt-2 space-y-2">
+          {error && (
+            <p role="alert" className="text-xs text-rose-600">
+              {error}
+            </p>
+          )}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="block text-xs text-slate-500">
+              Cantidad ajustada
+              <Input
+                type="number"
+                min={0}
+                value={qty}
+                onChange={(e) => setQty(Number(e.target.value))}
+              />
+            </label>
+            <label className="block text-xs text-slate-500">
+              Motivo del ajuste
+              <Input
+                placeholder="Ej. licitación confirmada, evento local…"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setEditing(false)}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={save}>
+              Guardar ajuste
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ProductDetail({ p }: { p: SeasonProductPlan }) {
   // Fórmula con total corriente.
   let running = 0;
@@ -276,6 +427,8 @@ export function ProductDetail({ p }: { p: SeasonProductPlan }) {
           </div>
         </div>
       </div>
+
+      <ForecastAdjust p={p} />
 
       {/* Origen de la demanda */}
       <div>
