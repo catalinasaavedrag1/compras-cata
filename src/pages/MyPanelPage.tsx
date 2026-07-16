@@ -1,15 +1,10 @@
 import { useMemo } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
-import { Card } from "../components/ui/Card";
-import { DataTable, type Column } from "../components/ui/Table";
-import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import {
   IconAlerts,
   IconReplenish,
-  IconCheck,
-  IconPlus,
   IconTruck,
   IconClock,
   IconCampaign,
@@ -32,7 +27,6 @@ import { useToast } from "../context/ToastContext";
 import { useSignals } from "../context/SignalsContext";
 import {
   coverageDays,
-  coverageSentence,
   estimatedStockoutDate,
   calculateSuggestedPurchase,
   addDaysISO,
@@ -75,6 +69,7 @@ import {
   PortfolioQualityCard,
   SalesSignalsCard,
   SectionLabel,
+  StockoutRiskCard,
   StrategicProductsCard,
   SuppliersToReviewList,
   TrendsCard,
@@ -826,99 +821,6 @@ export function MyPanelPage() {
     });
   };
 
-  const riskColumns: Column<RiskRow>[] = [
-    {
-      key: "product",
-      header: "Producto",
-      render: ({ product: p }) => (
-        <div className="min-w-[150px]">
-          <span className="text-xs font-mono text-slate-400">{p.sku}</span>
-          <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
-          <p className="text-xs text-slate-500">
-            {p.category} · {p.supplierName || "Sin proveedor"}
-          </p>
-          <p className="text-xs mt-0.5 leading-snug text-rose-600">
-            {coverageSentence(p.availableStock, p.salesLast30Days)}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: "stock",
-      header: "Stock disp.",
-      align: "right",
-      render: ({ product: p }) => (
-        <span className={p.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>
-          {formatNumber(p.availableStock)}
-        </span>
-      ),
-    },
-    {
-      key: "sales",
-      header: "Venta 30d",
-      align: "right",
-      hideOnMobile: true,
-      render: ({ product: p }) => formatNumber(p.salesLast30Days),
-    },
-    {
-      key: "stockout",
-      header: "Quiebre estimado",
-      align: "right",
-      render: (r) => (
-        <div className="text-sm">
-          <p
-            className={
-              r.coverage <= r.product.supplierLeadTimeDays
-                ? "text-rose-600 font-semibold"
-                : "text-amber-600 font-medium"
-            }
-          >
-            {r.product.availableStock <= 0 ? "En quiebre" : formatDate(r.stockoutDate ?? "")}
-          </p>
-          <p className="text-xs text-slate-400">
-            cubre {formatDays(r.coverage)} · lead {formatDays(r.product.supplierLeadTimeDays)}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: "suggested",
-      header: "Compra sugerida",
-      align: "right",
-      render: (r) => (
-        <div className="text-sm">
-          <p className="font-semibold text-slate-900">{formatNumber(r.suggestedQty)} u.</p>
-          <p className="text-xs text-slate-400">para ~{formatDays(r.coverageAfter)}</p>
-        </div>
-      ),
-    },
-    {
-      key: "action",
-      header: "",
-      render: (r) => (
-        <div className="flex flex-col items-end gap-1">
-          <Button
-            size="sm"
-            variant={hasItem(r.product.sku) ? "secondary" : "primary"}
-            disabled={hasItem(r.product.sku) || r.suggestedQty <= 0}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAdd(r.product, r.suggestedQty);
-            }}
-            icon={
-              hasItem(r.product.sku) ? (
-                <IconCheck className="w-3.5 h-3.5" />
-              ) : (
-                <IconPlus className="w-3.5 h-3.5" />
-              )
-            }
-          >
-            {hasItem(r.product.sku) ? "En OC" : "Agregar a OC"}
-          </Button>
-        </div>
-      ),
-    },
-  ];
 
   const portfolioHeader = {
     resumen: {
@@ -1073,103 +975,12 @@ export function MyPanelPage() {
         <div className="mb-4 grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-5">
             {/* Riesgo de quiebre */}
-            <div id="riesgo">
-              <div className="flex items-center justify-between mb-2.5">
-                <h3 className="text-sm font-semibold text-slate-800">
-                  Mis productos en riesgo de quiebre
-                </h3>
-                <Link
-                  to="/comprar/decisiones"
-                  className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                >
-                  Ver reposición
-                </Link>
-              </div>
-              <Card>
-                <DataTable
-                  columns={riskColumns}
-                  data={riskRows}
-                  rowKey={(r) => r.product.sku}
-                  onRowClick={(r) => navigate(`/productos/${r.product.sku}`)}
-                  rowClassName={(r) =>
-                    r.product.availableStock <= 0 ? "bg-rose-50/40" : undefined
-                  }
-                  emptyMessage="No tienes productos en riesgo de quiebre. ¡Bien!"
-                  mobileCard={(r) => (
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <span className="text-xs font-mono text-slate-400">{r.product.sku}</span>
-                          <p className="font-medium text-slate-800 leading-snug">
-                            {r.product.name}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {r.product.category} · {r.product.supplierName || "Sin proveedor"}
-                          </p>
-                          <p className="text-xs mt-0.5 leading-snug text-rose-600 font-medium">
-                            {coverageSentence(r.product.availableStock, r.product.salesLast30Days)}
-                          </p>
-                        </div>
-                        <Badge tone="red" dot>
-                          {r.product.availableStock <= 0 ? "Quiebre" : "Riesgo"}
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                        <div>
-                          <p className="text-xs text-slate-400">Stock</p>
-                          <p
-                            className={
-                              r.product.availableStock <= 0
-                                ? "text-rose-600 font-semibold"
-                                : "text-slate-700"
-                            }
-                          >
-                            {formatNumber(r.product.availableStock)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400">Quiebre</p>
-                          <p className="text-slate-700">
-                            {r.product.availableStock <= 0
-                              ? "hoy"
-                              : formatDate(r.stockoutDate ?? "")}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400">Comprar</p>
-                          <p className="font-semibold text-slate-900">
-                            {formatNumber(r.suggestedQty)} u.
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Cubre ~{formatDays(r.coverageAfter)} · lead{" "}
-                        {formatDays(r.product.supplierLeadTimeDays)}
-                      </p>
-                      <Button
-                        size="sm"
-                        className="mt-2 w-full"
-                        variant={hasItem(r.product.sku) ? "secondary" : "primary"}
-                        disabled={hasItem(r.product.sku) || r.suggestedQty <= 0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAdd(r.product, r.suggestedQty);
-                        }}
-                        icon={
-                          hasItem(r.product.sku) ? (
-                            <IconCheck className="w-3.5 h-3.5" />
-                          ) : (
-                            <IconPlus className="w-3.5 h-3.5" />
-                          )
-                        }
-                      >
-                        {hasItem(r.product.sku) ? "En OC" : "Agregar a OC"}
-                      </Button>
-                    </div>
-                  )}
-                />
-              </Card>
-            </div>
+            <StockoutRiskCard
+              rows={riskRows}
+              hasItem={hasItem}
+              onAdd={handleAdd}
+              onOpenProduct={(sku) => navigate(`/productos/${sku}`)}
+            />
 
             {/* OC sin recibir */}
             <OpenOrdersList orders={myOpenOrders} />
