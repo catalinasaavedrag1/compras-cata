@@ -96,6 +96,7 @@ const DocumentsPage = lazy(() => named(import("../pages/DocumentsPage"), "Docume
 const ReportsPage = lazy(() => named(import("../pages/ReportsPage"), "ReportsPage"));
 const ClaimsPage = lazy(() => named(import("../pages/ClaimsPage"), "ClaimsPage"));
 const GovernancePage = lazy(() => named(import("../pages/GovernancePage"), "GovernancePage"));
+const ImportsPage = lazy(() => named(import("../pages/ImportsPage"), "ImportsPage"));
 
 function PageLoader() {
   return <PageSkeleton />;
@@ -224,6 +225,7 @@ export default function AppRoutes() {
                               <Route path="/proveedores" element={<SuppliersPage />} />
                               <Route path="/proveedores/:id" element={<SupplierDetailPage />} />
                               <Route path="/reclamos" element={<ClaimsPage />} />
+                              <Route path="/importaciones" element={<ImportsPage />} />
                               <Route path="/ordenes-compra" element={<PurchaseOrdersPage />} />
                               <Route path="/comprar/borradores" element={<PurchaseOrdersPage />} />
                               <Route path="/comprar/ordenes" element={<PurchaseOrdersPage />} />

@@ -256,6 +256,12 @@ export const compradorModules: NavModule[] = [
         hint: "Qué viene en camino, qué llegó y con qué diferencias",
       },
       {
+        to: "/importaciones",
+        label: "Importaciones",
+        icon: IconTruck,
+        hint: "Proceso de importación (ETD/ETA), documentos y costo puesto en bodega",
+      },
+      {
         to: "/reclamos",
         label: "Reclamos",
         icon: IconAlerts,

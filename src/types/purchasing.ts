@@ -495,6 +495,56 @@ export interface SupplierClaim {
 }
 
 // ----------------------------------------------------------------------------
+//  Compras importadas — seguimiento del proceso de importación y costo puesto
+//  en bodega (que se recalcula cuando cambia el tipo de cambio, flete, arancel…)
+// ----------------------------------------------------------------------------
+
+export type ImportStage =
+  | "proforma" // proforma / cotización internacional
+  | "orden" // orden internacional confirmada
+  | "produccion" // en producción
+  | "embarque" // reservado / listo para embarque (ETD)
+  | "transito" // en tránsito marítimo
+  | "aduana" // en aduana / desaduanaje
+  | "internacion" // transporte terrestre a bodega
+  | "bodega"; // recibido en bodega
+
+export type Incoterm = "EXW" | "FOB" | "CIF" | "FCA" | "DDP";
+
+export interface ImportDoc {
+  nombre: string;
+  ok: boolean;
+}
+
+export interface ImportOrder {
+  id: string;
+  poNumber: string; // OC asociada
+  supplierName: string; // proveedor extranjero
+  origen: string; // país / puerto de origen
+  incoterm: Incoterm;
+  moneda: string; // ej. "USD"
+  tipoCambio: number; // CLP por unidad de moneda
+  montoFob: number; // monto en moneda extranjera
+  anticipoPct: number; // % de anticipo pagado
+  naviera: string;
+  contenedor: string; // tipo / número de contenedor
+  puerto: string; // puerto de destino
+  etd: string; // ISO — salida estimada
+  eta: string; // ISO — llegada estimada
+  fechaBodega?: string; // ISO — estimada en bodega
+  stage: ImportStage;
+  buyer: string;
+  skuCount: number;
+  // Gastos de internación en CLP
+  fleteInternacional: number;
+  arancelPct: number;
+  gastosPortuarios: number;
+  transporteTerrestre: number;
+  agenteAduana: number;
+  docs: ImportDoc[];
+}
+
+// ----------------------------------------------------------------------------
 //  Margen por canal de venta (marketplace / web / tienda)
 // ----------------------------------------------------------------------------
 
