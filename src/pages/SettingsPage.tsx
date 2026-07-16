@@ -23,8 +23,10 @@ import {
   formatNumber,
   formatPercent,
 } from "../utils/formatters";
-import { IconRules, IconAlerts, IconArrowRight } from "../components/ui/icons";
+import { IconRules, IconAlerts, IconArrowRight, IconCheck } from "../components/ui/icons";
 import { cn } from "../utils/cn";
+import { ruleParamIssues } from "../utils/paramHealth";
+import { TODAY_ISO } from "../utils/constants";
 import type { PurchaseRule } from "../types/purchasing";
 
 type RuleHealth = "ok" | "incoherent" | "high_lead" | "overstock_risk" | "stockout_risk";
@@ -92,6 +94,26 @@ export function SettingsPage() {
 
   const global = rules.find(isGlobal);
   const withHealth = useMemo(() => rules.map((r) => ({ r, health: healthOf(r) })), [rules]);
+
+  // Diagnóstico de parámetros vs la realidad de los productos del ámbito.
+  const paramIssues = useMemo(
+    () =>
+      rules
+        .flatMap((r) => ruleParamIssues(r, affectedProductsOf(r)).map((issue) => ({ r, issue })))
+        .sort((a, b) =>
+          a.issue.severity === b.issue.severity ? 0 : a.issue.severity === "high" ? -1 : 1
+        ),
+    [rules]
+  );
+
+  const applyFix = (rule: PurchaseRule, fix: Partial<PurchaseRule>, label: string) => {
+    setRules((prev) =>
+      prev.map((x) =>
+        x.id === rule.id ? { ...x, ...fix, updatedAt: TODAY_ISO, updatedBy: "Catalina Saavedra" } : x
+      )
+    );
+    toast.success(`Corregido: ${label}`);
+  };
   const propias = rules.filter((r) => !isGlobal(r)).length;
   const conAlerta = withHealth.filter((x) => x.health !== "ok").length;
   const leadProm = Math.round(rules.reduce((a, r) => a + r.leadTimeDays, 0) / rules.length);
@@ -403,6 +425,63 @@ export function SettingsPage() {
                 </span>
                 <IconArrowRight className="w-4 h-4 text-brand-500 flex-shrink-0" />
               </button>
+            ))}
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Diagnóstico: parámetros mal configurados vs la realidad */}
+      {paramIssues.length > 0 && (
+        <Card className="mb-4">
+          <CardHeader
+            title="Parámetros a corregir"
+            description="Detectados comparando la regla con el lead time real, la demanda y la estacionalidad de sus productos"
+          />
+          <CardBody className="space-y-2">
+            {paramIssues.map(({ r, issue }, i) => (
+              <div
+                key={`${r.id}-${issue.kind}-${i}`}
+                className={cn(
+                  "flex flex-col gap-2 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-center",
+                  issue.severity === "high"
+                    ? "border-rose-200 bg-rose-50/60"
+                    : "border-amber-200 bg-amber-50/50"
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={issue.severity === "high" ? "red" : "amber"} dot>
+                      {issue.title}
+                    </Badge>
+                    <button
+                      onClick={() => setEditing(r)}
+                      className="text-xs font-semibold text-slate-700 hover:text-brand-700"
+                    >
+                      {r.scope}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600">{issue.detail}</p>
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    Sugerencia: {issue.suggestion}
+                  </p>
+                </div>
+                <div className="flex flex-shrink-0 gap-2">
+                  {issue.fix ? (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={<IconCheck className="h-3.5 w-3.5" />}
+                      onClick={() => applyFix(r, issue.fix!, issue.suggestion)}
+                    >
+                      Aplicar
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => setEditing(r)}>
+                      Revisar
+                    </Button>
+                  )}
+                </div>
+              </div>
             ))}
           </CardBody>
         </Card>
