@@ -717,7 +717,7 @@ export function MyPanelPage() {
       key: "product",
       header: "Producto",
       render: ({ product: p }) => (
-        <div className="min-w-[200px]">
+        <div className="min-w-[150px]">
           <span className="text-xs font-mono text-slate-400">{p.sku}</span>
           <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
           <p className="text-xs text-slate-500">
@@ -782,7 +782,7 @@ export function MyPanelPage() {
       key: "action",
       header: "",
       render: (r) => (
-        <div className="flex flex-col gap-1 min-w-[130px]">
+        <div className="flex flex-col items-end gap-1">
           <Button
             size="sm"
             variant={hasItem(r.product.sku) ? "secondary" : "primary"}

@@ -121,32 +121,33 @@ export function DateRangePicker({
           aria-haspopup="dialog"
           aria-expanded={open}
           className={cn(
-            "w-full flex items-center gap-2 rounded-lg border bg-white py-2 pl-3 pr-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-100",
+            "w-full flex items-center gap-2 rounded-lg border bg-white py-2 pl-3 pr-9 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-100",
             open ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-300 hover:bg-slate-50",
             hasValue ? "text-slate-800" : "text-slate-400"
           )}
         >
           <IconCalendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
           <span className="flex-1 truncate text-left">{triggerText}</span>
-          {hasValue ? (
-            <span
-              role="button"
-              tabIndex={0}
-              aria-label="Limpiar fechas"
-              onClick={clear}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") clear();
-              }}
-              className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            >
-              <IconClose className="w-3.5 h-3.5" />
-            </span>
-          ) : (
+          {!hasValue && (
             <IconChevronRight
-              className={cn("w-4 h-4 text-slate-400 transition-transform", open && "rotate-90")}
+              className={cn(
+                "absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 transition-transform",
+                open && "rotate-90"
+              )}
             />
           )}
         </button>
+        {/* Control de limpiar como botón hermano (no anidado dentro del trigger). */}
+        {hasValue && (
+          <button
+            type="button"
+            aria-label="Limpiar fechas"
+            onClick={clear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+          >
+            <IconClose className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         {open && (
           <div

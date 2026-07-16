@@ -465,7 +465,8 @@ function LineComparison({ line, responses }: { line: RfqLine; responses: RfqResp
       {responses.length === 0 ? (
         <p className="px-3 py-3 text-sm text-slate-400">Ningún proveedor cotizó esta línea.</p>
       ) : (
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto scrollbar-thin">
+        <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 border-b border-slate-100">
               <th className="px-3 py-2">Proveedor</th>
@@ -536,6 +537,7 @@ function LineComparison({ line, responses }: { line: RfqLine; responses: RfqResp
             })}
           </tbody>
         </table>
+        </div>
       )}
 
       {tradeoffNote && (

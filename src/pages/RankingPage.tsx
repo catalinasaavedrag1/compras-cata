@@ -106,7 +106,7 @@ export function RankingPage() {
       </div>
 
       {/* KPIs del equipo */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         <KpiCard
           title="Score promedio"
           value={`${agg.avgScore} pts`}

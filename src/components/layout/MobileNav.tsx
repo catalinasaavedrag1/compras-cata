@@ -8,6 +8,7 @@ import { useRole } from "../../context/RoleContext";
 import { IconClose, IconSearch } from "../ui/icons";
 import { useNavBadges } from "./useNavBadges";
 import { PILL_TONE as PILL } from "../../utils/tone";
+import { useDialogA11y } from "../../utils/useDialogA11y";
 
 interface MobileNavProps {
   open: boolean;
@@ -31,6 +32,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
       !(pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/")))
   );
   const badges = useNavBadges();
+  const dialogRef = useDialogA11y(open, onClose);
 
   if (!open) return null;
 
@@ -45,7 +47,14 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
 
   return (
     <div className="fixed inset-0 z-40 lg:hidden">
-      <div className="relative w-full h-full bg-white flex flex-col">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menú de navegación"
+        tabIndex={-1}
+        className="relative w-full h-full bg-white flex flex-col focus:outline-none"
+      >
         <div className="flex items-center justify-between border-b border-slate-100 pr-3">
           <Brand />
           <button
@@ -60,6 +69,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
           <Input
             icon={<IconSearch className="w-4 h-4" />}
             placeholder="Buscar SKU o producto..."
+            aria-label="Buscar SKU o producto"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

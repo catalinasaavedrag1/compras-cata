@@ -116,7 +116,11 @@ export function LoginPage() {
             </div>
           </div>
 
-          {error && <p className="text-xs text-rose-600">{error}</p>}
+          {error && (
+            <p role="alert" className="text-xs text-rose-600">
+              {error}
+            </p>
+          )}
 
           <Button type="submit" className="w-full justify-center">
             Iniciar sesión

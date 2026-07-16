@@ -16,6 +16,8 @@ function base(path: React.ReactNode) {
         strokeWidth={1.8}
         strokeLinecap="round"
         strokeLinejoin="round"
+        aria-hidden="true"
+        focusable="false"
       >
         {path}
       </svg>

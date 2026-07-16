@@ -26,7 +26,9 @@ interface HoverTip {
 }
 
 export function Sidebar() {
-  const [panelOpen, setPanelOpen] = useLocalStorage<boolean>("compras:sidebar-panel-open", false);
+  // Abierto por defecto para que un usuario nuevo lea los nombres de los
+  // módulos; se recuerda "cerrado" solo si el usuario lo cierra explícitamente.
+  const [panelOpen, setPanelOpen] = useLocalStorage<boolean>("compras:sidebar-panel-open", true);
   const [tip, setTip] = useState<HoverTip | null>(null);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
@@ -174,12 +176,15 @@ export function Sidebar() {
                 >
                   <module.icon className="h-5 w-5" />
                   {showBadge && (
-                    <span
-                      className={cn(
-                        "absolute right-1.5 top-1.5 h-2 w-2 rounded-full ring-2 ring-white",
-                        BADGE_DOT[b!.tone]
-                      )}
-                    />
+                    <>
+                      <span
+                        className={cn(
+                          "absolute right-1.5 top-1.5 h-2 w-2 rounded-full ring-2 ring-white",
+                          BADGE_DOT[b!.tone]
+                        )}
+                      />
+                      <span className="sr-only">{b!.count} pendientes</span>
+                    </>
                   )}
                 </NavLink>
               );
@@ -238,6 +243,7 @@ export function Sidebar() {
                 <Input
                   icon={<IconSearch className="h-4 w-4" />}
                   placeholder="Buscar vista o módulo..."
+                  aria-label="Buscar vista o módulo"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />

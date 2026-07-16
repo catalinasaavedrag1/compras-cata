@@ -8,6 +8,7 @@ import {
   IconSuppliers,
   IconCategories,
   IconDensity,
+  IconRules,
 } from "../ui/icons";
 import { useDensity } from "../../context/DensityContext";
 import { useAuth } from "../../context/AuthContext";
@@ -310,7 +311,8 @@ export function TopbarActions() {
               value={buyer}
               onChange={(e) => setBuyer(e.target.value)}
               title="Cambiar de comprador"
-              className="appearance-none bg-transparent text-sm font-medium text-slate-700 cursor-pointer focus:outline-none text-right pr-1 hover:text-brand-700"
+              aria-label="Cambiar de comprador"
+              className="appearance-none bg-transparent text-sm font-medium text-slate-700 cursor-pointer rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 text-right pr-1 hover:text-brand-700"
             >
               {buyers.map((b) => (
                 <option key={b} value={b}>
@@ -348,6 +350,17 @@ export function TopbarActions() {
                 {email || (role === "lider" ? "Líder de Compras" : "Comprador")}
               </p>
             </div>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setAcctOpen(false);
+                navigate("/reglas");
+              }}
+              className="flex w-full items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <IconRules className="w-4 h-4 text-slate-400" />
+              Configuración y reglas
+            </button>
             <button
               role="menuitem"
               onClick={() => {
