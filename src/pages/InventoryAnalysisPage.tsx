@@ -20,6 +20,9 @@ import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/fo
 import { IconInventory, IconBox, IconAlerts } from "../components/ui/icons";
 import type { Product } from "../types/purchasing";
 
+/** Capital total inmovilizado en el stock de un producto (stock disponible × costo). */
+const stockCapital = (p: Product) => p.availableStock * p.cost;
+
 const GROUP_TABS = [
   { value: "category", label: "Por categoría" },
   { value: "warehouse", label: "Por tienda/bodega" },
@@ -39,7 +42,7 @@ export function InventoryAnalysisPage() {
 
   // Productos con más capital inmovilizado (stock disponible * costo)
   const frozen = [...products]
-    .map((p) => ({ p, frozen: p.availableStock * p.cost }))
+    .map((p) => ({ p, frozen: stockCapital(p) }))
     .sort((a, b) => b.frozen - a.frozen)
     .slice(0, 6);
 
@@ -83,7 +86,7 @@ export function InventoryAnalysisPage() {
       align: "right",
       render: (p) => (
         <span className="font-semibold text-slate-900">
-          {formatCurrency(p.availableStock * p.cost)}
+          {formatCurrency(stockCapital(p))}
         </span>
       ),
     },
@@ -222,7 +225,7 @@ export function InventoryAnalysisPage() {
                   </p>
                 </div>
                 <span className="text-sm font-semibold text-slate-900 flex-shrink-0">
-                  {formatCurrencyCompact(p.availableStock * p.cost)}
+                  {formatCurrencyCompact(stockCapital(p))}
                 </span>
               </div>
             </div>
@@ -287,7 +290,7 @@ function ListCard({
                 </p>
               </div>
               <span className="text-xs font-semibold text-slate-700 flex-shrink-0">
-                {formatCurrencyCompact(p.availableStock * p.cost)}
+                {formatCurrencyCompact(stockCapital(p))}
               </span>
             </Link>
           ))

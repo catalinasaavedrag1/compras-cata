@@ -22,7 +22,11 @@ import {
 import { IconSuppliers, IconAlerts, IconOrders } from "../components/ui/icons";
 import { supplierFulfillment } from "../utils/supplierPerf";
 import { supplierSeasonality } from "../utils/seasonality";
-import { SUPPLIER_PENDING_WARN_CLP } from "../utils/constants";
+import {
+  SUPPLIER_PENDING_WARN_CLP,
+  SUPPLIER_COMPLIANCE_CRITICAL,
+  SUPPLIER_COMPLIANCE_WARN,
+} from "../utils/constants";
 import { Link } from "react-router-dom";
 import type { Supplier } from "../types/purchasing";
 
@@ -45,7 +49,7 @@ export function SuppliersPage() {
 
   // KPIs según el resultado filtrado
   const delayed = filtered.filter((s) => s.status === "delayed").length;
-  const lowCompliance = filtered.filter((s) => s.deliveryCompliance < 70).length;
+  const lowCompliance = filtered.filter((s) => s.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL).length;
   const totalPending = filtered.reduce((a, s) => a + s.pendingAmount, 0);
   const openOCs = filtered.reduce((a, s) => a + s.openPurchaseOrders, 0);
 
@@ -119,9 +123,9 @@ export function SuppliersPage() {
       render: (s) => (
         <span
           className={
-            s.deliveryCompliance < 70
+            s.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL
               ? "text-rose-600 font-semibold"
-              : s.deliveryCompliance < 85
+              : s.deliveryCompliance < SUPPLIER_COMPLIANCE_WARN
                 ? "text-amber-600 font-medium"
                 : "text-emerald-600 font-medium"
           }
@@ -362,7 +366,7 @@ export function SuppliersPage() {
                     </p>
                     <p
                       className={
-                        s.deliveryCompliance < 70 ? "text-rose-600 font-semibold" : "text-slate-700"
+                        s.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL ? "text-rose-600 font-semibold" : "text-slate-700"
                       }
                     >
                       {formatPercent(s.deliveryCompliance, 0)}

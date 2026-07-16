@@ -30,6 +30,18 @@ export function purchaseMultiple(rec: PurchaseRecommendation): number {
   return 1;
 }
 
+/**
+ * Cobertura (días) proyectada a partir de un total de unidades y la venta diaria,
+ * redondeada a 1 decimal. Si no hay venta, cae al valor de inventario conocido.
+ */
+export function projectedCoverageDays(
+  totalUnits: number,
+  dailySales: number,
+  fallback: number
+): number {
+  return dailySales > 0 ? Math.round((totalUnits / dailySales) * 10) / 10 : fallback;
+}
+
 export function buildDecisionGroups(
   rows: PurchaseRecommendation[],
   getKey: (row: PurchaseRecommendation) => string,

@@ -16,7 +16,12 @@ import {
 } from "../../utils/formatters";
 import type { PurchaseRecommendation } from "../../types/purchasing";
 import type { DecisionGroup, DecisionViewMode, OpenPoSignal } from "./types";
-import { decisionTypeLabel, purchaseMultiple, salesTrendPct } from "./helpers";
+import {
+  decisionTypeLabel,
+  projectedCoverageDays,
+  purchaseMultiple,
+  salesTrendPct,
+} from "./helpers";
 import { buildRecommendationReasoning } from "../../utils/recommendationReasoning";
 import { buildBuyingAlerts, type BuyingAlert } from "../../utils/buyingAlerts";
 import {
@@ -257,10 +262,11 @@ export function RecommendationDecisionDrawer({
   const incomingQty = openPo?.quantity ?? 0;
   const effectiveIncomingQty =
     openPo?.status === "delayed" ? Math.round(incomingQty * 0.4) : incomingQty;
-  const projectedCoverage =
-    dailySales > 0
-      ? Math.round(((rec.availableStock + safeQty + effectiveIncomingQty) / dailySales) * 10) / 10
-      : rec.inventoryDays;
+  const projectedCoverage = projectedCoverageDays(
+    rec.availableStock + safeQty + effectiveIncomingQty,
+    dailySales,
+    rec.inventoryDays
+  );
   const currentCoverage = coverageDays(rec.availableStock, rec.salesLast30Days);
   const capital = safeQty * rec.unitCost;
   const unitPriceEstimate = rec.margin < 95 ? rec.unitCost / (1 - rec.margin / 100) : rec.unitCost;
@@ -779,10 +785,11 @@ function buildSimulationScenario(
   incomingQty: number
 ): SimulationScenario {
   const dailySales = rec.salesLast30Days > 0 ? rec.salesLast30Days / 30 : 0;
-  const coverage =
-    dailySales > 0
-      ? Math.round(((rec.availableStock + qty + incomingQty) / dailySales) * 10) / 10
-      : rec.inventoryDays;
+  const coverage = projectedCoverageDays(
+    rec.availableStock + qty + incomingQty,
+    dailySales,
+    rec.inventoryDays
+  );
   const capital = qty * rec.unitCost;
   const unitPriceEstimate = rec.margin < 95 ? rec.unitCost / (1 - rec.margin / 100) : rec.unitCost;
   const protectedSales =
@@ -817,10 +824,11 @@ function buildSupplierComparison(rec: PurchaseRecommendation, qty: number) {
 
   return candidates.map((candidate) => {
     const cost = Math.round(rec.unitCost * candidate.costFactor);
-    const coverage =
-      rec.salesLast30Days > 0
-        ? Math.round(((rec.availableStock + qty) / (rec.salesLast30Days / 30)) * 10) / 10
-        : rec.inventoryDays;
+    const coverage = projectedCoverageDays(
+      rec.availableStock + qty,
+      rec.salesLast30Days / 30,
+      rec.inventoryDays
+    );
     return {
       ...candidate,
       cost,

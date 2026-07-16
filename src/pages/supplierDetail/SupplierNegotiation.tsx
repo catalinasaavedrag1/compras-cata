@@ -10,6 +10,11 @@ import { products } from "../../data/mockProducts";
 import { categories } from "../../data/mockCategories";
 import { purchaseOrders } from "../../data/mockPurchaseOrders";
 import { supplierFulfillment } from "../../utils/supplierPerf";
+import {
+  SUPPLIER_COMPLIANCE_CRITICAL,
+  SUPPLIER_COMPLIANCE_WARN,
+  SUPPLIER_LEAD_TIME_WARN_DAYS,
+} from "../../utils/constants";
 import type { Supplier } from "../../types/purchasing";
 import { formatCurrencyCompact, formatDays, formatNumber, formatPercent } from "../../utils/formatters";
 
@@ -77,7 +82,7 @@ export function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
   // Rol del proveedor
   const maxBuy = Math.max(1, ...suppliers.map((s) => s.purchasedAmountLast90Days));
   const share = supplier.purchasedAmountLast90Days / maxBuy;
-  const problem = supplier.deliveryCompliance < 70 || perf.fillRate < 80;
+  const problem = supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL || perf.fillRate < 80;
   const strategic = share >= 0.6 || supplier.associatedSkus >= 200;
   const relevant = share >= 0.3 || supplier.associatedSkus >= 100;
   const role =
@@ -115,7 +120,7 @@ export function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
   const objetivos: string[] = [];
   if (perf.fillRate < 95)
     objetivos.push(`Asegurar fill rate ≥ 95% (hoy ${perf.fillRate}%) con despacho completo`);
-  if (supplier.deliveryCompliance < 85)
+  if (supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_WARN)
     objetivos.push(
       `Subir cumplimiento de entrega a 95% (hoy ${formatPercent(supplier.deliveryCompliance, 0)})`
     );
@@ -210,9 +215,9 @@ export function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
               label="Cumplimiento"
               value={formatPercent(supplier.deliveryCompliance, 0)}
               tone={
-                supplier.deliveryCompliance < 70
+                supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL
                   ? "bad"
-                  : supplier.deliveryCompliance < 85
+                  : supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_WARN
                     ? "warn"
                     : "good"
               }
@@ -222,7 +227,7 @@ export function SupplierNegotiation({ supplier }: { supplier: Supplier }) {
             <GStat
               label="Lead time"
               value={formatDays(supplier.averageLeadTimeDays)}
-              tone={supplier.averageLeadTimeDays >= 15 ? "warn" : undefined}
+              tone={supplier.averageLeadTimeDays >= SUPPLIER_LEAD_TIME_WARN_DAYS ? "warn" : undefined}
               hint={<MetricHint metric="leadTime" />}
             />
             <GStat

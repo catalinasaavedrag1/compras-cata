@@ -6,3 +6,11 @@ export const DEFAULT_TARGET_COVERAGE_DAYS = 45;
 
 // Umbral (CLP) sobre el cual el monto pendiente de un proveedor se marca en alerta.
 export const SUPPLIER_PENDING_WARN_CLP = 20_000_000;
+
+// Cumplimiento de entrega (%) del proveedor: bajo el crítico es rojo, bajo el
+// de advertencia es ámbar. Sobre el de advertencia, sano.
+export const SUPPLIER_COMPLIANCE_CRITICAL = 70;
+export const SUPPLIER_COMPLIANCE_WARN = 85;
+
+// Lead time (días) a partir del cual el plazo del proveedor se marca en alerta.
+export const SUPPLIER_LEAD_TIME_WARN_DAYS = 15;

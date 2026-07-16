@@ -42,7 +42,12 @@ import {
 import { useClaims } from "../context/ClaimsContext";
 import { CLAIM_OPEN_STATES } from "../data/mockClaims";
 import { supplierScore, SUPPLIER_CLASS } from "../utils/supplierScore";
-import { SUPPLIER_PENDING_WARN_CLP } from "../utils/constants";
+import {
+  SUPPLIER_PENDING_WARN_CLP,
+  SUPPLIER_COMPLIANCE_CRITICAL,
+  SUPPLIER_COMPLIANCE_WARN,
+  SUPPLIER_LEAD_TIME_WARN_DAYS,
+} from "../utils/constants";
 
 export function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -161,9 +166,9 @@ export function SupplierDetailPage() {
           title="Cumplimiento"
           value={formatPercent(supplier.deliveryCompliance, 0)}
           tone={
-            supplier.deliveryCompliance < 70
+            supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL
               ? "bad"
-              : supplier.deliveryCompliance < 85
+              : supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_WARN
                 ? "warn"
                 : "good"
           }
@@ -174,7 +179,7 @@ export function SupplierDetailPage() {
         <KpiCard
           title="Lead time"
           value={formatDays(supplier.averageLeadTimeDays)}
-          tone={supplier.averageLeadTimeDays >= 15 ? "warn" : "neutral"}
+          tone={supplier.averageLeadTimeDays >= SUPPLIER_LEAD_TIME_WARN_DAYS ? "warn" : "neutral"}
           icon={<IconInventory className="w-4 h-4" />}
           description="Promedio de entrega"
           info={<MetricHint metric="leadTime" />}
@@ -271,10 +276,10 @@ export function SupplierDetailPage() {
       {/* Motivo de revisión si aplica */}
       {(supplier.status === "delayed" ||
         supplier.status === "review" ||
-        supplier.deliveryCompliance < 70) && (
+        supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL) && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <b>Revisar proveedor:</b> cumplimiento {formatPercent(supplier.deliveryCompliance, 0)}
-          {supplier.averageLeadTimeDays >= 15 && (
+          {supplier.averageLeadTimeDays >= SUPPLIER_LEAD_TIME_WARN_DAYS && (
             <> · lead time alto ({formatDays(supplier.averageLeadTimeDays)})</>
           )}
           {riskProducts > 0 && <> · {riskProducts} SKU en quiebre</>}
@@ -348,7 +353,7 @@ export function SupplierDetailPage() {
               title="Cumplimiento"
               detail={`OTIF ${formatPercent(supplier.deliveryCompliance, 0)} · ${delayedPOs.length} OC atrasadas.`}
               ask="Acordar objetivo de servicio, lead time realista y plan para atrasos."
-              tone={delayedPOs.length > 0 || supplier.deliveryCompliance < 85 ? "amber" : "green"}
+              tone={delayedPOs.length > 0 || supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_WARN ? "amber" : "green"}
             />
             <NegotiationAgendaItem
               index={4}

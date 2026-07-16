@@ -65,6 +65,17 @@ para no arriesgar regresiones en la app desplegada.
   dejan de reimplementar `toggleSort`/`handleSort`/`cycleSort` (este último además
   reemplaza su tipo de estado inline por `SortState`).
 
+### Tercera pasada — constantes y helpers internos (sin cambio visual)
+- **Umbrales de proveedor a constantes** (`utils/constants.ts`): `SUPPLIER_COMPLIANCE_CRITICAL`
+  (70), `SUPPLIER_COMPLIANCE_WARN` (85) y `SUPPLIER_LEAD_TIME_WARN_DAYS` (15) reemplazan
+  los literales repetidos en `SuppliersPage`, `SupplierDetailPage` y `SupplierNegotiation`
+  (mismos valores; se dejan aparte `otif < 85` y `fillRate < 80`, que son otras métricas).
+- **`projectedCoverageDays()`** (`replenishment/helpers.ts`): unifica la fórmula de
+  cobertura proyectada repetida en 3 sitios de `replenishment/components.tsx`.
+- **`stockCapital()`** local en `InventoryAnalysisPage`: reemplaza el cálculo
+  `availableStock × cost` repetido 4 veces (distinto de `frozenCapital`, que es el
+  excedente sobre el máximo).
+
 ---
 
 ## 2. Recomendado — cambia salida visual (documentado, no aplicado)
@@ -125,11 +136,12 @@ Extraíbles a helper/constante compartida cuando se retome cada módulo:
   como está para no cambiar el formato de sus IDs.
 - ~~**Lógica de orden de sort** reimplementada~~ ✓ aplicado (`makeToggleSort` +
   `SortState` compartidos desde `Table.tsx`).
-- **Fórmulas de cobertura/riesgo** repetidas en `replenishment/components.tsx`
-  (riesgo de quiebre ×5, cobertura proyectada ×3): extraer helpers.
-- **Umbrales de proveedor** repetidos como literales: cumplimiento `70`/`85`,
-  lead time `15` días, en `Suppliers`/`SupplierDetail`/`SupplierNegotiation`:
-  extraer `complianceTone()` / constantes.
+- **Fórmulas de cobertura/riesgo** en `replenishment/components.tsx`: cobertura
+  proyectada ✓ aplicado (`projectedCoverageDays`). Queda el "riesgo de quiebre" (×5):
+  no se unificó porque los sitios difieren (algunos 3 niveles ≤lead/≤2×lead con tonos,
+  otros 2 niveles) y producen salidas visibles distintas.
+- ~~**Umbrales de proveedor** repetidos como literales~~ ✓ aplicado
+  (`SUPPLIER_COMPLIANCE_CRITICAL`/`WARN`, `SUPPLIER_LEAD_TIME_WARN_DAYS`).
 - **Colisión de nombre `CHANNEL_META`**: `utils/channelDemand.ts` (canales de
   demanda) y `data/mockCampaignPlans.ts` (canales de promo) exportan el mismo
   nombre con formas distintas. Renombrar uno (p. ej. `PROMO_CHANNEL_META`).
