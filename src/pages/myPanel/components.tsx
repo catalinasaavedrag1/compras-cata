@@ -812,3 +812,225 @@ export function StrategicProductsCard({
     </Card>
   );
 }
+
+/**
+ * "Salud de cartera" (score + fortaleza/problema + dimensiones) junto a
+ * "Principales focos" (dónde actuar primero). (Extraído de MyPanelPage.)
+ */
+export function PortfolioHealthFocus({
+  score,
+  best,
+  worst,
+  health,
+  riskCount,
+  overstockValue,
+  opportunityCount,
+  suppliersToReviewCount,
+  newProductsCount,
+}: {
+  score: number;
+  best: [string, number];
+  worst: [string, number];
+  health: Record<string, number>;
+  riskCount: number;
+  overstockValue: number;
+  opportunityCount: number;
+  suppliersToReviewCount: number;
+  newProductsCount: number;
+}) {
+  return (
+    <section className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <Card>
+        <CardHeader title="Salud de cartera" description="Qué está sano y cuál es tu mayor problema." />
+        <CardBody>
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <p className="text-3xl font-bold leading-none text-slate-900">
+                {score}
+                <span className="text-base font-normal text-slate-400">/100</span>
+              </p>
+              <p className="mt-1 text-xs font-medium text-emerald-600">↑ +3 vs mes anterior</p>
+            </div>
+            <div className="grid flex-1 grid-cols-2 gap-2">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-emerald-700">Fortaleza</p>
+                <p className="text-sm font-semibold text-emerald-800">
+                  {capitalize(best[0])} · {best[1]}
+                </p>
+              </div>
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-rose-700">Mayor problema</p>
+                <p className="text-sm font-semibold text-rose-800">
+                  {capitalize(worst[0])} · {worst[1]}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+            {Object.entries(health).map(([label, value]) => (
+              <MiniDim key={label} label={label} value={value} />
+            ))}
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Principales focos" description="Dónde actuar primero, en un solo lugar." />
+        <CardBody className="space-y-2">
+          <FocoCard
+            dot="bg-rose-500"
+            text={`${formatNumber(riskCount)} SKU con riesgo de quiebre`}
+            to="/comprar/decisiones"
+          />
+          <FocoCard
+            dot="bg-amber-500"
+            text={`${formatCurrencyCompact(overstockValue)} en sobrestock`}
+            to="/inventario"
+          />
+          <FocoCard
+            dot="bg-emerald-500"
+            text={`${formatNumber(opportunityCount)} oportunidades comerciales`}
+            to="/mi-cartera/oportunidades"
+          />
+          <FocoCard
+            dot="bg-orange-500"
+            text={`${formatNumber(suppliersToReviewCount)} proveedores por revisar`}
+            to="/proveedores"
+          />
+          <FocoCard
+            dot="bg-brand-500"
+            text={`${formatNumber(newProductsCount)} productos nuevos por evaluar`}
+            to="/productos"
+          />
+        </CardBody>
+      </Card>
+    </section>
+  );
+}
+
+/**
+ * Tablas compactas de "Marcas" y "Proveedores" de la cartera (top 5 cada una).
+ * (Extraído de MyPanelPage.)
+ */
+export function BrandsSuppliersTables({
+  brandRows,
+  supplierRows,
+}: {
+  brandRows: BrandPortfolioRow[];
+  supplierRows: SupplierPortfolioRow[];
+}) {
+  return (
+    <section className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader
+          title="Marcas"
+          description="Venta, margen y crecimiento."
+          action={
+            <Link
+              to="/mi-cartera/marcas"
+              className="text-xs font-medium text-brand-600 hover:text-brand-700"
+            >
+              Ver todas
+            </Link>
+          }
+        />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
+                <th className="px-4 py-2 font-medium">Marca</th>
+                <th className="px-2 py-2 text-right font-medium">Venta</th>
+                <th className="px-2 py-2 text-right font-medium">Margen</th>
+                <th className="px-4 py-2 text-right font-medium">Crec.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {brandRows.slice(0, 5).map((r) => (
+                <tr key={r.brand} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-2 font-medium text-slate-800">{r.brand}</td>
+                  <td className="px-2 py-2 text-right text-slate-700">
+                    {formatCurrencyCompact(r.sales)}
+                  </td>
+                  <td className="px-2 py-2 text-right text-slate-700">
+                    {formatPercent(r.margin, 0)}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <Delta pct={r.growth * 100} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Proveedores"
+          description="Venta, dependencia y estado."
+          action={
+            <Link
+              to="/mi-cartera/proveedores"
+              className="text-xs font-medium text-brand-600 hover:text-brand-700"
+            >
+              Ver todos
+            </Link>
+          }
+        />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
+                <th className="px-4 py-2 font-medium">Proveedor</th>
+                <th className="px-2 py-2 text-right font-medium">Venta</th>
+                <th className="px-2 py-2 text-right font-medium">Depend.</th>
+                <th className="px-4 py-2 text-right font-medium">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {supplierRows.slice(0, 5).map((r) => (
+                <tr key={r.supplier.id} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-2 font-medium text-slate-800">{r.supplier.name}</td>
+                  <td className="px-2 py-2 text-right text-slate-700">
+                    {formatCurrencyCompact(r.sales)}
+                  </td>
+                  <td className="px-2 py-2 text-right text-slate-700">
+                    {formatPercent(r.dependency * 100, 0)}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <StatusBadge kind="supplier" value={r.supplier.status} dot={false} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </section>
+  );
+}
+
+/** Resumen de oportunidades de cartera en 4 contadores. (Extraído de MyPanelPage.) */
+export function OpportunitiesSummary({
+  oppSummary,
+}: {
+  oppSummary: { label: string; count: number }[];
+}) {
+  return (
+    <section className="mb-4">
+      <SectionLabel>Oportunidades</SectionLabel>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {oppSummary.map((o) => (
+          <Link
+            key={o.label}
+            to="/mi-cartera/oportunidades"
+            className="rounded-xl border border-slate-200 bg-white p-3 shadow-card hover:border-brand-300 hover:bg-brand-50/40"
+          >
+            <p className="text-2xl font-bold text-slate-900">{formatNumber(o.count)}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{o.label}</p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}

@@ -47,7 +47,6 @@ import { seasonalFactor } from "../utils/seasonality";
 import { lostOpportunities } from "../utils/lostOpportunities";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
 import {
-  capitalize,
   formatCurrencyCompact,
   formatDate,
   formatDays,
@@ -67,13 +66,13 @@ import type {
   SupplierPortfolioRow,
 } from "./myPanel/types";
 import {
-  Delta,
+  BrandsSuppliersTables,
   ExecutiveSummary,
-  FocoCard,
-  MiniDim,
   MonthGoalsCard,
+  OpportunitiesSummary,
   PortfolioFocusWorkspace,
   PortfolioHeaderCard,
+  PortfolioHealthFocus,
   QualityItem,
   SectionLabel,
   StrategicProductsCard,
@@ -1020,82 +1019,17 @@ export function MyPanelPage() {
 
       {/* 4 · Salud de cartera (compacta) + 5 · Principales focos */}
       {isPortfolioView && portfolioFocus === "resumen" && (
-        <section className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-          <Card>
-            <CardHeader
-              title="Salud de cartera"
-              description="Qué está sano y cuál es tu mayor problema."
-            />
-            <CardBody>
-              <div className="flex items-center gap-4">
-                <div className="text-center">
-                  <p className="text-3xl font-bold leading-none text-slate-900">
-                    {story.score}
-                    <span className="text-base font-normal text-slate-400">/100</span>
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-emerald-600">↑ +3 vs mes anterior</p>
-                </div>
-                <div className="grid flex-1 grid-cols-2 gap-2">
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-emerald-700">
-                      Fortaleza
-                    </p>
-                    <p className="text-sm font-semibold text-emerald-800">
-                      {capitalize(story.best[0])} · {story.best[1]}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-rose-700">
-                      Mayor problema
-                    </p>
-                    <p className="text-sm font-semibold text-rose-800">
-                      {capitalize(story.worst[0])} · {story.worst[1]}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-                {Object.entries(portfolioInsights.health).map(([label, value]) => (
-                  <MiniDim key={label} label={label} value={value} />
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Principales focos"
-              description="Dónde actuar primero, en un solo lugar."
-            />
-            <CardBody className="space-y-2">
-              <FocoCard
-                dot="bg-rose-500"
-                text={`${formatNumber(riskRows.length)} SKU con riesgo de quiebre`}
-                to="/comprar/decisiones"
-              />
-              <FocoCard
-                dot="bg-amber-500"
-                text={`${formatCurrencyCompact(portfolio.overstockValue)} en sobrestock`}
-                to="/inventario"
-              />
-              <FocoCard
-                dot="bg-emerald-500"
-                text={`${formatNumber(portfolioInsights.opportunities.length)} oportunidades comerciales`}
-                to="/mi-cartera/oportunidades"
-              />
-              <FocoCard
-                dot="bg-orange-500"
-                text={`${formatNumber(mySuppliersToReview.length)} proveedores por revisar`}
-                to="/proveedores"
-              />
-              <FocoCard
-                dot="bg-brand-500"
-                text={`${formatNumber(newProductsToReview.length)} productos nuevos por evaluar`}
-                to="/productos"
-              />
-            </CardBody>
-          </Card>
-        </section>
+        <PortfolioHealthFocus
+          score={story.score}
+          best={story.best}
+          worst={story.worst}
+          health={portfolioInsights.health}
+          riskCount={riskRows.length}
+          overstockValue={portfolio.overstockValue}
+          opportunityCount={portfolioInsights.opportunities.length}
+          suppliersToReviewCount={mySuppliersToReview.length}
+          newProductsCount={newProductsToReview.length}
+        />
       )}
 
       {/* 6 · Productos estratégicos (top 3 por utilidad) */}
@@ -1105,112 +1039,15 @@ export function MyPanelPage() {
 
       {/* 7 · Marcas + 8 · Proveedores (tablas compactas) */}
       {isPortfolioView && portfolioFocus === "resumen" && (
-        <section className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader
-              title="Marcas"
-              description="Venta, margen y crecimiento."
-              action={
-                <Link
-                  to="/mi-cartera/marcas"
-                  className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                >
-                  Ver todas
-                </Link>
-              }
-            />
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
-                    <th className="px-4 py-2 font-medium">Marca</th>
-                    <th className="px-2 py-2 text-right font-medium">Venta</th>
-                    <th className="px-2 py-2 text-right font-medium">Margen</th>
-                    <th className="px-4 py-2 text-right font-medium">Crec.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {portfolioInsights.brandRows.slice(0, 5).map((r) => (
-                    <tr key={r.brand} className="hover:bg-slate-50/60">
-                      <td className="px-4 py-2 font-medium text-slate-800">{r.brand}</td>
-                      <td className="px-2 py-2 text-right text-slate-700">
-                        {formatCurrencyCompact(r.sales)}
-                      </td>
-                      <td className="px-2 py-2 text-right text-slate-700">
-                        {formatPercent(r.margin, 0)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <Delta pct={r.growth * 100} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Proveedores"
-              description="Venta, dependencia y estado."
-              action={
-                <Link
-                  to="/mi-cartera/proveedores"
-                  className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                >
-                  Ver todos
-                </Link>
-              }
-            />
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
-                    <th className="px-4 py-2 font-medium">Proveedor</th>
-                    <th className="px-2 py-2 text-right font-medium">Venta</th>
-                    <th className="px-2 py-2 text-right font-medium">Depend.</th>
-                    <th className="px-4 py-2 text-right font-medium">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {portfolioInsights.supplierRows.slice(0, 5).map((r) => (
-                    <tr key={r.supplier.id} className="hover:bg-slate-50/60">
-                      <td className="px-4 py-2 font-medium text-slate-800">{r.supplier.name}</td>
-                      <td className="px-2 py-2 text-right text-slate-700">
-                        {formatCurrencyCompact(r.sales)}
-                      </td>
-                      <td className="px-2 py-2 text-right text-slate-700">
-                        {formatPercent(r.dependency * 100, 0)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <StatusBadge kind="supplier" value={r.supplier.status} dot={false} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </section>
+        <BrandsSuppliersTables
+          brandRows={portfolioInsights.brandRows}
+          supplierRows={portfolioInsights.supplierRows}
+        />
       )}
 
       {/* 9 · Oportunidades (resumen) */}
       {isPortfolioView && portfolioFocus === "resumen" && (
-        <section className="mb-4">
-          <SectionLabel>Oportunidades</SectionLabel>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {story.oppSummary.map((o) => (
-              <Link
-                key={o.label}
-                to="/mi-cartera/oportunidades"
-                className="rounded-xl border border-slate-200 bg-white p-3 shadow-card hover:border-brand-300 hover:bg-brand-50/40"
-              >
-                <p className="text-2xl font-bold text-slate-900">{formatNumber(o.count)}</p>
-                <p className="mt-0.5 text-xs text-slate-500">{o.label}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
+        <OpportunitiesSummary oppSummary={story.oppSummary} />
       )}
 
       {/* 10 · Tendencias — acelerando vs desacelerando (unificado) */}
