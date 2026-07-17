@@ -341,6 +341,174 @@ export interface ConvertResultView {
   purchaseOrders: ConvertedPurchaseOrderView[];
 }
 
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Recepciones (F4)
+// ----------------------------------------------------------------------------
+
+/** Máquina de estados real de una recepción (01-modelo-dominio §2). */
+export type ReceptionBffStatus =
+  | "expected"
+  | "in_transit"
+  | "arrived"
+  | "checking"
+  | "completed"
+  | "discrepancy"
+  | "rejected";
+
+/** Acciones del PATCH C21 (transiciones de la máquina). */
+export type ReceptionTransitionAction =
+  | "mark_in_transit"
+  | "mark_arrived"
+  | "start_checking"
+  | "complete"
+  | "reject";
+
+/** Condición de una línea recibida (create-reception.dto del dominio). */
+export type ReceptionItemCondition = "ok" | "damaged" | "wrong_item";
+
+/** Fila resumen del listado (toReceptionSummary del dominio). */
+export interface ReceptionSummaryView {
+  id: string;
+  displayId: string;
+  purchaseOrderId: string;
+  poNumber: string | null;
+  supplierRef: string | null;
+  warehouseId: string;
+  status: ReceptionBffStatus;
+  expectedDate: string | null;
+  hasDiscrepancy: boolean;
+  itemCount: number;
+  version: number;
+}
+
+/** Línea del detalle: pedido-vs-recibido con condición y nota. */
+export interface ReceptionItemView {
+  itemId: string;
+  purchaseOrderLineId: string;
+  sku: string | null;
+  skuName: string | null;
+  qtyExpected: number | null;
+  qtyReceived: number | null;
+  condition: string;
+  note: string | null;
+}
+
+/** Cumplimiento congelado al completar la recepción. */
+export interface ReceptionComplianceSnap {
+  expected: number;
+  received: number;
+  pct: number;
+}
+
+/** Detalle (toReceptionResponse): items + bloque OC resumido + compliance. */
+export interface ReceptionDetailView {
+  id: string;
+  displayId: string;
+  purchaseOrderId: string;
+  warehouseId: string;
+  packingSlip: string | null;
+  status: ReceptionBffStatus;
+  expectedDate: string | null;
+  arrivedAt: string | null;
+  completedAt: string | null;
+  hasDiscrepancy: boolean;
+  complianceSnap: ReceptionComplianceSnap | null;
+  version: number;
+  items?: ReceptionItemView[];
+  purchaseOrder: { id: string; number: string; supplierRef: string; status: string } | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ReceptionListData {
+  items: ReceptionSummaryView[];
+  meta: BffPageMeta;
+}
+
+export interface CreateReceptionItemBody {
+  purchaseOrderLineId: string;
+  qtyReceived: number;
+  condition?: ReceptionItemCondition;
+  note?: string;
+}
+
+/** Cuerpo del POST /receptions (C21: registro manual; nace en `checking`). */
+export interface CreateReceptionBody {
+  purchaseOrderId: string;
+  warehouseId: string;
+  packingSlip?: string;
+  items: CreateReceptionItemBody[];
+}
+
+/** Cuerpo del PATCH: `reason` es obligatorio solo en reject (auditable). */
+export type ReceptionPatchBody =
+  | { action: Exclude<ReceptionTransitionAction, "reject"> }
+  | { action: "reject"; reason: string };
+
+// ----------------------------------------------------------------------------
+//  API pública — Recepciones (F4)
+// ----------------------------------------------------------------------------
+
+/** GET /receptions — listado resumen con filtros del dominio (incluye ?rid=). */
+export function listReceptions(params: {
+  status?: ReceptionBffStatus;
+  warehouseId?: string;
+  purchaseOrderId?: string;
+  supplierId?: string;
+  q?: string;
+  /** Deep-link: id interno o displayId exactos (manda sobre `q`). */
+  rid?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<ReceptionListData> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.warehouseId) query.set("warehouseId", params.warehouseId);
+  if (params.purchaseOrderId) query.set("purchaseOrderId", params.purchaseOrderId);
+  if (params.supplierId) query.set("supplierId", params.supplierId);
+  if (params.q) query.set("q", params.q);
+  if (params.rid) query.set("rid", params.rid);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 24));
+  return request<ReceptionListData>(`/receptions?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /receptions/:id — detalle con items, bloque OC y complianceSnap. */
+export function getReception(id: string): Promise<ReceptionDetailView> {
+  return request<ReceptionDetailView>(`/receptions/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /receptions — registra una recepción contra una OC emitida (🔑). */
+export function createReception(body: CreateReceptionBody): Promise<ReceptionDetailView> {
+  return request<ReceptionDetailView>("/receptions", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * PATCH /receptions/:id — transición de la máquina (If-Match `"<version>"`).
+ * `complete` decide completed|discrepancy y actualiza la OC en el dominio.
+ */
+export function patchReception(
+  id: string,
+  version: number,
+  body: ReceptionPatchBody
+): Promise<ReceptionDetailView> {
+  return request<ReceptionDetailView>(`/receptions/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...baseHeaders(), ...ifMatch(version) },
+    body: JSON.stringify(body),
+  });
+}
+
 /** GET /context: sesión, permisos purchase:* y cartera asignada. */
 export interface PurchaseContextData {
   userId: string;
