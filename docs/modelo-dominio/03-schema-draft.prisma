@@ -266,6 +266,26 @@ model PurchaseRecommendation {
   version        Int       @default(1)
   dateModified   DateTime  @updatedAt
 
+  // Materialización del motor para la vista (snapshots fechados por computedAt;
+  // la verdad viva sigue en su servicio dueño — analytics/pricing/inventory).
+  skuNameSnap      String?  @db.NVarChar(300)
+  brandSnap        String?  @db.NVarChar(200)
+  categoryNameSnap String?  @db.NVarChar(200)
+  supplierNameSnap String?  @db.NVarChar(300)
+  stockOnHand      Decimal? @db.Decimal(18, 3)
+  stockReserved    Decimal? @db.Decimal(18, 3)
+  salesLast30d     Decimal? @db.Decimal(18, 3)
+  salesLast90d     Decimal? @db.Decimal(18, 3)
+  rotation         Decimal? @db.Decimal(9, 2)
+  marginPct        Decimal? @db.Decimal(5, 2)
+  reorderPoint     Int?
+  minStock         Int?
+  maxStock         Int?
+  leadTimeDays     Int?
+  suggestedAmountClp BigInt?
+  reasonText       String?  @db.NVarChar(1000)
+  riskText         String?  @db.NVarChar(1000)
+
   actions       RecommendationAction[]
   proposalLines ProposalLine[]
 

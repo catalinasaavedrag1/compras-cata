@@ -28,7 +28,7 @@
 ### Replenishment
 | Tabla | Claves e índices | Columnas |
 |---|---|---|
-| `PurchaseRecommendation` | PK `id` · **UXf `(sku, supplierRef) WHERE status IN ('pending','in_cart','snoozed')`** · IX `(buyerId, status, priority)` · IX `(categoryId)` | `sku, supplierRef, categoryId, buyerId, priority, suggestedQty, overrideQty?, coverageDays?, dailyVelocity?, velocitySource(analytics\|materialized), velocityAsOf?, stockAvailable?, stockInTransit?, stockAsOf?, unitCostClp?, costAsOf?, flagsJson, status, snoozeUntil?, computedAt, version` |
+| `PurchaseRecommendation` | PK `id` · **UXf `(sku, supplierRef) WHERE status IN ('pending','in_cart','snoozed')`** · IX `(buyerId, status, priority)` · IX `(categoryId)` | `sku, supplierRef, categoryId, buyerId, priority, suggestedQty, overrideQty?, coverageDays?, dailyVelocity?, velocitySource(analytics\|materialized), velocityAsOf?, stockAvailable?, stockInTransit?, stockAsOf?, unitCostClp?, costAsOf?, flagsJson, status, snoozeUntil?, computedAt, version` + **materialización para la vista** (flujo 1): `skuNameSnap, brandSnap, categoryNameSnap, supplierNameSnap, stockOnHand?, stockReserved?, salesLast30d?, salesLast90d?, rotation?, marginPct?, reorderPoint?, minStock?, maxStock?, leadTimeDays?, suggestedAmountClp?, reasonText?, riskText?` — snapshots fechados por `computedAt`; la verdad viva sigue en su dueño |
 | `RecommendationAction` | PK `id` · FK→`recommendationId` · IX `(recommendationId, dateCreated)` | `action(override\|ignore\|snooze\|restore), qtyBefore?, qtyAfter?, reason, authorUserId` (append-only; alimenta atribución) |
 
 ### Sourcing

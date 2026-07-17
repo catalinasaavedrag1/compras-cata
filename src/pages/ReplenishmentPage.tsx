@@ -15,7 +15,7 @@ import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { IconReplenish, IconAlerts, IconPlus, IconClose, IconInfo } from "../components/ui/icons";
-import { recommendations as allRecs } from "../data/mockRecommendations";
+import { PageSkeleton } from "../components/ui/Skeleton";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { rfqs } from "../data/mockRfq";
 import { suppliers } from "../data/mockSuppliers";
@@ -33,12 +33,13 @@ import {
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
-import { useLocalStorage } from "../utils/useLocalStorage";
 import { useUrlState } from "../utils/useUrlState";
 import { ExportButton } from "../components/business/ExportButton";
 import type { PurchaseRecommendation } from "../types/purchasing";
+import { isHiddenByDefault, useReplenishment } from "../hooks/useReplenishment";
+import type { PurchaseBffError } from "../services/purchaseBff";
 
-import type { DecisionViewMode, OpenPoSignal, RecOverride } from "./replenishment/types";
+import type { DecisionViewMode, OpenPoSignal } from "./replenishment/types";
 import {
   buildDecisionGroups,
   decisionTypeLabel,
@@ -70,12 +71,10 @@ export function ReplenishmentPage() {
   const toast = useToast();
   const { approvals } = usePurchaseFlow();
 
-  // Estado persistente (sobrevive a recargas)
-  const [overrides, setOverrides] = useLocalStorage<Record<string, RecOverride>>(
-    "compras:rec-overrides",
-    {}
-  );
-  const [ignoredIds, setIgnoredIds] = useLocalStorage<string[]>("compras:rec-ignored", []);
+  // Datos reales del purchase-bff-service (reemplaza los mocks de
+  // recomendaciones y los overrides/ignoradas en localStorage).
+  const { rows, meta, warnings, loading, error, configured, refetch, applyAction } =
+    useReplenishment();
 
   // Estado de UI
   const [selected, setSelected] = useState<string[]>([]);
@@ -92,16 +91,26 @@ export function ReplenishmentPage() {
   const [editing, setEditing] = useState<PurchaseRecommendation | null>(null);
   const [editQty, setEditQty] = useState(0);
   const [editSupplier, setEditSupplier] = useState("");
+  const [editReason, setEditReason] = useState("");
   const [decision, setDecision] = useState<PurchaseRecommendation | null>(null);
   const [decisionQty, setDecisionQty] = useState(0);
+  // Ignorar (una o varias) exige un motivo auditable → mini modal de motivo.
+  const [ignoreTargets, setIgnoreTargets] = useState<PurchaseRecommendation[] | null>(null);
+  const [ignoreReason, setIgnoreReason] = useState("");
+  const [ignoreMode, setIgnoreMode] = useState<"ignore" | "snooze">("ignore");
+  const [savingAction, setSavingAction] = useState(false);
+  const [showIgnored, setShowIgnored] = useState(false);
 
-  // Aplica overrides guardados sobre los datos base
-  const recs = useMemo(
-    () => allRecs.map((r) => (overrides[r.id] ? { ...r, ...overrides[r.id] } : r)),
-    [overrides]
+  // Overrides ya vienen aplicados por el motor (suggestedQty con override).
+  const recs = rows;
+
+  // Ignoradas/pospuestas en el backend quedan fuera de la vista por defecto,
+  // igual que el antiguo compras:rec-ignored.
+  const hiddenCount = useMemo(() => recs.filter(isHiddenByDefault).length, [recs]);
+  const visible = useMemo(
+    () => (showIgnored ? recs : recs.filter((r) => !isHiddenByDefault(r))),
+    [recs, showIgnored]
   );
-
-  const visible = useMemo(() => recs.filter((r) => !ignoredIds.includes(r.id)), [recs, ignoredIds]);
 
   const filtered = useMemo(() => {
     let result = filterRecommendations(visible, {
@@ -235,11 +244,51 @@ export function ReplenishmentPage() {
     toast.info("Urgentes agrupados por proveedor para preparar borradores de OC");
   };
 
+  // Mensaje uniforme de error de acción (409 de concurrencia ya recarga la lista).
+  const notifyActionError = (err: PurchaseBffError) => {
+    if (err.code === "VERSION_CONFLICT") {
+      toast.warning("La recomendación cambió; se recargó la lista");
+    } else {
+      toast.error(err.message || "No se pudo guardar el cambio");
+    }
+  };
+
   const ignoreSelected = () => {
-    setIgnoredIds((prev) => Array.from(new Set([...prev, ...selected])));
-    toast.info(
-      `${selected.length} sugerencia${selected.length === 1 ? "" : "s"} ignorada${selected.length === 1 ? "" : "s"}`
+    if (selectedRecs.length === 0) return;
+    setIgnoreReason("");
+    setIgnoreMode("ignore");
+    setIgnoreTargets(selectedRecs);
+  };
+
+  const confirmIgnore = async () => {
+    if (!ignoreTargets || ignoreTargets.length === 0 || !ignoreReason.trim()) return;
+    setSavingAction(true);
+    const reason = ignoreReason.trim();
+    const snoozeUntil = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+    const results = await Promise.all(
+      ignoreTargets.map((r) =>
+        applyAction(
+          r.id,
+          ignoreMode === "snooze"
+            ? { action: "snooze", snoozeUntil, reason }
+            : { action: "ignore", reason }
+        )
+      )
     );
+    setSavingAction(false);
+    const failures = results.filter((r) => !r.ok);
+    const okCount = results.length - failures.length;
+    if (okCount > 0) {
+      toast.info(
+        ignoreMode === "snooze"
+          ? `${okCount} sugerencia${okCount === 1 ? "" : "s"} postergada${okCount === 1 ? "" : "s"} 7 días`
+          : `${okCount} sugerencia${okCount === 1 ? "" : "s"} ignorada${okCount === 1 ? "" : "s"}`
+      );
+    }
+    const firstFailure = failures.find((r) => !r.ok);
+    if (firstFailure && !firstFailure.ok) notifyActionError(firstFailure.error);
+    setIgnoreTargets(null);
+    setIgnoreReason("");
     setSelected([]);
   };
 
@@ -247,20 +296,25 @@ export function ReplenishmentPage() {
     setEditing(r);
     setEditQty(r.suggestedQuantity);
     setEditSupplier(r.supplierName);
+    setEditReason("");
   };
 
-  const saveEdit = () => {
-    if (!editing) return;
-    setOverrides((prev) => ({
-      ...prev,
-      [editing.id]: {
-        suggestedQuantity: editQty,
-        suggestedPurchaseAmount: editQty * editing.unitCost,
-        supplierName: editSupplier,
-      },
-    }));
-    toast.success(`Sugerencia de ${editing.productName} actualizada`);
+  const saveEdit = async () => {
+    if (!editing || !editReason.trim()) return;
+    setSavingAction(true);
+    const result = await applyAction(editing.id, {
+      action: "override",
+      qty: editQty,
+      reason: editReason.trim(),
+    });
+    setSavingAction(false);
+    if (result.ok) {
+      toast.success(`Sugerencia de ${editing.productName} actualizada`);
+    } else {
+      notifyActionError(result.error);
+    }
     setEditing(null);
+    setEditReason("");
   };
 
   const handleAddQuantity = (r: PurchaseRecommendation, quantity: number) => {
@@ -472,16 +526,63 @@ export function ReplenishmentPage() {
     },
   ];
 
-  const supplierOptions = uniqueValues(allRecs, (r) => r.supplierName).map((s) => ({
+  const supplierOptions = uniqueValues(recs, (r) => r.supplierName).map((s) => ({
     value: s,
     label: s,
   }));
 
+  const pageTitle = pathname.includes("/comprar/reposicion") ? "Reposición" : "Decisiones de compra";
+  const pageDescription =
+    "Prioriza necesidades, revisa recomendaciones y construye tus próximas órdenes.";
+
+  // --------------------------------------------------------------------------
+  //  Estados que exigen los datos reales: sin configurar, cargando y error.
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              conectar datos reales de recomendaciones.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && recs.length === 0) {
+    return <PageSkeleton />;
+  }
+
+  if (error && recs.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudieron cargar las recomendaciones
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
-        title={pathname.includes("/comprar/reposicion") ? "Reposición" : "Decisiones de compra"}
-        description="Prioriza necesidades, revisa recomendaciones y construye tus próximas órdenes."
+        title={pageTitle}
+        description={pageDescription}
         action={
           <div className="flex gap-2">
             <ExportButton
@@ -812,7 +913,7 @@ export function ReplenishmentPage() {
               placeholder: "Categoría",
               value: category,
               onChange: setCategory,
-              options: uniqueValues(allRecs, (r) => r.category).map((c) => ({
+              options: uniqueValues(recs, (r) => r.category).map((c) => ({
                 value: c,
                 label: c,
               })),
@@ -890,14 +991,25 @@ export function ReplenishmentPage() {
         />
       </div>
 
-      {ignoredIds.length > 0 && (
+      {meta?.partial && warnings.length > 0 && (
+        <Card className="mb-3 border-amber-200 bg-amber-50/60">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 text-xs text-amber-800">
+            <Badge tone="amber">Datos parciales</Badge>
+            {warnings.map((w) => (
+              <span key={w.code}>{w.message}</span>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {hiddenCount > 0 && (
         <div className="flex items-center gap-2 mb-3 text-xs text-slate-500">
-          <Badge tone="neutral">{ignoredIds.length} sugerencia(s) ignorada(s)</Badge>
+          <Badge tone="neutral">{hiddenCount} sugerencia(s) ignorada(s) o pospuesta(s)</Badge>
           <button
-            onClick={() => setIgnoredIds([])}
+            onClick={() => setShowIgnored((prev) => !prev)}
             className="font-medium text-brand-600 hover:text-brand-700"
           >
-            Restaurar
+            {showIgnored ? "Ocultar" : "Mostrar"}
           </button>
         </div>
       )}
@@ -955,6 +1067,7 @@ export function ReplenishmentPage() {
             columns={columns}
             data={filtered}
             rowKey={(r) => r.id}
+            emptyMessage="Sin recomendaciones para los filtros seleccionados."
             onRowClick={openDecision}
             rowClassName={(r) => (r.status === "critical" ? "bg-rose-50/40" : undefined)}
             sort={sort}
@@ -1000,9 +1113,10 @@ export function ReplenishmentPage() {
           openEdit(rec);
         }}
         onIgnore={(rec) => {
-          setIgnoredIds((prev) => Array.from(new Set([...prev, rec.id])));
           setDecision(null);
-          toast.info(`Sugerencia de ${rec.productName} ignorada`);
+          setIgnoreReason("");
+          setIgnoreMode("snooze");
+          setIgnoreTargets([rec]);
         }}
         onViewSku={(rec) => navigate(`/productos/${rec.sku}`)}
         alreadyInOc={decision ? hasItem(decision.sku) : false}
@@ -1023,7 +1137,12 @@ export function ReplenishmentPage() {
             <Button variant="secondary" onClick={() => setEditing(null)}>
               Cancelar
             </Button>
-            <Button onClick={saveEdit}>Guardar cambios</Button>
+            <Button
+              disabled={!editReason.trim() || savingAction}
+              onClick={() => void saveEdit()}
+            >
+              {savingAction ? "Guardando…" : "Guardar cambios"}
+            </Button>
           </>
         }
       >
@@ -1042,6 +1161,12 @@ export function ReplenishmentPage() {
               onChange={(e) => setEditSupplier(e.target.value)}
               options={suppliers.map((s) => ({ value: s.name, label: s.name }))}
             />
+            <Input
+              label="Motivo del ajuste (obligatorio)"
+              placeholder="Ej: demanda estacional, acuerdo con proveedor…"
+              value={editReason}
+              onChange={(e) => setEditReason(e.target.value)}
+            />
             <div className="rounded-lg bg-slate-50 p-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Costo unitario</span>
@@ -1057,6 +1182,44 @@ export function ReplenishmentPage() {
             <p className="text-xs text-slate-500">{editing.reason}</p>
           </div>
         )}
+      </Modal>
+
+      {/* Modal de motivo para ignorar/postergar (el backend lo exige, auditable) */}
+      <Modal
+        open={!!ignoreTargets}
+        onClose={() => setIgnoreTargets(null)}
+        title={ignoreMode === "snooze" ? "Postergar sugerencia 7 días" : "Ignorar sugerencia"}
+        description={
+          ignoreTargets && ignoreTargets.length === 1
+            ? `${ignoreTargets[0].sku} · ${ignoreTargets[0].productName}`
+            : `${ignoreTargets?.length ?? 0} sugerencias seleccionadas`
+        }
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIgnoreTargets(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!ignoreReason.trim() || savingAction}
+              onClick={() => void confirmIgnore()}
+            >
+              {savingAction ? "Guardando…" : "Ignorar"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Input
+            label="Motivo (obligatorio)"
+            placeholder="Ej: compra ya gestionada, producto en descontinuación…"
+            value={ignoreReason}
+            onChange={(e) => setIgnoreReason(e.target.value)}
+          />
+          <p className="text-xs text-slate-500">
+            El motivo queda registrado en la auditoría de la recomendación.
+          </p>
+        </div>
       </Modal>
     </div>
   );
