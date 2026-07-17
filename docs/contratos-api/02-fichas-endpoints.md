@@ -385,13 +385,15 @@ Envoltorio **crudo** de dominio (el BFF lo traduce). Permiso `purchase:recommend
 }
 ```
 
-## F-EXT-1 · Requerido en Sales/Analytics (❓ pendiente de verificación / debe crearse)
+## F-EXT-1 · Requerido en Sales/Analytics (✅ verificado — **AMPLIAR** `analysis-service`)
 
-Shape **requerido por el motor** — a confirmar contra `analysis-service` antes de implementar:
-`GET /api/analysis/v1/sales/velocity?skus=HT-TAL-0450,…&window=30d&channel=all`
+**Verificación V1 (código real):** `analysis-service` ya computa la velocidad — `GET /v1/api/resumen-producto?itemCode=` devuelve `PromedioDiario` (fórmula vigente del negocio: `(venta 14 días ×0.8 + mismo período año anterior ×0.2)/14`) y `CoberturaEnDias`; `GET /v1/api/pv/historico` da la serie diaria por SKU con ventanas `7D|14D|1M|3M|6M`. Falta: entrada **multi-SKU** (`skus=` CSV), salida en **unidades/día** (hoy la serie es monto), y forma normalizada. Todo es aditivo sobre el mismo SQL (`SUM(INV1.Quantity)` agrupado por `ItemCode`, join `OINV` con `CANCELED='N'`).
+
+Shape a exponer al ampliar (`analysis-service`, misma BD réplica SAP):
+`GET /v1/api/sales/velocity?skus=HT-TAL-0450,…&window=30d&channel=all`
 ```json
 { "items": [ { "sku": "HT-TAL-0450", "window": "30d", "unitsPerDay": 3.2, "byChannel": [ { "channelReferenceId": "MER-001", "unitsPerDay": 1.1 } ], "asOf": "2026-07-16" } ] }
 ```
-Fallback contractual mientras no exista: el motor usa la última velocidad materializada y toda
-respuesta marca `sales.source="materialized", stale=true` (nunca dato inventado silenciosamente).
+Notas de la verificación: el "canal" en analysis es **derivado** de `WhsCode+SlpCode` (mapeo hardcodeado en controladores) — conciliarlo vía `ChannelMap` (P13); el servicio no tiene auth ni envoltorio (raw arrays) — el consumo es interno (purchase/BFF), nunca del frontend.
+Fallback contractual mientras la ampliación no esté desplegada: el motor usa la última velocidad materializada y toda respuesta marca `sales.source="materialized", stale=true`. El motor de purchase-service **adopta la misma fórmula 80/20** como cálculo materializado (deja de ser inventada: es la del negocio — cierra la parte "velocidad" de P15).
 </content>

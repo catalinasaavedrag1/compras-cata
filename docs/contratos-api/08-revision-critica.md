@@ -27,7 +27,7 @@
 
 | # | Qué confirmar | Dónde | Impacto si difiere |
 |---|---|---|---|
-| V1 | `analysis-service`: existencia/forma de venta por SKU (velocidad, margen canal, oportunidades perdidas) | repo `analysis-service` (no explorado) | Motor usa fallback materializado; vistas 33/34/37 de la matriz |
+| V1 | ~~`analysis-service`: existencia/forma de venta por SKU~~ — **VERIFICADA**: es un backend de dashboards sobre réplica SAP (`SBO_INTER_MIM`, tablas `INV1`/`OINV`, refresh por cron). **Ya calcula velocidad diaria por SKU** (`GET /v1/api/resumen-producto`: `PromedioDiario = (venta 14d ×0.8 + mismo período año anterior ×0.2)/14` + `CoberturaEnDias`) y serie diaria por SKU con ventanas (`GET /v1/api/pv/historico`, `7D..6M`). Margen por canal ✅ (`/informes/productos-por-canal-margen`); canal **derivado** de `WhsCode+SlpCode` (mapeo hardcodeado). **Sin** oportunidades perdidas ni KPIs de decisión; **sin Kafka, sin auth, sin envoltorio**. Veredicto F-EXT-1: **AMPLIAR** (multi-SKU `skus=` CSV + unidades/día), no crear | verificado en código | Motor puede adoptar la fórmula real (cierra parte de P15-velocidad); vistas 33/34 viables; 37 (venta no capturada) sigue 🆕 |
 | V2 | `trace-service`: contrato de escritura/consulta de trazas (HTTP vs Kafka, shape) | repo `trace-service` | Formato de auditoría D7; bitácora de `/gobierno` |
 | V3 | `tms-service`: capacidad/tarifas para plan de retiro | repo `tms-service` | A4.11 queda simulado hasta confirmar |
 | V4 | `document-generator-service`: subida/generación y referencia de documentos | repo | A14.6 / docs de importación |
