@@ -32,7 +32,7 @@ import {
 } from "../utils/formatters";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
-import { usePurchaseFlow } from "../context/PurchaseFlowContext";
+import { usePendingApprovalsCount } from "../hooks/useApprovals";
 import { useUrlState } from "../utils/useUrlState";
 import { ExportButton } from "../components/business/ExportButton";
 import type { PurchaseRecommendation } from "../types/purchasing";
@@ -69,7 +69,8 @@ export function ReplenishmentPage() {
   const { pathname } = useLocation();
   const { addItem, hasItem, count: draftCount } = useOcDraft();
   const toast = useToast();
-  const { approvals } = usePurchaseFlow();
+  // Aprobaciones pendientes reales (barra de proceso).
+  const pendingApprovalsCount = usePendingApprovalsCount();
 
   // Datos reales del purchase-bff-service (reemplaza los mocks de
   // recomendaciones y los overrides/ignoradas en localStorage).
@@ -218,21 +219,24 @@ export function ReplenishmentPage() {
 
   const addSelectedToOc = () => {
     const toAdd = selectedRecs.filter((r) => r.suggestedQuantity > 0 && !hasItem(r.sku));
-    toAdd.forEach((r) =>
+    // La fila trae recommendationId: la línea nace de la recomendación (D3).
+    const added = toAdd.filter((r) =>
       addItem({
         sku: r.sku,
         productName: r.productName,
         supplierName: r.supplierName,
         quantity: r.suggestedQuantity,
         unitCost: r.unitCost,
+        recommendationId: r.id,
       })
     );
     setSelected([]);
+    if (toAdd.length > 0 && added.length === 0) return;
     toast.success(
-      toAdd.length > 0
-        ? `${toAdd.length} producto${toAdd.length === 1 ? "" : "s"} agregado${toAdd.length === 1 ? "" : "s"} al borrador de OC`
+      added.length > 0
+        ? `${added.length} producto${added.length === 1 ? "" : "s"} agregado${added.length === 1 ? "" : "s"} al borrador de OC`
         : "Esos productos ya estaban en el borrador de OC",
-      toAdd.length > 0
+      added.length > 0
         ? { label: "Ver borrador OC", onClick: () => navigate("/comprar/borradores") }
         : undefined
     );
@@ -318,13 +322,16 @@ export function ReplenishmentPage() {
   };
 
   const handleAddQuantity = (r: PurchaseRecommendation, quantity: number) => {
-    addItem({
+    // r.id ES el recommendationId real del motor (hook useReplenishment).
+    const added = addItem({
       sku: r.sku,
       productName: r.productName,
       supplierName: r.supplierName,
       quantity,
       unitCost: r.unitCost,
+      recommendationId: r.id,
     });
+    if (!added) return;
     toast.success(`${r.productName} agregado al borrador de OC`, {
       label: "Ver borrador OC",
       onClick: () => navigate("/comprar/borradores"),
@@ -643,9 +650,9 @@ export function ReplenishmentPage() {
           {
             label: "Aprobación",
             detail: "Validar desvíos",
-            count: approvals.length,
+            count: pendingApprovalsCount,
             to: "/comprar/aprobaciones",
-            tone: approvals.length > 0 ? "amber" : "green",
+            tone: pendingApprovalsCount > 0 ? "amber" : "green",
           },
           {
             label: "Emitidas",

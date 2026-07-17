@@ -3,6 +3,8 @@ import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Tabs } from "../components/ui/Tabs";
 import { Button } from "../components/ui/Button";
+import { Modal } from "../components/ui/Modal";
+import { Input } from "../components/ui/Input";
 import { DateRangePicker } from "../components/ui/DateRangePicker";
 import { InfoHint } from "../components/business/InfoHint";
 import { PurchaseProcessBar } from "../components/business/PurchaseProcessBar";
@@ -11,7 +13,6 @@ import { usePickupPlan } from "../components/business/LogisticsPlan";
 import { draftBudgetImpact } from "../utils/openToBuy";
 import { purchaseOrders as mockPOs } from "../data/mockPurchaseOrders";
 import { useCollection } from "../context/DataContext";
-import { apiCreate, backendEnabled } from "../services/apiClient";
 import { recommendations } from "../data/mockRecommendations";
 import { rfqs } from "../data/mockRfq";
 import { getProductBySku, products as allProducts } from "../data/mockProducts";
@@ -23,19 +24,25 @@ import {
   OrdersKpiRow,
   OrdersTable,
   OrderDraftDrawer,
+  ProposalDraftsTable,
 } from "./PurchaseOrdersSections";
 import { buildOrderProcessStages } from "./purchaseOrders/processStages";
-import { lineNet, type OcDraftItem } from "../context/OcDraftContext";
-import { purchaseRules, resolveRuleForProduct } from "../data/mockRules";
+import { type OcDraftItem } from "../context/OcDraftContext";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
 import { usePurchaseFlow } from "../context/PurchaseFlowContext";
+import { useProposals, type ProposalActionResult } from "../hooks/useProposals";
+import { usePendingApprovalsCount } from "../hooks/useApprovals";
 import { useBuyer } from "../context/BuyerContext";
 import { useRole } from "../context/RoleContext";
-import { coverageDays, addDaysISO } from "../utils/calculations";
+import {
+  criterionLabelEs,
+  describePurchaseBffError,
+  type ProposalView,
+} from "../services/purchaseBff";
+import { coverageDays } from "../utils/calculations";
 import { inRange, type IsoRange } from "../utils/dateRange";
-import { TODAY_ISO, APPROVAL_ORDER_AMOUNT_CLP, APPROVAL_COVERAGE_DAYS } from "../utils/constants";
-import type { ApprovalCriterion } from "../data/mockApprovals";
+import { TODAY_ISO } from "../utils/constants";
 import { useLocalStorage } from "../utils/useLocalStorage";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
 import { CLOSED_ORDER_STATUSES } from "../types/purchasing";
@@ -76,21 +83,31 @@ export function PurchaseOrdersPage() {
     updateQuantity,
     updateItem,
     removeItem,
-    clear,
     addItem,
     hasItem,
+    configured: draftConfigured,
+    proposal: activeDraft,
+    refetch: refetchDraft,
   } = useOcDraft();
   const toast = useToast();
-  const { addApproval, addDecision, approvals, approvalState } = usePurchaseFlow();
+  // Mock (flujo 3): estados derivados de las OC semilla. Las aprobaciones
+  // reales del flujo 2 viven en useProposals/useApprovals.
+  const { approvals, approvalState } = usePurchaseFlow();
+  const {
+    proposals: workingProposals,
+    loading: proposalsLoading,
+    error: proposalsError,
+    refetch: refetchProposals,
+    submit: submitProposalCmd,
+    cancel: cancelProposalCmd,
+  } = useProposals();
+  const pendingApprovalsCount = usePendingApprovalsCount();
   const { buyer } = useBuyer();
   const { role } = useRole();
   const seedPOs = useCollection<PurchaseOrder>("purchase-orders", mockPOs);
 
-  // Persistente: órdenes creadas por el usuario + cambios de estado sobre las semilla
-  const [createdOrders, setCreatedOrders] = useLocalStorage<PurchaseOrder[]>(
-    "compras:po-created",
-    []
-  );
+  // Persistente (mock, flujo 3): órdenes creadas antes + cambios de estado.
+  const [createdOrders] = useLocalStorage<PurchaseOrder[]>("compras:po-created", []);
   const [statusOverrides, setStatusOverrides] = useLocalStorage<
     Record<string, PurchaseOrderStatus>
   >("compras:po-status", {});
@@ -105,9 +122,11 @@ export function PurchaseOrdersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [prodSearch, setProdSearch] = useState("");
   const [detail, setDetail] = useState<PurchaseOrder | null>(null);
-  const [createdNumber, setCreatedNumber] = useState<string | null>(null);
   const [draftContextSku, setDraftContextSku] = useState<string | null>(null);
   const [draftContextTab, setDraftContextTab] = useState("resumen");
+  // Propuesta con comando en vuelo (submit/cancel) y objetivo del modal de cancelación.
+  const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<ProposalView | null>(null);
 
   // Estado derivado de aprobación: una OC "por aprobar" pasa a "aprobada" cuando
   // todas sus líneas con solicitud quedan aprobadas (mismo número en el id APR-).
@@ -168,12 +187,13 @@ export function PurchaseOrdersPage() {
   const counts = useMemo(() => {
     return {
       all: visible.length,
-      draft: visible.filter((o) => o.status === "draft").length,
+      // Borradores = propuestas reales en trabajo (draft/in_review/changes_requested).
+      draft: workingProposals.length,
       open: visible.filter((o) => EMITTED_STATUSES.includes(o.status)).length,
       delayed: visible.filter((o) => o.status === "delayed").length,
       received: visible.filter((o) => o.status === "received" || o.status === "closed").length,
     };
-  }, [visible]);
+  }, [visible, workingProposals]);
 
   // Venta en riesgo por OC: prioriza el seguimiento por impacto comercial, no
   // solo por días de atraso (una OC con 1 día de atraso que evita un quiebre
@@ -218,11 +238,8 @@ export function PurchaseOrdersPage() {
     .filter((o) => !["received", "cancelled"].includes(o.status))
     .reduce((a, o) => a + o.totalAmount, 0);
   const delayedCount = visible.filter((o) => o.status === "delayed").length;
-  const draftCount = visible.filter((o) => o.status === "draft").length;
+  const draftCount = workingProposals.length;
   const openRfqs = rfqs.filter((r) => !["convertida", "rechazada", "vencida"].includes(r.estado));
-  const pendingApprovals = approvals.filter(
-    (a) => (approvalState[a.id] ?? "pendiente") === "pendiente"
-  );
   const emittedOrders = visible.filter((o) => EMITTED_STATUSES.includes(o.status));
   const receivingOrders = visible.filter((o) =>
     ["sent", "confirmed", "partially_received", "delayed"].includes(o.status)
@@ -332,7 +349,9 @@ export function PurchaseOrdersPage() {
     const p = getProductBySku(sku);
     if (!p) return;
     const rec = recommendations.find((r) => r.sku === sku);
-    addItem({
+    // Catálogo mock sin referencia real (recommendationId/supplierId): el
+    // contexto avisa "flujo posterior" y no simula estado local.
+    const added = addItem({
       sku: p.sku,
       productName: p.name,
       supplierName: p.supplierName || "Sin proveedor",
@@ -343,6 +362,7 @@ export function PurchaseOrdersPage() {
       unitCost: p.cost,
       discountPct: p.descuentoVigentePct,
     });
+    if (!added) return;
     toast.success(`${p.name} agregado al borrador`);
     setProdSearch("");
   };
@@ -356,7 +376,7 @@ export function PurchaseOrdersPage() {
 
   // Agrega al borrador un candidato de consolidación con su cantidad sugerida.
   const addCandidate = (supplierName: string, c: ConsolidationCandidate) => {
-    addItem({
+    const added = addItem({
       sku: c.sku,
       productName: c.productName,
       supplierName,
@@ -364,147 +384,80 @@ export function PurchaseOrdersPage() {
       unitCost: c.unitCost,
       discountPct: c.discountPct,
     });
+    if (!added) return;
     toast.success(`${c.productName} agregado — consolidado con ${supplierName}`);
   };
 
-  const createOrder = () => {
-    if (count === 0) return;
-    const buyerName = role === "lider" ? "Catalina Saavedra" : buyer;
-    const expected = meta.expectedDate || addDaysISO(TODAY_ISO, 7);
+  // --------------------------------------------------------------------------
+  //  Comandos reales sobre propuestas: enviar a revisión y cancelar.
+  //  (La conversión a OC/SAP es el flujo siguiente y NO se conecta aquí.)
+  // --------------------------------------------------------------------------
+  const notifySubmitResult = (result: ProposalActionResult) => {
+    if (result.ok) {
+      const view = result.proposal;
+      if (view.status === "approved") {
+        toast.success("Propuesta aprobada automáticamente (sin criterios)");
+      } else {
+        const labels = [
+          ...new Set((view.approval?.criteria ?? []).map((c) => criterionLabelEs(c.code).toLowerCase())),
+        ];
+        toast.success(
+          labels.length > 0
+            ? `Enviada a revisión — criterios: ${labels.join(", ")}`
+            : "Enviada a revisión",
+          { label: "Ver aprobaciones", onClick: () => navigate("/comprar/aprobaciones") }
+        );
+      }
+      return;
+    }
+    const info = result.error;
+    if (info.code === "VERSION_CONFLICT" || info.code === "CONFLICT") {
+      toast.warning("La propuesta cambió en otra sesión; se recargó la lista");
+    } else {
+      toast.error(describePurchaseBffError(info));
+    }
+  };
 
-    // Una orden de compra por proveedor (una OC no mezcla proveedores).
-    const groups = new Map<string, OcDraftItem[]>();
-    items.forEach((i) => {
-      const arr = groups.get(i.supplierName) ?? [];
-      arr.push(i);
-      groups.set(i.supplierName, arr);
-    });
+  const submitProposalRow = async (p: ProposalView) => {
+    setProposalBusyId(p.id);
+    const result = await submitProposalCmd(p.id, p.version);
+    setProposalBusyId(null);
+    notifySubmitResult(result);
+    if (result.ok) refetchDraft();
+  };
 
-    const created: PurchaseOrder[] = [];
-    let approvalsCreated = 0;
-    let seq = 0;
+  /** Envía a revisión el borrador activo desde el drawer. */
+  const submitActiveDraft = async () => {
+    if (!activeDraft || count === 0) return;
+    setProposalBusyId(activeDraft.id);
+    const result = await submitProposalCmd(activeDraft.id, activeDraft.version);
+    setProposalBusyId(null);
+    notifySubmitResult(result);
+    if (result.ok) {
+      refetchDraft();
+      setDrawerOpen(false);
+      setTab("draft");
+    }
+  };
 
-    groups.forEach((groupItems, supplierName) => {
-      const num = `OC-2026-${String(143 + createdOrders.length + seq).padStart(4, "0")}`;
-      seq++;
-      let orderApprovals = 0;
-
-      // "Monto alto" es a nivel de OC (política de Gobierno: OC sobre $10M),
-      // no por línea: se evalúa contra el total neto de la orden.
-      const grossGroup = groupItems.reduce((a, i) => a + i.quantity * i.unitCost, 0);
-      const netGroup = groupItems.reduce((a, i) => a + lineNet(i), 0);
-      const montoAltoOC = netGroup >= APPROVAL_ORDER_AMOUNT_CLP;
-
-      groupItems.forEach((i, idx) => {
-        const rec = recommendations.find((r) => r.sku === i.sku);
-        const p = getProductBySku(i.sku);
-        const suggested = rec?.suggestedQuantity ?? i.quantity;
-        const diff = i.quantity - suggested;
-        const diffPct = suggested > 0 ? Math.abs(diff / suggested) : i.quantity > 0 ? 1 : 0;
-
-        const rule = p ? resolveRuleForProduct(p, purchaseRules) : null;
-        const objetivo = rule?.targetInventoryDays ?? 45;
-        const coverAfter =
-          p && p.salesLast30Days > 0
-            ? coverageDays(p.availableStock + i.quantity, p.salesLast30Days)
-            : 0;
-        const margin = p ? p.margin : 100;
-        const minMargin = rule?.minMargin ?? 0;
-        const lineAmount = lineNet(i);
-
-        const criteria: ApprovalCriterion[] = [];
-        if (suggested === 0 || diffPct > 0.2) criteria.push("desvio_sugerido");
-        if (montoAltoOC) criteria.push("monto_alto");
-        if (coverAfter > APPROVAL_COVERAGE_DAYS) criteria.push("cobertura_excesiva");
-        if (margin < minMargin) criteria.push("margen_bajo");
-
-        addDecision({
-          id: `DEC-${num}-${idx}`,
-          date: TODAY_ISO,
-          sku: i.sku,
-          productName: i.productName,
-          supplierName: i.supplierName,
-          buyerName,
-          approvedBy: criteria.length > 0 ? "Pendiente" : "—",
-          suggestedQty: suggested,
-          purchasedQty: i.quantity,
-          unitCost: i.unitCost,
-          reason:
-            criteria.length > 0
-              ? `Desvío vs sugerido en ${num}`
-              : `Compra alineada al sugerido (${num})`,
-          resultDays: 0,
-          outcome: "pendiente",
-          resultText: `Compra recién creada en ${num}. Resultado en medición.`,
-          learning: "—",
-        });
-
-        if (criteria.length > 0) {
-          orderApprovals++;
-          approvalsCreated++;
-          addApproval({
-            id: `APR-${num}-${idx}`,
-            date: TODAY_ISO,
-            sku: i.sku,
-            productName: i.productName,
-            supplierName: i.supplierName,
-            buyerName,
-            suggestedQty: suggested,
-            requestedQty: i.quantity,
-            unitCost: i.unitCost,
-            amount: lineAmount,
-            coberturaResultante: Math.round(coverAfter),
-            coberturaObjetivo: objetivo,
-            margin: Math.round(margin),
-            minMargin,
-            criteria,
-            justification: "Pendiente de justificar por el comprador",
-          });
-        }
-      });
-
-      const effDisc = grossGroup > 0 ? Math.round(((grossGroup - netGroup) / grossGroup) * 100) : 0;
-
-      const newOrder: PurchaseOrder = {
-        id: `PO-${num}`,
-        number: num,
-        supplierName,
-        createdAt: TODAY_ISO,
-        expectedDate: expected,
-        status: orderApprovals > 0 ? "pending_approval" : "draft",
-        totalAmount: netGroup,
-        skuCount: groupItems.length,
-        destinationWarehouse: meta.destinationWarehouse,
-        paymentTerms: meta.paymentTerms,
-        comments: meta.notes || undefined,
-        discountPct: effDisc || undefined,
-        buyerName,
-        delayedDays: 0,
-        lines: groupItems.map((i) => ({
-          sku: i.sku,
-          productName: i.productName,
-          quantity: i.quantity,
-          unitCost: i.unitCost,
-        })),
-      };
-      created.push(newOrder);
-      if (backendEnabled) apiCreate("purchase-orders", newOrder).catch(() => {});
-    });
-
-    setCreatedOrders((prev) => [...created, ...prev]);
-    const numbers = created.map((o) => o.number).join(", ");
-    setCreatedNumber(numbers);
-    clear();
-    setDrawerOpen(false);
-    setTab("draft");
-    const n = created.length;
-    toast.success(
-      `${n} borrador${n === 1 ? "" : "es"} creado${n === 1 ? "" : "s"} (${numbers})` +
-        (approvalsCreated > 0 ? ` · ${approvalsCreated} línea(s) requieren aprobación` : ""),
-      approvalsCreated > 0
-        ? { label: "Ver aprobaciones", onClick: () => navigate("/comprar/aprobaciones") }
-        : undefined
-    );
+  const confirmCancelProposal = async (reason: string) => {
+    if (!cancelTarget) return;
+    setProposalBusyId(cancelTarget.id);
+    const result = await cancelProposalCmd(cancelTarget.id, cancelTarget.version, reason);
+    setProposalBusyId(null);
+    if (result.ok) {
+      toast.info("Propuesta cancelada");
+      setCancelTarget(null);
+      refetchDraft();
+      return;
+    }
+    const info = result.error;
+    if (info.code === "VERSION_CONFLICT" || info.code === "CONFLICT") {
+      toast.warning("La propuesta cambió en otra sesión; se recargó la lista");
+      setCancelTarget(null);
+    } else {
+      toast.error(describePurchaseBffError(info));
+    }
   };
 
 
@@ -560,27 +513,12 @@ export function PurchaseOrdersPage() {
           draftCount: count,
           pathname,
           pickupPlan,
-          pendingCount: pendingApprovals.length,
+          pendingCount: pendingApprovalsCount,
           ordersCount: visible.length,
           emittedCount: emittedOrders.length,
           receivingOrders,
         })}
       />
-
-      {createdNumber && (
-        <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-center justify-between gap-3">
-          <p className="text-sm text-emerald-800">
-            Borrador <span className="font-semibold">{createdNumber}</span> creado correctamente.
-            Puedes revisarlo en la pestaña Borradores.
-          </p>
-          <button
-            onClick={() => setCreatedNumber(null)}
-            className="text-xs font-medium text-emerald-700 hover:text-emerald-900"
-          >
-            Cerrar
-          </button>
-        </div>
-      )}
 
       {count > 0 && (
         <DraftSummaryCard
@@ -616,19 +554,35 @@ export function PurchaseOrdersPage() {
         </div>
       </div>
 
-      <OrdersTable
-        orders={filtered}
-        riskOf={(id) => riskByOrder.get(id)}
-        tab={tab}
-        onOpenDetail={setDetail}
-      />
+      {tab === "draft" ? (
+        // Pestaña Borradores: propuestas reales (draft / en revisión / observadas).
+        <ProposalDraftsTable
+          proposals={workingProposals}
+          loading={proposalsLoading}
+          error={proposalsError}
+          configured={draftConfigured}
+          busyId={proposalBusyId}
+          onRetry={refetchProposals}
+          onSubmit={(p) => void submitProposalRow(p)}
+          onCancel={setCancelTarget}
+        />
+      ) : (
+        <OrdersTable
+          orders={filtered}
+          riskOf={(id) => riskByOrder.get(id)}
+          tab={tab}
+          onOpenDetail={setDetail}
+        />
+      )}
 
-      {/* Editor del borrador de orden de compra */}
+      {/* Editor del borrador de propuesta de compra */}
       <OrderDraftDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         navigate={navigate}
-        createOrder={createOrder}
+        onSubmitDraft={() => void submitActiveDraft()}
+        submitting={activeDraft !== null && proposalBusyId === activeDraft.id}
+        configured={draftConfigured}
         count={count}
         supplierGroups={supplierGroups}
         subtotal={subtotal}
@@ -657,6 +611,63 @@ export function PurchaseOrdersPage() {
       />
 
       <OcDetailModal detail={detail} onClose={closeDetail} onMarkSent={markAsSent} />
+
+      {cancelTarget && (
+        <CancelProposalModal
+          proposal={cancelTarget}
+          busy={proposalBusyId === cancelTarget.id}
+          onClose={() => setCancelTarget(null)}
+          onConfirm={(reason) => void confirmCancelProposal(reason)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Modal de cancelación de propuesta: el motivo es obligatorio (auditable). */
+function CancelProposalModal({
+  proposal,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  proposal: ProposalView;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const trimmed = reason.trim();
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      title="Cancelar propuesta"
+      description={proposal.title ?? proposal.id}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Volver
+          </Button>
+          <Button disabled={!trimmed || busy} onClick={() => onConfirm(trimmed)}>
+            {busy ? "Cancelando…" : "Cancelar propuesta"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-slate-600">
+          La propuesta queda cancelada y sus líneas dejan de estar en trabajo. Esta acción queda
+          trazada con su motivo.
+        </p>
+        <Input
+          label="Motivo (obligatorio)"
+          placeholder="Ej: compra postergada al próximo mes…"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </div>
+    </Modal>
   );
 }

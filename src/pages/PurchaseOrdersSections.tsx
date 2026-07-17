@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Modal } from "../components/ui/Modal";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Badge } from "../components/ui/Badge";
+import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { Drawer } from "../components/ui/Drawer";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
@@ -30,7 +30,9 @@ import {
   IconClose,
   IconTruck,
 } from "../components/ui/icons";
+import { Skeleton } from "../components/ui/Skeleton";
 import { lineNet, type OcDraftItem, type OcDraftMeta } from "../context/OcDraftContext";
+import type { ProposalStatus, ProposalView, PurchaseBffError } from "../services/purchaseBff";
 import { getProductBySku, products as allProducts } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
 import {
@@ -611,6 +613,220 @@ export function OrdersTable({
   );
 }
 
+// ----------------------------------------------------------------------------
+//  Pestaña Borradores: propuestas reales del purchase-bff-service
+// ----------------------------------------------------------------------------
+
+/** Estado de la propuesta → Badge en español. */
+export const PROPOSAL_STATUS_META: Record<string, { label: string; tone: BadgeTone }> = {
+  draft: { label: "Borrador", tone: "amber" },
+  in_review: { label: "En revisión", tone: "blue" },
+  changes_requested: { label: "Con observaciones", tone: "violet" },
+  approved: { label: "Aprobada", tone: "green" },
+  rejected: { label: "Rechazada", tone: "red" },
+  cancelled: { label: "Cancelada", tone: "neutral" },
+  converted: { label: "Convertida", tone: "green" },
+};
+
+export function proposalStatusMeta(status: ProposalStatus) {
+  return PROPOSAL_STATUS_META[status] ?? { label: status, tone: "neutral" as const };
+}
+
+/** Estados desde los que se puede enviar a revisión. */
+const SUBMITTABLE_STATUSES: ProposalStatus[] = ["draft", "changes_requested"];
+/** Estados desde los que se puede cancelar (flujo 2: sin approved/converted). */
+const CANCELLABLE_STATUSES: ProposalStatus[] = ["draft", "changes_requested", "in_review"];
+
+/**
+ * Tabla de propuestas en trabajo (borrador / en revisión / con observaciones)
+ * con acciones Enviar a revisión y Cancelar. Reemplaza el listado mock de OCs
+ * en la pestaña Borradores.
+ */
+export function ProposalDraftsTable({
+  proposals,
+  loading,
+  error,
+  configured,
+  busyId,
+  onRetry,
+  onSubmit,
+  onCancel,
+}: {
+  proposals: ProposalView[];
+  loading: boolean;
+  error: PurchaseBffError | null;
+  configured: boolean;
+  busyId: string | null;
+  onRetry: () => void;
+  onSubmit: (p: ProposalView) => void;
+  onCancel: (p: ProposalView) => void;
+}) {
+  if (!configured) {
+    return (
+      <Card>
+        <div className="p-6 text-center">
+          <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+            ver las propuestas de compra reales.
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
+  if (loading && proposals.length === 0) {
+    return (
+      <Card>
+        <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando propuestas">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  }
+
+  if (error && proposals.length === 0) {
+    return (
+      <Card>
+        <div className="p-6 text-center">
+          <p className="text-sm font-semibold text-slate-800">
+            No se pudieron cargar las propuestas
+          </p>
+          <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+          <Button className="mt-4" onClick={onRetry}>
+            Reintentar
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  const columns: Column<ProposalView>[] = [
+    {
+      key: "title",
+      header: "Propuesta",
+      render: (p) => (
+        <div className="min-w-[180px]">
+          <p className="font-medium text-slate-800">{p.title ?? "Borrador de compra"}</p>
+          <p className="text-xs text-slate-400 font-mono">{p.id}</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Estado",
+      render: (p) => {
+        const meta = proposalStatusMeta(p.status);
+        return <Badge tone={meta.tone}>{meta.label}</Badge>;
+      },
+    },
+    {
+      key: "lines",
+      header: "Líneas",
+      align: "right",
+      hideOnMobile: true,
+      render: (p) => formatNumber(p.lineCount ?? 0),
+    },
+    {
+      key: "suppliers",
+      header: "Proveedores",
+      align: "right",
+      hideOnMobile: true,
+      render: (p) => formatNumber(p.supplierCount ?? 0),
+    },
+    {
+      key: "net",
+      header: "Neto",
+      align: "right",
+      render: (p) => (
+        <span className="font-semibold text-slate-900">
+          {formatCurrency(p.netTotalClp ?? p.totals?.netClp ?? 0)}
+        </span>
+      ),
+    },
+    {
+      key: "updated",
+      header: "Actualizada",
+      hideOnMobile: true,
+      render: (p) => (
+        <span className="text-sm text-slate-600">
+          {p.updatedAt ? formatDate(p.updatedAt.slice(0, 10)) : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (p) => {
+        const busy = busyId === p.id;
+        return (
+          <div className="flex justify-end gap-2">
+            {SUBMITTABLE_STATUSES.includes(p.status) && (
+              <Button size="sm" disabled={busy} onClick={() => onSubmit(p)}>
+                {busy ? "Enviando…" : "Enviar a revisión"}
+              </Button>
+            )}
+            {CANCELLABLE_STATUSES.includes(p.status) && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => onCancel(p)}>
+                Cancelar
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  return (
+    <Card>
+      <DataTable
+        columns={columns}
+        data={proposals}
+        rowKey={(p) => p.id}
+        emptyMessage="Sin propuestas en borrador. Agrega productos desde Reposición sugerida para crear una."
+        mobileCard={(p) => {
+          const meta = proposalStatusMeta(p.status);
+          const busy = busyId === p.id;
+          return (
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-800 truncate">
+                    {p.title ?? "Borrador de compra"}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {formatNumber(p.lineCount ?? 0)} líneas ·{" "}
+                    {formatCurrencyCompact(p.netTotalClp ?? p.totals?.netClp ?? 0)}
+                  </p>
+                </div>
+                <Badge tone={meta.tone}>{meta.label}</Badge>
+              </div>
+              <div className="mt-2 flex gap-2">
+                {SUBMITTABLE_STATUSES.includes(p.status) && (
+                  <Button size="sm" disabled={busy} onClick={() => onSubmit(p)}>
+                    {busy ? "Enviando…" : "Enviar a revisión"}
+                  </Button>
+                )}
+                {CANCELLABLE_STATUSES.includes(p.status) && (
+                  <Button size="sm" variant="ghost" disabled={busy} onClick={() => onCancel(p)}>
+                    Cancelar
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        }}
+      />
+    </Card>
+  );
+}
+
 const WAREHOUSES = [
   "Centro de Distribución",
   "Bodega Santiago",
@@ -635,7 +851,9 @@ export function OrderDraftDrawer({
   open,
   onClose,
   navigate,
-  createOrder,
+  onSubmitDraft,
+  submitting,
+  configured,
   count,
   supplierGroups,
   subtotal,
@@ -665,7 +883,9 @@ export function OrderDraftDrawer({
   open: boolean;
   onClose: () => void;
   navigate: (to: string) => void;
-  createOrder: () => void;
+  onSubmitDraft: () => void;
+  submitting: boolean;
+  configured: boolean;
   count: number;
   supplierGroups: [string, OcDraftItem[]][];
   subtotal: number;
@@ -696,20 +916,28 @@ export function OrderDraftDrawer({
     <Drawer
       open={open}
       onClose={onClose}
-      title="Borrador de orden de compra"
-      description="Agrega productos, ajusta cantidad, costo y descuento, completa los datos y genera la OC."
+      title="Borrador de propuesta de compra"
+      description="Agrega productos, ajusta cantidades y envía la propuesta a revisión."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cerrar
           </Button>
-          <Button onClick={createOrder} disabled={count === 0}>
-            {supplierGroups.length > 1 ? `Crear ${supplierGroups.length} OC` : "Crear borrador"} ·{" "}
-            {formatCurrency(totalAmount)}
+          <Button onClick={onSubmitDraft} disabled={count === 0 || submitting || !configured}>
+            {submitting ? "Enviando…" : "Enviar a revisión"} · {formatCurrency(totalAmount)}
           </Button>
         </>
       }
     >
+      {!configured ? (
+        <div className="p-6 text-center">
+          <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+            trabajar el borrador real de la propuesta de compra.
+          </p>
+        </div>
+      ) : (
       <div className="space-y-4">
         {/* Buscar y agregar cualquier producto */}
         <div>
@@ -1039,6 +1267,7 @@ export function OrderDraftDrawer({
           </div>
         )}
       </div>
+      )}
     </Drawer>
   );
 }

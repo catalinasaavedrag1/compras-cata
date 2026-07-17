@@ -3,7 +3,7 @@ import type { BadgeTone } from "../ui/Badge";
 import type { NavBadgeKey } from "./navItems";
 import { alerts } from "../../data/mockAlerts";
 import { leaderAlerts } from "../../data/mockLeaderAlerts";
-import { usePurchaseFlow } from "../../context/PurchaseFlowContext";
+import { usePendingApprovalsCount } from "../../hooks/useApprovals";
 import { useSignals } from "../../context/SignalsContext";
 
 export interface NavBadge {
@@ -17,7 +17,8 @@ export interface NavBadge {
 //  desde la navegación, sin entrar a cada módulo.
 // ============================================================================
 export function useNavBadges(): Record<NavBadgeKey, NavBadge> {
-  const { pendingApprovalsCount } = usePurchaseFlow();
+  // Conteo real de aprobaciones pendientes (degrada en silencio a 0).
+  const pendingApprovalsCount = usePendingApprovalsCount();
   const { signals } = useSignals();
 
   return useMemo(() => {
