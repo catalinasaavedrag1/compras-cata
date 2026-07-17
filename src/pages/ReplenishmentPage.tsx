@@ -16,7 +16,6 @@ import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { IconReplenish, IconAlerts, IconPlus, IconClose, IconInfo } from "../components/ui/icons";
 import { PageSkeleton } from "../components/ui/Skeleton";
-import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { rfqs } from "../data/mockRfq";
 import { suppliers } from "../data/mockSuppliers";
 import { monthlyPurchaseBudget } from "../data/mockRules";
@@ -37,6 +36,8 @@ import { useUrlState } from "../utils/useUrlState";
 import { ExportButton } from "../components/business/ExportButton";
 import type { PurchaseRecommendation } from "../types/purchasing";
 import { isHiddenByDefault, useReplenishment } from "../hooks/useReplenishment";
+import { ACTIVE_PO_STATUSES, usePurchaseOrders } from "../hooks/usePurchaseOrders";
+import { TODAY_ISO } from "../utils/constants";
 import type { PurchaseBffError } from "../services/purchaseBff";
 
 import type { DecisionViewMode, OpenPoSignal } from "./replenishment/types";
@@ -76,6 +77,10 @@ export function ReplenishmentPage() {
   // recomendaciones y los overrides/ignoradas en localStorage).
   const { rows, meta, warnings, loading, error, configured, refetch, applyAction } =
     useReplenishment();
+
+  // OC reales (flujo 3): señal "OC abierta" por SKU y contadores de la barra de
+  // proceso. Con líneas de las OC activas; sin polling SAP en esta vista.
+  const { orders: purchaseOrderViews } = usePurchaseOrders({ withLinesForActive: true });
 
   // Estado de UI
   const [selected, setSelected] = useState<string[]>([]);
@@ -140,11 +145,14 @@ export function ReplenishmentPage() {
   const urgentRecs = visible.filter((r) => r.status === "critical" || r.status === "buy_now");
   const topDecision = urgentRecs[0] ?? visible[0];
   const openRfqs = rfqs.filter((r) => !["convertida", "rechazada", "vencida"].includes(r.estado));
-  const emittedOrders = purchaseOrders.filter((o) =>
-    ["sent", "confirmed", "partially_received", "with_difference"].includes(o.status)
+  // OC reales emitidas / por recibir (barra de proceso). En el contrato real el
+  // atraso no es un estado: se deriva de la fecha esperada vencida.
+  const emittedOrders = purchaseOrderViews.filter((o) =>
+    ["sent", "confirmed", "partially_received"].includes(o.status)
   );
-  const receivingOrders = purchaseOrders.filter((o) =>
-    ["sent", "confirmed", "partially_received", "delayed"].includes(o.status)
+  const receivingOrders = emittedOrders;
+  const hasDelayedReceiving = receivingOrders.some(
+    (o) => o.expectedDate !== null && o.expectedDate.slice(0, 10) < TODAY_ISO
   );
 
   // Resumen (sobre lo visible, no ignoradas)
@@ -168,33 +176,26 @@ export function ReplenishmentPage() {
       ? "bg-amber-500"
       : "bg-emerald-500";
 
+  // Señal "OC abierta" por SKU desde las OC reales aún activas (las líneas
+  // vienen del detalle que trae el hook para las OC activas).
   const openPoBySku = useMemo(() => {
-    const activeStatuses = [
-      "draft",
-      "pending_approval",
-      "approved",
-      "sent",
-      "confirmed",
-      "partially_received",
-      "delayed",
-    ];
     const map = new Map<string, OpenPoSignal>();
-    purchaseOrders
-      .filter((order) => activeStatuses.includes(order.status))
+    purchaseOrderViews
+      .filter((order) => ACTIVE_PO_STATUSES.includes(order.status))
       .forEach((order) => {
         order.lines?.forEach((line) => {
           if (!map.has(line.sku)) {
             map.set(line.sku, {
               number: order.number,
-              quantity: line.quantity,
-              expectedDate: order.expectedDate,
+              quantity: line.qty,
+              expectedDate: order.expectedDate?.slice(0, 10) ?? null,
               status: order.status,
             });
           }
         });
       });
     return map;
-  }, []);
+  }, [purchaseOrderViews]);
 
   const supplierGroups = useMemo(
     () => buildDecisionGroups(filtered, (r) => r.supplierName, openPoBySku),
@@ -493,7 +494,8 @@ export function ReplenishmentPage() {
           <div className="text-xs">
             <Badge tone="blue">OC abierta</Badge>
             <p className="mt-1 text-slate-500">
-              {formatNumber(openPo.quantity)} u. · {openPo.expectedDate}
+              {formatNumber(openPo.quantity)} u. ·{" "}
+              {openPo.expectedDate ?? "entrega por confirmar"}
             </p>
           </div>
         );
@@ -666,7 +668,7 @@ export function ReplenishmentPage() {
             detail: "Seguimiento y recepción",
             count: receivingOrders.length,
             to: "/comprar/recepciones",
-            tone: receivingOrders.some((o) => o.status === "delayed") ? "red" : "blue",
+            tone: hasDelayedReceiving ? "red" : "blue",
           },
         ]}
       />

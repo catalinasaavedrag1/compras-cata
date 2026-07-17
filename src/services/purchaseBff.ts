@@ -239,6 +239,108 @@ export interface ApprovalListData {
 
 export type ApprovalAction = "approve" | "reject" | "request-changes";
 
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Órdenes de compra y sincronización SAP (F6/F7)
+// ----------------------------------------------------------------------------
+
+/** Estados de sincronización SAP (05-integracion-sap §6). */
+export type SapSyncStatus =
+  | "pending"
+  | "processing"
+  | "posted"
+  | "failed"
+  | "rejected"
+  | "cancelled";
+
+/** Única ventana a SAP expuesta al frontend (bloque sapSync saneado del BFF). */
+export interface SapSyncView {
+  status: SapSyncStatus | null;
+  docEntry: number | string | null;
+  docNum: number | string | null;
+  attempts: number;
+  lastError: string | null;
+  postedAt: string | null;
+}
+
+/** Estados de negocio de una OC del dominio purchase-service. */
+export type PurchaseOrderBffStatus =
+  | "approved"
+  | "sent"
+  | "confirmed"
+  | "partially_received"
+  | "received"
+  | "closed"
+  | "cancelled";
+
+export interface PurchaseOrderLineView {
+  lineId: string;
+  proposalLineId: string | null;
+  sku: string;
+  skuName: string | null;
+  categoryId: string | null;
+  qty: number;
+  unitCostClp: number | null;
+  landedUnitCostClp: number | null;
+  subtotalClp: number | null;
+  qtyReceivedTotal: number | null;
+}
+
+/** OC en vista BFF (toPurchaseOrderResponse + sapSync saneado). */
+export interface PurchaseOrderView {
+  id: string;
+  number: string;
+  proposalId: string | null;
+  approvalId: string | null;
+  buyerId: string | null;
+  supplierId: string | null;
+  sapCardCode: string | null;
+  status: PurchaseOrderBffStatus;
+  version: number;
+  netTotalClp: number | null;
+  landedTotalClp: number | null;
+  currency: string | null;
+  expectedDate: string | null;
+  sentAt: string | null;
+  closedAt: string | null;
+  cancelReason: string | null;
+  otbBucketId?: string | null;
+  /** Solo presente en el detalle (la lista viene sin líneas). */
+  lines?: PurchaseOrderLineView[];
+  sapSync?: SapSyncView | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PurchaseOrderListData {
+  items: PurchaseOrderView[];
+  meta: BffPageMeta;
+}
+
+/** GET /purchase-orders/:id/sap-status — polling liviano (nunca cacheado). */
+export interface SapStatusData {
+  purchaseOrderId: string;
+  sapSync: SapSyncView | null;
+}
+
+/** OC resumida que devuelve el convert (C13). */
+export interface ConvertedPurchaseOrderView {
+  id: string;
+  number: string;
+  supplierId: string | null;
+  sapCardCode?: string | null;
+  status: string;
+  netTotalClp: number | null;
+  landedTotalClp?: number | null;
+  sapSync?: SapSyncView | null;
+}
+
+/** Respuesta de POST /proposals/:id/convert (202). */
+export interface ConvertResultView {
+  proposalId: string;
+  status: "converted";
+  purchaseOrders: ConvertedPurchaseOrderView[];
+}
+
 /** GET /context: sesión, permisos purchase:* y cartera asignada. */
 export interface PurchaseContextData {
   userId: string;
@@ -372,6 +474,15 @@ export function describePurchaseBffError(info: PurchaseBffError): string {
     }
     case "PURCHASE_PROPOSAL_INVALID_STATE":
       return "La propuesta cambió de estado y esta acción ya no aplica.";
+    case "PURCHASE_ORDER_INVALID_STATE":
+      return "La orden de compra cambió de estado y esta acción ya no aplica.";
+    case "SAP_VALIDATION_ERROR": {
+      const lastError =
+        detailString(d.lastError) || detailString(d.sapMessage) || detailString(d.message);
+      return lastError
+        ? `SAP rechazó el documento: ${lastError}`
+        : "SAP rechazó el documento de compra; corrige los datos y reintenta el envío.";
+    }
     case "VERSION_CONFLICT":
       return "El registro cambió en otra sesión; se recargaron los datos.";
     case "FORBIDDEN":
@@ -622,6 +733,79 @@ export function submitProposal(id: string, version: number): Promise<ProposalVie
 /** POST /proposals/:id/cancel — cancela con motivo (🔑 + If-Match). */
 export function cancelProposal(id: string, version: number, reason: string): Promise<ProposalView> {
   return request<ProposalView>(`/proposals/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency(), ...ifMatch(version) },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/**
+ * POST /proposals/:id/convert — convierte la propuesta aprobada en OC reales
+ * (una por proveedor) y encola su envío a SAP (🔑 + If-Match). Responde 202.
+ */
+export function convertProposal(id: string, version: number): Promise<ConvertResultView> {
+  return request<ConvertResultView>(`/proposals/${encodeURIComponent(id)}/convert`, {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency(), ...ifMatch(version) },
+    body: JSON.stringify({}),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Órdenes de compra y sincronización SAP
+// ----------------------------------------------------------------------------
+
+/** GET /purchase-orders?status=&page=&pageSize= — lista (sin líneas). */
+export function listPurchaseOrders(params: {
+  status?: PurchaseOrderBffStatus;
+  page?: number;
+  pageSize?: number;
+}): Promise<PurchaseOrderListData> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 24));
+  return request<PurchaseOrderListData>(`/purchase-orders?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /purchase-orders/:id — detalle con líneas y bloque sapSync. */
+export function getPurchaseOrder(id: string): Promise<PurchaseOrderView> {
+  return request<PurchaseOrderView>(`/purchase-orders/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /purchase-orders/:id/sap-status — polling liviano de sincronización. */
+export function getSapStatus(id: string): Promise<SapStatusData> {
+  return request<SapStatusData>(`/purchase-orders/${encodeURIComponent(id)}/sap-status`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/**
+ * POST /purchase-orders/:id/send — envía la OC al proveedor y re-encola el
+ * job SAP si estaba en `failed` (🔑 + If-Match). Responde 202.
+ */
+export function sendPurchaseOrder(id: string, version: number): Promise<PurchaseOrderView> {
+  return request<PurchaseOrderView>(`/purchase-orders/${encodeURIComponent(id)}/send`, {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency(), ...ifMatch(version) },
+    body: JSON.stringify({}),
+  });
+}
+
+/** POST /purchase-orders/:id/cancel — cancela con motivo (🔑 + If-Match). */
+export function cancelPurchaseOrder(
+  id: string,
+  version: number,
+  reason: string
+): Promise<PurchaseOrderView> {
+  return request<PurchaseOrderView>(`/purchase-orders/${encodeURIComponent(id)}/cancel`, {
     method: "POST",
     headers: { ...baseHeaders(), ...idempotency(), ...ifMatch(version) },
     body: JSON.stringify({ reason }),

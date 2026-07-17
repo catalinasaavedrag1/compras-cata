@@ -37,8 +37,8 @@ export interface BuyingAlertInput {
   /** Unidades en tránsito consideradas. */
   incoming?: number;
   salesLast30Days: number;
-  /** OC abierta para el SKU, si existe. */
-  openPo?: { number: string; quantity: number; expectedDate: string; status: string };
+  /** OC abierta para el SKU, si existe (las OC reales pueden no traer fecha). */
+  openPo?: { number: string; quantity: number; expectedDate: string | null; status: string };
 }
 
 function fmtM3(n: number): string {
@@ -84,9 +84,11 @@ export function buildBuyingAlerts(input: BuyingAlertInput): BuyingAlert[] {
       id: "open-po",
       tone: delayed ? "warn" : "info",
       title: `Ya existe una OC abierta para este SKU (${input.openPo.number})`,
-      detail: `${formatNumber(input.openPo.quantity)} u. con entrega esperada ${input.openPo.expectedDate}${
-        delayed ? " · actualmente atrasada" : ""
-      }. Evita duplicar la compra.`,
+      detail: `${formatNumber(input.openPo.quantity)} u.${
+        input.openPo.expectedDate
+          ? ` con entrega esperada ${input.openPo.expectedDate}`
+          : " con entrega por confirmar"
+      }${delayed ? " · actualmente atrasada" : ""}. Evita duplicar la compra.`,
     });
   }
 

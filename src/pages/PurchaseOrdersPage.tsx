@@ -11,15 +11,13 @@ import { PurchaseProcessBar } from "../components/business/PurchaseProcessBar";
 import { IconPlus } from "../components/ui/icons";
 import { usePickupPlan } from "../components/business/LogisticsPlan";
 import { draftBudgetImpact } from "../utils/openToBuy";
-import { purchaseOrders as mockPOs } from "../data/mockPurchaseOrders";
-import { useCollection } from "../context/DataContext";
 import { recommendations } from "../data/mockRecommendations";
 import { rfqs } from "../data/mockRfq";
 import { getProductBySku, products as allProducts } from "../data/mockProducts";
 import { suppliers as mockSuppliers } from "../data/mockSuppliers";
 import { orderSalesAtRisk, type ConsolidationCandidate } from "../utils/orderConsolidation";
 import {
-  OcDetailModal,
+  OrderDetailModal,
   DraftSummaryCard,
   OrdersKpiRow,
   OrdersTable,
@@ -30,11 +28,17 @@ import { buildOrderProcessStages } from "./purchaseOrders/processStages";
 import { type OcDraftItem } from "../context/OcDraftContext";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
-import { usePurchaseFlow } from "../context/PurchaseFlowContext";
-import { useProposals, type ProposalActionResult } from "../hooks/useProposals";
+import {
+  useProposals,
+  type ProposalActionResult,
+  type ProposalConvertResult,
+} from "../hooks/useProposals";
+import {
+  toPurchaseOrderRow,
+  usePurchaseOrders,
+  type PurchaseOrderRow,
+} from "../hooks/usePurchaseOrders";
 import { usePendingApprovalsCount } from "../hooks/useApprovals";
-import { useBuyer } from "../context/BuyerContext";
-import { useRole } from "../context/RoleContext";
 import {
   criterionLabelEs,
   describePurchaseBffError,
@@ -43,8 +47,7 @@ import {
 import { coverageDays } from "../utils/calculations";
 import { inRange, type IsoRange } from "../utils/dateRange";
 import { TODAY_ISO } from "../utils/constants";
-import { useLocalStorage } from "../utils/useLocalStorage";
-import type { PurchaseOrder, PurchaseOrderStatus } from "../types/purchasing";
+import type { PurchaseOrderStatus } from "../types/purchasing";
 import { CLOSED_ORDER_STATUSES } from "../types/purchasing";
 
 /** Días desde hoy hasta una fecha ISO (negativo si ya pasó). */
@@ -69,6 +72,17 @@ const EMITTED_STATUSES: PurchaseOrderStatus[] = [
   "with_difference",
 ];
 
+// Pestaña Seguimiento: OC recién convertidas (approved, viajando a SAP) + emitidas.
+const OPEN_STATUSES: PurchaseOrderStatus[] = ["approved", ...EMITTED_STATUSES];
+
+/** Códigos de conflicto de estado/versión que ameritan recargar la lista. */
+const CONFLICT_CODES = [
+  "VERSION_CONFLICT",
+  "CONFLICT",
+  "PURCHASE_PROPOSAL_INVALID_STATE",
+  "PURCHASE_ORDER_INVALID_STATE",
+];
+
 export function PurchaseOrdersPage() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -90,9 +104,6 @@ export function PurchaseOrdersPage() {
     refetch: refetchDraft,
   } = useOcDraft();
   const toast = useToast();
-  // Mock (flujo 3): estados derivados de las OC semilla. Las aprobaciones
-  // reales del flujo 2 viven en useProposals/useApprovals.
-  const { approvals, approvalState } = usePurchaseFlow();
   const {
     proposals: workingProposals,
     loading: proposalsLoading,
@@ -100,17 +111,19 @@ export function PurchaseOrdersPage() {
     refetch: refetchProposals,
     submit: submitProposalCmd,
     cancel: cancelProposalCmd,
+    convert: convertProposalCmd,
   } = useProposals();
+  // OC reales del comprador (flujo 3), con polling de sincronización SAP.
+  const {
+    orders: orderViews,
+    loading: ordersLoading,
+    error: ordersError,
+    configured: ordersConfigured,
+    refetch: refetchOrders,
+    send: sendOrderCmd,
+    cancel: cancelOrderCmd,
+  } = usePurchaseOrders({ poll: true });
   const pendingApprovalsCount = usePendingApprovalsCount();
-  const { buyer } = useBuyer();
-  const { role } = useRole();
-  const seedPOs = useCollection<PurchaseOrder>("purchase-orders", mockPOs);
-
-  // Persistente (mock, flujo 3): órdenes creadas antes + cambios de estado.
-  const [createdOrders] = useLocalStorage<PurchaseOrder[]>("compras:po-created", []);
-  const [statusOverrides, setStatusOverrides] = useLocalStorage<
-    Record<string, PurchaseOrderStatus>
-  >("compras:po-status", {});
 
   const initialTab = pathname.includes("/comprar/borradores")
     ? "draft"
@@ -121,47 +134,41 @@ export function PurchaseOrdersPage() {
   const [dates, setDates] = useState<IsoRange>({ from: "", to: "" });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [prodSearch, setProdSearch] = useState("");
-  const [detail, setDetail] = useState<PurchaseOrder | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [draftContextSku, setDraftContextSku] = useState<string | null>(null);
   const [draftContextTab, setDraftContextTab] = useState("resumen");
-  // Propuesta con comando en vuelo (submit/cancel) y objetivo del modal de cancelación.
+  // Propuesta con comando en vuelo (submit/cancel/convert) y objetivo del modal de cancelación.
   const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ProposalView | null>(null);
+  // OC con comando en vuelo (send/cancel) y objetivo del modal de cancelación de OC.
+  const [orderBusyId, setOrderBusyId] = useState<string | null>(null);
+  const [cancelOrderTarget, setCancelOrderTarget] = useState<{
+    order: PurchaseOrderRow;
+    version: number;
+  } | null>(null);
 
-  // Estado derivado de aprobación: una OC "por aprobar" pasa a "aprobada" cuando
-  // todas sus líneas con solicitud quedan aprobadas (mismo número en el id APR-).
-  const approvalDerivedStatus = (o: PurchaseOrder): PurchaseOrderStatus => {
-    if (o.status !== "pending_approval") return o.status;
-    const linked = approvals.filter((a) => a.id.startsWith(`APR-${o.number}-`));
-    if (linked.length === 0) return o.status;
-    const states = linked.map((a) => approvalState[a.id] ?? "pendiente");
-    if (states.every((s) => s === "aprobada")) return "approved";
-    return "pending_approval";
-  };
+  // Vista BFF → shape de la tabla existente. El alcance por comprador lo
+  // resuelve el servicio con las credenciales de la sesión (sin filtro local).
+  const orders = useMemo<PurchaseOrderRow[]>(() => orderViews.map(toPurchaseOrderRow), [orderViews]);
 
-  const orders = useMemo<PurchaseOrder[]>(() => {
-    const apply = (o: PurchaseOrder) => {
-      if (statusOverrides[o.id]) return { ...o, status: statusOverrides[o.id] };
-      const derived = approvalDerivedStatus(o);
-      return derived !== o.status ? { ...o, status: derived } : o;
-    };
-    const all = [...createdOrders.map(apply), ...seedPOs.map(apply)];
-    // El comprador solo ve sus propias OC; el líder, las de todo el equipo.
-    return role === "lider" ? all : all.filter((o) => o.buyerName === buyer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createdOrders, statusOverrides, approvals, approvalState, seedPOs, role, buyer]);
+  // El detalle abierto se re-deriva de la lista para que el polling de sapSync
+  // también refresque el modal.
+  const detail = useMemo(
+    () => (detailId ? (orders.find((o) => o.id === detailId) ?? null) : null),
+    [detailId, orders]
+  );
 
-  // Deep-link: /ordenes-compra?oc=OC-XXXX abre el detalle de esa orden.
+  // Deep-link: /ordenes-compra?oc=OC-XXXX abre el detalle de esa orden (por número real).
   const [searchParams, setSearchParams] = useSearchParams();
   const ocParam = searchParams.get("oc");
   useEffect(() => {
     if (!ocParam) return;
     const po = orders.find((o) => o.number === ocParam);
-    if (po) setDetail(po);
+    if (po) setDetailId(po.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ocParam, orders.length]);
   const closeDetail = () => {
-    setDetail(null);
+    setDetailId(null);
     if (ocParam) {
       searchParams.delete("oc");
       setSearchParams(searchParams, { replace: true });
@@ -187,10 +194,10 @@ export function PurchaseOrdersPage() {
   const counts = useMemo(() => {
     return {
       all: visible.length,
-      // Borradores = propuestas reales en trabajo (draft/in_review/changes_requested).
+      // Borradores = propuestas reales en trabajo (draft/in_review/changes_requested/approved).
       draft: workingProposals.length,
-      open: visible.filter((o) => EMITTED_STATUSES.includes(o.status)).length,
-      delayed: visible.filter((o) => o.status === "delayed").length,
+      open: visible.filter((o) => OPEN_STATUSES.includes(o.status)).length,
+      delayed: visible.filter((o) => o.delayedDays > 0).length,
       received: visible.filter((o) => o.status === "received" || o.status === "closed").length,
     };
   }, [visible, workingProposals]);
@@ -201,7 +208,12 @@ export function PurchaseOrdersPage() {
   const riskByOrder = useMemo(() => {
     const map = new Map<string, ReturnType<typeof orderSalesAtRisk>>();
     visible.forEach((o) => {
-      const arrivalDays = o.delayedDays > 0 ? o.delayedDays : Math.max(0, daysToDate(o.expectedDate));
+      const arrivalDays =
+        o.delayedDays > 0
+          ? o.delayedDays
+          : o.expectedDate
+            ? Math.max(0, daysToDate(o.expectedDate))
+            : 0;
       map.set(
         o.id,
         orderSalesAtRisk(o.lines, arrivalDays, (sku) => {
@@ -218,15 +230,14 @@ export function PurchaseOrdersPage() {
   const filtered = useMemo(() => {
     // En seguimiento (en curso / atrasadas) ordena por venta en riesgo y luego
     // por días de atraso: primero lo que más venta protege.
-    const rv = (o: PurchaseOrder) => riskByOrder.get(o.id)?.value ?? 0;
-    const byRisk = (a: PurchaseOrder, b: PurchaseOrder) => rv(b) - rv(a) || b.delayedDays - a.delayedDays;
+    const rv = (o: PurchaseOrderRow) => riskByOrder.get(o.id)?.value ?? 0;
+    const byRisk = (a: PurchaseOrderRow, b: PurchaseOrderRow) =>
+      rv(b) - rv(a) || b.delayedDays - a.delayedDays;
     switch (tab) {
-      case "draft":
-        return visible.filter((o) => o.status === "draft");
       case "open":
-        return visible.filter((o) => EMITTED_STATUSES.includes(o.status)).sort(byRisk);
+        return [...visible.filter((o) => OPEN_STATUSES.includes(o.status))].sort(byRisk);
       case "delayed":
-        return visible.filter((o) => o.status === "delayed").sort(byRisk);
+        return [...visible.filter((o) => o.delayedDays > 0)].sort(byRisk);
       case "received":
         return visible.filter((o) => o.status === "received" || o.status === "closed");
       default:
@@ -319,17 +330,11 @@ export function PurchaseOrdersPage() {
 
   // Open-to-Buy en vivo: cuánto presupuesto consume el borrador y si sobregira.
   const budget = useMemo(
-    () => draftBudgetImpact(TODAY_ISO.slice(0, 7), items, createdOrders),
-    [items, createdOrders]
+    () => draftBudgetImpact(TODAY_ISO.slice(0, 7), items, orders),
+    [items, orders]
   );
 
   const selectedDraftItem = items.find((i) => i.sku === draftContextSku) ?? items[0] ?? null;
-
-  const markAsSent = (id: string) => {
-    setStatusOverrides((prev) => ({ ...prev, [id]: "sent" }));
-    setDetail(null);
-    toast.success("Orden de compra marcada como enviada");
-  };
 
   // Sugerencias que aún no están en el borrador
   const pendingSuggestions = recommendations.filter(
@@ -389,8 +394,8 @@ export function PurchaseOrdersPage() {
   };
 
   // --------------------------------------------------------------------------
-  //  Comandos reales sobre propuestas: enviar a revisión y cancelar.
-  //  (La conversión a OC/SAP es el flujo siguiente y NO se conecta aquí.)
+  //  Comandos reales sobre propuestas (enviar a revisión, cancelar, convertir
+  //  en OC) y sobre órdenes de compra (enviar/reintentar SAP, cancelar).
   // --------------------------------------------------------------------------
   const notifySubmitResult = (result: ProposalActionResult) => {
     if (result.ok) {
@@ -455,6 +460,81 @@ export function PurchaseOrdersPage() {
     if (info.code === "VERSION_CONFLICT" || info.code === "CONFLICT") {
       toast.warning("La propuesta cambió en otra sesión; se recargó la lista");
       setCancelTarget(null);
+    } else {
+      toast.error(describePurchaseBffError(info));
+    }
+  };
+
+  /** Convierte una propuesta aprobada en OC reales y salta a Seguimiento. */
+  const notifyConvertResult = (result: ProposalConvertResult) => {
+    if (result.ok) {
+      const generated = result.result.purchaseOrders.map((po) => {
+        const name = result.supplierNames.get(po.supplierId ?? "") ?? po.supplierId ?? "proveedor";
+        return `${po.number} (${name})`;
+      });
+      toast.success(
+        generated.length > 0
+          ? `OC generadas: ${generated.join(", ")} — enviando a SAP`
+          : "Propuesta convertida en órdenes de compra"
+      );
+      refetchOrders();
+      setTab("open");
+      return;
+    }
+    const info = result.error;
+    if (CONFLICT_CODES.includes(info.code)) {
+      toast.warning("La propuesta cambió de estado o versión en otra sesión; se recargó la lista");
+    } else {
+      toast.error(describePurchaseBffError(info));
+    }
+  };
+
+  const convertProposalRow = async (p: ProposalView) => {
+    setProposalBusyId(p.id);
+    const result = await convertProposalCmd(p.id);
+    setProposalBusyId(null);
+    notifyConvertResult(result);
+  };
+
+  /** Envía la OC al proveedor (y re-encola el job SAP si estaba en failed). */
+  const sendOrder = async (row: PurchaseOrderRow, version: number = row.version) => {
+    setOrderBusyId(row.id);
+    const result = await sendOrderCmd(row.id, version);
+    setOrderBusyId(null);
+    if (result.ok) {
+      toast.success(
+        row.sapSync?.status === "failed"
+          ? `Reintento de envío a SAP encolado para ${row.number}`
+          : `${row.number} enviada al proveedor — sincronizando con SAP`
+      );
+      setDetailId(null);
+      return;
+    }
+    const info = result.error;
+    if (CONFLICT_CODES.includes(info.code)) {
+      toast.warning("La orden cambió en otra sesión; se recargó la lista");
+      setDetailId(null);
+    } else {
+      toast.error(describePurchaseBffError(info));
+    }
+  };
+
+  const confirmCancelOrder = async (reason: string) => {
+    if (!cancelOrderTarget) return;
+    const { order, version } = cancelOrderTarget;
+    setOrderBusyId(order.id);
+    const result = await cancelOrderCmd(order.id, version, reason);
+    setOrderBusyId(null);
+    if (result.ok) {
+      toast.info(`${order.number} cancelada`);
+      setCancelOrderTarget(null);
+      setDetailId(null);
+      return;
+    }
+    const info = result.error;
+    if (CONFLICT_CODES.includes(info.code)) {
+      toast.warning("La orden cambió en otra sesión; se recargó la lista");
+      setCancelOrderTarget(null);
     } else {
       toast.error(describePurchaseBffError(info));
     }
@@ -555,7 +635,7 @@ export function PurchaseOrdersPage() {
       </div>
 
       {tab === "draft" ? (
-        // Pestaña Borradores: propuestas reales (draft / en revisión / observadas).
+        // Pestaña Borradores: propuestas reales (draft / en revisión / observadas / aprobadas).
         <ProposalDraftsTable
           proposals={workingProposals}
           loading={proposalsLoading}
@@ -565,13 +645,20 @@ export function PurchaseOrdersPage() {
           onRetry={refetchProposals}
           onSubmit={(p) => void submitProposalRow(p)}
           onCancel={setCancelTarget}
+          onConvert={(p) => void convertProposalRow(p)}
         />
       ) : (
         <OrdersTable
           orders={filtered}
           riskOf={(id) => riskByOrder.get(id)}
           tab={tab}
-          onOpenDetail={setDetail}
+          loading={ordersLoading}
+          error={ordersError}
+          configured={ordersConfigured}
+          busyId={orderBusyId}
+          onRetry={refetchOrders}
+          onOpenDetail={(o) => setDetailId(o.id)}
+          onRetrySend={(o) => void sendOrder(o)}
         />
       )}
 
@@ -610,7 +697,13 @@ export function PurchaseOrdersPage() {
         pendingSuggestions={pendingSuggestions}
       />
 
-      <OcDetailModal detail={detail} onClose={closeDetail} onMarkSent={markAsSent} />
+      <OrderDetailModal
+        order={detail}
+        busy={detail !== null && orderBusyId === detail.id}
+        onClose={closeDetail}
+        onSend={(order, version) => void sendOrder(order, version)}
+        onCancelRequest={(order, version) => setCancelOrderTarget({ order, version })}
+      />
 
       {cancelTarget && (
         <CancelProposalModal
@@ -620,7 +713,64 @@ export function PurchaseOrdersPage() {
           onConfirm={(reason) => void confirmCancelProposal(reason)}
         />
       )}
+
+      {cancelOrderTarget && (
+        <CancelOrderModal
+          order={cancelOrderTarget.order}
+          busy={orderBusyId === cancelOrderTarget.order.id}
+          onClose={() => setCancelOrderTarget(null)}
+          onConfirm={(reason) => void confirmCancelOrder(reason)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Modal de cancelación de OC real: el motivo es obligatorio (auditable). */
+function CancelOrderModal({
+  order,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  order: PurchaseOrderRow;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const trimmed = reason.trim();
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      title="Cancelar orden de compra"
+      description={`${order.number} · ${order.supplierName}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Volver
+          </Button>
+          <Button disabled={!trimmed || busy} onClick={() => onConfirm(trimmed)}>
+            {busy ? "Cancelando…" : "Cancelar OC"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-slate-600">
+          La OC queda cancelada en la plataforma y, si ya fue contabilizada, se solicita su
+          cancelación en SAP. Esta acción queda trazada con su motivo.
+        </p>
+        <Input
+          label="Motivo (obligatorio)"
+          placeholder="Ej: quiebre del proveedor, compra duplicada…"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </div>
+    </Modal>
   );
 }
 

@@ -9,7 +9,8 @@ export type DecisionViewMode = "product" | "supplier" | "category";
 export interface OpenPoSignal {
   number: string;
   quantity: number;
-  expectedDate: string;
+  /** Fecha esperada de entrega (las OC reales pueden no tenerla aún). */
+  expectedDate: string | null;
   status: string;
 }
 

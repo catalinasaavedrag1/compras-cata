@@ -176,8 +176,8 @@ export function RecommendationMobileCard({
       </div>
       {openPo && (
         <p className="mt-2 rounded-lg bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700">
-          OC abierta {openPo.number} · {formatNumber(openPo.quantity)} u. · entrega{" "}
-          {openPo.expectedDate}
+          OC abierta {openPo.number} · {formatNumber(openPo.quantity)} u. ·{" "}
+          {openPo.expectedDate ? `entrega ${openPo.expectedDate}` : "entrega por confirmar"}
         </p>
       )}
       <p className={cn("mt-1.5 text-xs font-medium leading-snug", coverageToneText(rec))}>
@@ -414,7 +414,10 @@ export function RecommendationDecisionDrawer({
               <div>
                 <p className="text-sm font-semibold text-slate-900">{openPo.number}</p>
                 <p className="text-sm text-slate-600">
-                  {formatNumber(openPo.quantity)} unidades · entrega esperada {openPo.expectedDate}
+                  {formatNumber(openPo.quantity)} unidades ·{" "}
+                  {openPo.expectedDate
+                    ? `entrega esperada ${openPo.expectedDate}`
+                    : "entrega por confirmar"}
                 </p>
                 {openPo.status === "delayed" && (
                   <p className="mt-1 text-xs font-medium text-amber-700">
