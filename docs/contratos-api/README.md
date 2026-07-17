@@ -49,4 +49,8 @@
 
 **Reposición → Propuesta → Aprobación → Conversión → SAP → Seguimiento** — detalle y criterio de
 done en [`08-revision-critica.md` §5](08-revision-critica.md).
+
+> **Paso siguiente hecho:** el modelo de dominio y el diseño de base de datos están en
+> [`../modelo-dominio/`](../modelo-dominio/README.md) (decisiones D1–D6, agregados e invariantes,
+> modelo de datos lógico y borrador Prisma validado).
 </content>

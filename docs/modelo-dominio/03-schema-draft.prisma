@@ -1,0 +1,957 @@
+// ============================================================================
+// purchase-service · schema.prisma — BORRADOR DE DISEÑO (v0.1)
+// NO MIGRAR. Acompaña a 01-modelo-dominio.md y 02-modelo-datos.md.
+// Convenciones del monorepo (pricing/inventory-v3): SQL Server + Prisma.
+// Notas de compatibilidad SQL Server:
+//  - Sin enums nativos: estados como String (valores del contrato 04-comandos).
+//  - Sin tipo Json: campos *Json como String @db.NVarChar(Max).
+//  - Índices únicos FILTRADOS (UXf de 02-modelo-datos) no son expresables en
+//    Prisma: se crean por SQL en la migración (marcados // UXf).
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- Purchasing
+
+model PurchaseProposal {
+  id             String   @id // "prop-<ulid>"
+  status         String   @default("draft") // draft|changes_requested|in_review|approved|converted|rejected|cancelled
+  version        Int      @default(1)
+  buyerId        String
+  title          String?  @db.NVarChar(200)
+  note           String?  @db.NVarChar(2000)
+  sourceType     String   @default("manual") // manual|rfq|duplicate
+  sourceRef      String?
+  netTotalClp    BigInt   @default(0)
+  landedTotalClp BigInt   @default(0)
+  lineCount      Int      @default(0)
+  supplierCount  Int      @default(0)
+  submittedAt    DateTime?
+  decidedAt      DateTime?
+  convertedAt    DateTime?
+  cancelReason   String?  @db.NVarChar(1000)
+  dateCreated    DateTime @default(now())
+  dateModified   DateTime @updatedAt
+  userCreated    String
+  userModified   String
+
+  lines          ProposalLine[]
+  comments       ProposalComment[]
+  approvals      Approval[]
+  purchaseOrders PurchaseOrder[]
+  decisions      Decision[]
+
+  @@index([buyerId, status, dateModified])
+  @@map("purchase_proposals")
+}
+
+model ProposalLine {
+  id                String   @id // "pln-<ulid>"
+  proposalId        String
+  sku               String
+  skuNameSnap       String   @db.NVarChar(300)
+  categoryId        String
+  supplierRef       String   // comerce ReferenceId (D3)
+  qty               Decimal  @db.Decimal(18, 3)
+  packMultiple      Int?
+  moq               Int?
+  unitCostClp       BigInt?  // null = COST_MISSING (bloquea submit)
+  landedUnitCostClp BigInt?
+  costAsOf          DateTime?
+  priceListRef      String?
+  subtotalClp       BigInt?
+  recommendationId  String?
+  stockAsOfSnapJson String?  @db.NVarChar(Max) // { available, inTransit, asOf }
+  version           Int      @default(1)
+  dateCreated       DateTime @default(now())
+  dateModified      DateTime @updatedAt
+
+  proposal       PurchaseProposal        @relation(fields: [proposalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recommendation PurchaseRecommendation? @relation(fields: [recommendationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  poLines        PurchaseOrderLine[]
+
+  @@unique([proposalId, sku, supplierRef])
+  @@index([sku])
+  @@map("proposal_lines")
+}
+
+model ProposalComment {
+  id           String   @id
+  proposalId   String
+  authorUserId String
+  body         String   @db.NVarChar(2000)
+  dateCreated  DateTime @default(now())
+
+  proposal PurchaseProposal @relation(fields: [proposalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([proposalId, dateCreated])
+  @@map("proposal_comments")
+}
+
+model PurchaseOrder {
+  id             String   @id // "po-<ulid>"
+  number         String   @unique // "OC-2026-0789" (presentación, DocSequence)
+  proposalId     String
+  approvalId     String?
+  buyerId        String
+  supplierRef    String
+  sapCardCode    String?
+  status         String   @default("approved") // approved|sent|confirmed|partially_received|received|closed|cancelled
+  version        Int      @default(1)
+  netTotalClp    BigInt
+  landedTotalClp BigInt
+  currency       String   @default("CLP")
+  expectedDate   DateTime?
+  sentAt         DateTime?
+  closedAt       DateTime?
+  cancelReason   String?  @db.NVarChar(1000)
+  otbBucketId    String?
+
+  // --- SapSync (VO embebido; 05-integracion-sap) ---
+  sapStatus         String   @default("pending") // pending|processing|posted|failed|rejected|cancelled
+  sapIntegrationKey String   @unique // "po:<id>:opor"
+  sapDocEntry       Int?
+  sapDocNum         Int?
+  sapAttempts       Int      @default(0)
+  sapLastError      String?  @db.NVarChar(2000)
+  sapPostedAt       DateTime?
+
+  dateCreated  DateTime @default(now())
+  dateModified DateTime @updatedAt
+  userCreated  String
+  userModified String
+
+  proposal   PurchaseProposal @relation(fields: [proposalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  approval   Approval?        @relation(fields: [approvalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  otbBucket  OtbBucket?       @relation(fields: [otbBucketId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lines      PurchaseOrderLine[]
+  receptions Reception[]
+  claims     SupplierClaim[]
+  otbEntries OtbEntry[]
+  imports    ImportOrder[]
+
+  @@index([supplierRef, status])
+  @@index([status, dateCreated])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id                String  @id
+  purchaseOrderId   String
+  proposalLineId    String
+  sku               String
+  skuNameSnap       String  @db.NVarChar(300)
+  categoryId        String
+  qty               Decimal @db.Decimal(18, 3)
+  unitCostClp       BigInt  // congelado al convertir (lo aprobado = lo emitido)
+  landedUnitCostClp BigInt
+  subtotalClp       BigInt
+  qtyReceivedTotal  Decimal @default(0) @db.Decimal(18, 3)
+
+  purchaseOrder  PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  proposalLine   ProposalLine    @relation(fields: [proposalLineId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  receptionItems ReceptionItem[]
+
+  @@index([sku])
+  @@map("purchase_order_lines")
+}
+
+// ---------------------------------------------------------------- Governance
+
+model Approval {
+  id              String   @id // "apr-<ulid>"
+  proposalId      String   // UXf: única 'pending' por propuesta (SQL filtrado)
+  state           String   @default("pending") // pending|approved|rejected|observed
+  version         Int      @default(1)
+  requestedByUserId String
+  decidedByUserId String?
+  decidedAt       DateTime?
+  note            String?  @db.NVarChar(1000)
+  reason          String?  @db.NVarChar(1000) // obligatorio en reject/observe
+  dateCreated     DateTime @default(now())
+  dateModified    DateTime @updatedAt
+
+  proposal       PurchaseProposal    @relation(fields: [proposalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  criteria       ApprovalCriterion[]
+  purchaseOrders PurchaseOrder[]
+  decisions      Decision[]
+
+  @@index([state, dateCreated])
+  @@map("approvals")
+}
+
+model ApprovalCriterion {
+  id            String @id
+  approvalId    String
+  code          String // high_amount|excessive_coverage|new_supplier|out_of_assortment
+  thresholdJson String @db.NVarChar(Max)
+  actualJson    String @db.NVarChar(Max)
+  sku           String?
+
+  approval Approval @relation(fields: [approvalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("approval_criteria")
+}
+
+model PurchaseRule {
+  id           String   @id
+  scopeType    String   // global|category|supplier|buyer
+  scopeRef     String?
+  key          String   // p.ej. approval.high_amount_clp
+  valueJson    String   @db.NVarChar(Max)
+  active       Boolean  @default(true) // UXf (scopeType,scopeRef,key) WHERE active=1
+  validFrom    DateTime @default(now())
+  reason       String   @db.NVarChar(1000)
+  dateCreated  DateTime @default(now())
+  dateModified DateTime @updatedAt
+  userCreated  String
+  userModified String
+
+  @@index([key])
+  @@map("purchase_rules")
+}
+
+model Decision {
+  id             String   @id // "dec-<ulid>"
+  proposalId     String
+  approvalId     String?
+  buyerId        String
+  summary        String   @db.NVarChar(1000)
+  projectionJson String   @db.NVarChar(Max) // KPI proyectado + asOf
+  resultJson     String?  @db.NVarChar(Max) // KPI real (batch E8)
+  windowDays     Int      @default(30)
+  evaluatedAt    DateTime?
+  outcome        String   @default("pending") // pending|hit|miss|mixed
+  dateCreated    DateTime @default(now())
+
+  proposal PurchaseProposal @relation(fields: [proposalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  approval Approval?        @relation(fields: [approvalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([buyerId, dateCreated])
+  @@map("decisions")
+}
+
+// ------------------------------------------------------------- Replenishment
+
+model PurchaseRecommendation {
+  id             String    @id // "rec-<ulid>"
+  sku            String    // UXf (sku, supplierRef) WHERE status IN ('pending','in_cart','snoozed')
+  supplierRef    String
+  categoryId     String
+  buyerId        String
+  priority       String    // stockout_imminent|low_stock|opportunity
+  suggestedQty   Int
+  overrideQty    Int?
+  coverageDays   Decimal?  @db.Decimal(9, 2)
+  dailyVelocity  Decimal?  @db.Decimal(12, 3)
+  velocitySource String    @default("materialized") // analytics|materialized
+  velocityAsOf   DateTime?
+  stockAvailable Decimal?  @db.Decimal(18, 3)
+  stockInTransit Decimal?  @db.Decimal(18, 3)
+  stockAsOf      DateTime?
+  unitCostClp    BigInt?
+  costAsOf       DateTime?
+  flagsJson      String?   @db.NVarChar(Max)
+  status         String    @default("pending") // pending|in_cart|ordered|ignored|snoozed
+  snoozeUntil    DateTime?
+  computedAt     DateTime
+  version        Int       @default(1)
+  dateModified   DateTime  @updatedAt
+
+  actions       RecommendationAction[]
+  proposalLines ProposalLine[]
+
+  @@index([buyerId, status, priority])
+  @@index([categoryId])
+  @@map("purchase_recommendations")
+}
+
+model RecommendationAction {
+  id               String   @id
+  recommendationId String
+  action           String   // override|ignore|snooze|restore
+  qtyBefore        Int?
+  qtyAfter         Int?
+  reason           String   @db.NVarChar(500)
+  authorUserId     String
+  dateCreated      DateTime @default(now())
+
+  recommendation PurchaseRecommendation @relation(fields: [recommendationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([recommendationId, dateCreated])
+  @@map("recommendation_actions")
+}
+
+// ------------------------------------------------------------------ Sourcing
+
+model Rfq {
+  id                String   @id // "rfq-<ulid>"
+  number            String   @unique
+  title             String   @db.NVarChar(300)
+  buyerId           String
+  status            String   @default("draft") // draft|sent|partially_responded|responded|awarded|cancelled|expired
+  dueDate           DateTime?
+  awardedResponseId String?
+  version           Int      @default(1)
+  dateCreated       DateTime @default(now())
+  dateModified      DateTime @updatedAt
+  userCreated       String
+  userModified      String
+
+  lines     RfqLine[]
+  suppliers RfqSupplier[]
+  responses RfqResponse[]
+
+  @@index([status])
+  @@map("rfqs")
+}
+
+model RfqLine {
+  id                String  @id
+  rfqId             String
+  sku               String
+  qty               Decimal @db.Decimal(18, 3)
+  targetUnitCostClp BigInt?
+
+  rfq           Rfq               @relation(fields: [rfqId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  responseLines RfqResponseLine[]
+
+  @@map("rfq_lines")
+}
+
+model RfqSupplier {
+  id          String    @id
+  rfqId       String
+  supplierRef String
+  invitedAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  rfq       Rfq           @relation(fields: [rfqId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  responses RfqResponse[]
+
+  @@unique([rfqId, supplierRef])
+  @@map("rfq_suppliers")
+}
+
+model RfqResponse {
+  id             String    @id
+  rfqId          String
+  rfqSupplierId  String
+  receivedAt     DateTime  @default(now())
+  validUntil     DateTime?
+  paymentTermRef String?
+  leadTimeDays   Int?
+  notes          String?   @db.NVarChar(2000)
+  version        Int       @default(1)
+
+  rfq         Rfq               @relation(fields: [rfqId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rfqSupplier RfqSupplier       @relation(fields: [rfqSupplierId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lines       RfqResponseLine[]
+
+  @@map("rfq_responses")
+}
+
+model RfqResponseLine {
+  id            String  @id
+  rfqResponseId String
+  rfqLineId     String
+  unitCostClp   BigInt
+  minQty        Int?
+  comment       String? @db.NVarChar(500)
+
+  response RfqResponse @relation(fields: [rfqResponseId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rfqLine  RfqLine     @relation(fields: [rfqLineId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("rfq_response_lines")
+}
+
+// --------------------------------------------------------- Receiving + Claims
+
+model Reception {
+  id                 String    @id // "rcp-<ulid>"
+  displayId          String    @unique // "REC-2026-0311"
+  purchaseOrderId    String
+  warehouseId        String
+  packingSlip        String?
+  expectedDate       DateTime?
+  arrivedAt          DateTime?
+  completedAt        DateTime?
+  status             String    @default("expected") // expected|in_transit|arrived|checking|completed|discrepancy|rejected
+  hasDiscrepancy     Boolean   @default(false)
+  complianceSnapJson String?   @db.NVarChar(Max)
+  version            Int       @default(1)
+  dateCreated        DateTime  @default(now())
+  dateModified       DateTime  @updatedAt
+  userCreated        String
+  userModified       String
+
+  purchaseOrder PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items         ReceptionItem[]
+  claims        SupplierClaim[]
+
+  @@index([status, expectedDate])
+  @@index([warehouseId])
+  @@map("receptions")
+}
+
+model ReceptionItem {
+  id                  String  @id
+  receptionId         String
+  purchaseOrderLineId String
+  qtyExpected         Decimal @db.Decimal(18, 3)
+  qtyReceived         Decimal @db.Decimal(18, 3)
+  condition           String  @default("ok") // ok|damaged|wrong_item
+  note                String? @db.NVarChar(500)
+
+  reception Reception         @relation(fields: [receptionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  poLine    PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("reception_items")
+}
+
+model SupplierClaim {
+  id              String    @id // "clm-<ulid>"
+  purchaseOrderId String
+  receptionId     String?
+  supplierRef     String
+  type            String    // quantity|quality|price|other
+  description     String    @db.NVarChar(2000)
+  status          String    @default("open") // open|in_review|resolved|rejected
+  resolution      String?   // credit_note|replacement|return|none
+  creditNoteRef   String?
+  resolvedAt      DateTime?
+  reason          String?   @db.NVarChar(1000)
+  version         Int       @default(1)
+  dateCreated     DateTime  @default(now())
+  dateModified    DateTime  @updatedAt
+  userCreated     String
+  userModified    String
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reception     Reception?    @relation(fields: [receptionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status])
+  @@index([supplierRef])
+  @@map("supplier_claims")
+}
+
+// ------------------------------------------------------ Supplier Relationship
+
+model SupplierRelationship {
+  id                   String    @id // "sur-<ulid>"
+  supplierRef          String    @unique // comerce ReferenceId (clave canónica D3)
+  sapCardCode          String?   // UXf WHERE NOT NULL; requerido para emitir OC
+  document             String?   // RUT
+  nameSnap             String    @db.NVarChar(300)
+  status               String    @default("active") // active|on_watch|blocked
+  compliancePct        Decimal?  @db.Decimal(5, 2)
+  leadTimeDaysObserved Decimal?  @db.Decimal(6, 1)
+  pendingAmountClp     BigInt?
+  metricsAsOf          DateTime?
+  version              Int       @default(1)
+  dateCreated          DateTime  @default(now())
+  dateModified         DateTime  @updatedAt
+
+  terms        SupplierTerms[]
+  skuTerms     SupplierSkuTerms[]
+  agreements   SupplierAgreement[]
+  negotiations NegotiationRound[]
+
+  @@index([status])
+  @@map("supplier_relationships")
+}
+
+model SupplierTerms {
+  id                     String   @id
+  supplierRelationshipId String
+  validFrom              DateTime @default(now())
+  paymentTermRef         String?  // customer-service masterdata GroupNum
+  discountPct            Decimal? @db.Decimal(5, 2)
+  freightPolicy          String?  @db.NVarChar(300)
+  currency               String   @default("CLP")
+  notes                  String?  @db.NVarChar(2000)
+  version                Int      @default(1)
+  dateCreated            DateTime @default(now())
+  userCreated            String
+
+  relationship SupplierRelationship @relation(fields: [supplierRelationshipId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([supplierRelationshipId, validFrom(sort: Desc)])
+  @@map("supplier_terms")
+}
+
+model SupplierSkuTerms {
+  id                     String   @id
+  supplierRelationshipId String
+  sku                    String
+  moq                    Int?     // fuente del MOQ (R3)
+  packMultiple           Int?
+  leadTimeDays           Int?
+  agreedUnitCostClp      BigInt?
+  validFrom              DateTime @default(now())
+
+  relationship SupplierRelationship @relation(fields: [supplierRelationshipId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([supplierRelationshipId, sku])
+  @@map("supplier_sku_terms")
+}
+
+model SupplierAgreement {
+  id                     String    @id
+  supplierRelationshipId String
+  title                  String    @db.NVarChar(300)
+  kind                   String
+  validFrom              DateTime
+  validTo                DateTime?
+  docRef                 String?   // referencia DMS
+  status                 String    @default("active")
+  dateCreated            DateTime  @default(now())
+  userCreated            String
+
+  relationship SupplierRelationship @relation(fields: [supplierRelationshipId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("supplier_agreements")
+}
+
+model NegotiationRound {
+  id                     String   @id
+  supplierRelationshipId String
+  status                 String   @default("open") // open|in_progress|agreed|stalled
+  topic                  String   @db.NVarChar(300)
+  minutes                String   @db.NVarChar(Max)
+  outcomeJson            String?  @db.NVarChar(Max)
+  authorUserId           String
+  version                Int      @default(1)
+  dateCreated            DateTime @default(now())
+  dateModified           DateTime @updatedAt
+
+  relationship SupplierRelationship @relation(fields: [supplierRelationshipId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([dateCreated])
+  @@map("negotiation_rounds")
+}
+
+// ----------------------------------------------------------- Budget + Cartera
+
+model OtbBucket {
+  id         String @id // "otb-<ulid>"
+  month      String @db.Char(7) // "2026-07"
+  categoryId String
+  amountClp  BigInt
+  version    Int    @default(1)
+
+  entries        OtbEntry[]
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([month, categoryId])
+  @@map("otb_buckets")
+}
+
+model OtbEntry {
+  id              String   @id
+  otbBucketId     String
+  purchaseOrderId String?
+  type            String   // consume|release|reconcile
+  amountClp       BigInt   // con signo
+  note            String?  @db.NVarChar(500)
+  dateCreated     DateTime @default(now())
+  userCreated     String
+
+  bucket        OtbBucket      @relation(fields: [otbBucketId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([otbBucketId])
+  @@map("otb_entries")
+}
+
+model CategoryAssignment {
+  id         String   @id
+  categoryId String   @unique
+  buyerId    String
+  since      DateTime @default(now())
+  version    Int      @default(1)
+
+  @@map("category_assignments")
+}
+
+model CategoryAssignmentHistory {
+  id              String   @id
+  categoryId      String
+  fromBuyerId     String?
+  toBuyerId       String
+  changedByUserId String
+  reason          String?  @db.NVarChar(500)
+  changedAt       DateTime @default(now())
+
+  @@index([categoryId, changedAt])
+  @@map("category_assignment_history")
+}
+
+// ----------------------------------- Planning + Signals + Alerts + Team + Map
+
+model Season {
+  id        String   @id
+  code      String   @unique
+  name      String   @db.NVarChar(200)
+  salesFrom DateTime
+  salesTo   DateTime
+  buyFrom   DateTime
+  buyTo     DateTime
+  status    String   @default("planned")
+
+  plans SeasonPlan[]
+
+  @@map("seasons")
+}
+
+model SeasonPlan {
+  id           String   @id
+  seasonId     String
+  scenario     String   // base|optimista|conservador
+  planJson     String   @db.NVarChar(Max)
+  trackingJson String?  @db.NVarChar(Max)
+  version      Int      @default(1)
+  dateModified DateTime @updatedAt
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([seasonId, scenario])
+  @@map("season_plans")
+}
+
+model ForecastAdjustment {
+  id            String   @id
+  sku           String
+  seasonId      String?
+  adjustmentPct Decimal  @db.Decimal(6, 2)
+  reason        String   @db.NVarChar(500)
+  authorUserId  String
+  dateCreated   DateTime @default(now())
+
+  @@index([sku, dateCreated(sort: Desc)])
+  @@map("forecast_adjustments")
+}
+
+model CampaignOpportunity {
+  id           String   @id
+  dedupeKey    String   // UXf WHERE status IN ('detected','planned','active')
+  sku          String?
+  categoryId   String?
+  channelRef   String?
+  kind         String
+  windowFrom   DateTime
+  windowTo     DateTime
+  evidenceJson String   @db.NVarChar(Max)
+  status       String   @default("detected") // detected|planned|active|closed|dismissed
+  version      Int      @default(1)
+  dateCreated  DateTime @default(now())
+  dateModified DateTime @updatedAt
+
+  campaigns Campaign[]
+
+  @@index([status])
+  @@map("campaign_opportunities")
+}
+
+model Campaign {
+  id            String    @id
+  type          String    // ad_space|opportunity (P14: modelo unificado)
+  opportunityId String?
+  title         String    @db.NVarChar(300)
+  channelRef    String?
+  budgetClp     BigInt?
+  startsAt      DateTime
+  endsAt        DateTime
+  status        String    @default("planned")
+  version       Int       @default(1)
+  dateCreated   DateTime  @default(now())
+  dateModified  DateTime  @updatedAt
+  userCreated   String
+
+  opportunity CampaignOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status])
+  @@map("campaigns")
+}
+
+model ImportOrder {
+  id               String    @id
+  purchaseOrderId  String?
+  stage            String    @default("po") // po|production|shipping|customs|warehouse
+  etaDate          DateTime?
+  forwarderRef     String?
+  stageHistoryJson String    @db.NVarChar(Max)
+  version          Int       @default(1)
+  dateCreated      DateTime  @default(now())
+  dateModified     DateTime  @updatedAt
+
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  docs          ImportDoc[]
+
+  @@index([stage])
+  @@map("import_orders")
+}
+
+model ImportDoc {
+  id               String   @id
+  importOrderId    String
+  kind             String
+  dmsRef           String   // referencia; el binario vive en DMS
+  uploadedByUserId String
+  dateCreated      DateTime @default(now())
+
+  importOrder ImportOrder @relation(fields: [importOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("import_docs")
+}
+
+model SalesSignal {
+  id             String   @id
+  sku            String?
+  supplierRef    String?
+  storeRef       String?
+  kind           String
+  body           String   @db.NVarChar(2000)
+  reporterUserId String
+  status         String   @default("new") // new|in_review|actioned|dismissed
+  version        Int      @default(1)
+  dateCreated    DateTime @default(now())
+  dateModified   DateTime @updatedAt
+
+  messages SignalMessage[]
+
+  @@index([status, dateCreated])
+  @@index([sku])
+  @@map("sales_signals")
+}
+
+model SignalMessage {
+  id           String   @id
+  signalId     String
+  authorUserId String
+  body         String   @db.NVarChar(2000)
+  dateCreated  DateTime @default(now())
+
+  signal SalesSignal @relation(fields: [signalId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([signalId, dateCreated])
+  @@map("signal_messages")
+}
+
+model CommercialAlert {
+  id             String    @id
+  dedupeKey      String    // UXf WHERE status='active' (el motor no duplica alertas vivas)
+  ruleKey        String
+  type           String
+  severity       String    // critical|warning|info
+  title          String    @db.NVarChar(300)
+  refEntity      String
+  refId          String
+  buyerId        String?
+  status         String    @default("active") // active|acknowledged|resolved|dismissed
+  acknowledgedBy String?
+  resolvedAt     DateTime?
+  dismissReason  String?   @db.NVarChar(500)
+  version        Int       @default(1)
+  dateCreated    DateTime  @default(now())
+  dateModified   DateTime  @updatedAt
+
+  @@index([buyerId, status, severity])
+  @@map("commercial_alerts")
+}
+
+model BuyerProfile {
+  id          String  @id
+  buyerId     String  @unique // id de negocio ("catalina")
+  userId      String  @unique // id-service usuarioId
+  displayName String  @db.NVarChar(200)
+  active      Boolean @default(true)
+
+  @@map("buyer_profiles")
+}
+
+model Goal {
+  id           String   @id
+  buyerId      String
+  period       String   // "2026-Q3"
+  kind         String
+  targetJson   String   @db.NVarChar(Max)
+  progressJson String?  @db.NVarChar(Max)
+  status       String   @default("on_track") // on_track|at_risk|off_track|achieved
+  version      Int      @default(1)
+  dateModified DateTime @updatedAt
+
+  @@index([buyerId, period])
+  @@map("goals")
+}
+
+model Reward {
+  id           String   @id
+  title        String   @db.NVarChar(200)
+  description  String   @db.NVarChar(1000)
+  criteriaJson String   @db.NVarChar(Max)
+  active       Boolean  @default(true)
+  version      Int      @default(1)
+  dateCreated  DateTime @default(now())
+  dateModified DateTime @updatedAt
+  userCreated  String
+  userModified String
+
+  @@map("rewards")
+}
+
+model ScoreSnapshot {
+  id          String   @id
+  buyerId     String
+  period      String
+  metricsJson String   @db.NVarChar(Max)
+  computedAt  DateTime
+
+  @@unique([buyerId, period])
+  @@map("score_snapshots")
+}
+
+model WorkloadSnapshot {
+  id          String   @id
+  buyerId     String
+  period      String
+  metricsJson String   @db.NVarChar(Max)
+  computedAt  DateTime
+
+  @@unique([buyerId, period])
+  @@map("workload_snapshots")
+}
+
+model NotificationRead {
+  userId  String
+  notifId String
+  readAt  DateTime @default(now())
+
+  @@id([userId, notifId])
+  @@map("notification_reads")
+}
+
+model ChannelMap {
+  id         String @id
+  taxonomy   String // promo|demand|margin|campaign (P13)
+  frontValue String
+  channelRef String // comerce sales-channel ReferenceId
+
+  @@unique([taxonomy, frontValue])
+  @@map("channel_map")
+}
+
+// ------------------------------------------------------------- Infraestructura
+
+model OutboxEvent {
+  id          String    @id
+  topic       String
+  eventType   String
+  aggregateId String
+  payloadJson String    @db.NVarChar(Max)
+  status      String    @default("PENDING") // PENDING|SENT|ERROR
+  attempts    Int       @default(0)
+  sentAt      DateTime?
+  dateCreated DateTime  @default(now())
+
+  @@index([status, dateCreated])
+  @@map("outbox_events")
+}
+
+model ProcessedEvent {
+  id            String   @id
+  topic         String
+  messageKey    String
+  consumerGroup String
+  dateCreated   DateTime @default(now())
+
+  @@unique([topic, messageKey, consumerGroup])
+  @@map("processed_events")
+}
+
+model IdempotencyKey {
+  id           String   @id
+  key          String
+  route        String
+  method       String
+  requestHash  String
+  statusCode   Int?
+  responseBody String?  @db.NVarChar(Max)
+  expiresAt    DateTime
+  dateCreated  DateTime @default(now())
+
+  @@unique([key, route, method])
+  @@map("idempotency_keys")
+}
+
+model SapOutboxJob {
+  id             String    @id
+  integrationKey String    @unique // "po:<id>:opor" | "po:<id>:cancel"
+  sapObject      String    // PurchaseOrders | PurchaseOrders/Cancel | (P6: PurchaseDeliveryNotes)
+  sourceType     String    // purchase_order
+  sourceId       String
+  payloadJson    String    @db.NVarChar(Max)
+  status         String    @default("PENDING") // PENDING|PROCESSING|POSTED|FAILED|REJECTED|CANCELLED
+  attempts       Int       @default(0)
+  maxRetries     Int       @default(20)
+  nextAttemptAt  DateTime?
+  sapDocEntry    Int?
+  sapDocNum      Int?
+  lastError      String?   @db.NVarChar(2000)
+  lockedAt       DateTime?
+  workerName     String?
+  dateCreated    DateTime  @default(now())
+  dateModified   DateTime  @updatedAt
+
+  snapshots SapDocumentSnapshot[]
+
+  @@index([status, nextAttemptAt])
+  @@map("sap_outbox_jobs")
+}
+
+model SapDocumentSnapshot {
+  id           String   @id
+  jobId        String
+  requestJson  String   @db.NVarChar(Max)
+  responseJson String?  @db.NVarChar(Max)
+  httpStatus   Int?
+  docEntry     Int?
+  docNum       Int?
+  dateCreated  DateTime @default(now())
+
+  job SapOutboxJob @relation(fields: [jobId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([jobId])
+  @@map("sap_document_snapshots")
+}
+
+model DocSequence {
+  kind      String // po|reception|rfq|approval
+  year      Int
+  nextValue Int    @default(1)
+
+  @@id([kind, year])
+  @@map("doc_sequences")
+}
+
+model ExportJob {
+  id                String    @id
+  reportId          String
+  paramsJson        String    @db.NVarChar(Max)
+  requestedByUserId String
+  status            String    @default("pending") // pending|running|done|failed
+  fileRef           String?
+  error             String?   @db.NVarChar(2000)
+  expiresAt         DateTime?
+  dateCreated       DateTime  @default(now())
+
+  @@index([status])
+  @@map("export_jobs")
+}
