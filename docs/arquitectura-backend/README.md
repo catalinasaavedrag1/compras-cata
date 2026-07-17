@@ -665,5 +665,9 @@ Con esta arquitectura fijada, el paso siguiente es **diseñar los contratos de A
 dominio** de `purchase-service` y `purchase-bff-service` — resolviendo primero las decisiones que
 bloquean el modelo (FK reales, umbrales como configuración, autorización server-side, alcance SAP) por
 el orden de `docs/backend-spec/09`.
+
+> **Hecho:** los contratos de API están en [`../contratos-api/`](../contratos-api/README.md)
+> (convenciones, inventario A–E, fichas, composición por vista, comandos, SAP, permisos,
+> trazabilidad, revisión crítica y OpenAPI preliminar de ambos servicios).
 </content>
 </invoke>

@@ -1,0 +1,831 @@
+openapi: 3.0.3
+info:
+  title: purchase-bff-service
+  version: 0.1.0-preliminar
+  description: >
+    Contrato preliminar del BFF de Compras (único servicio que consume el frontend).
+    Envoltorio `{success,data,correlationId}`; errores con `code` funcional y `retryable`.
+    Cobertura: flujo vertical estrella + recursos representativos. Los grupos restantes del
+    inventario (01) siguen exactamente estos mismos patrones. NO implementar aún.
+servers:
+  - url: /api/purchase-bff/v1
+security:
+  - bearerAuth: []
+
+tags:
+  - { name: contexto }
+  - { name: dashboard }
+  - { name: reposicion }
+  - { name: propuestas }
+  - { name: ordenes }
+  - { name: aprobaciones }
+  - { name: recepciones }
+  - { name: proveedores }
+  - { name: alertas }
+
+paths:
+  /context:
+    get:
+      tags: [contexto]
+      summary: Sesión, permisos purchase:*, comprador activo y alcance
+      operationId: getContext
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/Context' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /server-time:
+    get:
+      tags: [contexto]
+      summary: Fecha/hora de servidor (reemplaza TODAY_ISO del front)
+      operationId: getServerTime
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example: { success: true, data: { now: '2026-07-17T12:00:00Z' }, correlationId: '8c2f6e0a-…' }
+
+  /dashboard:
+    get:
+      tags: [dashboard]
+      summary: Bandeja diaria compuesta (secciones degradables)
+      operationId: getDashboard
+      parameters:
+        - $ref: '#/components/parameters/Scope'
+      responses:
+        '200':
+          description: OK (puede ser parcial; ver sections[].status)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/Dashboard' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '502': { $ref: '#/components/responses/Downstream' }
+
+  /replenishment/search:
+    post:
+      tags: [reposicion]
+      summary: Tabla de recomendaciones de reposición (search por body)
+      operationId: searchReplenishment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReplenishmentSearchRequest' }
+      responses:
+        '200':
+          description: Página de recomendaciones (posiblemente parcial)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items: { $ref: '#/components/schemas/ReplenishmentRow' }
+                          meta: { $ref: '#/components/schemas/PageMeta' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '502': { $ref: '#/components/responses/Downstream' }
+
+  /products/critical/search:
+    post:
+      tags: [reposicion]
+      summary: Alias curado de reposición con foco críticos (mismo compuesto)
+      operationId: searchCriticalProducts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReplenishmentSearchRequest' }
+            example:
+              filters: { q: taladro, categoryIds: [cat-herramientas], priority: [stockout_imminent, low_stock] }
+              scope: mine
+              page: 1
+              pageSize: 24
+              sort: [ { field: priority, order: desc }, { field: coverageDays, order: asc } ]
+      responses:
+        '200':
+          description: OK (ver ejemplo completo en 02-fichas F1)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+
+  /replenishment/recommendations/{id}:
+    patch:
+      tags: [reposicion]
+      summary: Override de cantidad / ignorar / posponer (auditable)
+      operationId: patchRecommendation
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: { type: string, enum: [override, ignore, snooze] }
+                qty: { type: integer, minimum: 1 }
+                snoozeUntil: { type: string, format: date }
+                reason: { type: string, maxLength: 500 }
+              required: [action, reason]
+      responses:
+        '200': { description: Recomendación actualizada }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /proposals:
+    post:
+      tags: [propuestas]
+      summary: Crear propuesta de compra (C1)
+      operationId: createProposal
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProposalRequest' }
+      responses:
+        '201':
+          description: Propuesta creada
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/Proposal' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRule' }
+    get:
+      tags: [propuestas]
+      summary: Listar propuestas
+      operationId: listProposals
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - { name: status, in: query, schema: { type: array, items: { $ref: '#/components/schemas/ProposalStatus' } }, style: form, explode: false }
+        - $ref: '#/components/parameters/Scope'
+      responses:
+        '200': { description: Página de propuestas }
+
+  /proposals/{id}:
+    get:
+      tags: [propuestas]
+      summary: Detalle (agrupado por proveedor, costeo, approvalPreview)
+      operationId: getProposal
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200':
+          description: OK (header ETag = version)
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/Proposal' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [propuestas]
+      summary: Editar metadatos (C2)
+      operationId: patchProposal
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { title: { type: string }, note: { type: string } } }
+      responses:
+        '200': { description: Propuesta actualizada }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /proposals/{id}/lines:
+    post:
+      tags: [propuestas]
+      summary: Agregar línea (C3)
+      operationId: addProposalLine
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, qty]
+              properties:
+                sku: { type: string }
+                qty: { type: integer, minimum: 1 }
+                recommendationId: { type: string }
+      responses:
+        '201': { description: Línea agregada (respuesta = propuesta con totales recalculados) }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRule' }
+
+  /proposals/{id}/lines/{lineId}:
+    patch:
+      tags: [propuestas]
+      summary: Actualizar cantidad (C4)
+      operationId: updateProposalLine
+      parameters: [ { $ref: '#/components/parameters/Id' }, { name: lineId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [qty], properties: { qty: { type: integer, minimum: 1 } } }
+      responses:
+        '200': { description: Línea actualizada }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRule' }
+    delete:
+      tags: [propuestas]
+      summary: Eliminar línea (C5)
+      operationId: deleteProposalLine
+      parameters: [ { $ref: '#/components/parameters/Id' }, { name: lineId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { description: Propuesta con totales recalculados }
+
+  /proposals/{id}/submit:
+    post:
+      tags: [propuestas]
+      summary: Enviar a revisión (C7) — evalúa criterios de Governance
+      operationId: submitProposal
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200':
+          description: in_review (con approval) o approved directo
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  id: prop-2026-000123
+                  status: in_review
+                  version: 7
+                  approval:
+                    id: apr-2026-000455
+                    state: pending
+                    criteria:
+                      - { code: high_amount, thresholdClp: 10000000, actualClp: 12400000 }
+                correlationId: 8c2f6e0a-…
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRule' }
+
+  /proposals/{id}/convert:
+    post:
+      tags: [propuestas]
+      summary: Convertir en OC(s) y encolar emisión SAP (C13, asíncrono)
+      operationId: convertProposal
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '202':
+          description: OC(s) creadas; sapSync=pending (ver 05-integracion-sap)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/ConvertResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRule' }
+
+  /approvals:
+    get:
+      tags: [aprobaciones]
+      summary: Bandeja de aprobaciones (default state=pending)
+      operationId: listApprovals
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [pending, approved, rejected, observed], default: pending } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { description: Página de aprobaciones }
+
+  /approvals/{id}/approve:
+    post:
+      tags: [aprobaciones]
+      summary: Aprobar (C8, solo permiso purchase:proposal:approve)
+      operationId: approve
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { note: { type: string, maxLength: 1000 } } }
+      responses:
+        '200': { description: approved (propuesta pasa a approved) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /approvals/{id}/reject:
+    post:
+      tags: [aprobaciones]
+      summary: Rechazar (C9, reason obligatorio)
+      operationId: reject
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [reason], properties: { reason: { type: string, maxLength: 1000 } } }
+      responses:
+        '200': { description: rejected }
+
+  /approvals/{id}/request-changes:
+    post:
+      tags: [aprobaciones]
+      summary: Solicitar corrección (C10, reason obligatorio; propuesta vuelve editable)
+      operationId: requestChanges
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [reason], properties: { reason: { type: string } } }
+      responses:
+        '200': { description: observed / changes_requested }
+
+  /purchase-orders:
+    get:
+      tags: [ordenes]
+      summary: Listar OC (tabs borradores/órdenes/seguimiento; deep-link ?oc=)
+      operationId: listPurchaseOrders
+      parameters:
+        - { name: tab, in: query, schema: { type: string, enum: [drafts, orders, tracking] } }
+        - { name: oc, in: query, schema: { type: string }, description: número legible para deep-link }
+        - $ref: '#/components/parameters/Scope'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { description: Página de OC }
+
+  /purchase-orders/{id}:
+    get:
+      tags: [ordenes]
+      summary: Detalle de OC (líneas, aprobación, recepciones, sapSync)
+      operationId: getPurchaseOrder
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data: { $ref: '#/components/schemas/PurchaseOrder' }
+
+  /purchase-orders/{id}/sap-status:
+    get:
+      tags: [ordenes]
+      summary: Estado de sincronización SAP (polling liviano; nunca cacheado)
+      operationId: getSapStatus
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  purchaseOrderId: po-2026-000789
+                  sapSync: { status: posted, docEntry: 18342, docNum: 45021, attempts: 1, lastError: null, postedAt: '2026-07-17T12:06:40Z' }
+                correlationId: 8c2f6e0a-…
+
+  /purchase-orders/{id}/cancel:
+    post:
+      tags: [ordenes]
+      summary: Cancelar OC (C14b, reason obligatorio; reglas según sapSync)
+      operationId: cancelPurchaseOrder
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [reason], properties: { reason: { type: string } } }
+      responses:
+        '200': { description: cancelled (local y/o solicitud a SAP según estado) }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /receptions:
+    post:
+      tags: [recepciones]
+      summary: Registrar recepción contra OC (F8)
+      operationId: createReception
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateReceptionRequest' }
+      responses:
+        '201': { description: Reception en checking }
+        '422': { $ref: '#/components/responses/BusinessRule' }
+
+  /suppliers/{id}:
+    get:
+      tags: [proveedores]
+      summary: Ficha de proveedor por pestaña (identidad comerce + relación purchase)
+      operationId: getSupplier
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - { name: tab, in: query, schema: { type: string, enum: [ficha, evaluacion, temporadas, productos, ordenes, recepciones, alertas], default: ficha } }
+      responses:
+        '200': { description: Sección de la ficha (compuesta, degradable) }
+
+  /alerts:
+    get:
+      tags: [alertas]
+      summary: Centro de alertas con estado (módulo Alerts de purchase)
+      operationId: listAlerts
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [active, acknowledged, resolved, dismissed] } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { description: Página de alertas }
+
+  /alerts/{id}/acknowledge:
+    post:
+      tags: [alertas]
+      summary: Atender alerta (C17, transición idempotente)
+      operationId: acknowledgeAlert
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200': { description: acknowledged (repetir devuelve 200 sin cambio) }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT de id-service (claims usuarioId, correo, nombre, plataformaId)
+
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 24 } }
+    Scope: { name: scope, in: query, schema: { type: string, enum: [mine, all], default: mine } }
+    IdempotencyKey:
+      name: idempotency-key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+      description: Obligatoria en comandos de creación/efecto externo (00 §6)
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: { type: string }
+      description: Versión esperada de la entidad ("<version>"); desajuste ⇒ 409 VERSION_CONFLICT
+
+  responses:
+    Unauthenticated:
+      description: JWT ausente/expirado/revocado
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    Forbidden:
+      description: Permiso o alcance de cartera insuficiente
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    NotFound:
+      description: Entidad inexistente
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    Validation:
+      description: Parámetros/body inválidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example:
+            success: false
+            code: VALIDATION_ERROR
+            message: Parámetros inválidos.
+            statusCode: 400
+            details: [ { field: pageSize, issue: 'max 100', actual: 500 } ]
+            retryable: false
+            correlationId: 8c2f6e0a-…
+    Conflict:
+      description: Estado no permite la transición / versión desactualizada / idempotencia
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example:
+            success: false
+            code: VERSION_CONFLICT
+            message: La propuesta fue modificada por otro usuario.
+            statusCode: 409
+            details: { expectedVersion: 6, currentVersion: 7 }
+            retryable: false
+            correlationId: 8c2f6e0a-…
+    BusinessRule:
+      description: Regla de negocio (OTB_EXCEEDED, MOQ_NOT_MET, SUPPLIER_INACTIVE, COST_MISSING, SAP_VALIDATION_ERROR)
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    Downstream:
+      description: Dependencia indispensable no disponible
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example:
+            success: false
+            code: DOWNSTREAM_SERVICE_ERROR
+            message: Un servicio dependiente no está disponible.
+            statusCode: 502
+            details: { service: purchase }
+            retryable: true
+            correlationId: 8c2f6e0a-…
+
+  schemas:
+    ApiResponse:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean, example: true }
+        data: { type: object }
+        correlationId: { type: string }
+
+    ApiError:
+      type: object
+      required: [success, code, message, statusCode]
+      properties:
+        success: { type: boolean, example: false }
+        code: { type: string, example: PURCHASE_PROPOSAL_INVALID_STATE }
+        message: { type: string }
+        statusCode: { type: integer }
+        details: {}
+        retryable: { type: boolean }
+        correlationId: { type: string }
+
+    PageMeta:
+      type: object
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+        hasNext: { type: boolean }
+        hasPrev: { type: boolean }
+        partial: { type: boolean, description: presente y true si hubo degradación }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/Warning' }
+
+    Warning:
+      type: object
+      properties:
+        code: { type: string, example: PRICING_UNAVAILABLE }
+        scope: { type: string, example: 'items[].cost' }
+        message: { type: string }
+        retryable: { type: boolean }
+
+    Context:
+      type: object
+      properties:
+        userId: { type: string }
+        name: { type: string }
+        buyerId: { type: string }
+        role: { type: string, enum: [comprador, lider] }
+        permissions: { type: array, items: { type: string, example: 'purchase:proposal:write' } }
+        platformId: { type: integer }
+        assignedCategories: { type: array, items: { type: string } }
+
+    Dashboard:
+      type: object
+      properties:
+        asOf: { type: string, format: date-time }
+        sections:
+          type: object
+          description: Cada sección trae status ok|degraded y su payload propio
+          additionalProperties: true
+
+    ReplenishmentSearchRequest:
+      type: object
+      properties:
+        filters:
+          type: object
+          properties:
+            q: { type: string }
+            categoryIds: { type: array, items: { type: string } }
+            supplierIds: { type: array, items: { type: string } }
+            priority: { type: array, items: { $ref: '#/components/schemas/Priority' } }
+            status: { type: array, items: { type: string } }
+            warehouseId: { type: string, nullable: true }
+        scope: { type: string, enum: [mine, all], default: mine }
+        page: { type: integer, default: 1 }
+        pageSize: { type: integer, maximum: 100, default: 24 }
+        sort:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              order: { type: string, enum: [asc, desc] }
+
+    Priority:
+      type: string
+      enum: [stockout_imminent, low_stock, opportunity]
+
+    ReplenishmentRow:
+      type: object
+      description: Fila completa de la tabla; procedencia de campos en 03 §5
+      properties:
+        recommendationId: { type: string }
+        sku: { type: string }
+        name: { type: string }
+        brand: { type: string }
+        category: { type: object, properties: { id: { type: string }, name: { type: string } } }
+        supplier: { type: object, properties: { id: { type: string }, name: { type: string }, sapCardCode: { type: string, nullable: true } } }
+        stock:
+          type: object
+          nullable: true
+          properties:
+            available: { type: number }
+            inTransit: { type: number }
+            security: { type: number }
+            asOf: { type: string, format: date-time }
+        sales:
+          type: object
+          properties:
+            dailyVelocity: { type: number, nullable: true }
+            source: { type: string, enum: [analytics, materialized] }
+            stale: { type: boolean }
+        coverageDays: { type: number, nullable: true }
+        priority: { $ref: '#/components/schemas/Priority' }
+        suggestedQty: { type: integer }
+        packMultiple: { type: integer, nullable: true }
+        moq: { type: integer, nullable: true }
+        cost:
+          type: object
+          nullable: true
+          properties:
+            unitCost: { type: integer, description: CLP entero }
+            currency: { type: string, example: CLP }
+            priceListId: { type: string }
+            asOf: { type: string, format: date-time }
+        flags: { type: array, items: { type: string } }
+        status: { type: string }
+        version: { type: integer }
+
+    ProposalStatus:
+      type: string
+      enum: [draft, changes_requested, in_review, approved, converted, rejected, cancelled]
+
+    CreateProposalRequest:
+      type: object
+      properties:
+        title: { type: string, maxLength: 200 }
+        note: { type: string, maxLength: 2000 }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [sku, qty]
+            properties:
+              sku: { type: string }
+              qty: { type: integer, minimum: 1 }
+              recommendationId: { type: string }
+
+    Proposal:
+      type: object
+      properties:
+        id: { type: string, example: prop-2026-000123 }
+        status: { $ref: '#/components/schemas/ProposalStatus' }
+        version: { type: integer }
+        buyerId: { type: string }
+        title: { type: string }
+        supplierGroups:
+          type: array
+          items:
+            type: object
+            properties:
+              supplierId: { type: string }
+              supplierName: { type: string }
+              sapCardCode: { type: string, nullable: true }
+              netTotalClp: { type: integer }
+              lines:
+                type: array
+                items: { $ref: '#/components/schemas/ProposalLine' }
+        totals:
+          type: object
+          properties:
+            netClp: { type: integer }
+            landedClp: { type: integer }
+            lineCount: { type: integer }
+            supplierCount: { type: integer }
+        approvalPreview:
+          type: object
+          properties:
+            wouldRequireApproval: { type: boolean }
+            criteria: { type: array, items: { $ref: '#/components/schemas/ApprovalCriterion' } }
+        approval:
+          nullable: true
+          type: object
+          properties:
+            id: { type: string }
+            state: { type: string, enum: [pending, approved, rejected, observed] }
+            criteria: { type: array, items: { $ref: '#/components/schemas/ApprovalCriterion' } }
+        createdAt: { type: string, format: date-time }
+
+    ProposalLine:
+      type: object
+      properties:
+        lineId: { type: string }
+        sku: { type: string }
+        name: { type: string }
+        qty: { type: integer }
+        unitCostClp: { type: integer, nullable: true, description: null = COST_MISSING (bloquea submit) }
+        landedUnitCostClp: { type: integer, nullable: true }
+        subtotalClp: { type: integer, nullable: true }
+        recommendationId: { type: string, nullable: true }
+        version: { type: integer }
+
+    ApprovalCriterion:
+      type: object
+      properties:
+        code: { type: string, enum: [high_amount, excessive_coverage, new_supplier, out_of_assortment] }
+        thresholdClp: { type: integer, nullable: true }
+        actualClp: { type: integer, nullable: true }
+        thresholdDays: { type: integer, nullable: true }
+        actualDays: { type: number, nullable: true }
+        sku: { type: string, nullable: true }
+
+    ConvertResult:
+      type: object
+      properties:
+        proposalId: { type: string }
+        status: { type: string, example: converted }
+        purchaseOrders:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              number: { type: string, example: OC-2026-0789 }
+              supplierId: { type: string }
+              status: { type: string }
+              netTotalClp: { type: integer }
+              sapSync: { $ref: '#/components/schemas/SapSync' }
+
+    SapSync:
+      type: object
+      description: Única ventana a SAP expuesta al frontend (05-integracion-sap)
+      properties:
+        status: { type: string, enum: [pending, processing, posted, failed, rejected, cancelled] }
+        docEntry: { type: integer, nullable: true }
+        docNum: { type: integer, nullable: true }
+        attempts: { type: integer }
+        lastError: { type: string, nullable: true }
+        postedAt: { type: string, format: date-time, nullable: true }
+
+    PurchaseOrder:
+      type: object
+      properties:
+        id: { type: string }
+        number: { type: string }
+        proposalId: { type: string }
+        supplier: { type: object, properties: { id: { type: string }, name: { type: string }, sapCardCode: { type: string } } }
+        status: { type: string, enum: [approved, sent, confirmed, partially_received, received, closed, cancelled] }
+        version: { type: integer }
+        lines: { type: array, items: { $ref: '#/components/schemas/ProposalLine' } }
+        totals: { type: object }
+        sapSync: { $ref: '#/components/schemas/SapSync' }
+        receptions: { type: array, items: { type: object } }
+        approvalId: { type: string, nullable: true }
+
+    CreateReceptionRequest:
+      type: object
+      required: [purchaseOrderId, warehouseId, items]
+      properties:
+        purchaseOrderId: { type: string }
+        warehouseId: { type: string }
+        packingSlip: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            required: [lineId, qtyReceived]
+            properties:
+              lineId: { type: string }
+              qtyReceived: { type: number, minimum: 0 }
+              condition: { type: string, enum: [ok, damaged, wrong_item], default: ok }
+              note: { type: string }
