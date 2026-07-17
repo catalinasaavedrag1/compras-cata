@@ -42,6 +42,7 @@ import {
 } from "./receptions/helpers";
 import { ReceptionDetail } from "./receptions/ReceptionDetail";
 import { RegisterReceptionDrawer } from "./receptions/RegisterReceptionDrawer";
+import { CreateClaimModal, type ClaimPrefill } from "./claims/CreateClaimModal";
 
 // ============================================================================
 //  Recepciones (flujo 4) conectadas al purchase-bff-service. El mapeo de la
@@ -123,6 +124,8 @@ export function ReceptionsPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  // Reclamo desde una recepción cerrada: OC + recepción prefijadas (flujo 5).
+  const [claimPrefill, setClaimPrefill] = useState<ClaimPrefill | null>(null);
   const [reorderBusySku, setReorderBusySku] = useState<string | null>(null);
 
   // Deep-link: /recepciones?rid=<id|displayId> abre el detalle vía la API.
@@ -315,6 +318,10 @@ export function ReceptionsPage() {
 
   const detailMissing = (detail?.items ?? []).filter((it) => lineMissing(it) > 0);
   const detailActions = detail ? (RECEPTION_NEXT_ACTIONS[detail.status] ?? []) : [];
+  // C22: el reclamo solo puede abrirse sobre una recepción cerrada
+  // (con diferencias o completa) — mismo criterio que valida el dominio.
+  const detailClaimable =
+    detail !== null && (detail.status === "discrepancy" || detail.status === "completed");
 
   // --------------------------------------------------------------------------
   //  Tabla
@@ -784,8 +791,24 @@ export function ReceptionsPage() {
             : ""
         }
         footer={
-          detail && (detailActions.length > 0 || detailMissing.length > 0) ? (
+          detail && (detailActions.length > 0 || detailMissing.length > 0 || detailClaimable) ? (
             <>
+              {detailClaimable && (
+                <Button
+                  variant="secondary"
+                  icon={<IconAlerts className="w-4 h-4" />}
+                  onClick={() =>
+                    setClaimPrefill({
+                      purchaseOrderId: detail.purchaseOrderId,
+                      poNumber: detail.purchaseOrder?.number ?? null,
+                      receptionId: detail.id,
+                      receptionDisplayId: detail.displayId,
+                    })
+                  }
+                >
+                  Crear reclamo
+                </Button>
+              )}
               {detail.status === "discrepancy" && detailMissing.length > 0 && (
                 <Button
                   variant="secondary"
@@ -854,6 +877,11 @@ export function ReceptionsPage() {
           onClose={() => setRejectOpen(false)}
           onConfirm={(reason) => void runTransition("reject", reason)}
         />
+      )}
+
+      {/* Reclamo al proveedor con OC + recepción prefijadas (C22, flujo 5) */}
+      {claimPrefill && (
+        <CreateClaimModal prefill={claimPrefill} onClose={() => setClaimPrefill(null)} />
       )}
 
       {/* Registro manual de recepción contra una OC real (C21) */}

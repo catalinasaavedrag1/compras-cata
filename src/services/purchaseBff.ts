@@ -446,6 +446,71 @@ export type ReceptionPatchBody =
   | { action: "reject"; reason: string };
 
 // ----------------------------------------------------------------------------
+//  Tipos del contrato — Reclamos al proveedor (F5)
+// ----------------------------------------------------------------------------
+
+/** Máquina de estados real (C22): open → in_review → resolved | rejected. */
+export type ClaimStatusBff = "open" | "in_review" | "resolved" | "rejected";
+
+/** Tipos de reclamo del dominio (create-claim.dto). */
+export type ClaimType = "quantity" | "quality" | "price" | "other";
+
+/** Resoluciones posibles al resolver (patch-claim.dto). */
+export type ClaimResolution = "credit_note" | "replacement" | "return" | "none";
+
+/** Acciones del PATCH C22 (transiciones de la máquina). */
+export type ClaimAction = "start_review" | "resolve" | "reject";
+
+/** Fila resumen del listado (toClaimSummary del dominio). */
+export interface ClaimSummaryView {
+  id: string;
+  purchaseOrderId: string;
+  poNumber: string | null;
+  receptionId: string | null;
+  receptionDisplayId: string | null;
+  supplierRef: string;
+  type: ClaimType;
+  status: ClaimStatusBff;
+  resolution: ClaimResolution | null;
+  creditNoteRef: string | null;
+  description: string;
+  dateCreated: string | null;
+  resolvedAt: string | null;
+  version: number;
+}
+
+/** Detalle (toClaimResponse): resumen + reason + bloques OC/recepción. */
+export interface ClaimDetailView extends ClaimSummaryView {
+  reason: string | null;
+  purchaseOrder: { id: string; number: string; supplierRef: string; status: string } | null;
+  reception: { id: string; displayId: string; status: string } | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ClaimListData {
+  items: ClaimSummaryView[];
+  meta: BffPageMeta;
+}
+
+/** Cuerpo del POST /claims (C22: abrir reclamo contra OC y recepción opcional). */
+export interface CreateClaimBody {
+  purchaseOrderId: string;
+  receptionId?: string;
+  type: ClaimType;
+  description: string;
+}
+
+/**
+ * Cuerpo del PATCH /claims/:id. `resolution` es obligatoria en resolve
+ * (creditNoteRef solo con credit_note) y `reason` es obligatorio en reject.
+ */
+export type ClaimPatchBody =
+  | { action: "start_review" }
+  | { action: "resolve"; resolution: ClaimResolution; creditNoteRef?: string }
+  | { action: "reject"; reason: string };
+
+// ----------------------------------------------------------------------------
 //  API pública — Recepciones (F4)
 // ----------------------------------------------------------------------------
 
@@ -503,6 +568,69 @@ export function patchReception(
   body: ReceptionPatchBody
 ): Promise<ReceptionDetailView> {
   return request<ReceptionDetailView>(`/receptions/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...baseHeaders(), ...ifMatch(version) },
+    body: JSON.stringify(body),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Reclamos al proveedor (F5)
+// ----------------------------------------------------------------------------
+
+/** GET /claims — listado resumen con filtros del dominio. */
+export function listClaims(params: {
+  status?: ClaimStatusBff;
+  /** Filtro por proveedor: supplierRef persistido en el reclamo. */
+  supplierId?: string;
+  purchaseOrderId?: string;
+  receptionId?: string;
+  /** Búsqueda por descripción o número de OC (contains). */
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<ClaimListData> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.supplierId) query.set("supplierId", params.supplierId);
+  if (params.purchaseOrderId) query.set("purchaseOrderId", params.purchaseOrderId);
+  if (params.receptionId) query.set("receptionId", params.receptionId);
+  if (params.q) query.set("q", params.q);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 24));
+  return request<ClaimListData>(`/claims?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /claims/:id — detalle con reason y bloques OC/recepción (la versión viaja en el cuerpo). */
+export function getClaim(id: string): Promise<ClaimDetailView> {
+  return request<ClaimDetailView>(`/claims/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /claims — abre un reclamo contra una OC (🔑 idempotente). */
+export function createClaim(body: CreateClaimBody): Promise<ClaimDetailView> {
+  return request<ClaimDetailView>("/claims", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * PATCH /claims/:id — transición de la máquina (If-Match `"<version>"`).
+ * resolve/reject exigen el permiso purchase:claim:resolve en el dominio.
+ */
+export function patchClaim(
+  id: string,
+  version: number,
+  body: ClaimPatchBody
+): Promise<ClaimDetailView> {
+  return request<ClaimDetailView>(`/claims/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { ...baseHeaders(), ...ifMatch(version) },
     body: JSON.stringify(body),

@@ -40,8 +40,7 @@ import {
   formatPercent,
 } from "../utils/formatters";
 import { IconOrders, IconInventory, IconSuppliers } from "../components/ui/icons";
-import { useClaims } from "../context/ClaimsContext";
-import { CLAIM_OPEN_STATES } from "../data/mockClaims";
+import { isOpenClaim, useClaims } from "../context/ClaimsContext";
 import { supplierScore } from "../utils/supplierScore";
 import {
   SUPPLIER_PENDING_WARN_CLP,
@@ -71,11 +70,27 @@ export function SupplierDetailPage() {
     );
   }
 
+  // Reclamos reales del servicio de compras (flujo 5), filtrados por el
+  // supplierRef persistido en el reclamo. Mientras la ficha siga sobre el
+  // maestro mock, la referencia real normalmente no coincide con el nombre y
+  // la lista degrada en silencio a vacía (la ficha se conecta en un flujo
+  // posterior). El contrato no expone montos: el valor en juego queda en 0.
   const supClaims = forSupplier(supplier.name);
-  const openStates = new Set(CLAIM_OPEN_STATES);
-  const openClaims = supClaims.filter((c) => openStates.has(c.estado));
-  const claimsValue = openClaims.reduce((a, c) => a + c.valorReclamado, 0);
-  const score = supplierScore(supplier, supClaims);
+  const openClaims = supClaims.filter((c) => isOpenClaim(c.status));
+  const claimsValue = 0;
+  const score = supplierScore(
+    supplier,
+    // Adaptador al shape que evalúa el score: estado mock equivalente, sin monto.
+    supClaims.map((c) => ({
+      estado:
+        c.status === "resolved"
+          ? ("resuelto" as const)
+          : c.status === "rejected"
+            ? ("rechazado" as const)
+            : ("abierto" as const),
+      valorReclamado: 0,
+    }))
+  );
 
   const supProducts = products.filter((p) => p.supplierName === supplier.name);
   const supSkus = new Set(supProducts.map((p) => p.sku));

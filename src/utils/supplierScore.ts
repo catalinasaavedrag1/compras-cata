@@ -42,7 +42,12 @@ export interface SupplierScore {
   reasons: string[];
 }
 
-export function supplierScore(supplier: Supplier, claims: SupplierClaim[]): SupplierScore {
+export function supplierScore(
+  supplier: Supplier,
+  // Subconjunto estructural: permite alimentar el score tanto con los reclamos
+  // mock como con los reales del BFF (que no traen monto) ya adaptados.
+  claims: Pick<SupplierClaim, "estado" | "valorReclamado">[]
+): SupplierScore {
   const perf = supplierFulfillment(supplier.name);
   const compliance = perf.compliance; // % a tiempo
   const fillRate = perf.fillRate;
