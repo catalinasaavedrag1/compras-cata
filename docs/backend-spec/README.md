@@ -17,6 +17,7 @@ Fecha ancla de la demo: `TODAY_ISO = 2026-06-24` (el backend debe exponer fecha 
 8. [`08-clasificacion.md`](08-clasificacion.md) — cada necesidad clasificada: existe / ampliar / crear / integrar / definir.
 9. [`09-orden-implementacion.md`](09-orden-implementacion.md) — orden de implementación por flujos verticales end-to-end.
 10. [`10-decisiones-pendientes.md`](10-decisiones-pendientes.md) — decisiones de negocio/modelado abiertas, con alternativa razonable propuesta.
+11. [`11-validacion-vista-por-vista.md`](11-validacion-vista-por-vista.md) — auditoría del código real vista por vista: rutas y enums corregidos, escrituras ocultas e inconsistencias detectadas.
 
 ---
 
@@ -55,5 +56,5 @@ Además de los 8 solicitados (**Catalog, Inventory, Pricing, Supplier, Sales, SA
 
 ### Las 3 decisiones de modelado más urgentes (ver doc 10)
 1. **Enlaces por string vs FK reales** entre OC ↔ Aprobación/Decisión (`APR-<n>-<i>`), Recepción→OC (`poNumber`), Reclamo→OC/Recepción. Introducir claves foráneas.
-2. **Tres taxonomías de canal** incompatibles: promo (`redes/ml/web/tienda`), demanda (`tienda/ecommerce/marketplace/empresa/licitaciones`), margen (`marketplace/web/store`), más el enum extendido `CampaignChannel`. Reconciliar.
+2. **Cuatro+ taxonomías de canal** incompatibles: promo (`redes/ml/web/tienda`), demanda (`tienda/ecommerce/marketplace/empresa/licitaciones`), margen (`marketplace/web/store`), señal (`store/web/marketplace/call_center`), más `CampaignChannel`/`PromoChannel`. Reconciliar (doc 10 #2).
 3. **Dos modelos de "campaña"** sin relación (`CampaignPlan` vs `CreatedCampaign`) y **dos costeos "landed"** (`importCost` a nivel orden CLP vs `landedCost` por unidad con logística). Unificar.
