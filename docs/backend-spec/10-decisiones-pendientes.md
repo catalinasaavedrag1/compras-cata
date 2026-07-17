@@ -13,9 +13,13 @@
 - **Propuesta**: introducir FK reales (`purchaseOrderId`, `approvalId`, `receptionId`) y tratar los
   códigos legibles como atributo de presentación, no como clave. **Resolver en Fase 0-1.**
 
-### 2. Tres taxonomías de canal incompatibles
-- **Hoy**: promo (`redes/ml/web/tienda`), demanda (`tienda/ecommerce/marketplace/empresa/licitaciones`),
-  margen (`marketplace/web/store`) + enum extendido `CampaignChannel`.
+### 2. Cuatro+ taxonomías de canal incompatibles (validado)
+- **Hoy** conviven, sin conversión entre sí:
+  - **demanda** `DemandChannel` (5): `tienda/ecommerce/marketplace/empresa/licitaciones` (Temporadas, SeasonPlanner).
+  - **promo** `PromoChannelKey` (4): `redes/ml/web/tienda` (CampaignsPage; performance añade `google_ads/email`).
+  - **margen** `MarginChannelKey` (3): `marketplace/web/store` (ChannelMargin).
+  - **oportunidad/creada** `CampaignChannel` (7) / `PromoChannel` (10, +`google_ads/meta/tiktok`) (Anticipación).
+  - **señal** `SignalChannel` (4): `store/web/marketplace/call_center` (SalesSignals).
 - **Propuesta**: definir un **catálogo único de canales** con mapeo a los alias por contexto; una tabla
   `channels` maestra y vistas que proyecten sus subconjuntos. Confirmar la lista canónica con negocio.
 
@@ -57,6 +61,32 @@
 - **Propuesta**: cada uno es un **contrato de servicio a definir con el dueño de negocio**; el front
   solo fija el **shape de salida esperado** (las interfaces ya tipadas), no la fórmula. Documentar
   entradas/salidas por indicador antes de implementar.
+
+### 12. Fuente de verdad única de las OC (validado — inconsistencia real)
+- **Hoy**: `ReportsPage` lee `mockPurchaseOrders` directo (las OC creadas en sesión **no** aparecen en
+  reportes), mientras `BudgetPage`/OTB **sí** incluye las OC de `compras:po-created`. La misma entidad
+  tiene dos fuentes según la vista.
+- **Propuesta**: una sola colección `purchase-orders` como fuente; reportes y OTB la consumen igual.
+
+### 13. IDs generados en cliente
+- **Hoy**: `OC-2026-{143+n}`, `RFQ-2026-{9+n}`, `CLM-`, `NEG-<Date.now()>`, `CAMP-<hash>`, factura
+  `F-<últimos6>`, señales `uid=Date.now()`. Colisionan entre sesiones/servidor.
+- **Propuesta**: el **servidor** genera todos los IDs; el cliente nunca los inventa.
+
+### 14. Escrituras "fantasma" (acción sin persistencia)
+- **Hoy**: varias acciones solo hacen `toast` o solo escriben bitácora sin mutar estado real:
+  WorkloadPage reasignar/offboard, ChannelMargin "crear tarea", PriceIncreases aprobar (no actualiza costo),
+  SeasonPlanner "replan", ProductDetail MoreActions, NewProducts "programar salida", SettingsPage (reglas
+  en `useState`, no persisten). Documentos "Ver/Descargar" son no-op.
+- **Propuesta**: decidir para cada una si debe tener endpoint real (transición de estado + evento) o
+  quedar como acción informativa. Ninguna debe "parecer" que guardó sin hacerlo.
+
+### 15. Alcance/scoping inconsistente entre vistas
+- **Hoy**: solo algunas vistas filtran por comprador/rol (MyPanel, Productos, Análisis-compra, Margen-canal,
+  Calidad, Decisiones vía scope/`buyer`); Inventario, Ventas, Reportes, Presupuesto, Alzas, Venta-no-capturada,
+  Alertas son **globales** pese a que las categorías tienen `buyer`.
+- **Propuesta**: definir una política de scoping uniforme (qué es "mi cartera" en cada vista) y aplicarla
+  server-side.
 
 ## Seguridad / permisos
 
