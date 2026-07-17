@@ -139,6 +139,7 @@ model PurchaseOrder {
 
   @@index([supplierRef, status])
   @@index([status, dateCreated])
+  @@index([buyerId, status])
   @@map("purchase_orders")
 }
 
@@ -463,9 +464,23 @@ model SupplierRelationship {
   skuTerms     SupplierSkuTerms[]
   agreements   SupplierAgreement[]
   negotiations NegotiationRound[]
+  evaluations  SupplierEvaluation[]
 
   @@index([status])
   @@map("supplier_relationships")
+}
+
+model SupplierEvaluation {
+  id                     String   @id
+  supplierRelationshipId String
+  period                 String   @db.Char(7) // "2026-06"
+  dimensionsJson         String   @db.NVarChar(Max) // calidad|factura|documentos|estabilidad_precio — fórmula pendiente (P15); shape = interfaz tipada del front
+  computedAt             DateTime
+
+  relationship SupplierRelationship @relation(fields: [supplierRelationshipId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([supplierRelationshipId, period])
+  @@map("supplier_evaluations")
 }
 
 model SupplierTerms {
@@ -710,6 +725,22 @@ model ImportDoc {
   importOrder ImportOrder @relation(fields: [importOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("import_docs")
+}
+
+model ProcurementDoc {
+  id               String   @id // "doc-<ulid>"
+  kind             String   // oc_pdf|invoice|certificate|customs|price_list|other
+  title            String   @db.NVarChar(300)
+  refEntity        String?  // purchase_order|reception|claim|import|supplier (nullable: doc suelto)
+  refId            String?
+  supplierRef      String?
+  dmsRef           String   // referencia; el binario vive en DMS (document-generator / storage)
+  uploadedByUserId String
+  dateCreated      DateTime @default(now())
+
+  @@index([refEntity, refId])
+  @@index([supplierRef])
+  @@map("procurement_docs")
 }
 
 model SalesSignal {

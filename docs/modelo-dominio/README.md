@@ -12,8 +12,8 @@
 |---|---|
 | [`00-decisiones-modelado.md`](00-decisiones-modelado.md) | D1–D6: FK reales + códigos como atributo (cierra P1) · N propuestas activas (cierra P2) · identidad de proveedor `supplierRef`+`sapCardCode` (cierra P3) · OTB con entries append-only (cierra P16) · convenciones de esquema · qué NO se modela. Las que requieren ratificación de negocio van marcadas **[RATIFICAR]** con su costo de cambio |
 | [`01-modelo-dominio.md`](01-modelo-dominio.md) | Lenguaje ubicuo ES↔EN · 20+ agregados con invariantes y máquinas de estado · reglas de transacción (1 tx = 1 agregado, excepciones documentadas) · tablas de infraestructura (Outbox, idempotencia, SAP outbox) |
-| [`02-modelo-datos.md`](02-modelo-datos.md) | 32 tablas de dominio + 7 de infraestructura con claves/índices (incl. únicos filtrados críticos: recomendación activa por sku×proveedor, alerta viva por dedupeKey, approval pending por propuesta) · diagrama de relaciones · qué escribe cada transacción crítica · volumetría y retención · mapa evento↔escritura |
-| [`03-schema-draft.prisma`](03-schema-draft.prisma) | Borrador Prisma completo (39 modelos, **validado**) para SQL Server: sin enums nativos ni Json (restricciones reales del provider, igual que pricing/inventory-v3), `onDelete/onUpdate: NoAction` (coherente con "nada se borra"), UXf documentados para crear por SQL en la migración |
+| [`02-modelo-datos.md`](02-modelo-datos.md) | 47 tablas de dominio + 7 de infraestructura con claves/índices (incl. únicos filtrados críticos: recomendación activa por sku×proveedor, alerta viva por dedupeKey, approval pending por propuesta) · diagrama de relaciones · qué escribe cada transacción crítica · volumetría y retención · mapa evento↔escritura |
+| [`03-schema-draft.prisma`](03-schema-draft.prisma) | Borrador Prisma completo (54 modelos, **validado**) para SQL Server: sin enums nativos ni Json (restricciones reales del provider, igual que pricing/inventory-v3), `onDelete/onUpdate: NoAction` (coherente con "nada se borra"), UXf documentados para crear por SQL en la migración |
 
 ## Decisiones clave del modelo (resumen)
 

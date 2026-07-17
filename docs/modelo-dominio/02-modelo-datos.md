@@ -5,7 +5,7 @@
 > Convenciones D5. Leyenda: **PK** clave primaria · **UX** índice único · **IX** índice ·
 > **UXf** único filtrado · FK→ relación física.
 
-## 1. Catálogo de tablas por módulo (32 de dominio + 7 de infraestructura)
+## 1. Catálogo de tablas por módulo (47 de dominio + 7 de infraestructura = 54 modelos)
 
 ### Purchasing
 | Tabla | Claves e índices | Columnas de negocio (resumen) |
@@ -55,6 +55,7 @@
 | `SupplierSkuTerms` | PK `id` · UX `(supplierRelationshipId, sku)` | `sku, moq?, packMultiple?, leadTimeDays?, agreedUnitCostClp?, validFrom` (**fuente del MOQ** — R3) |
 | `SupplierAgreement` | PK `id` · FK→`supplierRelationshipId` | `title, kind, validFrom, validTo?, docRef?, status` |
 | `NegotiationRound` | PK `id` · FK→`supplierRelationshipId` · IX `(dateCreated)` | `status(open\|in_progress\|agreed\|stalled), topic, minutes, outcomeJson?, authorUserId, version` |
+| `SupplierEvaluation` | PK `id` · **UX `(supplierRelationshipId, period)`** | `period(char 7), dimensionsJson(calidad\|factura\|documentos\|estabilidad — fórmula P15; shape = interfaz tipada del front), computedAt` — snapshot mensual del batch E9; respalda `GET /supplier-relations/:id/evaluation` (matriz fila 27) |
 
 ### Budget + Cartera
 | Tabla | Claves e índices | Columnas |
@@ -71,9 +72,10 @@
 | `SeasonPlan` | PK `id` · UX `(seasonId, scenario)` | `scenario, planJson(asOf), trackingJson?, version` |
 | `ForecastAdjustment` | PK `id` · IX `(sku, dateCreated DESC)` | `sku, seasonId?, adjustmentPct, reason, authorUserId` (append-only, vigente = último) |
 | `CampaignOpportunity` | PK `id` · UXf `(dedupeKey) WHERE status IN ('detected','planned','active')` · IX `(status)` | `dedupeKey, sku?, categoryId?, channelRef?, kind, windowFrom, windowTo, evidenceJson, status, version` |
-| `Campaign` | PK `id` · IX `(status)` | `type(ad_space\|opportunity), opportunityId?, title, channelRef?, budgetClp?, startsAt, endsAt, status, version` (P14) |
+| `Campaign` | PK `id` · IX `(status)` | `type(ad_space\|opportunity), opportunityId?, title, channelRef?, budgetClp?, startsAt, endsAt, status, version` (P14 — **absorbe** al `CampaignPlan` del front como `type=ad_space` y a `CreatedCampaign` como `type=opportunity`; matriz fila 15) |
 | `ImportOrder` | PK `id` · FK→`purchaseOrderId?` · IX `(stage)` | `stage, etaDate?, forwarderRef?, stageHistoryJson, version` |
 | `ImportDoc` | PK `id` · FK→`importOrderId` | `kind, dmsRef, uploadedByUserId` (referencia; binario en DMS) |
+| `ProcurementDoc` | PK `id` · IX `(refEntity, refId)` · IX `(supplierRef)` | `kind(oc_pdf\|invoice\|certificate\|customs\|price_list\|other), title, refEntity?, refId?, supplierRef?, dmsRef, uploadedByUserId` — respalda la vista Documentos (matriz fila 39); doc suelto o ligado a OC/recepción/reclamo/importación/proveedor |
 | `SalesSignal` | PK `id` · IX `(status, dateCreated)` · IX `(sku)` | `sku?, supplierRef?, storeRef?, kind, body, reporterUserId, status, version` |
 | `SignalMessage` | PK `id` · FK→`signalId` · IX `(signalId, dateCreated)` | `authorUserId, body` (cursor por `dateCreated,id`) |
 | `CommercialAlert` | PK `id` · **UXf `(dedupeKey) WHERE status='active'`** · IX `(buyerId, status, severity)` | `dedupeKey, ruleKey, type, severity, title, refEntity, refId, buyerId?, status, acknowledgedBy?, resolvedAt?, dismissReason?, version` |
@@ -148,4 +150,7 @@ PurchaseProposal/Approval ──▶ Decision (aprendizaje)          SupplierRela
 3. Colación/`NVARCHAR` vs `VARCHAR` para texto de negocio (español) — default propuesto: `NVARCHAR`.
 4. Confirmar contra el modelo físico de `pricing-service` el patrón exacto de `OutboxEvent` para
    reutilizar su publisher tal cual (V-nuevo, verificación de bajo costo).
+5. Gamificación avanzada (retos, feed de competencia, ligas): el levantamiento la clasifica como
+   derivado/simulado read-only (P15) — se sirve desde `ScoreSnapshot` + cálculo; **sin tablas
+   propias en v1**. Si negocio define retos configurables, se añade `Challenge` (aditivo).
 </content>

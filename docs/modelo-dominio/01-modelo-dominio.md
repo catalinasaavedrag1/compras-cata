@@ -16,12 +16,13 @@
 | Cotización | `Rfq` (+`RfqLine`,`RfqResponse`) | |
 | Recepción | `Reception` (+`ReceptionItem`) | contra OC |
 | Reclamo | `SupplierClaim` | FK OC + recepción |
-| Relación proveedor / condiciones / acuerdos / negociación | `SupplierRelationship` (+`SupplierTerms`, `SupplierSkuTerms`, `SupplierAgreement`, `NegotiationRound`) | identidad en comerce/SAP |
+| Relación proveedor / condiciones / acuerdos / negociación / evaluación | `SupplierRelationship` (+`SupplierTerms`, `SupplierSkuTerms`, `SupplierAgreement`, `NegotiationRound`, `SupplierEvaluation`) | identidad en comerce/SAP |
 | Presupuesto (OTB) | `OtbBucket` (+`OtbEntry`) | |
 | Cartera | `CategoryAssignment` | fuente del alcance |
 | Temporada / ajuste forecast | `Season`, `SeasonPlan`, `ForecastAdjustment` | |
 | Oportunidad / campaña | `CampaignOpportunity`, `Campaign` (unificada, `type`) | P14 |
 | Importación | `ImportOrder` (+`ImportDoc`) | docs = referencia DMS |
+| Documento (vista Documentos) | `ProcurementDoc` | referencia DMS; suelto o ligado a OC/recepción/reclamo/importación/proveedor |
 | Señal de venta | `SalesSignal` (+`SignalMessage`) | |
 | Alerta comercial | `CommercialAlert` | inbox con estado (R1) |
 | Regla de compra / matriz | `PurchaseRule` | umbral como configuración |
@@ -80,6 +81,10 @@
    (consistencia eventual entre agregados, mismo servicio).
 3. Al completar emite `reception.completed` → inventory (efecto físico) y SAP GRN (P6).
 **Máquina:** `expected → in_transit → arrived → checking → completed | discrepancy | rejected`.
+**Creación (dos vías, ambas soportadas):** proyección automática en `expected` cuando la OC pasa a
+`sent` (consumidor interno de `order.sent_to_supplier`), o registro manual directo en `checking`
+(F8) si la mercadería llega sin recepción proyectada — en ese caso el comando crea la fila con
+`arrivedAt = now`.
 
 ### `SupplierClaim` (raíz)
 1. FK `purchaseOrderId` + `receptionId` (nullable si reclamo no ligado a recepción — [RATIFICAR]).
@@ -94,7 +99,8 @@
   (`compliancePct`, `leadTimeDaysObserved`, `pendingAmountClp`) recalculadas por batch (E9/E12) con `asOf`.
 - Hijos: `SupplierTerms` (vigencia por `validFrom`, histórico completo: pago, descuento, flete),
   `SupplierSkuTerms` (**aquí vive el MOQ** y pack/lead-time por SKU — R3), `SupplierAgreement`,
-  `NegotiationRound`.
+  `NegotiationRound`, y `SupplierEvaluation` (snapshot mensual multi-dimensión del batch E9;
+  `dimensionsJson` con fórmula pendiente P15 — el shape lo fija la interfaz tipada del front).
 - Invariante: un solo `SupplierTerms` vigente por proveedor (el de `validFrom` máximo ≤ hoy).
 
 ## 4. Presupuesto, cartera y gobierno
@@ -120,6 +126,8 @@
 - `CampaignOpportunity` (`detected→planned→active→closed|dismissed`) y `Campaign` unificada
   (`type: ad_space|opportunity`, P14).
 - `ImportOrder` (`stage: po→production→shipping→customs→warehouse`) + `ImportDoc` (referencia DMS).
+- `ProcurementDoc`: documento de compra suelto o ligado a OC/recepción/reclamo/importación/proveedor
+  (vista Documentos, fila 39) — siempre referencia (`dmsRef`), nunca el binario.
 - `SalesSignal` + `SignalMessage[]` (hilo, cursor); máquina `new→in_review→actioned|dismissed`.
 - `CommercialAlert`: `dedupeKey` único activo (regla+entidad) — el motor no duplica alertas vivas;
   máquina `active→acknowledged→resolved|dismissed`.
