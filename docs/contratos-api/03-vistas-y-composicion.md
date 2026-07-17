@@ -115,7 +115,7 @@ El BFF une por `supplierId`; ninguna unión se hace en el front.
 | **Lead time** (sin SupplierTerms) | `eta: null` + flag `lead_time_unknown`; no bloquea |
 | **Sales Analytics no responde** | `sales.source="materialized", stale=true` (último valor del motor) + warning global `ANALYTICS_UNAVAILABLE`; cobertura se muestra con esa base |
 | **Stock no responde** | se usa `stockSnapshot` del motor con su `asOf` + warning `STOCK_STALE`; si tampoco existe ⇒ `stock:null` y flag |
-| **comerce no responde** | nombre de proveedor desde snapshot del motor; warning |
+| **comerce no responde** | nombre de proveedor desde snapshot del motor; warning `SUPPLIER_DATA_STALE` |
 
 **Respuesta parcial**: `meta.partial=true` + `warnings[]` (`{code, scope, message, retryable}`) — el
 front pinta banner estándar y por-celda "—" con tooltip del warning.

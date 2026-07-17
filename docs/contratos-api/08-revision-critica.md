@@ -40,11 +40,15 @@
 
 ## 3. Decisiones funcionales pendientes (entregable 10 — ninguna bloquea el diseño, todas marcadas en los contratos)
 
+> **Actualización (paso modelo de dominio):** P1, P2, P3 y P16 quedaron **resueltas por diseño** en
+> `../modelo-dominio/00-decisiones-modelado.md` (D1–D4), con costo de cambio explícito; siguen
+> marcadas **[RATIFICAR]** con negocio pero ya no bloquean nada.
+
 | # | Decisión | Propuesta no vinculante | Bloquea |
 |---|---|---|---|
-| P1 | FK vs string (heredada, ya resuelta en contrato: **FK reales**) | confirmar en modelo de datos | modelo de dominio |
-| P2 | ¿Una propuesta activa por comprador o varias? | varias (contrato ya soporta N) | UX del borrador |
-| P3 | Identidad canónica de proveedor: `comerce.ReferenceId` ↔ `SAP CardCode` | purchase guarda ambas; canónica = CardCode (necesaria para OPOR); cross-ref en `SupplierRelationship` | ficha proveedor, OPOR |
+| P1 | FK vs string — **resuelta (D1)**: FK reales, códigos legibles como atributo | ratificar | — |
+| P2 | ¿Una propuesta activa por comprador o varias? — **resuelta (D2)**: N activas; "borrador activo" = la más reciente | ratificar | — |
+| P3 | Identidad canónica de proveedor — **resuelta (D3)**: `supplierRef` (comerce) canónica + `sapCardCode` obligatorio para emitir | ratificar | — |
 | P4 | Alta de proveedor: ¿upsert `cSupplier` a SAP o exigir CardCode preexistente? | v1: exigir preexistente; upsert = fase posterior | emisión a proveedores nuevos |
 | P5 | Fuente real de velocidad de venta (analysis vs feed OMS vs POS) | definir con dueño de analysis (V1); shape F-EXT-1 fijado | precisión del motor |
 | P6 | GRN/recepción: ¿la origina purchase o inventory `supplying`? | purchase registra negocio; efecto físico+SAP vía inventory sap-sync | fase 2 |
@@ -57,7 +61,7 @@
 | P13 | Taxonomía única de canales (heredada #2): mapear las 3 del front a `comerce sales-channel.ReferenceId` | tabla de mapeo en purchase config | margen canal, demanda |
 | P14 | Unificación de campaña y costeo landed (heredadas #3): una entidad con `type`; landed **por unidad** | ya reflejada en contratos | fase 5 |
 | P15 | Fórmulas de "inteligencia" simulada (evaluación proveedor, atribución, ABC/XYZ, temporada) | contrato por indicador con negocio; el shape tipado del front es el contrato de salida | fases 3–6 |
-| P16 | OTB: fuente de actuals (¿SAP compras facturadas o OC emitidas?) | OC emitidas (plataforma) con conciliación mensual SAP | Budget |
+| P16 | OTB: fuente de actuals — **resuelta (D4)**: OC convertidas con `OtbEntry` append-only + conciliación mensual SAP | ratificar | — |
 
 ## 4. Riesgos técnicos (entregable 11)
 

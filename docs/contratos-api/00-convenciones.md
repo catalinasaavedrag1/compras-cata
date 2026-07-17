@@ -80,7 +80,7 @@ entrega igual y se declara la sección degradada:
 - El BFF **traduce** siempre ese crudo al envoltorio §2 — el frontend jamás ve la forma interna
   (tampoco modelos SAP, entidades Prisma ni formas de otros microservicios; principio #5).
 
-## 4. Catálogo de errores (resumen; catálogo completo en `06` de fichas y OpenAPI)
+## 4. Catálogo de errores (canónico — este es el catálogo completo de la plataforma)
 
 Códigos funcionales expuestos por el BFF y su mapeo al código interno del dominio:
 
@@ -109,6 +109,21 @@ Códigos funcionales expuestos por el BFF y su mapeo al código interno del domi
 
 *Procedencia:* enum de códigos internos = `inventory-service-v3/src/shared/errors/error-codes.ts`;
 `retryable` es la **única extensión** al envoltorio base (exigida por el enunciado).
+
+### 4.1 Códigos de warning (respuesta parcial — viajan en `meta.warnings[]` / `sections[].warning`, nunca como error HTTP)
+
+| `code` (warning) | Significado | Efecto en la vista |
+|---|---|---|
+| `PRICING_UNAVAILABLE` | pricing caído o SKU sin precio en una lectura | `cost: null` por ítem; submit posterior fallará con `COST_MISSING` |
+| `STOCK_UNAVAILABLE` | inventory caído y sin snapshot utilizable | `stock: null` + flag |
+| `STOCK_STALE` | inventory caído; se usa `stockSnapshot` del motor con su `asOf` | dato mostrado con marca de antigüedad |
+| `ANALYTICS_UNAVAILABLE` | Sales/Analytics no responde | `sales.source="materialized", stale=true` |
+| `SUPPLIER_DATA_STALE` | comerce no responde; identidad de proveedor desde snapshot | nombre/estado con marca de antigüedad |
+| `DOWNSTREAM_SERVICE_ERROR` | sección **opcional** de un compuesto caída (p. ej. `budget` del dashboard) | `sections[x].status="degraded"` |
+
+Todos los warnings son `retryable: true` por definición (reflejan indisponibilidad transitoria).
+La misma dependencia caída en un dato **indispensable** no genera warning: genera el error HTTP 502
+`DOWNSTREAM_SERVICE_ERROR` de la tabla principal (qué es indispensable por endpoint: `03` §5).
 
 ## 5. Identidad, sesión y propagación ⚠️ (realidad verificada — condiciona el contrato)
 
