@@ -2050,3 +2050,82 @@ export function getCategoryFicha(categoryId: string): Promise<CategoryFichaData>
     headers: baseHeaders(),
   });
 }
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Paneles de proveedores y categorías (F12)
+// ----------------------------------------------------------------------------
+
+/** Fila del panel de proveedores (GET /suppliers). null = sub-lectura degradada. */
+export interface SupplierPanelRow {
+  supplierId: string;
+  name: string;
+  rut: string | null;
+  sapCardCode: string | null;
+  status: string;
+  compliancePct: number | null;
+  leadTimeDaysObserved: number | null;
+  pendingAmountClp: number | null;
+  purchased90Clp: number | null;
+  openOrders: number | null;
+  skuCount: number | null;
+  categories: string[];
+}
+
+export interface SuppliersPanelData {
+  items: SupplierPanelRow[];
+  meta: ReplenishmentMeta;
+}
+
+/** Fila del panel de categorías (GET /categories). */
+export interface CategoryPanelRow {
+  categoryId: string;
+  name: string;
+  buyerId: string | null;
+  skuCount: number;
+  pendingCount: number;
+  byPriority: { stockout_imminent: number; low_stock: number; opportunity: number };
+  suggestedAmountClp: number;
+  sales30Units: number | null;
+  avgMarginPct: number | null;
+  budget: {
+    month: string;
+    budgetClp: number;
+    committedClp: number;
+    availableClp: number;
+  } | null;
+}
+
+export interface CategoriesPanelData {
+  items: CategoryPanelRow[];
+  warnings?: BffWarning[];
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Paneles de proveedores y categorías (F12)
+// ----------------------------------------------------------------------------
+
+/** GET /suppliers?q=&status= — panel compuesto de proveedores. */
+export function getSuppliersPanel(params?: {
+  q?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<SuppliersPanelData> {
+  const query = new URLSearchParams();
+  if (params?.q) query.set("q", params.q);
+  if (params?.status) query.set("status", params.status);
+  query.set("page", String(params?.page ?? 1));
+  query.set("pageSize", String(params?.pageSize ?? 50));
+  return request<SuppliersPanelData>(`/suppliers?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /categories — panel de categorías (motor + OTB + cartera). */
+export function getCategoriesPanel(): Promise<CategoriesPanelData> {
+  return request<CategoriesPanelData>("/categories", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
