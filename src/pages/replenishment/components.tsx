@@ -721,14 +721,6 @@ function ReasoningSection({
         </li>
       </ul>
 
-      {reasoning.promo && (
-        <div className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-xs text-slate-600">
-          <b className="text-slate-800">Promoción «{reasoning.promo.name}»</b> en{" "}
-          {formatDays(reasoning.promo.daysTo)}: +{formatPercent(reasoning.promo.upliftPct, 0)} de
-          demanda esperada, ya considerada en la cobertura objetivo.
-        </div>
-      )}
-
       <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
         <p>
           <b>Por qué no menos:</b> menor colchón ante una aceleración de venta.

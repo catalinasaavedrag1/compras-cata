@@ -1,29 +1,35 @@
-
-
 import { Card, CardBody, CardHeader } from "../../components/ui/Card";
-
 import { HelpNote } from "../../components/business/HelpNote";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-
 import { EmptyState } from "../../components/ui/EmptyState";
+import { formatCurrency, formatDate } from "../../utils/formatters";
+import { IconPlus, IconCampaign } from "../../components/ui/icons";
+import type { CampaignStatus, CampaignView } from "../../services/purchaseBff";
+import { CAMPAIGN_STATUS_UI, CAMPAIGN_TYPE_UI, nextCampaignActions } from "../campaignsHelpers";
 
-import { formatCurrency, formatDate, formatNumber } from "../../utils/formatters";
+// ============================================================================
+//  "Campañas creadas" reales (GET /campaigns): título, tipo, canal,
+//  presupuesto, vigencia y estado, con la relación opportunityId hacia la
+//  oportunidad que las originó. Los productos con descuento por campaña del
+//  mock no existen en el contrato y se degradaron honestamente.
+// ============================================================================
 
-import { PROMO_CHANNEL_LABELS, CREATED_CAMPAIGN_STATUS } from "../../components/business/campaignLabels";
-import { IconPlus, IconCampaign, IconClose } from "../../components/ui/icons";
-import type { CreatedCampaign } from "../../types/purchasing";
+const fmtDate = (iso: string) => (iso ? formatDate(iso.slice(0, 10)) : "—");
 
 export function CreatedCampaignsView({
   campaigns,
+  opportunityRef,
+  busy,
   onCreate,
-  onDelete,
-  onAddToOc,
+  onTransition,
 }: {
-  campaigns: CreatedCampaign[];
+  campaigns: CampaignView[];
+  /** Referencia legible de la oportunidad ligada (null si no se conoce). */
+  opportunityRef: (opportunityId: string | null) => string | null;
+  busy: boolean;
   onCreate: () => void;
-  onDelete: (id: string) => void;
-  onAddToOc: (sku: string) => void;
+  onTransition: (camp: CampaignView, status: Exclude<CampaignStatus, "planned">) => void;
 }) {
   if (campaigns.length === 0) {
     return (
@@ -31,11 +37,11 @@ export function CreatedCampaignsView({
         <CardBody>
           <EmptyState
             icon={<IconCampaign className="w-6 h-6" />}
-            title="Aún no has creado campañas"
-            description="Crea una campaña (ej. Cyber), elige los canales (web, marketplace, Google Ads, Meta…) y sube los productos que estarán con descuento."
+            title="Aún no hay campañas creadas"
+            description="Planifica una oportunidad y crea desde ella una campaña con título, presupuesto y vigencia. También puedes crear espacios publicitarios en Campañas y descuentos."
             action={
               <Button onClick={onCreate} icon={<IconPlus className="w-4 h-4" />}>
-                Crear campaña
+                Registrar oportunidad
               </Button>
             }
           />
@@ -47,75 +53,64 @@ export function CreatedCampaignsView({
   return (
     <div className="space-y-4">
       <HelpNote variant="tip">
-        Estas son tus campañas. Revisa los productos con <b>stock bajo</b> antes de lanzarlas y
-        agrégalos a una orden de compra para no quebrar durante el evento.
+        Estas son las campañas reales del servicio de compras. El detalle de productos con
+        descuento por campaña estará disponible cuando exista esa fuente.
       </HelpNote>
       {campaigns.map((c) => {
-        const lowStock = c.products.filter((p) => p.availableStock <= 5).length;
-        const avgDiscount = Math.round(
-          c.products.reduce((a, p) => a + p.discountPct, 0) / Math.max(1, c.products.length)
-        );
+        const st = CAMPAIGN_STATUS_UI[c.status];
+        const ty = CAMPAIGN_TYPE_UI[c.type];
+        const ref = opportunityRef(c.opportunityId);
+        const actions = nextCampaignActions(c.status);
         return (
           <Card key={c.id}>
             <CardHeader
-              title={c.name}
-              description={`${formatDate(c.startDate)} → ${formatDate(c.endDate)} · ${c.products.length} producto${c.products.length === 1 ? "" : "s"} · ${avgDiscount}% dcto promedio`}
+              title={c.title}
+              description={`${fmtDate(c.startsAt)} → ${fmtDate(c.endsAt)}${c.userCreated ? ` · creada por ${c.userCreated}` : ""}`}
               action={
                 <div className="flex items-center gap-2">
-                  <Badge tone={CREATED_CAMPAIGN_STATUS[c.status].tone} dot>
-                    {CREATED_CAMPAIGN_STATUS[c.status].label}
+                  <Badge tone={st.tone} dot>
+                    {st.label}
                   </Badge>
-                  <button
-                    onClick={() => onDelete(c.id)}
-                    className="text-slate-400 hover:text-rose-600"
-                    aria-label="Eliminar campaña"
-                  >
-                    <IconClose className="w-4 h-4" />
-                  </button>
                 </div>
               }
             />
             <CardBody>
               <div className="flex flex-wrap gap-1.5 mb-3">
-                {c.channels.map((ch) => (
-                  <Badge key={ch} tone="blue">
-                    {PROMO_CHANNEL_LABELS[ch]}
-                  </Badge>
-                ))}
-                {lowStock > 0 && (
-                  <Badge tone="red">{lowStock} con stock bajo — revisa compra</Badge>
+                <Badge tone={ty.tone}>{ty.label}</Badge>
+                {c.channelRef && <Badge tone="blue">{c.channelRef}</Badge>}
+                {c.opportunityId && (
+                  <Badge tone="amber">Oportunidad: {ref ?? c.opportunityId}</Badge>
                 )}
               </div>
-              <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-                {c.products.map((p) => (
-                  <div key={p.sku} className="flex flex-wrap items-center gap-3 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <span className="text-xs font-mono text-slate-400">{p.sku}</span>
-                      <p className="text-sm font-medium text-slate-800 truncate">{p.productName}</p>
-                      <p className="text-xs text-slate-500">
-                        Stock {formatNumber(p.availableStock)}
-                        {p.availableStock <= 5 && (
-                          <span className="text-rose-500 font-medium"> · stock bajo</span>
-                        )}
-                      </p>
-                    </div>
-                    <Badge tone="amber">-{p.discountPct}%</Badge>
-                    <div className="text-right w-28">
-                      <p className="text-xs text-slate-400 line-through">
-                        {formatCurrency(p.basePrice)}
-                      </p>
-                      <p className="text-sm font-semibold text-emerald-600">
-                        {formatCurrency(p.campaignPrice)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => onAddToOc(p.sku)}
-                      className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                    >
-                      Ver producto
-                    </button>
+              <div className="flex flex-wrap items-center gap-6">
+                <div>
+                  <p className="text-xs text-slate-400">Presupuesto</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {c.budgetClp !== null ? formatCurrency(c.budgetClp) : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Venta atribuida</p>
+                  <p className="text-sm font-semibold text-slate-400">—</p>
+                  <p className="text-[11px] text-slate-400">
+                    Disponible cuando exista la fuente de venta por campaña
+                  </p>
+                </div>
+                {actions.length > 0 && (
+                  <div className="flex items-center gap-2 ml-auto">
+                    {actions.map((a) => (
+                      <Button
+                        key={a.status}
+                        size="sm"
+                        variant={a.primary ? "primary" : "secondary"}
+                        disabled={busy}
+                        onClick={() => onTransition(c, a.status)}
+                      >
+                        {a.label}
+                      </Button>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </CardBody>
           </Card>
