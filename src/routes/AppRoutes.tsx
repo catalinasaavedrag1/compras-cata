@@ -9,7 +9,6 @@ import { BuyerProvider } from "../context/BuyerContext";
 import { RoleProvider } from "../context/RoleContext";
 import { NotificationProvider } from "../context/NotificationContext";
 import { SignalsProvider } from "../context/SignalsContext";
-import { PurchaseFlowProvider } from "../context/PurchaseFlowContext";
 import { DataProvider } from "../context/DataContext";
 import { DensityProvider } from "../context/DensityContext";
 import { ClaimsProvider } from "../context/ClaimsContext";
@@ -128,7 +127,6 @@ export default function AppRoutes() {
               <BuyerProvider>
                 <NotificationProvider>
                   <OcDraftProvider>
-                    <PurchaseFlowProvider>
                       <ClaimsProvider>
                       <TraceProvider>
                       <SignalsProvider>
@@ -279,7 +277,6 @@ export default function AppRoutes() {
                       </SignalsProvider>
                       </TraceProvider>
                       </ClaimsProvider>
-                    </PurchaseFlowProvider>
                   </OcDraftProvider>
                 </NotificationProvider>
               </BuyerProvider>

@@ -2300,3 +2300,98 @@ export function addSignalComment(
     body: JSON.stringify(body),
   });
 }
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Decisiones y aprendizaje (F14)
+// ----------------------------------------------------------------------------
+
+export type DecisionBffOutcome = "pending" | "hit" | "miss" | "mixed";
+
+/** Línea de la proyección: qué se compró vs qué sugería el motor al decidir. */
+export interface DecisionProjectionLine {
+  sku?: string;
+  skuName?: string | null;
+  supplierId?: string | null;
+  boughtQty?: number | null;
+  unitCostClp?: number | null;
+  recommendationId?: string | null;
+  suggestedQtyAtDecision?: number | null;
+  coverageAtDecision?: number | null;
+}
+
+export interface DecisionProjection {
+  netTotalClp?: number | null;
+  lineCount?: number;
+  supplierCount?: number;
+  lines?: DecisionProjectionLine[];
+  asOf?: string;
+}
+
+/** Resultado del evaluador E8 (estado fresco del motor a windowDays). */
+export interface DecisionResult {
+  evaluatedWith?: string;
+  asOf?: string;
+  skuCount?: number;
+  backInCritical?: string[];
+  backInLowStock?: string[];
+  note?: string;
+}
+
+export interface DecisionView {
+  id: string;
+  proposalId: string;
+  approvalId: string | null;
+  buyerId: string;
+  summary: string;
+  projection: DecisionProjection | null;
+  result: DecisionResult | null;
+  windowDays: number;
+  outcome: DecisionBffOutcome;
+  evaluatedAt: string | null;
+  dateCreated: string;
+}
+
+export interface DecisionListData {
+  items: DecisionView[];
+  meta: ReplenishmentMeta;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Decisiones y aprendizaje (F14)
+// ----------------------------------------------------------------------------
+
+/** GET /decisions — historial (scope mine/all, filtros outcome/q). */
+export function listDecisions(params?: {
+  outcome?: DecisionBffOutcome;
+  q?: string;
+  buyerId?: string;
+  scope?: "mine" | "all";
+  page?: number;
+  pageSize?: number;
+}): Promise<DecisionListData> {
+  const query = new URLSearchParams();
+  if (params?.outcome) query.set("outcome", params.outcome);
+  if (params?.q) query.set("q", params.q);
+  if (params?.buyerId) query.set("buyerId", params.buyerId);
+  if (params?.scope) query.set("scope", params.scope);
+  query.set("page", String(params?.page ?? 1));
+  query.set("pageSize", String(params?.pageSize ?? 50));
+  return request<DecisionListData>(`/decisions?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /decisions — registro manual anotado sobre una propuesta (🔑). */
+export function createDecision(body: {
+  proposalId: string;
+  summary: string;
+  windowDays?: number;
+  projection?: DecisionProjection;
+}): Promise<DecisionView> {
+  return request<DecisionView>("/decisions", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
