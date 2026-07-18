@@ -33,15 +33,15 @@ import type { AgendaItem } from "./types";
 //  - Agenda ← recepciones por llegar, OC con problema SAP y reclamos abiertos.
 //  - Trabajo pendiente ← pendingCount del motor, propuestas en trabajo
 //    (useProposals, flujo 2-3) y aprobaciones del dashboard (si hay permiso).
-//  Los accesos a proveedores/señales siguen alimentados por mocks (flujos
-//  posteriores) y llegan como conteos desde MyPanelPage.
+//  Los conteos de proveedores (panel F12) y señales (F13) también son reales y
+//  llegan desde MyPanelPage; null = fuente cargando o degradada ⇒ "—".
 // ============================================================================
 
 interface InicioPortadaConnectedProps {
-  /** Conteo mock de proveedores por revisar (flujo posterior). */
-  suppliersToReviewCount: number;
-  /** Conteo mock de señales de ventas (flujo posterior). */
-  salesSignalsCount: number;
+  /** Proveedores por revisar según el panel real (null = sin dato aún). */
+  suppliersToReviewCount: number | null;
+  /** Señales de ventas pendientes reales (null = sin dato aún). */
+  salesSignalsCount: number | null;
 }
 
 /** Urgencia, tono y orden por prioridad del motor de reposición. */
@@ -351,7 +351,10 @@ export function InicioPortadaConnected({
     {
       id: "proveedores",
       label: "Proveedores por contactar",
-      detail: "Bajo cumplimiento o sin respuesta",
+      detail:
+        suppliersToReviewCount === null
+          ? "No disponible por ahora"
+          : "En observación o bloqueados",
       count: suppliersToReviewCount,
       tone: "amber",
       to: "/proveedores",
@@ -359,7 +362,10 @@ export function InicioPortadaConnected({
     {
       id: "senales",
       label: "Señales de ventas por resolver",
-      detail: "Reportes del equipo de ventas en tus categorías",
+      detail:
+        salesSignalsCount === null
+          ? "No disponible por ahora"
+          : "Reportes del equipo de ventas pendientes de decisión",
       count: salesSignalsCount,
       tone: "violet",
       to: "/senales-ventas",
