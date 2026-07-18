@@ -2677,3 +2677,292 @@ export function createExport(reportId: string): Promise<ExportJobView> {
     body: JSON.stringify({ reportId }),
   });
 }
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Temporadas y campañas (F18)
+// ----------------------------------------------------------------------------
+
+export type SeasonStatus = "planned" | "buying" | "selling" | "closed";
+
+export type SeasonScenario = "base" | "optimista" | "conservador";
+
+export interface SeasonPlanTracking {
+  computedAt: string;
+  orderCount: number;
+  totalCommittedClp: number;
+  byCategory: Record<string, number>;
+}
+
+export interface SeasonPlanView {
+  id: string;
+  scenario: SeasonScenario;
+  /** Estructura del plan (byCategory.plannedClp, notes) — la fija el planner. */
+  plan: {
+    byCategory?: Record<string, { plannedClp?: number }>;
+    notes?: string;
+  } | null;
+  tracking: SeasonPlanTracking | null;
+  version: number;
+  dateModified: string;
+}
+
+export interface SeasonView {
+  id: string;
+  code: string;
+  name: string;
+  salesFrom: string;
+  salesTo: string;
+  buyFrom: string;
+  buyTo: string;
+  status: SeasonStatus;
+  plans: SeasonPlanView[];
+}
+
+export interface ForecastAdjustmentView {
+  id: string;
+  sku: string;
+  seasonId: string | null;
+  adjustmentPct: number | null;
+  reason: string;
+  authorUserId: string;
+  dateCreated: string;
+}
+
+export type CampaignOpportunityStatus =
+  | "detected"
+  | "planned"
+  | "active"
+  | "closed"
+  | "dismissed";
+
+export interface CampaignOpportunityView {
+  id: string;
+  kind: string;
+  sku: string | null;
+  categoryId: string | null;
+  channelRef: string | null;
+  windowFrom: string;
+  windowTo: string;
+  evidence: Record<string, unknown> | null;
+  status: CampaignOpportunityStatus;
+  campaignCount: number;
+  version: number;
+  dateCreated: string;
+  dateModified: string;
+}
+
+export type CampaignStatus = "planned" | "active" | "closed" | "cancelled";
+
+export type CampaignType = "ad_space" | "opportunity";
+
+export interface CampaignView {
+  id: string;
+  type: CampaignType;
+  opportunityId: string | null;
+  title: string;
+  channelRef: string | null;
+  budgetClp: number | null;
+  startsAt: string;
+  endsAt: string;
+  status: CampaignStatus;
+  version: number;
+  dateCreated: string;
+  userCreated: string;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Temporadas y campañas (F18)
+// ----------------------------------------------------------------------------
+
+/** GET /seasons — temporadas con sus planes por escenario. */
+export function listSeasons(): Promise<{ items: SeasonView[]; total: number }> {
+  return request<{ items: SeasonView[]; total: number }>("/seasons", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /seasons/:id — detalle con planes. */
+export function getSeason(id: string): Promise<SeasonView> {
+  return request<SeasonView>(`/seasons/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /seasons — crear temporada (🔑; código único ⇒ 409). */
+export function createSeason(body: {
+  code: string;
+  name: string;
+  salesFrom: string;
+  salesTo: string;
+  buyFrom: string;
+  buyTo: string;
+}): Promise<SeasonView> {
+  return request<SeasonView>("/seasons", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** PATCH /seasons/:id — avanzar ciclo y/o fechas (retroceder ⇒ 409). */
+export function patchSeason(
+  id: string,
+  body: {
+    status?: Exclude<SeasonStatus, "planned">;
+    salesFrom?: string;
+    salesTo?: string;
+    buyFrom?: string;
+    buyTo?: string;
+  }
+): Promise<SeasonView> {
+  return request<SeasonView>(`/seasons/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: baseHeaders(),
+    body: JSON.stringify(body),
+  });
+}
+
+/** PUT /seasons/:id/plans/:scenario — upsert del plan (If-Match si existe). */
+export function putSeasonPlan(
+  id: string,
+  scenario: SeasonScenario,
+  plan: NonNullable<SeasonPlanView["plan"]>,
+  version?: number
+): Promise<SeasonPlanView> {
+  const headers =
+    version !== undefined
+      ? { ...baseHeaders(), "If-Match": `"${version}"` }
+      : baseHeaders();
+  return request<SeasonPlanView>(
+    `/seasons/${encodeURIComponent(id)}/plans/${encodeURIComponent(scenario)}`,
+    { method: "PUT", headers, body: JSON.stringify({ plan }) }
+  );
+}
+
+/** GET /seasons/forecast-adjustments — ajustes auditados (filtros sku/seasonId). */
+export function listForecastAdjustments(params?: {
+  sku?: string;
+  seasonId?: string;
+}): Promise<{ items: ForecastAdjustmentView[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params?.sku) query.set("sku", params.sku);
+  if (params?.seasonId) query.set("seasonId", params.seasonId);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ items: ForecastAdjustmentView[]; total: number }>(
+    `/seasons/forecast-adjustments${suffix}`,
+    { method: "GET", headers: baseHeaders() }
+  );
+}
+
+/** POST /seasons/forecast-adjustments — ajuste por SKU con motivo (🔑). */
+export function createForecastAdjustment(body: {
+  sku: string;
+  seasonId?: string;
+  adjustmentPct: number;
+  reason: string;
+}): Promise<ForecastAdjustmentView> {
+  return request<ForecastAdjustmentView>("/seasons/forecast-adjustments", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** GET /campaign-opportunities — oportunidades (filtros status/kind). */
+export function listCampaignOpportunities(params?: {
+  status?: CampaignOpportunityStatus;
+  kind?: string;
+}): Promise<{ items: CampaignOpportunityView[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  if (params?.kind) query.set("kind", params.kind);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ items: CampaignOpportunityView[]; total: number }>(
+    `/campaign-opportunities${suffix}`,
+    { method: "GET", headers: baseHeaders() }
+  );
+}
+
+/** POST /campaign-opportunities — registrar oportunidad (🔑; duplicada ⇒ 409). */
+export function createCampaignOpportunity(body: {
+  kind: string;
+  sku?: string;
+  categoryId?: string;
+  channelRef?: string;
+  windowFrom: string;
+  windowTo: string;
+  evidence: Record<string, unknown>;
+}): Promise<CampaignOpportunityView> {
+  return request<CampaignOpportunityView>("/campaign-opportunities", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** PATCH /campaign-opportunities/:id — ciclo (If-Match; descartar exige motivo). */
+export function patchCampaignOpportunity(
+  id: string,
+  version: number,
+  body: { status: Exclude<CampaignOpportunityStatus, "detected">; reason?: string }
+): Promise<CampaignOpportunityView> {
+  return request<CampaignOpportunityView>(
+    `/campaign-opportunities/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { ...baseHeaders(), "If-Match": `"${version}"` },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+/** GET /campaigns — campañas (filtros status/type). */
+export function listCampaigns(params?: {
+  status?: CampaignStatus;
+  type?: CampaignType;
+}): Promise<{ items: CampaignView[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  if (params?.type) query.set("type", params.type);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ items: CampaignView[]; total: number }>(`/campaigns${suffix}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /campaigns — crear campaña (🔑; opportunity exige opportunityId). */
+export function createCampaign(body: {
+  type: CampaignType;
+  title: string;
+  opportunityId?: string;
+  channelRef?: string;
+  budgetClp?: number;
+  startsAt: string;
+  endsAt: string;
+}): Promise<CampaignView> {
+  return request<CampaignView>("/campaigns", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** PATCH /campaigns/:id — ciclo/presupuesto/fecha fin (If-Match). */
+export function patchCampaign(
+  id: string,
+  version: number,
+  body: {
+    status?: Exclude<CampaignStatus, "planned">;
+    budgetClp?: number;
+    endsAt?: string;
+  }
+): Promise<CampaignView> {
+  return request<CampaignView>(`/campaigns/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...baseHeaders(), "If-Match": `"${version}"` },
+    body: JSON.stringify(body),
+  });
+}
