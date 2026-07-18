@@ -2,23 +2,11 @@ import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Button } from "../components/ui/Button";
-import {
-  IconAlerts,
-  IconReplenish,
-  IconTruck,
-  IconClock,
-  IconCampaign,
-} from "../components/ui/icons";
+import { IconAlerts, IconReplenish } from "../components/ui/icons";
 import { products } from "../data/mockProducts";
 import { recommendations } from "../data/mockRecommendations";
 import { suppliers } from "../data/mockSuppliers";
-import { campaignOpportunities } from "../data/mockCampaignOpportunities";
-import { orderBySignal } from "../utils/orderConsolidation";
-import {
-  InicioPortada,
-  type AgendaEntry,
-  type PendingWork,
-} from "./myPanel/InicioPortada";
+import { InicioPortadaConnected } from "./myPanel/InicioPortadaConnected";
 import { purchaseOrders } from "../data/mockPurchaseOrders";
 import { categories } from "../data/mockCategories";
 import { useBuyer } from "../context/BuyerContext";
@@ -34,17 +22,9 @@ import {
 import { TODAY_ISO } from "../utils/constants";
 import { seasonalFactor } from "../utils/seasonality";
 import { lostOpportunities } from "../utils/lostOpportunities";
-import { usePurchaseFlow } from "../context/PurchaseFlowContext";
-import {
-  formatCurrencyCompact,
-  formatDate,
-  formatDays,
-  formatNumber,
-  formatPercent,
-} from "../utils/formatters";
+import { formatDays, formatPercent } from "../utils/formatters";
 import type { Product } from "../types/purchasing";
 import type {
-  AgendaItem,
   BrandPortfolioRow,
   KeyProductRow,
   PortfolioFocus,
@@ -89,7 +69,6 @@ export function MyPanelPage() {
           ? "oportunidades"
           : "resumen";
   const { buyer, myCategories } = useBuyer();
-  const { approvals } = usePurchaseFlow();
   const { signals } = useSignals();
 
   // Señales de ventas que me tocan: asignadas a mí, o de mis categorías sin asignar.
@@ -107,7 +86,7 @@ export function MyPanelPage() {
       })
       .slice(0, 5);
   }, [signals, buyer, myCategories]);
-  const { addItem, hasItem, count: draftCount, totalAmount: draftTotal } = useOcDraft();
+  const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
 
   const myProducts = useMemo(
@@ -347,13 +326,12 @@ export function MyPanelPage() {
     return { productRows, brandRows, supplierRows, opportunities, health };
   }, [myProducts, myCategories, portfolio, salesPace.faster.length, salesPace.slower.length]);
 
-  // Oportunidades no capturadas y aprobaciones del comprador
+  // Oportunidades no capturadas del comprador
   const myLostOpps = useMemo(
     () => lostOpportunities().filter((o) => myCategories.includes(o.category)),
     [myCategories]
   );
   const myLostRevenue = myLostOpps.reduce((a, o) => a + o.ventaPerdida, 0);
-  const myApprovals = approvals.filter((a) => a.buyerName === buyer);
 
   // Riesgo de quiebre: sin stock con venta, o cobertura corta vs lead time
   const riskRows = useMemo<RiskRow[]>(() => {
@@ -494,316 +472,6 @@ export function MyPanelPage() {
     newProductsToReview.length,
   ]);
 
-  // ---- Agenda de decisiones: prioridad + impacto + urgencia ----
-  const daysTo = (iso: string) =>
-    Math.round(
-      (new Date(`${iso}T00:00:00`).getTime() - new Date(`${TODAY_ISO}T00:00:00`).getTime()) /
-        86400000
-    );
-
-  const agenda: AgendaItem[] = [];
-  riskRows.forEach((r) => {
-    const due = r.product.availableStock <= 0 ? TODAY_ISO : (r.stockoutDate ?? TODAY_ISO);
-    const riskRevenue = Math.round(Math.max(1, r.product.salesLast30Days) * r.product.price);
-    agenda.push({
-      id: `q-${r.product.sku}`,
-      dueDate: due,
-      days: Math.max(daysTo(due), r.product.availableStock <= 0 ? -1 : daysTo(due)),
-      kind: "Compra",
-      urgency: r.product.availableStock <= 0 ? "CRÍTICO · HOY" : "ALTA PRIORIDAD",
-      title: r.product.name,
-      meta: `${r.product.availableStock <= 0 ? "Quiebre activo" : "Riesgo de quiebre"} · stock ${formatNumber(r.product.availableStock)} u. · cobertura ${formatDays(r.coverage)}`,
-      impact: `Venta en riesgo: ${formatCurrencyCompact(riskRevenue)}`,
-      recommendation: `Recomendación: comprar ${formatNumber(r.suggestedQty)} u.`,
-      actionLabel: "Revisar compra",
-      to: `/productos/${r.product.sku}`,
-      tone: "red",
-      priority: r.product.availableStock <= 0 ? 1000 : 900 - Math.min(200, Math.round(r.coverage)),
-      impactValue: riskRevenue,
-    });
-  });
-  salesPace.faster.slice(0, 3).forEach((r) => {
-    const salesValue = Math.round(r.product.salesLast30Days * r.product.price);
-    agenda.push({
-      id: `fast-${r.product.sku}`,
-      dueDate: TODAY_ISO,
-      days: 0,
-      kind: "Inventario",
-      urgency: r.coverage <= r.product.supplierLeadTimeDays * 2 ? "ALTA PRIORIDAD" : "HOY",
-      title: r.product.name,
-      meta: `Venta ${formatNumber(Math.round(r.diffPct * 100))}% sobre lo esperado · cobertura ${formatDays(r.coverage)}`,
-      impact: `Venta mensual: ${formatCurrencyCompact(salesValue)}`,
-      recommendation:
-        r.coverage <= r.product.supplierLeadTimeDays * 2
-          ? "Recomendación: anticipar compra"
-          : "Recomendación: revisar profundidad",
-      actionLabel: "Revisar stock",
-      to: `/productos/${r.product.sku}`,
-      tone: r.coverage <= r.product.supplierLeadTimeDays * 2 ? "red" : "blue",
-      priority: r.coverage <= r.product.supplierLeadTimeDays * 2 ? 830 : 620,
-      impactValue: salesValue,
-    });
-  });
-  salesPace.slower.slice(0, 3).forEach((r) => {
-    const exposedCapital = Math.round(r.product.availableStock * r.product.cost);
-    agenda.push({
-      id: `slow-${r.product.sku}`,
-      dueDate: addDaysISO(TODAY_ISO, 7),
-      days: 7,
-      kind: "Margen",
-      urgency: "ESTA SEMANA",
-      title: r.product.name,
-      meta: `Venta ${formatNumber(Math.abs(Math.round(r.diffPct * 100)))}% bajo lo esperado · stock ${formatNumber(r.product.availableStock)} u.`,
-      impact: `Capital expuesto: ${formatCurrencyCompact(exposedCapital)}`,
-      recommendation: "Recomendación: frenar recompra o activar salida",
-      actionLabel: "Revisar venta",
-      to: `/productos/${r.product.sku}`,
-      tone: "amber",
-      priority: 520,
-      impactValue: exposedCapital,
-    });
-  });
-  myOpenOrders.forEach((o) => {
-    agenda.push({
-      id: `oc-${o.id}`,
-      dueDate: o.expectedDate,
-      days: daysTo(o.expectedDate),
-      kind: "OC",
-      urgency: o.delayedDays > 0 ? `ATRASADO · ${o.delayedDays} DÍAS` : "POR RECIBIR",
-      title: o.number,
-      meta: `${o.supplierName} · ${formatCurrencyCompact(o.totalAmount)} pendientes · ${o.skuCount} SKU afectados`,
-      impact:
-        o.delayedDays > 0
-          ? `${o.delayedDays} días de atraso`
-          : `Entrega esperada ${formatDate(o.expectedDate)}`,
-      recommendation: "Recomendación: confirmar entrega o ajustar reposición",
-      actionLabel: "Revisar OC",
-      to: "/comprar/seguimiento",
-      tone: o.delayedDays > 0 ? "red" : "amber",
-      priority: o.delayedDays > 0 ? 880 + Math.min(80, o.delayedDays) : 560,
-      impactValue: o.totalAmount,
-    });
-  });
-  mySuppliersToReview.forEach((s) => {
-    const add = s.status === "delayed" ? 0 : s.status === "review" ? 14 : 30;
-    const due = addDaysISO(TODAY_ISO, add);
-    agenda.push({
-      id: `prov-${s.id}`,
-      dueDate: due,
-      days: daysTo(due),
-      kind: "Proveedor",
-      urgency: s.status === "delayed" ? "ALTA PRIORIDAD" : "SEGUIMIENTO",
-      title: s.name,
-      meta: `Cumplimiento ${s.deliveryCompliance}% · última compra ${formatDate(s.lastPurchaseDate)}`,
-      impact: `${s.categories.filter((c) => myCategories.includes(c)).length} categorías afectadas`,
-      recommendation: "Recomendación: revisar cumplimiento y alternativas",
-      actionLabel: "Revisar proveedor",
-      to: "/proveedores",
-      tone: "amber",
-      priority: s.status === "delayed" ? 760 : 470,
-      impactValue: 0,
-    });
-  });
-  overstockProducts.forEach((p) => {
-    const exposedCapital = Math.round(p.availableStock * p.cost);
-    const due = addDaysISO(TODAY_ISO, 30);
-    agenda.push({
-      id: `over-${p.sku}`,
-      dueDate: due,
-      days: daysTo(due),
-      kind: "Inventario",
-      urgency: "DESPUÉS",
-      title: p.name,
-      meta: `Sobrestock · ${formatNumber(p.availableStock)} u. · ${formatNumber(p.inventoryDays)} días inv.`,
-      impact: `${formatCurrencyCompact(exposedCapital)} inmovilizado`,
-      recommendation: "Recomendación: liquidar, transferir o pausar compra",
-      actionLabel: "Revisar sobrestock",
-      to: `/productos/${p.sku}`,
-      tone: "violet",
-      priority: 390,
-      impactValue: exposedCapital,
-    });
-  });
-  myApprovals.forEach((a) => {
-    agenda.push({
-      id: `apr-${a.id}`,
-      dueDate: a.date,
-      days: daysTo(a.date),
-      kind: "Aprobación",
-      urgency: "REQUIERE DECISIÓN",
-      title: a.productName,
-      meta: `${a.supplierName} · solicitado ${formatNumber(a.requestedQty)} u. vs sugerido ${formatNumber(a.suggestedQty)} u.`,
-      impact: `Monto: ${formatCurrencyCompact(a.amount)}`,
-      recommendation: `Motivo: ${a.justification}`,
-      actionLabel: "Revisar aprobación",
-      to: "/comprar/aprobaciones",
-      tone: "amber",
-      priority: 780,
-      impactValue: a.amount,
-    });
-  });
-
-  const priorityAgenda = [...agenda].sort(
-    (a, b) => b.priority - a.priority || b.impactValue - a.impactValue || a.days - b.days
-  );
-  const agendaCounts = {
-    prioridad: agenda.length,
-    hoy: agenda.filter((a) => a.days <= 0).length,
-    semana: agenda.filter((a) => a.days > 0 && a.days <= 7).length,
-    despues: agenda.filter((a) => a.days > 7).length,
-  };
-  // ==========================================================================
-  //  Portada de Inicio (bandeja diaria del comprador).
-  //  Prioridades + agenda + resumen + trabajo pendiente, en vez de un dashboard.
-  // ==========================================================================
-  const portadaPriorities = priorityAgenda.slice(0, 6);
-
-  const portadaSummary = {
-    categorias: myCategories.length,
-    quiebres: riskRows.filter((r) => r.product.availableStock <= 0).length,
-    riesgos: riskRows.length,
-    sobrestock: formatCurrencyCompact(portfolio.overstockValue),
-    ocAtrasadas: myOpenOrders.filter((o) => o.delayedDays > 0).length,
-  };
-
-  const whenLabel = (days: number): string =>
-    days <= 0 ? "hoy" : days === 1 ? "mañana" : days <= 30 ? `${days}d` : formatDate(addDaysISO(TODAY_ISO, days)).slice(0, 5);
-
-  const portadaAgenda = useMemo<AgendaEntry[]>(() => {
-    const entries: AgendaEntry[] = [];
-
-    // Fechas límite para emitir órdenes (quiebre − lead time).
-    riskRows
-      .map((r) => ({
-        r,
-        sig: orderBySignal(
-          r.product.availableStock,
-          r.product.salesLast30Days,
-          r.product.supplierLeadTimeDays,
-          TODAY_ISO
-        ),
-      }))
-      .filter(({ sig }) => sig.orderByDate && sig.status !== "ok" && sig.status !== "none")
-      .sort((a, b) => (a.sig.daysToOrderBy ?? 0) - (b.sig.daysToOrderBy ?? 0))
-      .slice(0, 2)
-      .forEach(({ r, sig }) => {
-        entries.push({
-          id: `ob-${r.product.sku}`,
-          icon: IconReplenish,
-          title: `Emitir OC · ${r.product.name}`,
-          detail:
-            sig.status === "overdue"
-              ? "Ya deberías haberla emitido — llegaría con quiebre"
-              : `Emitir antes del ${formatDate(sig.orderByDate!)}`,
-          when: whenLabel(sig.daysToOrderBy ?? 0),
-          tone: sig.status === "overdue" ? "red" : "amber",
-          to: `/productos/${r.product.sku}`,
-        });
-      });
-
-    // Órdenes atrasadas que requieren seguimiento.
-    myOpenOrders
-      .filter((o) => o.delayedDays > 0)
-      .slice(0, 1)
-      .forEach((o) => {
-        entries.push({
-          id: `fu-${o.id}`,
-          icon: IconClock,
-          title: `Seguir OC atrasada · ${o.supplierName}`,
-          detail: `${o.number} · ${o.delayedDays} días de atraso`,
-          when: `${o.delayedDays}d`,
-          tone: "red",
-          to: "/comprar/seguimiento",
-        });
-      });
-
-    // Llegadas próximas (OC por recibir a tiempo).
-    myOpenOrders
-      .filter((o) => o.delayedDays <= 0)
-      .sort((a, b) => (a.expectedDate < b.expectedDate ? -1 : 1))
-      .slice(0, 2)
-      .forEach((o) => {
-        entries.push({
-          id: `arr-${o.id}`,
-          icon: IconTruck,
-          title: `Llega ${o.number}`,
-          detail: `${o.supplierName} · ${formatCurrencyCompact(o.totalAmount)}`,
-          when: whenLabel(daysTo(o.expectedDate)),
-          tone: "blue",
-          to: "/comprar/seguimiento",
-        });
-      });
-
-    // Promociones/campañas próximas en mis categorías (una entrada por campaña).
-    const seenCampaigns = new Set<string>();
-    campaignOpportunities
-      .filter((c) => myCategories.includes(c.category) && c.daysToCampaign >= 0 && c.daysToCampaign <= 21)
-      .sort((a, b) => a.daysToCampaign - b.daysToCampaign)
-      .forEach((c) => {
-        if (seenCampaigns.has(c.campaignName) || seenCampaigns.size >= 2) return;
-        seenCampaigns.add(c.campaignName);
-        entries.push({
-          id: `promo-${c.id}`,
-          icon: IconCampaign,
-          title: `Campaña · ${c.campaignName}`,
-          detail: `Prepara stock en ${c.category} (+${Math.round(c.growthRate)}%)`,
-          when: whenLabel(c.daysToCampaign),
-          tone: "violet",
-          to: "/anticipacion",
-        });
-      });
-
-    return entries.slice(0, 7);
-  }, [riskRows, myOpenOrders, myCategories]);
-
-  const portadaPending = useMemo<PendingWork[]>(() => {
-    const proposals = recommendations.filter(
-      (r) => (r.status === "critical" || r.status === "buy_now") && r.suggestedQuantity > 0
-    ).length;
-    return [
-      {
-        id: "propuestas",
-        label: "Propuestas de compra por revisar",
-        detail: "Quiebres y recomendaciones que inician la compra",
-        count: proposals,
-        tone: "red",
-        to: "/comprar/decisiones",
-      },
-      {
-        id: "borrador",
-        label: "Órdenes en preparación",
-        detail: draftCount > 0 ? `${formatCurrencyCompact(draftTotal)} en borrador` : "Sin borrador activo",
-        count: draftCount,
-        tone: "blue",
-        to: "/comprar/borradores",
-      },
-      {
-        id: "aprobaciones",
-        label: "Esperando aprobación",
-        detail: "Compras fuera de criterio",
-        count: myApprovals.length,
-        tone: "amber",
-        to: "/comprar/aprobaciones",
-      },
-      {
-        id: "proveedores",
-        label: "Proveedores por contactar",
-        detail: "Bajo cumplimiento o sin respuesta",
-        count: mySuppliersToReview.length,
-        tone: "amber",
-        to: "/proveedores",
-      },
-      {
-        id: "senales",
-        label: "Señales de ventas por resolver",
-        detail: "Reportes del equipo de ventas en tus categorías",
-        count: mySignals.length,
-        tone: "violet",
-        to: "/senales-ventas",
-      },
-    ];
-  }, [draftCount, draftTotal, myApprovals.length, mySuppliersToReview.length, mySignals.length]);
-
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Buenos días" : hour < 20 ? "Buenas tardes" : "Buenas noches";
 
@@ -861,9 +529,7 @@ export function MyPanelPage() {
         description={
           isPortfolioView
             ? portfolioHeader[portfolioFocus].description
-            : agenda.length > 0
-              ? `Esto requiere tu atención hoy · ${formatNumber(agendaCounts.hoy)} para hoy · ${formatNumber(agendaCounts.semana)} esta semana`
-              : "Esto requiere tu atención hoy"
+            : "Esto requiere tu atención hoy"
         }
         action={
           <Button
@@ -882,12 +548,12 @@ export function MyPanelPage() {
         }
       />
 
+      {/* Bandeja diaria conectada al dashboard real (flujo 6). Los conteos de
+          proveedores/señales siguen siendo mock (flujos posteriores). */}
       {!isPortfolioView && (
-        <InicioPortada
-          priorities={portadaPriorities}
-          agenda={portadaAgenda}
-          summary={portadaSummary}
-          pending={portadaPending}
+        <InicioPortadaConnected
+          suppliersToReviewCount={mySuppliersToReview.length}
+          salesSignalsCount={mySignals.length}
         />
       )}
 

@@ -637,6 +637,114 @@ export function patchClaim(
   });
 }
 
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Dashboard de Inicio (F6: bandeja diaria compuesta)
+// ----------------------------------------------------------------------------
+
+/** Sección degradada: el BFF no pudo componerla pero la vista sigue viva. */
+export interface DashboardDegradedSection {
+  status: "degraded";
+  warning: BffWarning;
+}
+
+/** Módulo aún no construido en v1 (alerts / signals). */
+export interface DashboardUnavailableSection {
+  status: "unavailable";
+}
+
+/** Recomendación destacada de la bandeja (top 3 del motor de reposición). */
+export interface DashboardTopRecommendation {
+  recommendationId: string;
+  sku: string;
+  skuName: string | null;
+  /** Prioridad cruda del motor (stockout_imminent | low_stock | opportunity). */
+  priority: string;
+  coverageDays: number | null;
+  suggestedQty: number | null;
+}
+
+/** Sección indispensable: si el motor cae, el GET /dashboard responde 502. */
+export interface DashboardReplenishmentSection {
+  status: "ok";
+  pendingCount: number;
+  stockoutImminent: number;
+  lowStock: number;
+  opportunity: number;
+  suggestedAmountClp: number | null;
+  top: DashboardTopRecommendation[];
+}
+
+export interface DashboardApprovalsOkSection {
+  status: "ok";
+  pendingCount: number;
+  oldestAt: string | null;
+}
+
+export type DashboardApprovalsSection = DashboardApprovalsOkSection | DashboardDegradedSection;
+
+/** Bucket OTB del mes (lista de /budget del dominio, esparcida en la sección). */
+export interface DashboardBudgetBucket {
+  id: string;
+  month: string;
+  categoryId: string;
+  amountClp: number;
+  availableClp: number;
+  version: number;
+}
+
+/** Sección budget: `{status:'ok'}` + el resultado paginado de /budget?month=. */
+export interface DashboardBudgetOkSection {
+  status: "ok";
+  items?: DashboardBudgetBucket[];
+  total?: number;
+}
+
+export type DashboardBudgetSection = DashboardBudgetOkSection | DashboardDegradedSection;
+
+export interface DashboardAgendaReceptionItem {
+  type: "reception_due";
+  /** displayId legible de la recepción (REC-…). */
+  refId: string | null;
+  receptionId: string | null;
+  poNumber: string | null;
+  dueDate: string;
+}
+
+export interface DashboardAgendaSapItem {
+  type: "sap_attention";
+  /** Número legible de la OC (OC-…). */
+  refId: string | null;
+  purchaseOrderId: string | null;
+  detail: string | null;
+}
+
+export type DashboardAgendaItem = DashboardAgendaReceptionItem | DashboardAgendaSapItem;
+
+export interface DashboardAgendaOkSection {
+  status: "ok";
+  items: DashboardAgendaItem[];
+  claimsOpenCount: number | null;
+  /** Presente solo si alguna sub-fuente degradó (datos parciales). */
+  warnings?: BffWarning[];
+}
+
+export type DashboardAgendaSection = DashboardAgendaOkSection | DashboardDegradedSection;
+
+export interface DashboardSections {
+  replenishment: DashboardReplenishmentSection;
+  /** Solo viene si la sesión tiene purchase:proposal:approve. */
+  approvals?: DashboardApprovalsSection;
+  budget: DashboardBudgetSection;
+  agenda: DashboardAgendaSection;
+  alerts: DashboardUnavailableSection;
+  signals: DashboardUnavailableSection;
+}
+
+export interface DashboardData {
+  asOf: string;
+  sections: DashboardSections;
+}
+
 /** GET /context: sesión, permisos purchase:* y cartera asignada. */
 export interface PurchaseContextData {
   userId: string;
@@ -1160,6 +1268,22 @@ export function decideApproval(
 /** GET /context — sesión, permisos purchase:* y cartera asignada. */
 export function getContext(): Promise<PurchaseContextData> {
   return request<PurchaseContextData>("/context", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Dashboard de Inicio (F6)
+// ----------------------------------------------------------------------------
+
+/**
+ * GET /dashboard?scope=mine|all — bandeja diaria compuesta: reposición
+ * (indispensable; sin motor ⇒ 502 DOWNSTREAM_SERVICE_ERROR), aprobaciones
+ * (solo con permiso), presupuesto OTB y agenda, con degradación por sección.
+ */
+export function getDashboard(scope: "mine" | "all"): Promise<DashboardData> {
+  return request<DashboardData>(`/dashboard?scope=${scope}`, {
     method: "GET",
     headers: baseHeaders(),
   });

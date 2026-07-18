@@ -18,18 +18,28 @@ export interface AgendaEntry {
 }
 
 export interface PortadaSummary {
-  categorias: number;
+  /** Recomendaciones pendientes del motor de reposición. */
+  pendientes: number;
+  /** Con quiebre inminente. */
   quiebres: number;
-  riesgos: number;
-  sobrestock: string;
-  ocAtrasadas: number;
+  /** Con stock bajo. */
+  stockBajo: number;
+  /** Oportunidades de compra. */
+  oportunidades: number;
+  /** Monto sugerido por el motor, ya formateado (null = sin dato). */
+  compraSugerida: string | null;
+  /** Línea de presupuesto abierto (OTB). */
+  otbLabel: string;
+  /** true cuando la línea OTB es un aviso (degradada/sin configurar), no un dato. */
+  otbMuted: boolean;
 }
 
 export interface PendingWork {
   id: string;
   label: string;
   detail: string;
-  count: number;
+  /** null = conteo no disponible (sección degradada): se muestra "—". */
+  count: number | null;
   tone: Tone;
   to: string;
 }
@@ -39,6 +49,10 @@ interface InicioPortadaProps {
   agenda: AgendaEntry[];
   summary: PortadaSummary;
   pending: PendingWork[];
+  /** Aviso discreto cuando la sección de agenda viene degradada. */
+  agendaNotice?: string | null;
+  /** Detalle de sub-fuentes caídas (badge "Datos parciales" en la agenda). */
+  agendaPartial?: string | null;
 }
 
 const cardTone: Record<AgendaItem["tone"], string> = {
@@ -78,37 +92,54 @@ const pillTone: Record<Tone, string> = {
  * dashboard — dice, en orden, qué resolver hoy, por qué importa, cuánto está en
  * juego y qué acción tomar. El detalle profundo vive más abajo o en otras vistas.
  */
-export function InicioPortada({ priorities, agenda, summary, pending }: InicioPortadaProps) {
+export function InicioPortada({
+  priorities,
+  agenda,
+  summary,
+  pending,
+  agendaNotice,
+  agendaPartial,
+}: InicioPortadaProps) {
   return (
     <section className="mb-4 space-y-4">
-      {/* 3 · Resumen rápido de categorías — una sola línea, sin robar el centro */}
+      {/* 3 · KPIs de la bandeja — una sola línea, sin robar el centro */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600 shadow-card">
-        <SummaryChip value={summary.categorias} label={plural(summary.categorias, "categoría", "categorías")} />
+        <SummaryChip
+          value={summary.pendientes}
+          label={plural(summary.pendientes, "decisión pendiente", "decisiones pendientes")}
+          tone={summary.pendientes > 0 ? "blue" : "slate"}
+        />
         <Sep />
         <SummaryChip
           value={summary.quiebres}
-          label={plural(summary.quiebres, "quiebre", "quiebres")}
+          label={plural(summary.quiebres, "quiebre inminente", "quiebres inminentes")}
           tone={summary.quiebres > 0 ? "red" : "slate"}
         />
         <Sep />
         <SummaryChip
-          value={summary.riesgos}
-          label={plural(summary.riesgos, "riesgo de quiebre", "riesgos de quiebre")}
-          tone={summary.riesgos > 0 ? "amber" : "slate"}
+          value={summary.stockBajo}
+          label={summary.stockBajo === 1 ? "producto con stock bajo" : "productos con stock bajo"}
+          tone={summary.stockBajo > 0 ? "amber" : "slate"}
         />
-        <Sep />
-        <span className="inline-flex items-baseline gap-1">
-          <span className={cn("font-semibold", summary.sobrestock !== "$0" ? "text-violet-700" : "text-slate-700")}>
-            {summary.sobrestock}
-          </span>
-          <span className="text-slate-500">sobrestock</span>
-        </span>
         <Sep />
         <SummaryChip
-          value={summary.ocAtrasadas}
-          label={plural(summary.ocAtrasadas, "OC atrasada", "OC atrasadas")}
-          tone={summary.ocAtrasadas > 0 ? "red" : "slate"}
+          value={summary.oportunidades}
+          label={plural(summary.oportunidades, "oportunidad", "oportunidades")}
+          tone={summary.oportunidades > 0 ? "green" : "slate"}
         />
+        {summary.compraSugerida !== null && (
+          <>
+            <Sep />
+            <span className="inline-flex items-baseline gap-1">
+              <span className="font-semibold text-brand-700">{summary.compraSugerida}</span>
+              <span className="text-slate-500">compra sugerida</span>
+            </span>
+          </>
+        )}
+        <Sep />
+        <span className={cn(summary.otbMuted ? "italic text-slate-400" : "text-slate-600")}>
+          {summary.otbLabel}
+        </span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -182,10 +213,20 @@ export function InicioPortada({ priorities, agenda, summary, pending }: InicioPo
         {/* 2 · Agenda del comprador + 4 · Trabajo pendiente (al costado) */}
         <aside className="space-y-4">
           <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-card">
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
               Tu agenda
+              {agendaPartial && (
+                <span
+                  title={agendaPartial}
+                  className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-700"
+                >
+                  Datos parciales
+                </span>
+              )}
             </h2>
-            {agenda.length === 0 ? (
+            {agendaNotice ? (
+              <p className="py-2 text-xs text-amber-600">{agendaNotice}</p>
+            ) : agenda.length === 0 ? (
               <p className="py-2 text-xs text-slate-400">Sin vencimientos ni eventos próximos.</p>
             ) : (
               <ul className="space-y-1">
@@ -240,10 +281,12 @@ export function InicioPortada({ priorities, agenda, summary, pending }: InicioPo
                     <span
                       className={cn(
                         "flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
-                        w.count > 0 ? pillTone[w.tone] : "bg-slate-100 text-slate-400"
+                        w.count !== null && w.count > 0
+                          ? pillTone[w.tone]
+                          : "bg-slate-100 text-slate-400"
                       )}
                     >
-                      {w.count}
+                      {w.count ?? "—"}
                     </span>
                     <IconChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-slate-300" />
                   </Link>
