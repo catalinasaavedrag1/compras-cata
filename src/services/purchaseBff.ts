@@ -2966,3 +2966,158 @@ export function patchCampaign(
     body: JSON.stringify(body),
   });
 }
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Desempeño y gamificación (F19)
+// ----------------------------------------------------------------------------
+
+export interface ScoreComponentsView {
+  ordersIssued: number;
+  orderValueClp: number;
+  receptionsCompleted: number;
+  claimsResolved: number;
+  signalsActioned: number;
+  decisionsEvaluated: number;
+  decisionHits: number;
+  decisionMixed: number;
+  /** null cuando el mes no tiene decisiones evaluadas (sin calidad medible). */
+  hitRatePct: number | null;
+}
+
+export interface ScoreMetricsView {
+  formulaVersion: string;
+  score: number;
+  activityPoints: number;
+  qualityPoints: number;
+  components: ScoreComponentsView;
+}
+
+export interface ScoreSnapshotView {
+  buyerId: string;
+  displayName: string | null;
+  period: string;
+  metrics: ScoreMetricsView | null;
+  computedAt: string;
+}
+
+export type GoalStatus = "on_track" | "at_risk" | "off_track" | "achieved";
+
+export type GoalKind =
+  | "order_count"
+  | "hit_rate"
+  | "claims_resolved"
+  | "signals_actioned";
+
+export interface GoalView {
+  id: string;
+  buyerId: string;
+  /** Mes ("2026-07") o trimestre ("2026-Q3"). */
+  period: string;
+  kind: GoalKind;
+  target: { value?: number } | null;
+  progress: { value?: number; updatedAt?: string } | null;
+  status: GoalStatus;
+  version: number;
+  dateModified: string;
+}
+
+export interface MyPerformanceView {
+  buyerId: string;
+  displayName: string | null;
+  period: string;
+  current: ScoreSnapshotView | null;
+  previous: ScoreSnapshotView | null;
+  goals: GoalView[];
+}
+
+export interface RankingRowView {
+  position: number;
+  buyerId: string;
+  displayName: string | null;
+  score: number;
+  metrics: ScoreMetricsView | null;
+  previousScore: number | null;
+  computedAt: string;
+}
+
+export interface RewardView {
+  id: string;
+  title: string;
+  description: string;
+  criteria: Record<string, unknown> | null;
+  active: boolean;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Desempeño y gamificación (F19)
+// ----------------------------------------------------------------------------
+
+/** GET /performance/me — mi score del mes, delta vs mes anterior y metas. */
+export function getMyPerformance(): Promise<MyPerformanceView> {
+  return request<MyPerformanceView>("/performance/me", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /performance/ranking — ranking del equipo (mes en curso). */
+export function getPerformanceRanking(): Promise<{
+  period: string;
+  items: RankingRowView[];
+  total: number;
+}> {
+  return request<{ period: string; items: RankingRowView[]; total: number }>(
+    "/performance/ranking",
+    { method: "GET", headers: baseHeaders() }
+  );
+}
+
+/** GET /performance/rewards — recompensas activas con criterios explícitos. */
+export function listRewards(): Promise<{ items: RewardView[]; total: number }> {
+  return request<{ items: RewardView[]; total: number }>("/performance/rewards", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /performance/goals — metas (el comprador ve las suyas; líder filtra). */
+export function listGoals(params?: {
+  buyerId?: string;
+  period?: string;
+}): Promise<{ items: GoalView[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params?.buyerId) query.set("buyerId", params.buyerId);
+  if (params?.period) query.set("period", params.period);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<{ items: GoalView[]; total: number }>(
+    `/performance/goals${suffix}`,
+    { method: "GET", headers: baseHeaders() }
+  );
+}
+
+/** POST /performance/goals — alta de meta (líder, 🔑; duplicada ⇒ 409). */
+export function createGoal(body: {
+  buyerId: string;
+  period: string;
+  kind: GoalKind;
+  targetValue: number;
+}): Promise<GoalView> {
+  return request<GoalView>("/performance/goals", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** PATCH /performance/goals/:id — ajustar objetivo (líder, If-Match). */
+export function patchGoal(
+  id: string,
+  version: number,
+  body: { targetValue: number }
+): Promise<GoalView> {
+  return request<GoalView>(`/performance/goals/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...baseHeaders(), "If-Match": `"${version}"` },
+    body: JSON.stringify(body),
+  });
+}
