@@ -38,6 +38,7 @@ import {
   type PurchaseOrderRow,
 } from "../hooks/usePurchaseOrders";
 import { usePendingApprovalsCount } from "../hooks/useApprovals";
+import { useBudget } from "../hooks/useBudget";
 import { useOpenRfqCount } from "../hooks/useRfqs";
 import {
   criterionLabelEs,
@@ -330,10 +331,13 @@ export function PurchaseOrdersPage() {
   );
   const pickupPlan = usePickupPlan(pickupLines);
 
-  // Open-to-Buy en vivo: cuánto presupuesto consume el borrador y si sobregira.
+  // Open-to-Buy en vivo: buckets reales del mes vigente + borrador en curso.
+  // Sin presupuesto configurado (o BFF caído) el impacto es neutro: la tarjeta
+  // no inventa sobregiros.
+  const { data: budgetData } = useBudget();
   const budget = useMemo(
-    () => draftBudgetImpact(TODAY_ISO.slice(0, 7), items, orders),
-    [items, orders]
+    () => draftBudgetImpact(budgetData?.items ?? [], items),
+    [budgetData, items]
   );
 
   const selectedDraftItem = items.find((i) => i.sku === draftContextSku) ?? items[0] ?? null;

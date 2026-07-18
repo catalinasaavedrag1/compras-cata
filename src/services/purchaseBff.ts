@@ -1640,3 +1640,80 @@ export function getDashboard(scope: "mine" | "all"): Promise<DashboardData> {
     headers: baseHeaders(),
   });
 }
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Presupuesto / Open-to-Buy (F9)
+// ----------------------------------------------------------------------------
+
+/**
+ * Bucket OTB del mes en vista BFF: números netos por categoría. El semáforo y
+ * el % usado los deriva la página, porque el borrador en curso (local) también
+ * consume presupuesto en vivo.
+ */
+export interface BudgetBucketView {
+  bucketId: string;
+  month: string;
+  categoryId: string;
+  /** Nombre desde el snapshot materializado; fallback = categoryId. */
+  categoryName: string;
+  budgetClp: number;
+  /** Comprometido: neto de consumos (OC emitidas) menos reintegros. */
+  committedClp: number;
+  availableClp: number;
+  version: number;
+}
+
+export interface BudgetTotals {
+  budgetClp: number;
+  committedClp: number;
+  availableClp: number;
+}
+
+/** GET /budget: mes efectivo + selector de meses + buckets + totales. */
+export interface BudgetOverviewData {
+  /** null cuando no hay presupuesto configurado (estado vacío). */
+  month: string | null;
+  /** Meses con presupuesto, más reciente primero. */
+  months: string[];
+  items: BudgetBucketView[];
+  totals: BudgetTotals;
+}
+
+export interface SupplierSpendItem {
+  supplierId: string;
+  supplierName: string;
+  totalClp: number;
+  orderCount: number;
+  /** Participación sobre el total de la ventana (0..1). */
+  share: number;
+}
+
+/** GET /budget/supplier-spend: compra agregada por proveedor (ventana móvil). */
+export interface SupplierSpendData {
+  windowDays: number;
+  totalClp: number;
+  items: SupplierSpendItem[];
+  /** Presente si comerce degradó (nombres desde la referencia interna). */
+  warnings?: BffWarning[];
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Presupuesto / Open-to-Buy (F9)
+// ----------------------------------------------------------------------------
+
+/** GET /budget?month= — vista OTB del mes (sin mes: el más reciente). */
+export function getBudgetOverview(month?: string): Promise<BudgetOverviewData> {
+  const query = month ? `?month=${encodeURIComponent(month)}` : "";
+  return request<BudgetOverviewData>(`/budget${query}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /budget/supplier-spend?days= — compra por proveedor de la ventana. */
+export function getSupplierSpend(days = 90): Promise<SupplierSpendData> {
+  return request<SupplierSpendData>(`/budget/supplier-spend?days=${days}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
