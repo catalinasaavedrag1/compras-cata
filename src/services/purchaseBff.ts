@@ -721,6 +721,8 @@ export function listAlerts(params: {
   status?: AlertStatusBff;
   severity?: AlertSeverityBff;
   type?: string;
+  /** Filtro por comprador (vistas de equipo del líder, F15). */
+  buyerId?: string;
   page?: number;
   pageSize?: number;
 }): Promise<AlertListData> {
@@ -728,6 +730,7 @@ export function listAlerts(params: {
   if (params.status) query.set("status", params.status);
   if (params.severity) query.set("severity", params.severity);
   if (params.type) query.set("type", params.type);
+  if (params.buyerId) query.set("buyerId", params.buyerId);
   query.set("page", String(params.page ?? 1));
   query.set("pageSize", String(params.pageSize ?? 24));
   return request<AlertListData>(`/alerts?${query.toString()}`, {
@@ -2390,6 +2393,223 @@ export function createDecision(body: {
   projection?: DecisionProjection;
 }): Promise<DecisionView> {
   return request<DecisionView>("/decisions", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Equipo del líder (F15)
+// ----------------------------------------------------------------------------
+
+export interface BuyerWorkloadCounts {
+  recommendationsPending: number;
+  criticalPending: number;
+  proposalsOpen: number;
+  ordersOpen: number;
+  receptionsPending: number;
+  claimsOpen: number;
+  alertsActive: number;
+  signalsOpen: number;
+  decisionsPending: number;
+}
+
+export interface BuyerWorkloadRow {
+  buyerId: string;
+  displayName: string | null;
+  active: boolean;
+  categories: string[];
+  counts: BuyerWorkloadCounts;
+}
+
+export interface TeamWorkloadData {
+  items: BuyerWorkloadRow[];
+  asOf: string;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Equipo del líder (F15)
+// ----------------------------------------------------------------------------
+
+/** GET /team/workload — carga viva por comprador (permiso team:read, líder). */
+export function getTeamWorkload(): Promise<TeamWorkloadData> {
+  return request<TeamWorkloadData>("/team/workload", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** PUT /team/assignments/:categoryId — C18: reasignar cartera (líder). */
+export function reassignCategory(
+  categoryId: string,
+  body: { buyerId: string; reason?: string },
+  version?: number
+): Promise<{ categoryId: string; buyerId: string; since: string; version: number }> {
+  return request(`/team/assignments/${encodeURIComponent(categoryId)}`, {
+    method: "PUT",
+    headers: {
+      ...baseHeaders(),
+      ...(version !== undefined ? { "If-Match": `"${version}"` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Importaciones y documentos (F16)
+// ----------------------------------------------------------------------------
+
+export type ImportStage = "po" | "production" | "shipping" | "customs" | "warehouse";
+
+export interface ImportDocRow {
+  id: string;
+  kind: string;
+  dmsRef: string;
+  uploadedByUserId: string;
+  dateCreated: string;
+}
+
+export interface ImportView {
+  id: string;
+  purchaseOrderId: string | null;
+  poNumber: string | null;
+  supplierId: string | null;
+  buyerId: string | null;
+  stage: ImportStage;
+  etaDate: string | null;
+  forwarderRef: string | null;
+  stageHistory: Array<{ stage: string; at: string; byUserId: string }>;
+  version: number;
+  dateCreated: string;
+  dateModified: string;
+  docs?: ImportDocRow[];
+}
+
+export interface ImportListData {
+  items: ImportView[];
+  meta: ReplenishmentMeta;
+}
+
+export interface ProcurementDocView {
+  id: string;
+  kind: string;
+  title: string;
+  refEntity: string | null;
+  refId: string | null;
+  supplierId: string | null;
+  dmsRef: string;
+  uploadedByUserId: string;
+  dateCreated: string;
+}
+
+export interface DocumentListData {
+  items: ProcurementDocView[];
+  meta: ReplenishmentMeta;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Importaciones y documentos (F16)
+// ----------------------------------------------------------------------------
+
+/** GET /imports — pipeline de importaciones (filtros stage/q). */
+export function listImports(params?: {
+  stage?: ImportStage;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<ImportListData> {
+  const query = new URLSearchParams();
+  if (params?.stage) query.set("stage", params.stage);
+  if (params?.q) query.set("q", params.q);
+  query.set("page", String(params?.page ?? 1));
+  query.set("pageSize", String(params?.pageSize ?? 50));
+  return request<ImportListData>(`/imports?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /imports/:id — detalle con historia de etapas y documentos. */
+export function getImport(id: string): Promise<ImportView> {
+  return request<ImportView>(`/imports/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /imports — abrir seguimiento (🔑; OC opcional). */
+export function createImport(body: {
+  purchaseOrderId?: string;
+  etaDate?: string;
+  forwarderRef?: string;
+}): Promise<ImportView> {
+  return request<ImportView>("/imports", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** PATCH /imports/:id — avanzar etapa / ETA / forwarder (If-Match). */
+export function patchImport(
+  id: string,
+  version: number,
+  body: { stage?: Exclude<ImportStage, "po">; etaDate?: string | null; forwarderRef?: string | null }
+): Promise<ImportView> {
+  return request<ImportView>(`/imports/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...baseHeaders(), "If-Match": `"${version}"` },
+    body: JSON.stringify(body),
+  });
+}
+
+/** POST /imports/:id/docs — registrar documento (referencia DMS, 🔑). */
+export function addImportDoc(
+  id: string,
+  body: { kind: string; dmsRef: string }
+): Promise<ImportView> {
+  return request<ImportView>(`/imports/${encodeURIComponent(id)}/docs`, {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** GET /documents — repositorio documental (filtros kind/ref/supplier/q). */
+export function listDocuments(params?: {
+  kind?: string;
+  refEntity?: string;
+  refId?: string;
+  supplierId?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<DocumentListData> {
+  const query = new URLSearchParams();
+  if (params?.kind) query.set("kind", params.kind);
+  if (params?.refEntity) query.set("refEntity", params.refEntity);
+  if (params?.refId) query.set("refId", params.refId);
+  if (params?.supplierId) query.set("supplierId", params.supplierId);
+  if (params?.q) query.set("q", params.q);
+  query.set("page", String(params?.page ?? 1));
+  query.set("pageSize", String(params?.pageSize ?? 50));
+  return request<DocumentListData>(`/documents?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /documents — registrar referencia DMS (🔑). */
+export function createDocument(body: {
+  kind: string;
+  title: string;
+  refEntity?: string;
+  refId?: string;
+  supplierId?: string;
+  dmsRef: string;
+}): Promise<ProcurementDocView> {
+  return request<ProcurementDocView>("/documents", {
     method: "POST",
     headers: { ...baseHeaders(), ...idempotency() },
     body: JSON.stringify(body),
