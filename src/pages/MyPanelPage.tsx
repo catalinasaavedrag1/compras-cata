@@ -71,21 +71,19 @@ export function MyPanelPage() {
   const { buyer, myCategories } = useBuyer();
   const { signals } = useSignals();
 
-  // Señales de ventas que me tocan: asignadas a mí, o de mis categorías sin asignar.
+  // Señales de ventas vivas del backend (nuevas o en revisión), las más urgentes primero.
+  // El contrato real no trae categoría ni nombre del comprador, así que ya no
+  // se puede cruzar contra la cartera mock: se muestran las pendientes del equipo.
   const mySignals = useMemo(() => {
     const order = { high: 0, medium: 1, low: 2 } as const;
     return signals
-      .filter(
-        (s) =>
-          (s.status === "new" || s.status === "in_review") &&
-          (s.assignedBuyer === buyer || (!s.assignedBuyer && myCategories.includes(s.category)))
-      )
+      .filter((s) => s.status === "new" || s.status === "in_review")
       .sort((a, b) => {
         const p = order[a.priority] - order[b.priority];
-        return p !== 0 ? p : a.date < b.date ? 1 : -1;
+        return p !== 0 ? p : a.dateCreated < b.dateCreated ? 1 : -1;
       })
       .slice(0, 5);
-  }, [signals, buyer, myCategories]);
+  }, [signals]);
   const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
 

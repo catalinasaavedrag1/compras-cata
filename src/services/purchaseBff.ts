@@ -990,10 +990,13 @@ export interface DashboardDegradedSection {
   warning: BffWarning;
 }
 
-/** Módulo aún no construido en v1 (alerts / signals). */
-export interface DashboardUnavailableSection {
-  status: "unavailable";
+/** Sección señales (F13): conteo de señales nuevas, fresca y degradable. */
+export interface DashboardSignalsOkSection {
+  status: "ok";
+  newCount: number;
 }
+
+export type DashboardSignalsSection = DashboardSignalsOkSection | DashboardDegradedSection;
 
 /** Recomendación destacada de la bandeja (top 3 del motor de reposición). */
 export interface DashboardTopRecommendation {
@@ -1089,7 +1092,7 @@ export interface DashboardSections {
   budget: DashboardBudgetSection;
   agenda: DashboardAgendaSection;
   alerts: DashboardAlertsSection;
-  signals: DashboardUnavailableSection;
+  signals: DashboardSignalsSection;
 }
 
 export interface DashboardData {
@@ -2127,5 +2130,173 @@ export function getCategoriesPanel(): Promise<CategoriesPanelData> {
   return request<CategoriesPanelData>("/categories", {
     method: "GET",
     headers: baseHeaders(),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Señales de venta (F13)
+// ----------------------------------------------------------------------------
+
+export type SignalBffStatus = "new" | "in_review" | "actioned" | "dismissed";
+
+export type SignalBffPriority = "high" | "medium" | "low";
+
+export interface SignalMessageView {
+  id: string;
+  authorUserId: string;
+  authorName: string | null;
+  role: "seller" | "buyer";
+  body: string;
+  dateCreated: string;
+}
+
+/** Detalle estructurado sin estado propio (canal, evidencia, solicitud formal). */
+export interface SignalDetails {
+  channel?: string;
+  recommendedAction?: string;
+  customersAsking?: number;
+  estimatedLostSale?: number;
+  evidenceNote?: string;
+  request?: {
+    customerName?: string;
+    requestedQty?: number;
+    requiredDate?: string;
+    targetPrice?: number;
+    suggestedSupplier?: string;
+    quotedCost?: number;
+  };
+}
+
+export interface SignalView {
+  id: string;
+  kind: string;
+  body: string;
+  sku: string | null;
+  supplierId: string | null;
+  storeRef: string | null;
+  priority: SignalBffPriority;
+  status: SignalBffStatus;
+  reporterUserId: string;
+  reporterName: string | null;
+  assignedBuyerId: string | null;
+  resolution: string | null;
+  details: SignalDetails | null;
+  version: number;
+  dateCreated: string;
+  dateModified: string;
+  messageCount?: number;
+}
+
+/** Bloque de apoyo del detalle (motor + stock vivo, degradable). */
+export interface SignalSupportView {
+  skuName: string | null;
+  stockAvailable: number | null;
+  stockInTransit: number | null;
+  stockFromSnapshot: boolean;
+  dailyVelocity: number | null;
+  coverageDays: number | null;
+  salesLast30d: number | null;
+  rotation: number | null;
+  marginPct: number | null;
+  unitCostClp: number | null;
+  supplierId: string | null;
+  supplierName: string | null;
+  recommendationId: string | null;
+}
+
+export interface SignalDetailData extends SignalView {
+  messages: SignalMessageView[];
+  support: SignalSupportView | null;
+  warnings?: BffWarning[];
+}
+
+export interface SignalListData {
+  items: SignalView[];
+  meta: ReplenishmentMeta;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Señales de venta (F13)
+// ----------------------------------------------------------------------------
+
+/** GET /signals — bandeja con filtros. */
+export function listSignals(params?: {
+  status?: SignalBffStatus;
+  kind?: string;
+  sku?: string;
+  supplierId?: string;
+  assignedBuyerId?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<SignalListData> {
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  if (params?.kind) query.set("kind", params.kind);
+  if (params?.sku) query.set("sku", params.sku);
+  if (params?.supplierId) query.set("supplierId", params.supplierId);
+  if (params?.assignedBuyerId) query.set("assignedBuyerId", params.assignedBuyerId);
+  if (params?.q) query.set("q", params.q);
+  query.set("page", String(params?.page ?? 1));
+  query.set("pageSize", String(params?.pageSize ?? 50));
+  return request<SignalListData>(`/signals?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /signals/:id — detalle con hilo y bloque de apoyo. */
+export function getSignal(id: string): Promise<SignalDetailData> {
+  return request<SignalDetailData>(`/signals/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /signals — reportar señal (🔑). */
+export function createSignal(body: {
+  kind: string;
+  body: string;
+  sku?: string;
+  supplierRef?: string;
+  storeRef?: string;
+  priority?: SignalBffPriority;
+  reporterName?: string;
+  details?: SignalDetails;
+}): Promise<SignalView> {
+  return request<SignalView>("/signals", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** PATCH /signals/:id — máquina new→in_review→actioned|dismissed (If-Match). */
+export function patchSignal(
+  id: string,
+  version: number,
+  body: {
+    status?: "in_review" | "actioned" | "dismissed";
+    reason?: string;
+    priority?: SignalBffPriority;
+    assignedBuyerId?: string;
+  }
+): Promise<SignalView> {
+  return request<SignalView>(`/signals/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...baseHeaders(), "If-Match": `"${version}"` },
+    body: JSON.stringify(body),
+  });
+}
+
+/** POST /signals/:id/comments — comentario del hilo (🔑). */
+export function addSignalComment(
+  id: string,
+  body: { body: string; authorName?: string }
+): Promise<SignalMessageView> {
+  return request<SignalMessageView>(`/signals/${encodeURIComponent(id)}/comments`, {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
   });
 }

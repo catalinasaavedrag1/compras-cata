@@ -1,9 +1,5 @@
-import type {
-  SignalChannel,
-  SignalPriority,
-  SignalStatus,
-  SignalType,
-} from "../../types/purchasing";
+import type { SignalChannel, SignalPriority, SignalType } from "../../types/purchasing";
+import type { SignalBffStatus } from "../../services/purchaseBff";
 import type { BadgeTone } from "../ui/Badge";
 
 // ============================================================================
@@ -96,6 +92,22 @@ export const SIGNAL_TYPE: Record<SignalType, SignalTypeMeta> = {
   },
 };
 
+/**
+ * El backend acepta kinds abiertos (string): si llega uno fuera del catálogo
+ * conocido, se muestra tal cual sin romper la vista.
+ */
+export function signalKindMeta(kind: string): SignalTypeMeta {
+  return (
+    (SIGNAL_TYPE as Record<string, SignalTypeMeta>)[kind] ?? {
+      label: kind,
+      short: kind,
+      tone: "neutral",
+      group: "Sugerencia",
+      hint: "",
+    }
+  );
+}
+
 export const SIGNAL_CHANNEL: Record<SignalChannel, string> = {
   store: "Tienda",
   web: "Web",
@@ -103,21 +115,23 @@ export const SIGNAL_CHANNEL: Record<SignalChannel, string> = {
   call_center: "Call center",
 };
 
+/** Canal legible desde details.channel (string libre del backend). */
+export function signalChannelLabel(channel: string | undefined | null): string | null {
+  if (!channel) return null;
+  return SIGNAL_CHANNEL[channel as SignalChannel] ?? channel;
+}
+
 export interface SignalStatusMeta {
   label: string;
   tone: BadgeTone;
 }
 
-export const SIGNAL_STATUS: Record<SignalStatus, SignalStatusMeta> = {
-  new: { label: "Solicitado", tone: "blue" },
+/** Máquina real del backend: new → in_review → actioned | dismissed. */
+export const SIGNAL_STATUS: Record<SignalBffStatus, SignalStatusMeta> = {
+  new: { label: "Nueva", tone: "blue" },
   in_review: { label: "En revisión", tone: "amber" },
-  sourcing: { label: "Consultando proveedor", tone: "amber" },
-  quoted: { label: "Cotizado", tone: "violet" },
-  awaiting_customer: { label: "Esperando cliente", tone: "amber" },
-  accepted: { label: "Aprobado", tone: "green" },
-  purchased: { label: "Comprado", tone: "green" },
-  rejected: { label: "Rechazado", tone: "slate" },
-  resolved: { label: "Resuelto", tone: "neutral" },
+  actioned: { label: "Accionada", tone: "green" },
+  dismissed: { label: "Descartada", tone: "slate" },
 };
 
 export const SIGNAL_PRIORITY: Record<SignalPriority, { label: string; tone: BadgeTone }> = {

@@ -7,7 +7,7 @@ import { DataTable, type Column } from "../../components/ui/Table";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { StatusBadge } from "../../components/business/StatusBadge";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
-import { SIGNAL_TYPE, SIGNAL_STATUS, SIGNAL_PRIORITY } from "../../components/business/signalLabels";
+import { SIGNAL_STATUS, SIGNAL_PRIORITY, signalKindMeta } from "../../components/business/signalLabels";
 import { IconCheck, IconPlus, IconSignal } from "../../components/ui/icons";
 import {
   capitalize,
@@ -20,7 +20,8 @@ import {
 import { coverageSentence } from "../../utils/calculations";
 import { cn } from "../../utils/cn";
 import type { LostOpportunity } from "../../utils/lostOpportunities";
-import type { Category, Product, PurchaseOrder, SalesSignal, Supplier } from "../../types/purchasing";
+import type { Category, Product, PurchaseOrder, Supplier } from "../../types/purchasing";
+import type { SignalView } from "../../services/purchaseBff";
 import type {
   BrandPortfolioRow,
   KeyProductRow,
@@ -1369,14 +1370,14 @@ export function LostSalesCard({
   );
 }
 
-/** "Señales de ventas para mí": lo que ventas reportó y espera decisión. (Extraído de MyPanelPage.) */
-export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
+/** "Señales de ventas pendientes": lo que ventas reportó (backend) y espera decisión. */
+export function SalesSignalsCard({ signals }: { signals: SignalView[] }) {
   return (
     <CollapsibleSection
       id="panel-senales"
       className="mb-4"
-      title="Señales de ventas para mí"
-      description="Lo que ventas reportó en tus categorías y aún espera tu decisión"
+      title="Señales de ventas pendientes"
+      description="Lo que ventas reportó desde el terreno y aún espera decisión"
       hint={`${signals.length} pendiente${signals.length === 1 ? "" : "s"}`}
       action={
         <Link to="/senales-ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
@@ -1387,7 +1388,7 @@ export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
       {signals.length === 0 ? (
         <EmptyState
           title="Todo al día"
-          description="No tienes señales de ventas pendientes en tus categorías."
+          description="No hay señales de ventas pendientes de decisión."
           icon={<IconCheck className="w-6 h-6" />}
         />
       ) : (
@@ -1395,7 +1396,7 @@ export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
           {signals.map((s) => (
             <Link
               key={s.id}
-              to="/senales-ventas"
+              to={`/senales-ventas?sig=${encodeURIComponent(s.id)}`}
               className="flex items-start gap-2 rounded-lg border border-slate-200 p-2.5 hover:border-brand-300 hover:bg-brand-50/40"
             >
               <IconSignal className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
@@ -1404,12 +1405,12 @@ export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
                   <Badge tone={SIGNAL_PRIORITY[s.priority].tone}>
                     {SIGNAL_PRIORITY[s.priority].label}
                   </Badge>
-                  <Badge tone={SIGNAL_TYPE[s.type].tone}>{SIGNAL_TYPE[s.type].short}</Badge>
+                  <Badge tone={signalKindMeta(s.kind).tone}>{signalKindMeta(s.kind).short}</Badge>
                   <span className="text-sm font-medium text-slate-800 truncate">
-                    {s.productName}
+                    {s.sku ?? signalKindMeta(s.kind).label}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 truncate mt-0.5">{s.comment}</p>
+                <p className="text-xs text-slate-500 truncate mt-0.5">{s.body}</p>
               </div>
               <Badge tone={SIGNAL_STATUS[s.status].tone} dot>
                 {SIGNAL_STATUS[s.status].label}

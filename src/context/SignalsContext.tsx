@@ -1,269 +1,171 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
-import { useLocalStorage } from "../utils/useLocalStorage";
-import { signalService, productService } from "../services";
-import type {
-  SalesSignal,
-  SignalChannel,
-  SignalEvent,
-  SignalEventKind,
-  SignalMessage,
-  SignalPriority,
-  SignalStatus,
-  SignalSupport,
-  SignalType,
-} from "../types/purchasing";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useAuth } from "./AuthContext";
+import {
+  isPurchaseBffConfigured,
+  listSignals,
+  toPurchaseBffError,
+  type PurchaseBffError,
+  type SignalBffPriority,
+  type SignalView,
+} from "../services/purchaseBff";
+import {
+  useSignalCommands,
+  type CreateSignalInput,
+  type SignalCommandResult,
+  type SignalCommentResult,
+  type SignalTargetStatus,
+} from "../hooks/useSignals";
 
 // ============================================================================
-//  Estado central de las Señales de Ventas.
-//  Fuente única para la página, el dashboard y las notificaciones.
-//  Persiste en localStorage como "parches" sobre la semilla (robusto ante
-//  cambios de los datos mock) + señales nuevas creadas + mensajes y eventos.
-//  Cada acción deja trazabilidad en el timeline de la señal.
+//  Estado central de las Señales de Ventas, conectado al purchase-bff (F13).
+//  Fuente única para la bandeja, los badges del menú y "Mi panel": carga la
+//  lista completa (una página grande, como reclamos) y expone los comandos de
+//  la máquina real new → in_review → actioned | dismissed.
+//  - UNAUTHENTICATED en la carga inicial degrada en silencio (provider global);
+//    en comandos cierra sesión (vía useSignalCommands).
+//  - VERSION_CONFLICT / CONFLICT recargan la lista para reflejar la realidad.
 // ============================================================================
 
-interface SignalPatch {
-  status?: SignalStatus;
-  priority?: SignalPriority;
-  assignedBuyer?: string;
-  rejectionReason?: string;
-  customerName?: string;
-  requestedQty?: number;
-  requiredDate?: string;
-  targetPrice?: number;
-  suggestedSupplier?: string;
-  quotedCost?: number;
-}
-
-export type SignalRequestFields = Pick<
-  SignalPatch,
-  | "customerName"
-  | "requestedQty"
-  | "requiredDate"
-  | "targetPrice"
-  | "suggestedSupplier"
-  | "quotedCost"
->;
-
-interface SignalsState {
-  created: SalesSignal[];
-  patches: Record<string, SignalPatch>;
-  extraMessages: Record<string, SignalMessage[]>;
-  extraEvents: Record<string, SignalEvent[]>;
-}
-
-const EMPTY_STATE: SignalsState = {
-  created: [],
-  patches: {},
-  extraMessages: {},
-  extraEvents: {},
-};
-
-export interface NewSignalInput {
-  type: SignalType;
-  priority: SignalPriority;
-  sku?: string;
-  productName: string;
-  category: string;
-  brand?: string;
-  channel: SignalChannel;
-  store: string;
-  reportedBy: string;
-  comment: string;
-  recommendedAction?: string;
-  customersAsking?: number;
-  estimatedLostSale?: number;
-  evidenceNote?: string;
-  support?: SignalSupport;
-  customerName?: string;
-  requestedQty?: number;
-  requiredDate?: string;
-  targetPrice?: number;
-  suggestedSupplier?: string;
-}
+const PAGE_SIZE = 100;
 
 interface SignalsContextValue {
-  signals: SalesSignal[];
-  addSignal: (input: NewSignalInput) => SalesSignal;
-  setStatus: (id: string, status: SignalStatus, note?: string) => void;
-  assign: (id: string, buyer: string) => void;
-  setPriority: (id: string, priority: SignalPriority) => void;
-  reject: (id: string, reason: string) => void;
-  updateRequest: (id: string, fields: SignalRequestFields) => void;
-  addMessage: (id: string, msg: { role: "seller" | "buyer"; author: string; text: string }) => void;
-  markConverted: (id: string, detail: string) => void;
+  signals: SignalView[];
+  /** ¿Hay VITE_PURCHASE_BFF_URL configurada? */
+  configured: boolean;
+  loading: boolean;
+  error: PurchaseBffError | null;
+  refetch: () => void;
+  /** POST /signals — reportar una señal desde el terreno. */
+  report: (input: CreateSignalInput) => Promise<SignalCommandResult>;
+  /** PATCH /signals/:id — transición de estado (dismissed exige reason). */
+  transition: (
+    id: string,
+    version: number,
+    status: SignalTargetStatus,
+    reason?: string
+  ) => Promise<SignalCommandResult>;
+  /** PATCH /signals/:id — cambio de prioridad. */
+  setPriority: (
+    id: string,
+    version: number,
+    priority: SignalBffPriority
+  ) => Promise<SignalCommandResult>;
+  /** POST /signals/:id/comments — comentario del hilo. */
+  comment: (id: string, body: string) => Promise<SignalCommentResult>;
 }
 
 const SignalsContext = createContext<SignalsContextValue | null>(null);
 
-let seq = 0;
-const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${seq++}`;
-const now = () => new Date().toISOString();
-
-function supportFor(sku?: string, given?: SignalSupport): SignalSupport {
-  if (given) return given;
-  const p = sku ? productService.getBySku(sku) : undefined;
-  return {
-    stock: p?.availableStock ?? 0,
-    sales30: p?.salesLast30Days ?? 0,
-    rotation: p?.rotation ?? 0,
-    marginPct: p?.margin ?? 0,
-    stockoutEvents30: 0,
-    affectedStores: [],
-  };
-}
-
 export function SignalsProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useLocalStorage<SignalsState>("compras:signals", EMPTY_STATE);
+  const configured = isPurchaseBffConfigured();
+  const { authenticated } = useAuth();
 
-  const signals = useMemo<SalesSignal[]>(() => {
-    const base = [...signalService.list(), ...state.created];
-    return base.map((s) => {
-      const patch = state.patches[s.id];
-      const merged: SalesSignal = patch ? { ...s, ...patch } : { ...s };
-      const extraMsgs = state.extraMessages[s.id];
-      const extraEvts = state.extraEvents[s.id];
-      if (extraMsgs) merged.messages = [...s.messages, ...extraMsgs];
-      if (extraEvts) merged.timeline = [...s.timeline, ...extraEvts];
-      return merged;
-    });
-  }, [state]);
+  const [signals, setSignals] = useState<SignalView[]>([]);
+  const [loading, setLoading] = useState(configured);
+  const [error, setError] = useState<PurchaseBffError | null>(null);
+  const loadSeqRef = useRef(0);
 
-  const pushEvent = useCallback(
-    (id: string, kind: SignalEventKind, actor: string, text: string) => {
-      const ev: SignalEvent = { id: uid("ev"), date: now(), actor, kind, text };
-      setState((prev) => ({
-        ...prev,
-        extraEvents: {
-          ...prev.extraEvents,
-          [id]: [...(prev.extraEvents[id] ?? []), ev],
-        },
-      }));
+  const load = useCallback(async () => {
+    if (!configured || !authenticated) return;
+    const seq = ++loadSeqRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await listSignals({ page: 1, pageSize: PAGE_SIZE });
+      if (seq !== loadSeqRef.current) return;
+      setSignals(page.items);
+    } catch (err) {
+      if (seq !== loadSeqRef.current) return;
+      const info = toPurchaseBffError(err);
+      // Sin sesión válida: lista vacía (sin redirigir desde un provider global).
+      if (info.code === "UNAUTHENTICATED") setSignals([]);
+      else setError(info);
+    } finally {
+      if (seq === loadSeqRef.current) setLoading(false);
+    }
+  }, [configured, authenticated]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  /** Refleja en la lista el estado fresco que devuelve un comando. */
+  const applyView = useCallback((view: SignalView) => {
+    setSignals((prev) =>
+      prev.some((s) => s.id === view.id)
+        ? prev.map((s) => (s.id === view.id ? { ...s, ...view } : s))
+        : [view, ...prev]
+    );
+  }, []);
+
+  const commands = useSignalCommands({ onConflict: () => void load() });
+
+  const report = useCallback(
+    async (input: CreateSignalInput) => {
+      const result = await commands.report(input);
+      if (result.ok) applyView(result.signal);
+      return result;
     },
-    [setState]
+    [commands, applyView]
   );
 
-  const patch = useCallback(
-    (id: string, p: SignalPatch) =>
-      setState((prev) => ({
-        ...prev,
-        patches: { ...prev.patches, [id]: { ...prev.patches[id], ...p } },
-      })),
-    [setState]
+  const transition = useCallback(
+    async (id: string, version: number, status: SignalTargetStatus, reason?: string) => {
+      const result = await commands.transition(id, version, status, reason);
+      if (result.ok) applyView(result.signal);
+      return result;
+    },
+    [commands, applyView]
   );
 
-  const value = useMemo<SignalsContextValue>(() => {
-    const STATUS_TEXT: Record<SignalStatus, string> = {
-      new: "Marcada como solicitada",
-      in_review: "Pasó a En revisión",
-      sourcing: "Consultando al proveedor",
-      quoted: "Cotización recibida",
-      awaiting_customer: "Esperando respuesta del cliente",
-      accepted: "Aprobada",
-      purchased: "Comprada",
-      rejected: "Rechazada",
-      resolved: "Resuelta",
-    };
+  const setPriority = useCallback(
+    async (id: string, version: number, priority: SignalBffPriority) => {
+      const result = await commands.setPriority(id, version, priority);
+      if (result.ok) applyView(result.signal);
+      return result;
+    },
+    [commands, applyView]
+  );
 
-    return {
-      signals,
-      addSignal: (input) => {
-        const created = now();
-        const signal: SalesSignal = {
-          id: uid("SIG"),
-          type: input.type,
-          priority: input.priority,
-          status: "new",
-          sku: input.sku,
-          productName: input.productName,
-          category: input.category,
-          brand: input.brand,
-          channel: input.channel,
-          store: input.store,
-          reportedBy: input.reportedBy,
-          date: created,
-          comment: input.comment,
-          recommendedAction: input.recommendedAction ?? "",
-          customersAsking: input.customersAsking,
-          estimatedLostSale: input.estimatedLostSale,
-          evidenceNote: input.evidenceNote,
-          customerName: input.customerName,
-          requestedQty: input.requestedQty,
-          requiredDate: input.requiredDate,
-          targetPrice: input.targetPrice,
-          suggestedSupplier: input.suggestedSupplier,
-          support: supportFor(input.sku, input.support),
-          messages: input.comment
-            ? [
-                {
-                  id: uid("m"),
-                  role: "seller",
-                  author: input.reportedBy,
-                  date: created,
-                  text: input.comment,
-                },
-              ]
-            : [],
-          timeline: [
-            {
-              id: uid("ev"),
-              date: created,
-              actor: input.reportedBy,
-              kind: "created",
-              text: `Señal reportada desde ${input.store}`,
-            },
-          ],
-        };
-        setState((prev) => ({ ...prev, created: [signal, ...prev.created] }));
-        return signal;
-      },
-      setStatus: (id, status, note) => {
-        patch(id, { status });
-        pushEvent(id, "status", "Comprador", note ?? STATUS_TEXT[status]);
-      },
-      assign: (id, buyer) => {
-        patch(id, { assignedBuyer: buyer });
-        pushEvent(id, "assigned", buyer, `Asignada a ${buyer}`);
-      },
-      setPriority: (id, priority) => {
-        patch(id, { priority });
-        pushEvent(
-          id,
-          "priority",
-          "Comprador",
-          `Prioridad cambiada a ${priority === "high" ? "Alta" : priority === "medium" ? "Media" : "Baja"}`
+  const comment = useCallback(
+    async (id: string, body: string) => {
+      const result = await commands.comment(id, body);
+      // El comando no devuelve la señal: solo se ajusta el contador del hilo.
+      if (result.ok) {
+        setSignals((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, messageCount: (s.messageCount ?? 0) + 1 } : s
+          )
         );
-      },
-      reject: (id, reason) => {
-        patch(id, { status: "rejected", rejectionReason: reason });
-        pushEvent(id, "status", "Comprador", `Rechazada — ${reason}`);
-      },
-      updateRequest: (id, fields) => {
-        patch(id, fields);
-        pushEvent(id, "comment", "Comprador", "Datos de la solicitud actualizados");
-      },
-      addMessage: (id, msg) => {
-        const m: SignalMessage = {
-          id: uid("m"),
-          role: msg.role,
-          author: msg.author,
-          date: now(),
-          text: msg.text,
-        };
-        setState((prev) => ({
-          ...prev,
-          extraMessages: {
-            ...prev.extraMessages,
-            [id]: [...(prev.extraMessages[id] ?? []), m],
-          },
-        }));
-        pushEvent(id, "comment", msg.author, `Comentó: "${msg.text}"`);
-      },
-      markConverted: (id, detail) => {
-        patch(id, { status: "accepted" });
-        pushEvent(id, "converted", "Comprador", detail);
-      },
-    };
-  }, [signals, patch, pushEvent, setState]);
+      }
+      return result;
+    },
+    [commands]
+  );
+
+  const value = useMemo<SignalsContextValue>(
+    () => ({
+      signals,
+      configured,
+      loading,
+      error,
+      refetch: () => void load(),
+      report,
+      transition,
+      setPriority,
+      comment,
+    }),
+    [signals, configured, loading, error, load, report, transition, setPriority, comment]
+  );
 
   return <SignalsContext.Provider value={value}>{children}</SignalsContext.Provider>;
 }

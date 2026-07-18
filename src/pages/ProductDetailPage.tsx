@@ -16,12 +16,12 @@ import { IconPlus, IconInfo, IconAlerts, IconSignal, IconSuppliers, IconCategori
 
 import { supplierPath, categoryPath } from "../utils/entityLinks";
 
-import { signalService } from "../services";
-import { SIGNAL_TYPE, SIGNAL_STATUS, SIGNAL_PRIORITY, SIGNAL_CHANNEL } from "../components/business/signalLabels";
+import { SIGNAL_STATUS, SIGNAL_PRIORITY, signalKindMeta } from "../components/business/signalLabels";
 import { ALERT_STATUS_UI } from "../components/business/alertBff";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
 import { useProductFicha } from "../hooks/useFichas";
+import { useSignalsList } from "../hooks/useSignals";
 
 import { DecisionBanner, MiniStat, Row } from "./productDetail/components";
 import { productPriorityUi } from "./productDetail/helpers";
@@ -31,7 +31,7 @@ import { formatCurrency, formatDate, formatDays, formatNumber, formatPercent } f
 //  Ficha de producto (SKU 360, F11) conectada al purchase-bff-service:
 //  GET /products/:sku compone identidad, stock (feed vivo o snapshot del
 //  motor), costo vigente, ventas, recomendación, OCs y alertas. Las señales
-//  de venta siguen en su servicio local (flujo pendiente). Regla de oro:
+//  de venta del SKU salen de GET /signals?sku=… (F13). Regla de oro:
 //  dato sin fuente real ⇒ "—" o estado vacío honesto.
 // ============================================================================
 
@@ -46,6 +46,13 @@ export function ProductDetailPage() {
   const [tab, setTab] = useState(searchParams.get("tab") ?? "resumen");
 
   const { data, loading, error, notFound, configured, refetch } = useProductFicha(sku);
+
+  // Señales de venta reales del SKU (antes de los early-returns: es un hook).
+  const {
+    signals: productSignals,
+    loading: signalsLoading,
+    error: signalsError,
+  } = useSignalsList({ sku }, { enabled: !!sku });
 
   const pageTitle = data?.name ?? sku ?? "Producto";
   const breadcrumbs = [{ label: "Productos", to: "/productos" }, { label: sku ?? "—" }];
@@ -123,7 +130,6 @@ export function ProductDetailPage() {
   if (!data || !sku) return null;
 
   const rec = data.recommendation;
-  const productSignals = signalService.bySku(data.sku);
 
   // Cobertura: la del motor o disponible/velocidad si ambos existen.
   const coverage =
@@ -694,7 +700,19 @@ export function ProductDetailPage() {
             }
           />
           <CardBody>
-            {productSignals.length === 0 ? (
+            {signalsLoading && productSignals.length === 0 ? (
+              <div className="space-y-2.5" aria-busy="true" aria-label="Cargando señales">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : signalsError && productSignals.length === 0 ? (
+              <EmptyState
+                icon={<IconSignal className="w-6 h-6" />}
+                title="No se pudieron cargar las señales"
+                description={signalsError.message}
+              />
+            ) : productSignals.length === 0 ? (
               <EmptyState
                 icon={<IconSignal className="w-6 h-6" />}
                 title="Sin señales de ventas"
@@ -705,22 +723,22 @@ export function ProductDetailPage() {
                 {productSignals.map((s) => (
                   <Link
                     key={s.id}
-                    to="/senales-ventas"
+                    to={`/senales-ventas?sig=${encodeURIComponent(s.id)}`}
                     className="block rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
                   >
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
                       <Badge tone={SIGNAL_PRIORITY[s.priority].tone}>
                         {SIGNAL_PRIORITY[s.priority].label}
                       </Badge>
-                      <Badge tone={SIGNAL_TYPE[s.type].tone}>{SIGNAL_TYPE[s.type].short}</Badge>
+                      <Badge tone={signalKindMeta(s.kind).tone}>{signalKindMeta(s.kind).short}</Badge>
                       <div className="flex-1" />
                       <Badge tone={SIGNAL_STATUS[s.status].tone} dot>
                         {SIGNAL_STATUS[s.status].label}
                       </Badge>
                     </div>
-                    <p className="text-sm text-slate-700">{s.comment}</p>
+                    <p className="text-sm text-slate-700">{s.body}</p>
                     <p className="text-xs text-slate-500 mt-1">
-                      {s.reportedBy} · {SIGNAL_CHANNEL[s.channel]} · {s.store}
+                      {[s.reporterName ?? s.reporterUserId, s.storeRef].filter(Boolean).join(" · ")}
                     </p>
                   </Link>
                 ))}

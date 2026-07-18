@@ -46,12 +46,16 @@ export function WorkloadPage() {
       .filter((s) => s.status !== "inactive" && s.categories.some((c) => b.categories.includes(c)))
       .map((s) => s.name)
       .slice(0, 6);
+  // Señales reales asignadas al comprador y aún vivas (la máquina real cierra
+  // con actioned/dismissed). El backend asigna por id de usuario, así que solo
+  // matchea si el nombre del tablero coincide con ese id.
   const requestsOf = (b: Buyer) =>
     signals
       .filter(
-        (s) => s.assignedBuyer === b.name && s.status !== "resolved" && s.status !== "rejected"
+        (s) =>
+          s.assignedBuyerId === b.name && s.status !== "actioned" && s.status !== "dismissed"
       )
-      .map((s) => s.productName)
+      .map((s) => s.sku ?? s.kind)
       .slice(0, 6);
 
   return (
