@@ -4,245 +4,243 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { Tabs } from "../components/ui/Tabs";
-import { RelatedEntitiesPanel } from "../shared/components/RelatedEntitiesPanel";
 import { ActivityTimeline, type ActivityItem } from "../shared/components/ActivityTimeline";
-import { relatedEntitiesForProduct } from "../shared/entities";
-import { channelMarginsForSku, CHANNEL_LABELS, MARGIN_STATUS } from "../data/mockChannelMargin";
 import { KpiCard } from "../components/business/KpiCard";
 import { StatusBadge } from "../components/business/StatusBadge";
-import { RecommendationBadge } from "../components/business/RecommendationBadge";
-import { AlertCard } from "../components/business/AlertCard";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
+import { Skeleton } from "../components/ui/Skeleton";
 import { BarList } from "../components/business/BarList";
-import { IconPlus, IconInfo, IconAlerts, IconSignal } from "../components/ui/icons";
-import { getProductBySku, products } from "../data/mockProducts";
+import { IconPlus, IconInfo, IconAlerts, IconSignal, IconSuppliers, IconCategories } from "../components/ui/icons";
 
-import { supplierPath } from "../utils/entityLinks";
+import { supplierPath, categoryPath } from "../utils/entityLinks";
 
-import { skuOptimizationStatus, ACTION_LABEL, TIER_LABEL } from "../utils/catalogOptimization";
-import { recommendations } from "../data/mockRecommendations";
-import { alerts } from "../data/mockAlerts";
 import { signalService } from "../services";
 import { SIGNAL_TYPE, SIGNAL_STATUS, SIGNAL_PRIORITY, SIGNAL_CHANNEL } from "../components/business/signalLabels";
-import { purchaseOrders } from "../data/mockPurchaseOrders";
+import { ALERT_STATUS_UI } from "../components/business/alertBff";
 import { useOcDraft } from "../context/OcDraftContext";
 import { useToast } from "../context/ToastContext";
-import { useTrace } from "../context/TraceContext";
-import { MoreActions, type MoreAction } from "../components/ui/MoreActions";
-import { TODAY_ISO } from "../utils/constants";
+import { useProductFicha } from "../hooks/useFichas";
 
-import { DecisionBanner, MiniStat, NegotiationPanel, Row } from "./productDetail/components";
-import { formatCurrency, formatDate, formatNumber, formatPercent } from "../utils/formatters";
+import { DecisionBanner, MiniStat, Row } from "./productDetail/components";
+import { productPriorityUi } from "./productDetail/helpers";
+import { formatCurrency, formatDate, formatDays, formatNumber, formatPercent } from "../utils/formatters";
+
+// ============================================================================
+//  Ficha de producto (SKU 360, F11) conectada al purchase-bff-service:
+//  GET /products/:sku compone identidad, stock (feed vivo o snapshot del
+//  motor), costo vigente, ventas, recomendación, OCs y alertas. Las señales
+//  de venta siguen en su servicio local (flujo pendiente). Regla de oro:
+//  dato sin fuente real ⇒ "—" o estado vacío honesto.
+// ============================================================================
+
+const fmtDate = (iso: string | null) => (iso ? formatDate(iso.slice(0, 10)) : "—");
 
 export function ProductDetailPage() {
   const { sku } = useParams<{ sku: string }>();
   const navigate = useNavigate();
   const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
-  const { log } = useTrace();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "resumen");
 
-  const product = sku ? getProductBySku(sku) : undefined;
+  const { data, loading, error, notFound, configured, refetch } = useProductFicha(sku);
 
-  if (!product) {
+  const pageTitle = data?.name ?? sku ?? "Producto";
+  const breadcrumbs = [{ label: "Productos", to: "/productos" }, { label: sku ?? "—" }];
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando, error y 404 (patrón F1).
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver la ficha real del producto.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && !data) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando ficha del producto">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (notFound) {
     return (
       <div className="py-10">
         <EmptyState
           title="Producto no encontrado"
-          description={`No existe un SKU "${sku}" en el catálogo.`}
+          description={`El servicio de compras no conoce el SKU "${sku}".`}
           action={<Button onClick={() => navigate("/productos")}>Volver a productos</Button>}
         />
       </div>
     );
   }
 
-  const rec = recommendations.find((r) => r.sku === product.sku);
-  const relatedAlerts = alerts.filter((a) => a.relatedSku === product.sku);
-  const productSignals = signalService.bySku(product.sku);
-  const relatedPOs = purchaseOrders.filter((o) => o.lines?.some((l) => l.sku === product.sku));
+  if (error && !data) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudo cargar la ficha del producto
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-  // Historiales simples (mock)
-  const salesHistory = [
-    { period: "Junio 2026", units: product.salesLast30Days },
-    { period: "Mayo 2026", units: Math.round(product.salesLast90Days / 3) },
-    {
-      period: "Abril 2026",
-      units: Math.round((product.salesLast90Days - product.salesLast30Days) / 2.2),
-    },
-  ];
-  const purchaseHistory = relatedPOs.map((o) => {
-    const line = o.lines?.find((l) => l.sku === product.sku);
-    return {
-      date: o.createdAt,
-      number: o.number,
-      qty: line?.quantity ?? 0,
-      cost: line?.unitCost ?? product.cost,
-    };
-  });
-  const costHistory = [
-    { date: product.costUpdatedAt, cost: product.cost, note: "Costo vigente" },
-    { date: "2026-03-15", cost: Math.round(product.cost * 0.94), note: "Lista anterior" },
-    { date: "2025-12-01", cost: Math.round(product.cost * 0.89), note: "Lista 2025" },
-  ];
+  if (!data || !sku) return null;
 
-  // Entidades relacionadas (conexión con otros módulos)
-  const related = relatedEntitiesForProduct(product.sku);
+  const rec = data.recommendation;
+  const productSignals = signalService.bySku(data.sku);
 
-  // Estado en el catálogo optimizado (surtido redundante / a reactivar)
-  const optStatus = skuOptimizationStatus(product.sku, products);
-  const optLink = optStatus.category
-    ? `/surtido-redundante?cat=${encodeURIComponent(optStatus.category)}`
-    : "/surtido-redundante";
+  // Cobertura: la del motor o disponible/velocidad si ambos existen.
+  const coverage =
+    rec?.coverageDays ??
+    (data.stock.available !== null &&
+    data.sales.dailyVelocity !== null &&
+    data.sales.dailyVelocity > 0
+      ? Math.round(data.stock.available / data.sales.dailyVelocity)
+      : null);
 
-  // Margen por canal
-  const channelMargin = channelMarginsForSku(product.sku);
-  const bestChannel = [...channelMargin].sort((a, b) => b.marginPct - a.marginPct)[0];
-  const worstChannel = [...channelMargin].sort((a, b) => a.marginPct - b.marginPct)[0];
-
-  // Actividad / auditoría básica del producto
-  const activity: ActivityItem[] = [
-    {
-      date: product.costUpdatedAt,
-      title: "Actualización de costo",
-      description: `Costo vigente ${formatCurrency(product.cost)}`,
-      tone: "blue" as const,
-    },
-    ...purchaseHistory.map((h) => ({
-      date: h.date,
-      title: `Orden de compra ${h.number}`,
-      description: `${formatNumber(h.qty)} unidades a ${formatCurrency(h.cost)} c/u`,
-      tone: "neutral" as const,
-    })),
-    ...relatedAlerts.map((a) => ({
-      date: a.date,
-      title: "Alerta comercial",
-      description: a.description,
-      tone: "amber" as const,
-    })),
-  ].sort((a, b) => (a.date < b.date ? 1 : -1));
-
+  const added = hasItem(data.sku);
   const handleAdd = () => {
-    if (!rec) return;
-    addItem({
-      sku: product.sku,
-      productName: product.name,
-      supplierName: product.supplierName,
-      quantity: rec.suggestedQuantity || product.reorderPoint,
-      unitCost: product.cost,
+    const ok = addItem({
+      sku: data.sku,
+      productName: data.name ?? data.sku,
+      supplierName: data.supplier.name ?? "",
+      quantity: rec?.suggestedQty ?? 1,
+      unitCost: data.cost.unitCostClp ?? 0,
+      recommendationId: rec?.id,
+      supplierId: data.supplier.id ?? undefined,
+      categoryId: data.category.id ?? undefined,
+    });
+    if (!ok) return;
+    toast.success(`${data.name ?? data.sku} agregado al borrador de OC`, {
+      label: "Ver borrador OC",
+      onClick: () => navigate("/comprar/borradores"),
     });
   };
 
-  // Acciones contextuales sobre el producto (inventario). Registran en bitácora.
-  const runAction = (action: string, detail?: string) => {
-    log({
-      actor: "Catalina Saavedra",
-      entity: `Producto · ${product.name}`,
-      action,
-      reason: detail,
-      date: TODAY_ISO,
-    });
-    toast.success(`${action}${detail ? ` · ${detail}` : ""}`);
-  };
-  const isOverstock =
-    product.purchaseStatus === "overstock" ||
-    product.productStatus === "no_sales" ||
-    product.inventoryDays > 180;
-  const multiLocation = (product.stockByLocation?.length ?? 0) > 1;
-  const productActions: MoreAction[] = [
-    ...(multiLocation
-      ? [{ label: "Transferir stock entre ubicaciones", onClick: () => runAction("Transferencia solicitada") }]
-      : []),
-    ...(isOverstock
+  // Actividad real: costo vigente, OCs con el SKU y alertas.
+  const activity: ActivityItem[] = [
+    ...(data.cost.asOf
       ? [
-          { label: "Solicitar liquidación", onClick: () => runAction("Liquidación solicitada") },
-          { label: "Pedir devolución al proveedor", onClick: () => runAction("Devolución solicitada al proveedor") },
-          { label: "Solicitar acción comercial", onClick: () => runAction("Acción comercial solicitada a ventas") },
+          {
+            date: data.cost.asOf.slice(0, 10),
+            title: "Actualización de costo",
+            description: `Costo vigente ${
+              data.cost.unitCostClp !== null ? formatCurrency(data.cost.unitCostClp) : "—"
+            }${data.cost.priceListId ? ` (lista ${data.cost.priceListId})` : ""}`,
+            tone: "blue" as const,
+          },
         ]
       : []),
-    {
-      label: product.purchaseStatus === "do_not_buy" ? "Reactivar compra" : "Detener nuevas compras",
-      onClick: () =>
-        runAction(
-          product.purchaseStatus === "do_not_buy" ? "Compra reactivada" : "Compra detenida",
-          "cambio de estado de compra"
-        ),
-    },
-    { label: "Cambiar parámetros de reposición", onClick: () => navigate("/reglas") },
-    {
-      label: "Marcar como estacional",
-      onClick: () => runAction("Marcado como estacional", "planificar por temporada"),
-    },
-    {
-      label: "Marcar como descontinuado",
-      danger: true,
-      onClick: () => runAction("Marcado como descontinuado", "bloquear nuevas compras"),
-    },
-  ];
+    ...data.orders
+      .filter((o) => o.createdAt)
+      .map((o) => ({
+        date: (o.createdAt ?? "").slice(0, 10),
+        title: `Orden de compra ${o.number ?? o.purchaseOrderId ?? ""}`,
+        description: `${o.qty !== null ? formatNumber(o.qty) : "—"} unidades${
+          o.unitCostClp !== null ? ` a ${formatCurrency(o.unitCostClp)} c/u` : ""
+        }`,
+        tone: "neutral" as const,
+      })),
+    ...data.alerts
+      .filter((a) => a.dateCreated)
+      .map((a) => ({
+        date: (a.dateCreated ?? "").slice(0, 10),
+        title: "Alerta comercial",
+        description: a.title ?? "—",
+        tone: "amber" as const,
+      })),
+  ].sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return (
     <div>
       <PageHeader
-        breadcrumbs={[{ label: "Productos", to: "/productos" }, { label: product.sku }]}
-        title={product.name}
-        description={`${product.category} · ${product.subcategory} · ${product.brand}`}
+        breadcrumbs={breadcrumbs}
+        title={pageTitle}
+        description={
+          [data.category.name, data.brand].filter(Boolean).join(" · ") || undefined
+        }
         action={
-          <div className="flex items-center gap-2">
-            {rec && rec.suggestedQuantity > 0 && (
-              <Button
-                onClick={handleAdd}
-                disabled={hasItem(product.sku)}
-                variant={hasItem(product.sku) ? "secondary" : "primary"}
-                icon={<IconPlus className="w-4 h-4" />}
-              >
-                {hasItem(product.sku) ? "Agregado a OC" : "Agregar a OC"}
-              </Button>
-            )}
-            <MoreActions actions={productActions} label="Acciones del producto" />
-          </div>
+          rec && rec.suggestedQty > 0 ? (
+            <Button
+              onClick={handleAdd}
+              disabled={added}
+              variant={added ? "secondary" : "primary"}
+              icon={<IconPlus className="w-4 h-4" />}
+            >
+              {added ? "Agregado a OC" : "Agregar a OC"}
+            </Button>
+          ) : undefined
         }
       />
 
-      {/* Encabezado: chips */}
+      {/* Encabezado: chips de identidad con links reales */}
       <div className="flex flex-wrap items-center gap-2 mb-5">
         <span className="text-xs font-mono text-slate-500 bg-slate-100 rounded px-2 py-1">
-          {product.sku}
+          {data.sku}
         </span>
-        <StatusBadge kind="product" value={product.productStatus} />
-        <StatusBadge kind="purchase" value={product.purchaseStatus} dot={false} />
-        {product.supplierName ? (
+        {data.supplier.name || data.supplier.id ? (
           <Link
-            to={supplierPath(product.supplierName)}
+            to={supplierPath(data.supplier.id)}
             className="text-xs text-brand-600 hover:text-brand-700 font-medium"
           >
-            Proveedor: {product.supplierName}
+            Proveedor: {data.supplier.name ?? data.supplier.id}
           </Link>
         ) : (
           <Badge tone="red">Sin proveedor asignado</Badge>
         )}
-        {optStatus.kind === "redundant" && (
+        {data.category.name && (
           <Link
-            to={optLink}
-            title={`Gama ${TIER_LABEL[optStatus.segment!]} ya cubierta por “${optStatus.leaderName}”`}
+            to={categoryPath(data.category.id)}
+            className="text-xs text-brand-600 hover:text-brand-700 font-medium"
           >
-            <Badge tone="amber" dot>
-              Redundante · {ACTION_LABEL[optStatus.action!]}
-            </Badge>
+            Categoría: {data.category.name}
           </Link>
         )}
-        {optStatus.kind === "reactivate" && (
-          <Link to={optLink} title="Es el mejor de su gama pero está en “no comprar”">
-            <Badge tone="amber" dot>
-              Reactivar compra
-            </Badge>
-          </Link>
+        {data.stock.fromSnapshot && (
+          <Badge tone="amber" dot>
+            Stock desde snapshot del motor
+          </Badge>
         )}
       </div>
 
       {/* Decisión recomendada — lo primero que debe ver el comprador */}
-      <DecisionBanner product={product} rec={rec} added={hasItem(product.sku)} onAdd={handleAdd} />
+      <DecisionBanner data={data} added={added} onAdd={handleAdd} />
 
       <Tabs
         className="mb-5"
@@ -251,9 +249,9 @@ export function ProductDetailPage() {
         tabs={[
           { value: "resumen", label: "Resumen" },
           { value: "negociacion", label: "Negociación" },
-          { value: "margen", label: "Margen por canal", count: channelMargin.length },
+          { value: "margen", label: "Margen por canal" },
           { value: "senales", label: "Señales de ventas", count: productSignals.length },
-          { value: "relacionados", label: "Relacionados", count: related.length },
+          { value: "relacionados", label: "Relacionados" },
           { value: "actividad", label: "Actividad", count: activity.length },
         ]}
       />
@@ -262,247 +260,377 @@ export function ProductDetailPage() {
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <KpiCard title="Stock total" value={formatNumber(product.totalStock)} tone="neutral" />
             <KpiCard
               title="Stock disponible"
-              value={formatNumber(product.availableStock)}
-              tone={product.availableStock <= 0 ? "bad" : "good"}
-              description={`${formatNumber(product.committedStock)} comprometido`}
+              value={data.stock.available !== null ? formatNumber(data.stock.available) : "—"}
+              tone={
+                data.stock.available === null
+                  ? "neutral"
+                  : data.stock.available <= 0
+                    ? "bad"
+                    : "good"
+              }
+              description={data.stock.fromSnapshot ? "Snapshot del motor" : undefined}
+            />
+            <KpiCard
+              title="En tránsito"
+              value={data.stock.inTransit !== null ? formatNumber(data.stock.inTransit) : "—"}
+              tone="neutral"
             />
             <KpiCard
               title="Venta 30 días"
-              value={formatNumber(product.salesLast30Days)}
+              value={
+                data.sales.salesLast30d !== null ? formatNumber(data.sales.salesLast30d) : "—"
+              }
               tone="info"
-              description={`${formatNumber(product.salesLast90Days)} en 90 días`}
+              description={
+                data.sales.salesLast90d !== null
+                  ? `${formatNumber(data.sales.salesLast90d)} en 90 días`
+                  : undefined
+              }
             />
             <KpiCard
-              title="Días de inventario"
-              value={formatNumber(product.inventoryDays)}
+              title="Cobertura"
+              value={coverage !== null ? formatDays(coverage) : "—"}
               tone={
-                product.inventoryDays < 7 ? "bad" : product.inventoryDays > 120 ? "warn" : "good"
+                coverage === null ? "neutral" : coverage < 7 ? "bad" : coverage > 120 ? "warn" : "good"
               }
             />
             <KpiCard
               title="Margen"
-              value={formatPercent(product.margin)}
-              tone={product.margin < 25 ? "warn" : "good"}
-            />
-            <KpiCard
-              title="Costo actual"
-              value={formatCurrency(product.cost)}
-              tone="neutral"
-              description={`Actualizado ${formatDate(product.costUpdatedAt)}`}
-            />
-            <KpiCard title="Precio venta" value={formatCurrency(product.price)} tone="neutral" />
-            <KpiCard
-              title="Cantidad sugerida"
-              value={rec ? `${formatNumber(rec.suggestedQuantity)} u.` : "—"}
-              tone="info"
-              description={
-                rec ? formatCurrency(rec.suggestedPurchaseAmount) : "Sin recomendación activa"
+              value={data.sales.marginPct !== null ? formatPercent(data.sales.marginPct) : "—"}
+              tone={
+                data.sales.marginPct === null
+                  ? "neutral"
+                  : data.sales.marginPct < 25
+                    ? "warn"
+                    : "good"
               }
+            />
+            <KpiCard
+              title="Costo vigente"
+              value={data.cost.unitCostClp !== null ? formatCurrency(data.cost.unitCostClp) : "—"}
+              tone="neutral"
+              description={
+                data.cost.priceListId
+                  ? `Lista ${data.cost.priceListId} · ${fmtDate(data.cost.asOf)}`
+                  : fmtDate(data.cost.asOf)
+              }
+            />
+            <KpiCard
+              title="Velocidad diaria"
+              value={
+                data.sales.dailyVelocity !== null
+                  ? data.sales.dailyVelocity.toLocaleString("es-CL", { maximumFractionDigits: 1 })
+                  : "—"
+              }
+              tone="neutral"
+              description="Unidades por día"
+            />
+            <KpiCard
+              title="Rotación"
+              value={
+                data.sales.rotation !== null
+                  ? data.sales.rotation.toLocaleString("es-CL", { maximumFractionDigits: 1 })
+                  : "—"
+              }
+              tone="neutral"
             />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-            {/* Recomendación de compra */}
+            {/* Recomendación de compra real del motor */}
             <div className="lg:col-span-2">
               <Card>
                 <CardHeader
                   title="Recomendación de compra"
-                  description="Qué hacer con este producto y por qué"
+                  description="Qué hacer con este producto y por qué (motor de reposición)"
                 />
                 <CardBody>
                   {rec ? (
                     <div className="space-y-4">
                       <div className="flex flex-wrap items-center gap-3">
-                        <RecommendationBadge status={rec.status} />
+                        <Badge tone={productPriorityUi(rec.priority).tone} dot>
+                          {productPriorityUi(rec.priority).label}
+                        </Badge>
                         <div>
                           <p className="text-2xl font-semibold text-slate-900">
-                            {formatNumber(rec.suggestedQuantity)} unidades
+                            {formatNumber(rec.suggestedQty)} unidades
                           </p>
                           <p className="text-sm text-slate-500">
-                            {formatCurrency(rec.suggestedPurchaseAmount)} · {rec.supplierName} (lead
-                            time {rec.supplierLeadTimeDays} días)
+                            {data.cost.unitCostClp !== null
+                              ? formatCurrency(rec.suggestedQty * data.cost.unitCostClp)
+                              : "monto según costo vigente no disponible"}
+                            {data.supplier.name && <> · {data.supplier.name}</>}
+                            {data.terms.leadTimeDays !== null && (
+                              <> (lead time {formatDays(data.terms.leadTimeDays)})</>
+                            )}
                           </p>
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <div className="flex gap-2.5 rounded-lg border-l-2 border-slate-300 bg-slate-50 px-3 py-2">
-                          <IconInfo className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                          <p className="text-sm text-slate-700">
-                            <span className="font-medium text-slate-500">Motivo: </span>
-                            {rec.reason}
-                          </p>
-                        </div>
-                        <div className="flex gap-2.5 rounded-lg border-l-2 border-rose-400 bg-rose-50 px-3 py-2">
-                          <IconAlerts className="w-4 h-4 text-rose-500 mt-0.5 flex-shrink-0" />
-                          <p className="text-sm text-slate-700">
-                            <span className="font-medium text-rose-600">
-                              Riesgo si no compras:{" "}
-                            </span>
-                            {rec.risk}
-                          </p>
-                        </div>
+                        {rec.reason && (
+                          <div className="flex gap-2.5 rounded-lg border-l-2 border-slate-300 bg-slate-50 px-3 py-2">
+                            <IconInfo className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-slate-700">
+                              <span className="font-medium text-slate-500">Motivo: </span>
+                              {rec.reason}
+                            </p>
+                          </div>
+                        )}
+                        {rec.risk && (
+                          <div className="flex gap-2.5 rounded-lg border-l-2 border-rose-400 bg-rose-50 px-3 py-2">
+                            <IconAlerts className="w-4 h-4 text-rose-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-slate-700">
+                              <span className="font-medium text-rose-600">
+                                Riesgo si no compras:{" "}
+                              </span>
+                              {rec.risk}
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-3 gap-3 text-center">
-                        <MiniStat label="Stock mínimo" value={formatNumber(rec.minStock)} />
-                        <MiniStat label="Punto reposición" value={formatNumber(rec.reorderPoint)} />
-                        <MiniStat label="Stock máximo" value={formatNumber(rec.maxStock)} />
+                        <MiniStat
+                          label="MOQ"
+                          value={data.terms.moq !== null ? formatNumber(data.terms.moq) : "—"}
+                        />
+                        <MiniStat
+                          label="Múltiplo de compra"
+                          value={
+                            data.terms.packMultiple !== null
+                              ? formatNumber(data.terms.packMultiple)
+                              : "—"
+                          }
+                        />
+                        <MiniStat
+                          label="Cobertura sugerida"
+                          value={
+                            rec.coverageDays != null ? formatDays(rec.coverageDays) : "—"
+                          }
+                        />
                       </div>
                     </div>
                   ) : (
                     <EmptyState
                       title="Sin recomendación activa"
-                      description="Este producto no tiene una recomendación de compra pendiente. Su stock cubre la venta esperada."
+                      description="El motor de reposición no tiene una recomendación pendiente para este SKU."
                     />
                   )}
                 </CardBody>
               </Card>
             </div>
 
-            {/* Stock por ubicación */}
+            {/* Stock real (feed vivo o snapshot) */}
             <Card>
-              <CardHeader title="Stock por ubicación" description="Disponible vs comprometido" />
-              <CardBody className="space-y-3">
-                {product.stockByLocation.map((loc) => (
-                  <div key={loc.locationName}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm text-slate-700">{loc.locationName}</span>
-                      <span className="text-sm font-medium text-slate-900">
-                        {formatNumber(loc.stock)}
-                      </span>
-                    </div>
-                    <div className="flex h-2 rounded-full overflow-hidden bg-slate-100">
-                      <div
-                        className="bg-emerald-500 h-full"
-                        style={{ width: `${(loc.available / Math.max(loc.stock, 1)) * 100}%` }}
-                      />
-                      <div
-                        className="bg-amber-400 h-full"
-                        style={{ width: `${(loc.committed / Math.max(loc.stock, 1)) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-slate-400 mt-0.5">
-                      <span>Disp. {formatNumber(loc.available)}</span>
-                      <span>Comp. {formatNumber(loc.committed)}</span>
-                    </div>
-                  </div>
-                ))}
+              <CardHeader
+                title="Stock"
+                description={
+                  data.stock.fromSnapshot
+                    ? "Snapshot del motor (feed vivo caído)"
+                    : "Saldo según el feed de inventario"
+                }
+              />
+              <CardBody className="space-y-2">
+                <Row
+                  label="Disponible"
+                  value={data.stock.available !== null ? formatNumber(data.stock.available) : "—"}
+                  strong
+                />
+                <Row
+                  label="En tránsito"
+                  value={data.stock.inTransit !== null ? formatNumber(data.stock.inTransit) : "—"}
+                />
+                <Row
+                  label="Stock de seguridad"
+                  value={data.stock.security !== null ? formatNumber(data.stock.security) : "—"}
+                />
+                <Row label="Actualizado" value={fmtDate(data.stock.asOf)} />
               </CardBody>
             </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-            {/* Historial ventas */}
+            {/* Ventas reales: solo las ventanas publicadas (sin inventar meses) */}
             <Card>
-              <CardHeader title="Últimas ventas" description="Unidades por mes" />
+              <CardHeader title="Ventas" description="Unidades por ventana publicada" />
               <CardBody>
-                <BarList
-                  items={salesHistory.map((s) => ({
-                    label: s.period,
-                    value: s.units,
-                    display: `${formatNumber(s.units)} u.`,
-                    tone: "blue",
-                  }))}
-                />
+                {data.sales.salesLast30d === null && data.sales.salesLast90d === null ? (
+                  <p className="text-sm text-slate-400 py-4 text-center">
+                    Sin ventas publicadas para este SKU.
+                  </p>
+                ) : (
+                  <>
+                    <BarList
+                      items={[
+                        ...(data.sales.salesLast30d !== null
+                          ? [
+                              {
+                                label: "Últimos 30 días",
+                                value: data.sales.salesLast30d,
+                                display: `${formatNumber(data.sales.salesLast30d)} u.`,
+                                tone: "blue" as const,
+                              },
+                            ]
+                          : []),
+                        ...(data.sales.salesLast90d !== null
+                          ? [
+                              {
+                                label: "Últimos 90 días",
+                                value: data.sales.salesLast90d,
+                                display: `${formatNumber(data.sales.salesLast90d)} u.`,
+                                tone: "blue" as const,
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                    <p className="mt-2 text-xs text-slate-400">
+                      La serie mensual se publica desde analytics; pendiente.
+                    </p>
+                  </>
+                )}
               </CardBody>
             </Card>
 
-            {/* Historial compras */}
+            {/* Historial de compras real */}
             <Card>
               <CardHeader title="Últimas compras" description="Órdenes con este SKU" />
               <CardBody className="space-y-2">
-                {purchaseHistory.length > 0 ? (
-                  purchaseHistory.map((h) => (
+                {data.orders.length > 0 ? (
+                  data.orders.map((o, i) => (
                     <div
-                      key={h.number}
+                      key={o.purchaseOrderId ?? i}
                       className="flex items-center justify-between text-sm py-1.5 border-b border-slate-50 last:border-0"
                     >
                       <div>
-                        <p className="font-medium text-slate-700">{h.number}</p>
-                        <p className="text-xs text-slate-400">{formatDate(h.date)}</p>
+                        <p className="font-medium text-slate-700">{o.number ?? "—"}</p>
+                        <p className="text-xs text-slate-400">
+                          {fmtDate(o.createdAt)}
+                          {o.status && (
+                            <>
+                              {" · "}
+                              <StatusBadge kind="purchaseOrder" value={o.status} dot={false} />
+                            </>
+                          )}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-slate-700">{formatNumber(h.qty)} u.</p>
-                        <p className="text-xs text-slate-400">{formatCurrency(h.cost)} c/u</p>
+                        <p className="text-slate-700">
+                          {o.qty !== null ? `${formatNumber(o.qty)} u.` : "—"}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {o.unitCostClp !== null ? `${formatCurrency(o.unitCostClp)} c/u` : "—"}
+                        </p>
                       </div>
                     </div>
                   ))
                 ) : (
                   <p className="text-sm text-slate-400 py-4 text-center">
-                    Sin compras recientes registradas.
+                    Sin compras registradas con este SKU.
                   </p>
                 )}
               </CardBody>
             </Card>
 
-            {/* Historial costo */}
+            {/* Costo vigente (sin serie histórica todavía) */}
             <Card>
               <CardHeader title="Cambios de costo" description="Evolución del costo unitario" />
               <CardBody className="space-y-2">
-                {costHistory.map((c, i) => (
-                  <div
-                    key={c.date}
-                    className="flex items-center justify-between text-sm py-1.5 border-b border-slate-50 last:border-0"
-                  >
+                {data.cost.unitCostClp !== null ? (
+                  <div className="flex items-center justify-between text-sm py-1.5">
                     <div>
-                      <p className="font-medium text-slate-700">{formatCurrency(c.cost)}</p>
-                      <p className="text-xs text-slate-400">{c.note}</p>
+                      <p className="font-medium text-slate-700">
+                        {formatCurrency(data.cost.unitCostClp)}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {data.cost.priceListId ? `Lista ${data.cost.priceListId}` : "Costo vigente"}
+                      </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-slate-400">{formatDate(c.date)}</p>
-                      {i === 0 && <Badge tone="green">Vigente</Badge>}
+                      <p className="text-xs text-slate-400">{fmtDate(data.cost.asOf)}</p>
+                      <Badge tone="green">Vigente</Badge>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <p className="text-sm text-slate-400 py-4 text-center">
+                    Sin costo vigente publicado.
+                  </p>
+                )}
+                <p className="text-xs text-slate-400">
+                  El historial estará disponible cuando pricing publique versiones de lista.
+                </p>
               </CardBody>
             </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Alertas relacionadas */}
+            {/* Alertas reales del SKU */}
             <div>
               <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Alertas relacionadas</h3>
-              {relatedAlerts.length > 0 ? (
-                <div className="space-y-3">
-                  {relatedAlerts.map((a) => (
-                    <AlertCard key={a.id} alert={a} compact />
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardBody>
+              <Card>
+                <CardBody className="space-y-2">
+                  {data.alerts.length > 0 ? (
+                    data.alerts.map((a) => {
+                      const st =
+                        a.status && a.status in ALERT_STATUS_UI
+                          ? ALERT_STATUS_UI[a.status as keyof typeof ALERT_STATUS_UI]
+                          : { label: a.status ?? "—", tone: "neutral" as const };
+                      return (
+                        <div
+                          key={a.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">
+                              {a.title ?? "Alerta comercial"}
+                            </p>
+                            <p className="text-xs text-slate-500">{fmtDate(a.dateCreated)}</p>
+                          </div>
+                          <Badge tone={st.tone} dot>
+                            {st.label}
+                          </Badge>
+                        </div>
+                      );
+                    })
+                  ) : (
                     <EmptyState
                       title="Sin alertas"
                       description="Este producto no tiene alertas comerciales activas."
                     />
-                  </CardBody>
-                </Card>
-              )}
+                  )}
+                </CardBody>
+              </Card>
             </div>
 
-            {/* OC relacionadas */}
+            {/* OC relacionadas reales */}
             <div>
               <h3 className="text-sm font-semibold text-slate-800 mb-2.5">
                 Órdenes de compra relacionadas
               </h3>
               <Card>
                 <CardBody className="space-y-2">
-                  {relatedPOs.length > 0 ? (
-                    relatedPOs.map((o) => (
+                  {data.orders.length > 0 ? (
+                    data.orders.map((o, i) => (
                       <Link
-                        key={o.id}
-                        to={`/comprar/seguimiento?oc=${encodeURIComponent(o.number)}`}
+                        key={o.purchaseOrderId ?? i}
+                        to={
+                          o.number
+                            ? `/comprar/seguimiento?oc=${encodeURIComponent(o.number)}`
+                            : "/comprar/seguimiento"
+                        }
                         className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5 hover:border-brand-300 hover:bg-brand-50/40"
                       >
                         <div>
-                          <p className="text-sm font-medium text-slate-800">{o.number}</p>
+                          <p className="text-sm font-medium text-slate-800">{o.number ?? "—"}</p>
                           <p className="text-xs text-slate-500">
-                            {o.supplierName} · espera {formatDate(o.expectedDate)}
+                            creada {fmtDate(o.createdAt)}
+                            {o.expectedDate && <> · espera {fmtDate(o.expectedDate)}</>}
                           </p>
                         </div>
-                        <StatusBadge kind="purchaseOrder" value={o.status} dot={false} />
+                        {o.status && (
+                          <StatusBadge kind="purchaseOrder" value={o.status} dot={false} />
+                        )}
                       </Link>
                     ))
                   ) : (
@@ -518,81 +646,35 @@ export function ProductDetailPage() {
         </>
       )}
 
-      {tab === "negociacion" && <NegotiationPanel product={product} rec={rec} />}
+      {tab === "negociacion" && (
+        <Card>
+          <CardBody>
+            <EmptyState
+              title="Negociación por proveedor"
+              description="Las rondas y condiciones se registran en la ficha del proveedor."
+              action={
+                data.supplier.id ? (
+                  <Button onClick={() => navigate(`${supplierPath(data.supplier.id)}?tab=negociacion`)}>
+                    Ir a la ficha del proveedor
+                  </Button>
+                ) : undefined
+              }
+            />
+          </CardBody>
+        </Card>
+      )}
 
       {tab === "margen" && (
         <Card>
           <CardHeader
             title="Margen por canal"
-            description="Precio y margen del mismo SKU en cada canal, con precio sugerido para alcanzar el objetivo"
-            action={
-              <Link
-                to={`/margen-canal?q=${product.sku}`}
-                className="text-xs font-medium text-brand-600 hover:text-brand-700"
-              >
-                Ver comparador
-              </Link>
-            }
+            description="Precio y margen del mismo SKU en cada canal"
           />
           <CardBody>
-            {channelMargin.length === 0 ? (
-              <EmptyState
-                title="Sin datos de canal"
-                description="Este producto no tiene margen por canal cargado."
-              />
-            ) : (
-              <>
-                {bestChannel && worstChannel && bestChannel.channel !== worstChannel.channel && (
-                  <div className="mb-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
-                    Mejor margen en <b>{CHANNEL_LABELS[bestChannel.channel]}</b> (
-                    {formatPercent(bestChannel.marginPct)}); el más bajo en{" "}
-                    <b>{CHANNEL_LABELS[worstChannel.channel]}</b> (
-                    {formatPercent(worstChannel.marginPct)}).
-                  </div>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {channelMargin.map((c) => (
-                    <div key={c.channel} className="rounded-xl border border-slate-200 p-3">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-sm font-semibold text-slate-800">
-                          {CHANNEL_LABELS[c.channel]}
-                        </span>
-                        <Badge tone={MARGIN_STATUS[c.status].tone} dot>
-                          {MARGIN_STATUS[c.status].label}
-                        </Badge>
-                      </div>
-                      <div className="space-y-1 text-sm">
-                        <Row label="Precio" value={formatCurrency(c.finalPrice)} />
-                        <Row label="Costo" value={formatCurrency(c.cost)} />
-                        {c.commission > 0 && (
-                          <Row label="Comisión" value={formatCurrency(c.commission)} />
-                        )}
-                        {c.discount > 0 && (
-                          <Row label="Descuento" value={formatCurrency(c.discount)} />
-                        )}
-                        <Row
-                          label="Margen"
-                          value={formatPercent(c.marginPct)}
-                          strong
-                          tone={c.marginPct < 0 ? "bad" : c.status === "low" ? "warn" : "good"}
-                        />
-                        <Row label="Objetivo" value={formatPercent(c.targetMarginPct, 0)} />
-                        <Row label="Venta 30d" value={`${formatNumber(c.sales30)} u.`} />
-                      </div>
-                      {(c.status === "low" || c.status === "negative") && (
-                        <div className="mt-2 rounded-lg bg-brand-50 border border-brand-100 px-2.5 py-1.5">
-                          <p className="text-xs text-brand-800">
-                            Precio sugerido: <b>{formatCurrency(c.suggestedPrice)}</b>
-                          </p>
-                        </div>
-                      )}
-                      <p className="text-xs text-slate-500 mt-2 leading-snug">{c.cause}</p>
-                      <p className="text-xs font-medium text-slate-700 mt-1">Acción: {c.action}</p>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+            <EmptyState
+              title="Sin datos de canal"
+              description="El margen por canal se publica desde analytics; pendiente de conexión."
+            />
           </CardBody>
         </Card>
       )}
@@ -654,8 +736,41 @@ export function ProductDetailPage() {
             title="Entidades relacionadas"
             description="Conexiones de este producto con otros módulos"
           />
-          <CardBody>
-            <RelatedEntitiesPanel entities={related} />
+          <CardBody className="space-y-2">
+            {data.supplier.id || data.supplier.name ? (
+              <Link
+                to={supplierPath(data.supplier.id)}
+                className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 hover:border-brand-300 hover:bg-brand-50/40"
+              >
+                <IconSuppliers className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs text-slate-400">Proveedor</span>
+                  <span className="block text-sm font-medium text-slate-800 truncate">
+                    {data.supplier.name ?? data.supplier.id}
+                  </span>
+                </span>
+              </Link>
+            ) : null}
+            {data.category.id || data.category.name ? (
+              <Link
+                to={categoryPath(data.category.id)}
+                className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 hover:border-brand-300 hover:bg-brand-50/40"
+              >
+                <IconCategories className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs text-slate-400">Categoría</span>
+                  <span className="block text-sm font-medium text-slate-800 truncate">
+                    {data.category.name ?? data.category.id}
+                  </span>
+                </span>
+              </Link>
+            ) : null}
+            {!data.supplier.id && !data.supplier.name && !data.category.id && !data.category.name && (
+              <EmptyState
+                title="Sin entidades relacionadas"
+                description="La ficha no trae proveedor ni categoría asociados."
+              />
+            )}
           </CardBody>
         </Card>
       )}
@@ -664,10 +779,17 @@ export function ProductDetailPage() {
         <Card>
           <CardHeader
             title="Actividad del producto"
-            description="Auditoría básica de eventos y cambios"
+            description="Eventos reales: costo vigente, órdenes y alertas"
           />
           <CardBody>
-            <ActivityTimeline items={activity} />
+            {activity.length === 0 ? (
+              <EmptyState
+                title="Sin actividad registrada"
+                description="Todavía no hay eventos reales para este SKU."
+              />
+            ) : (
+              <ActivityTimeline items={activity} />
+            )}
           </CardBody>
         </Card>
       )}

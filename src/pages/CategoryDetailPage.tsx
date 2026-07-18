@@ -1,136 +1,175 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
-import { Card, CardBody } from "../components/ui/Card";
+import { Card, CardBody, CardHeader } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { Tabs } from "../components/ui/Tabs";
 import { Button } from "../components/ui/Button";
-import { Badge } from "../components/ui/Badge";
+import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
-import { StatusBadge } from "../components/business/StatusBadge";
-import { RecommendationBadge } from "../components/business/RecommendationBadge";
-import { AlertCard } from "../components/business/AlertCard";
-import { CatalogRedundancy } from "../components/business/CatalogRedundancy";
-import { analyzeCatalog } from "../utils/catalogOptimization";
-import { categories } from "../data/mockCategories";
-import { products } from "../data/mockProducts";
-import { suppliers } from "../data/mockSuppliers";
-import { recommendations } from "../data/mockRecommendations";
-import { alerts } from "../data/mockAlerts";
-import { useOcDraft } from "../context/OcDraftContext";
-import { useToast } from "../context/ToastContext";
+import { Skeleton } from "../components/ui/Skeleton";
+import { useCategoryFicha } from "../hooks/useFichas";
+import { supplierPath, productPath } from "../utils/entityLinks";
 import {
-  formatCurrency,
   formatCurrencyCompact,
   formatNumber,
   formatPercent,
 } from "../utils/formatters";
-import { IconProducts, IconAlerts, IconReplenish, IconSales } from "../components/ui/icons";
+import { IconProducts, IconReplenish, IconSales, IconSuppliers } from "../components/ui/icons";
+
+// ============================================================================
+//  Ficha de categoría (F11) conectada al purchase-bff-service: el :id de la
+//  ruta es el categoryId real (cat-…). GET /categories/:id compone productos
+//  conocidos por el motor, reposición pendiente, presupuesto OTB del mes y
+//  proveedores de la categoría. Las secciones del mock sin fuente (venta CLP,
+//  tendencias, marcas) quedan como estados vacíos honestos.
+// ============================================================================
+
+/** Prioridad del motor → chip (tolerante a valores nuevos). */
+const PRIORITY_UI: Record<string, { label: string; tone: BadgeTone }> = {
+  stockout_imminent: { label: "Quiebre inminente", tone: "red" },
+  low_stock: { label: "Stock bajo", tone: "amber" },
+  opportunity: { label: "Oportunidad", tone: "blue" },
+};
+
+function priorityUi(priority: string): { label: string; tone: BadgeTone } {
+  return PRIORITY_UI[priority] ?? { label: priority, tone: "neutral" };
+}
 
 export function CategoryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addItem, hasItem } = useOcDraft();
-  const toast = useToast();
   const [tab, setTab] = useState("productos");
 
-  const category = categories.find((c) => c.id === id);
+  const { data, loading, error, notFound, configured, refetch } = useCategoryFicha(id);
 
-  if (!category) {
+  const pageTitle = data?.name ?? id ?? "Categoría";
+  const breadcrumbs = [{ label: "Categorías", to: "/categorias" }, { label: pageTitle }];
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando, error y 404 (patrón F1).
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver la ficha real de la categoría.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && !data) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando ficha de la categoría">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (notFound) {
     return (
       <div className="py-10">
         <EmptyState
           title="Categoría no encontrada"
+          description={`El servicio de compras no conoce la categoría "${id}".`}
           action={<Button onClick={() => navigate("/categorias")}>Volver a categorías</Button>}
         />
       </div>
     );
   }
 
-  const catProducts = products.filter((p) => p.category === category.name);
-  const catSuppliers = suppliers.filter((s) => s.categories.includes(category.name));
-  const catRecs = recommendations.filter((r) => r.category === category.name);
-  const catSkus = new Set(catProducts.map((p) => p.sku));
-  const catAlerts = alerts.filter(
-    (a) => a.relatedEntity === category.name || (a.relatedSku && catSkus.has(a.relatedSku))
-  );
-  const redundantCount = analyzeCatalog(catProducts).candidateCount;
-  const productRoles = catProducts
-    .map((p) => {
-      const sales = p.salesLast30Days * p.price;
-      const profit = p.salesLast30Days * (p.price - p.cost);
-      const expected = p.salesLast90Days / 3;
-      const growth = expected > 0 ? (p.salesLast30Days - expected) / expected : 0;
-      const role =
-        p.salesLast30Days === 0 && p.availableStock > 0
-          ? "Detenido"
-          : growth >= 0.25
-            ? "Emergente"
-            : growth <= -0.25 && p.availableStock > 0
-              ? "Deterioro"
-              : p.margin >= 34 && sales > 0
-                ? "Margen"
-                : p.salesLast30Days >= 40
-                  ? "Tractor"
-                  : "Riesgo";
-      return { product: p, sales, profit, growth, role };
-    })
-    .sort((a, b) => b.sales - a.sales);
-  const catBrandRows = Array.from(new Set(catProducts.map((p) => p.brand).filter(Boolean)))
-    .map((brand) => {
-      const rows = catProducts.filter((p) => p.brand === brand);
-      const sales = rows.reduce((sum, p) => sum + p.salesLast30Days * p.price, 0);
-      const profit = rows.reduce((sum, p) => sum + p.salesLast30Days * (p.price - p.cost), 0);
-      const stockouts = rows.filter((p) => p.availableStock <= 0 && p.salesLast30Days > 0).length;
-      return {
-        brand,
-        sales,
-        margin: sales > 0 ? (profit / sales) * 100 : 0,
-        skus: rows.length,
-        stockouts,
-      };
-    })
-    .sort((a, b) => b.sales - a.sales);
+  if (error && !data) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudo cargar la ficha de la categoría
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { replenishment, budget } = data;
+  const byPriority = replenishment.byPriority;
 
   return (
     <div>
       <PageHeader
-        breadcrumbs={[{ label: "Categorías", to: "/categorias" }, { label: category.name }]}
-        title={category.name}
-        description={`Comprador: ${category.buyer}`}
-        action={<StatusBadge kind="category" value={category.status} />}
+        breadcrumbs={breadcrumbs}
+        title={data.name}
+        description={`Comprador: ${data.buyerId ?? "Sin asignar"}`}
       />
+
+      {/* Aviso discreto de composición parcial (secciones degradadas del BFF) */}
+      {data.warnings && data.warnings.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Ficha con datos parciales: {data.warnings.map((w) => w.message).join(" · ")}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <KpiCard
-          title="Compra sugerida"
-          value={formatCurrencyCompact(category.suggestedPurchase)}
-          tone="info"
-          icon={<IconReplenish className="w-4 h-4" />}
-          description="Ver reposición"
-          onClick={() => setTab("reposicion")}
-          active={tab === "reposicion"}
-        />
-        <KpiCard
-          title="SKUs en quiebre"
-          value={formatNumber(category.stockoutSkus)}
-          tone="bad"
-          icon={<IconAlerts className="w-4 h-4" />}
-          description={`${category.riskSkus} en riesgo`}
-        />
-        <KpiCard
-          title="Venta 30 días"
-          value={formatCurrencyCompact(category.salesLast30Days)}
-          tone="good"
-          icon={<IconSales className="w-4 h-4" />}
-          description={`margen ${formatPercent(category.averageMargin)}`}
-        />
-        <KpiCard
-          title="Inventario"
-          value={formatCurrencyCompact(category.inventoryValue)}
+          title="SKUs conocidos"
+          value={formatNumber(data.products.length)}
           tone="neutral"
           icon={<IconProducts className="w-4 h-4" />}
-          description={`${category.overstockSkus} sobrestock`}
+          description="Según el motor de reposición"
+        />
+        <KpiCard
+          title="Pendientes de reposición"
+          value={formatNumber(replenishment.pendingCount)}
+          tone={byPriority.stockout_imminent > 0 ? "bad" : "info"}
+          icon={<IconReplenish className="w-4 h-4" />}
+          description={`${formatNumber(byPriority.stockout_imminent)} quiebre · ${formatNumber(
+            byPriority.low_stock
+          )} bajo · ${formatNumber(byPriority.opportunity)} oportunidad`}
+        />
+        <KpiCard
+          title="Monto sugerido"
+          value={formatCurrencyCompact(replenishment.suggestedAmountClp)}
+          tone="info"
+          icon={<IconSales className="w-4 h-4" />}
+          description={
+            replenishment.sales30Units !== null
+              ? `Venta 30d: ${formatNumber(replenishment.sales30Units)} u.`
+              : undefined
+          }
+        />
+        <KpiCard
+          title="Presupuesto disponible"
+          value={budget ? formatCurrencyCompact(budget.availableClp) : "—"}
+          tone={budget ? (budget.availableClp <= 0 ? "bad" : "good") : "neutral"}
+          icon={<IconSales className="w-4 h-4" />}
+          description={budget ? `OTB ${budget.month}` : "Presupuesto no configurado"}
         />
       </div>
 
@@ -139,236 +178,89 @@ export function CategoryDetailPage() {
         value={tab}
         onChange={setTab}
         tabs={[
-          { value: "productos", label: "Productos", count: catProducts.length },
-          { value: "clave", label: "Productos clave", count: productRoles.length },
-          {
-            value: "crecimiento",
-            label: "Crecimiento",
-            count: productRoles.filter((r) => r.growth >= 0.25).length,
-          },
-          {
-            value: "detenidos",
-            label: "Detenidos",
-            count: productRoles.filter((r) => r.role === "Detenido").length,
-          },
-          { value: "marcas", label: "Marcas", count: catBrandRows.length },
-          { value: "optimizar", label: "Optimizar surtido", count: redundantCount },
-          { value: "reposicion", label: "Reposición", count: catRecs.length },
-          { value: "proveedores", label: "Proveedores", count: catSuppliers.length },
-          { value: "alertas", label: "Alertas", count: catAlerts.length },
+          { value: "productos", label: "Productos", count: data.products.length },
+          { value: "proveedores", label: "Proveedores", count: data.suppliers.length },
+          { value: "tendencias", label: "Tendencias" },
         ]}
       />
 
       {tab === "productos" && (
         <Card>
-          <CardBody className="space-y-2">
-            {catProducts.length === 0 ? (
-              <EmptyState title="Sin productos" description="Esta categoría no tiene SKUs." />
-            ) : (
-              catProducts.map((p) => (
-                <Link
-                  key={p.sku}
-                  to={`/productos/${p.sku}`}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-                >
-                  <div className="min-w-0">
-                    <span className="text-xs font-mono text-slate-400">{p.sku}</span>
-                    <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
-                    <p className="text-xs text-slate-500">
-                      disp. {formatNumber(p.availableStock)} · vende{" "}
-                      {formatNumber(p.salesLast30Days)}/mes · margen {formatPercent(p.margin)}
-                    </p>
-                  </div>
-                  <StatusBadge kind="purchase" value={p.purchaseStatus} dot={false} />
-                </Link>
-              ))
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      {tab === "clave" && (
-        <Card>
-          <CardBody className="space-y-2">
-            {productRoles.slice(0, 12).map((r) => (
-              <Link
-                key={r.product.sku}
-                to={`/productos/${r.product.sku}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      tone={
-                        r.role === "Detenido" || r.role === "Deterioro"
-                          ? "red"
-                          : r.role === "Margen"
-                            ? "violet"
-                            : "blue"
-                      }
-                    >
-                      {r.role}
-                    </Badge>
-                    <span className="text-xs font-mono text-slate-400">{r.product.sku}</span>
-                  </div>
-                  <p className="mt-1 text-sm font-medium text-slate-800 truncate">
-                    {r.product.name}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    venta {formatCurrencyCompact(r.sales)} · margen{" "}
-                    {formatPercent(r.product.margin)} · utilidad {formatCurrencyCompact(r.profit)}
-                  </p>
-                </div>
-                <StatusBadge kind="purchase" value={r.product.purchaseStatus} dot={false} />
-              </Link>
-            ))}
-          </CardBody>
-        </Card>
-      )}
-
-      {tab === "crecimiento" && (
-        <Card>
-          <CardBody className="space-y-2">
-            {productRoles.filter((r) => r.growth >= 0.25).length === 0 ? (
+          <CardHeader
+            title="Productos de la categoría"
+            description="SKUs conocidos por el motor: stock, cobertura, venta en unidades y prioridad."
+          />
+          <CardBody>
+            {data.products.length === 0 ? (
               <EmptyState
-                title="Sin aceleraciones fuertes"
-                description="No hay productos con crecimiento sobre 25% contra su ritmo reciente."
+                title="Sin productos"
+                description="El motor no conoce SKUs de esta categoría."
               />
             ) : (
-              productRoles
-                .filter((r) => r.growth >= 0.25)
-                .map((r) => (
-                  <Link
-                    key={r.product.sku}
-                    to={`/productos/${r.product.sku}`}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-slate-800 truncate">
-                        {r.product.name}
-                      </span>
-                      <span className="block text-xs text-slate-500">
-                        cobertura {formatNumber(r.product.inventoryDays)} d · stock{" "}
-                        {formatNumber(r.product.availableStock)}
-                      </span>
-                    </span>
-                    <Badge tone="blue">{formatPercent(r.growth * 100, 0)}</Badge>
-                  </Link>
-                ))
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      {tab === "detenidos" && (
-        <Card>
-          <CardBody className="space-y-2">
-            {productRoles.filter((r) => r.role === "Detenido").length === 0 ? (
-              <EmptyState
-                title="Sin productos detenidos"
-                description="No hay productos con venta detenida y stock expuesto en esta categoría."
-              />
-            ) : (
-              productRoles
-                .filter((r) => r.role === "Detenido")
-                .map((r) => (
-                  <Link
-                    key={r.product.sku}
-                    to={`/productos/${r.product.sku}`}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50/40 px-3 py-2 hover:border-rose-300"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-slate-800 truncate">
-                        {r.product.name}
-                      </span>
-                      <span className="block text-xs text-slate-500">
-                        stock {formatNumber(r.product.availableStock)} · capital{" "}
-                        {formatCurrencyCompact(r.product.availableStock * r.product.cost)}
-                      </span>
-                    </span>
-                    <Badge tone="red">Detenido</Badge>
-                  </Link>
-                ))
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      {tab === "marcas" && (
-        <Card>
-          <CardBody className="space-y-2">
-            {catBrandRows.map((b) => (
-              <div key={b.brand} className="rounded-lg border border-slate-200 px-3 py-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{b.brand}</p>
-                    <p className="text-xs text-slate-500">
-                      {b.skus} SKU · margen {formatPercent(b.margin)}
-                    </p>
-                  </div>
-                  {b.stockouts > 0 && <Badge tone="red">{b.stockouts} quiebre</Badge>}
-                </div>
-                <p className="mt-1 text-sm font-semibold text-slate-900">
-                  {formatCurrencyCompact(b.sales)}
-                </p>
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-sm min-w-[860px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-xs">
+                      <th className="text-left font-medium text-slate-500 py-2 pl-1">Producto</th>
+                      <th className="text-left font-medium text-slate-500 py-2 px-2">Proveedor</th>
+                      <th className="text-right font-medium text-slate-500 py-2 px-2">Stock</th>
+                      <th className="text-right font-medium text-slate-500 py-2 px-2">Cobertura</th>
+                      <th className="text-right font-medium text-slate-500 py-2 px-2">
+                        Venta 30d (u.)
+                      </th>
+                      <th className="text-right font-medium text-slate-500 py-2 px-2">Margen</th>
+                      <th className="text-right font-medium text-slate-500 py-2 pr-1">Prioridad</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {data.products.map((p) => {
+                      const prio = priorityUi(p.priority);
+                      return (
+                        <tr key={p.sku} className="hover:bg-slate-50">
+                          <td className="py-2 pl-1 min-w-0">
+                            <Link to={productPath(p.sku)} className="group block">
+                              <span className="text-slate-800 group-hover:text-brand-700 group-hover:underline">
+                                {p.name ?? p.sku}
+                              </span>
+                              <span className="block text-xs text-slate-400">
+                                {p.sku}
+                                {p.brand && <> · {p.brand}</>}
+                              </span>
+                            </Link>
+                          </td>
+                          <td className="py-2 px-2">
+                            {p.supplierId || p.supplierName ? (
+                              <Link
+                                to={supplierPath(p.supplierId)}
+                                className="text-slate-600 hover:text-brand-700 hover:underline"
+                              >
+                                {p.supplierName ?? p.supplierId}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="text-right py-2 px-2 tabular-nums text-slate-600">
+                            {p.stockAvailable !== null ? formatNumber(p.stockAvailable) : "—"}
+                          </td>
+                          <td className="text-right py-2 px-2 tabular-nums text-slate-600">
+                            {p.coverageDays !== null ? `${formatNumber(p.coverageDays)} d` : "—"}
+                          </td>
+                          <td className="text-right py-2 px-2 tabular-nums text-slate-600">
+                            {p.salesLast30d !== null ? formatNumber(p.salesLast30d) : "—"}
+                          </td>
+                          <td className="text-right py-2 px-2 tabular-nums text-slate-600">
+                            {p.marginPct !== null ? formatPercent(p.marginPct, 0) : "—"}
+                          </td>
+                          <td className="text-right py-2 pr-1">
+                            <Badge tone={prio.tone}>{prio.label}</Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </CardBody>
-        </Card>
-      )}
-
-      {tab === "optimizar" && (
-        <CatalogRedundancy products={catProducts} scopeLabel={category.name} />
-      )}
-
-      {tab === "reposicion" && (
-        <Card>
-          <CardBody className="space-y-2">
-            {catRecs.length === 0 ? (
-              <EmptyState
-                title="Sin sugerencias"
-                description="No hay reposición sugerida en esta categoría."
-              />
-            ) : (
-              catRecs.map((r) => (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2"
-                >
-                  <Link to={`/productos/${r.sku}`} className="min-w-0 hover:text-brand-700">
-                    <p className="text-sm font-medium text-slate-800 truncate">{r.productName}</p>
-                    <p className="text-xs text-slate-500">
-                      {formatNumber(r.suggestedQuantity)} u. ·{" "}
-                      {formatCurrency(r.suggestedPurchaseAmount)} · {r.supplierName}
-                    </p>
-                  </Link>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <RecommendationBadge status={r.status} />
-                    {r.suggestedQuantity > 0 && (
-                      <Button
-                        size="sm"
-                        variant={hasItem(r.sku) ? "secondary" : "primary"}
-                        disabled={hasItem(r.sku)}
-                        onClick={() => {
-                          addItem({
-                            sku: r.sku,
-                            productName: r.productName,
-                            supplierName: r.supplierName,
-                            quantity: r.suggestedQuantity,
-                            unitCost: r.unitCost,
-                          });
-                          toast.success(`${r.productName} agregado al borrador de OC`, {
-                            label: "Ver borrador OC",
-                            onClick: () => navigate("/comprar/borradores"),
-                          });
-                        }}
-                      >
-                        {hasItem(r.sku) ? "En OC" : "Agregar"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))
             )}
           </CardBody>
         </Card>
@@ -376,24 +268,34 @@ export function CategoryDetailPage() {
 
       {tab === "proveedores" && (
         <Card>
+          <CardHeader
+            title="Proveedores de la categoría"
+            description="Con cuántos SKUs participan y cuánto sugiere comprarles el motor."
+          />
           <CardBody className="space-y-2">
-            {catSuppliers.length === 0 ? (
+            {data.suppliers.length === 0 ? (
               <EmptyState title="Sin proveedores" description="No hay proveedores asociados." />
             ) : (
-              catSuppliers.map((s) => (
+              data.suppliers.map((s) => (
                 <Link
-                  key={s.id}
-                  to={`/proveedores/${s.id}`}
+                  key={s.supplierId}
+                  to={supplierPath(s.supplierId)}
                   className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{s.name}</p>
-                    <p className="text-xs text-slate-500">
-                      cumple {formatPercent(s.deliveryCompliance, 0)} · lead {s.averageLeadTimeDays}
-                      d · {s.openPurchaseOrders} OC abiertas
-                    </p>
+                  <div className="min-w-0 flex items-center gap-2.5">
+                    <IconSuppliers className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">
+                        {s.supplierName ?? s.supplierId}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {formatNumber(s.skuCount)} SKU en la categoría
+                      </p>
+                    </div>
                   </div>
-                  <StatusBadge kind="supplier" value={s.status} dot={false} />
+                  <span className="text-sm font-semibold text-slate-700 flex-shrink-0">
+                    {formatCurrencyCompact(s.suggestedAmountClp)} sugerido
+                  </span>
                 </Link>
               ))
             )}
@@ -401,25 +303,15 @@ export function CategoryDetailPage() {
         </Card>
       )}
 
-      {tab === "alertas" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {catAlerts.length === 0 ? (
-            <Card>
-              <CardBody>
-                <EmptyState title="Sin alertas" description="Esta categoría no tiene alertas." />
-              </CardBody>
-            </Card>
-          ) : (
-            catAlerts.map((a) => (
-              <AlertCard
-                key={a.id}
-                alert={a}
-                compact
-                entityTo={a.relatedSku ? `/productos/${a.relatedSku}` : undefined}
-              />
-            ))
-          )}
-        </div>
+      {tab === "tendencias" && (
+        <Card>
+          <CardBody>
+            <EmptyState
+              title="Tendencias y venta en CLP"
+              description="La venta valorizada, marcas y tendencias de la categoría se publican desde analytics; pendiente de conexión."
+            />
+          </CardBody>
+        </Card>
       )}
     </div>
   );

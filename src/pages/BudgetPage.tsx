@@ -117,7 +117,7 @@ function SupplierSpendCard() {
               {rows.slice(0, 8).map((s) => (
                 <div key={s.supplierId} className="flex items-center gap-3">
                   <Link
-                    to={supplierPath(s.supplierName)}
+                    to={supplierPath(s.supplierId)}
                     className="w-40 flex-shrink-0 truncate text-sm font-medium text-slate-700 hover:text-brand-700 hover:underline"
                   >
                     {s.supplierName}

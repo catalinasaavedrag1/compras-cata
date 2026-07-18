@@ -1,10 +1,12 @@
-import type { Supplier, SupplierClaim } from "../types/purchasing";
-import { supplierFulfillment } from "./supplierPerf";
+import type { SupplierFichaData } from "../services/purchaseBff";
 
 // ============================================================================
-//  Evaluación de desempeño del proveedor (sección 19).
-//  Combina despacho (OTIF), lead time prometido vs real y la tasa de reclamos
-//  para clasificar al proveedor. Un buen precio no compensa pérdidas operativas.
+//  Evaluación de desempeño del proveedor sobre la ficha real (F11).
+//  Combina el cumplimiento observado (metrics.compliancePct), la evaluación
+//  del período (evaluation.dimensions: calidad / factura / documentos /
+//  estabilidad_precio, 0–100) y los reclamos abiertos (summary.claimsOpen)
+//  para clasificar al proveedor. Nada se inventa: cada dimensión ausente
+//  simplemente no aporta al score y la tarjeta la muestra como no disponible.
 // ============================================================================
 
 export type SupplierClass =
@@ -29,76 +31,123 @@ export const SUPPLIER_CLASS: Record<
   bloqueado: { label: "Bloqueado", tone: "neutral" },
 };
 
+/** Etiquetas de las dimensiones que publica la evaluación del período. */
+export const EVALUATION_DIMENSION_LABEL: Record<string, string> = {
+  calidad: "Calidad",
+  factura: "Exactitud de factura",
+  documentos: "Exactitud documental",
+  estabilidad_precio: "Estabilidad de precios",
+};
+
+export interface SupplierScoreDimension {
+  key: string;
+  label: string;
+  /** 0–100 según la evaluación del período. */
+  value: number;
+}
+
 export interface SupplierScore {
-  otif: number; // % on-time in-full
-  fillRate: number;
-  compliance: number | null;
-  leadPromised: number | null; // días comprometidos (maestro)
-  leadReal: number; // días reales (promedio)
-  leadGap: number; // real − prometido
-  claimsOpen: number;
-  claimsValue: number;
+  /** Score ponderado 0–100; null cuando no hay ningún insumo real. */
+  score: number | null;
+  compliancePct: number | null;
+  leadTimeDays: number | null;
+  claimsOpen: number | null;
+  /** Dimensiones reales de la evaluación del período (vacío si no hay). */
+  dimensions: SupplierScoreDimension[];
+  /** Período de la evaluación (null cuando no está publicada). */
+  period: string | null;
   classification: SupplierClass;
   reasons: string[];
 }
 
-export function supplierScore(
-  supplier: Supplier,
-  // Subconjunto estructural: permite alimentar el score tanto con los reclamos
-  // mock como con los reales del BFF (que no traen monto) ya adaptados.
-  claims: Pick<SupplierClaim, "estado" | "valorReclamado">[]
-): SupplierScore {
-  const perf = supplierFulfillment(supplier.name);
-  const compliance = perf.compliance; // % a tiempo
-  const fillRate = perf.fillRate;
-  const otif = Math.round(((compliance ?? 100) / 100) * (fillRate / 100) * 100);
+// Pesos: el cumplimiento observado manda; las dimensiones del período reparten
+// el resto. Si falta un insumo, su peso se redistribuye (promedio ponderado
+// solo sobre lo disponible).
+const COMPLIANCE_WEIGHT = 0.4;
+const DIMENSION_WEIGHT: Record<string, number> = {
+  calidad: 0.2,
+  factura: 0.15,
+  documentos: 0.1,
+  estabilidad_precio: 0.15,
+};
+/** Castigo por reclamo abierto (pérdidas operativas), acotado. */
+const CLAIM_PENALTY = 4;
+const CLAIM_PENALTY_MAX = 20;
 
-  const leadPromised = supplier.plazoEntregaDias ?? null;
-  const leadReal = supplier.averageLeadTimeDays;
-  const leadGap = leadPromised !== null ? leadReal - leadPromised : 0;
+/** Computa la evaluación de desempeño desde la ficha real del proveedor. */
+export function supplierScoreFromFicha(data: SupplierFichaData): SupplierScore {
+  const compliancePct = data.metrics.compliancePct;
+  const leadTimeDays = data.metrics.leadTimeDaysObserved;
+  const claimsOpen = data.summary.claimsOpen;
 
-  const open = claims.filter((c) => c.estado !== "resuelto" && c.estado !== "rechazado");
-  const claimsOpen = open.length;
-  const claimsValue = open.reduce((a, c) => a + c.valorReclamado, 0);
+  const dimensions: SupplierScoreDimension[] = data.evaluation
+    ? Object.entries(data.evaluation.dimensions)
+        .filter(([, v]) => Number.isFinite(v))
+        .map(([key, value]) => ({
+          key,
+          label: EVALUATION_DIMENSION_LABEL[key] ?? key,
+          value: Math.max(0, Math.min(100, value)),
+        }))
+    : [];
 
-  // Volumen y dependencia como señal de "estratégico".
-  const highVolume = supplier.purchasedAmountLast90Days >= 60_000_000;
+  // Promedio ponderado sobre los insumos disponibles.
+  let weighted = 0;
+  let weightSum = 0;
+  if (compliancePct !== null) {
+    weighted += compliancePct * COMPLIANCE_WEIGHT;
+    weightSum += COMPLIANCE_WEIGHT;
+  }
+  for (const d of dimensions) {
+    const w = DIMENSION_WEIGHT[d.key] ?? 0.1;
+    weighted += d.value * w;
+    weightSum += w;
+  }
+  let score: number | null = null;
+  if (weightSum > 0) {
+    const base = weighted / weightSum;
+    const penalty = Math.min(CLAIM_PENALTY_MAX, (claimsOpen ?? 0) * CLAIM_PENALTY);
+    score = Math.round(Math.max(0, Math.min(100, base - penalty)));
+  }
 
   const reasons: string[] = [];
   let classification: SupplierClass;
+  const share = data.summary.purchased90Share;
 
-  if (supplier.status === "blocked") {
+  if (data.status === "blocked") {
     classification = "bloqueado";
     reasons.push("Proveedor bloqueado en el maestro.");
-  } else if (otif < 70 || (claimsOpen >= 2 && claimsValue > 800_000)) {
+  } else if (compliancePct === null && dimensions.length === 0) {
+    classification = "en_desarrollo";
+    reasons.push("Sin métricas del período todavía; historial en formación.");
+  } else if ((compliancePct !== null && compliancePct < 70) || (claimsOpen ?? 0) >= 2) {
     classification = "critico";
-    if (otif < 70) reasons.push(`OTIF bajo (${otif}%).`);
-    if (claimsOpen >= 2) reasons.push(`${claimsOpen} reclamos abiertos por pérdidas operativas.`);
-  } else if (otif < 85 || (leadGap >= 5) || claimsOpen >= 1) {
+    if (compliancePct !== null && compliancePct < 70)
+      reasons.push(`Cumplimiento bajo (${Math.round(compliancePct)}%).`);
+    if ((claimsOpen ?? 0) >= 2)
+      reasons.push(`${claimsOpen} reclamos abiertos por pérdidas operativas.`);
+  } else if ((compliancePct !== null && compliancePct < 85) || (claimsOpen ?? 0) >= 1) {
     classification = "riesgoso";
-    if (otif < 85) reasons.push(`OTIF a mejorar (${otif}%).`);
-    if (leadGap >= 5) reasons.push(`Entrega ${leadGap} días más lento que lo comprometido.`);
-    if (claimsOpen >= 1) reasons.push("Tiene reclamos abiertos.");
-  } else if (highVolume && otif >= 90) {
+    if (compliancePct !== null && compliancePct < 85)
+      reasons.push(`Cumplimiento a mejorar (${Math.round(compliancePct)}%).`);
+    if ((claimsOpen ?? 0) >= 1) reasons.push("Tiene reclamos abiertos.");
+  } else if (share !== null && share > 0.3 && (compliancePct ?? 0) >= 90) {
     classification = "estrategico";
-    reasons.push("Alto volumen de compra y buen desempeño: cuidar la relación.");
-  } else if (otif >= 92) {
+    reasons.push("Alta participación de compra y buen desempeño: cuidar la relación.");
+  } else if ((compliancePct ?? 0) >= 92) {
     classification = "confiable";
-    reasons.push("Cumple a tiempo y completo de forma consistente.");
+    reasons.push("Cumple a tiempo de forma consistente.");
   } else {
     classification = "en_desarrollo";
     reasons.push("Desempeño aceptable; volumen o historial aún en formación.");
   }
 
   return {
-    otif,
-    fillRate,
-    compliance,
-    leadPromised,
-    leadReal,
-    leadGap,
+    score,
+    compliancePct,
+    leadTimeDays,
     claimsOpen,
-    claimsValue,
+    dimensions,
+    period: data.evaluation?.period ?? null,
     classification,
     reasons,
   };
