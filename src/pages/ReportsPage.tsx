@@ -1,377 +1,360 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { KpiCard } from "../components/business/KpiCard";
-import { type SortState } from "../components/ui/Table";
-import { FilterBar } from "../components/business/FilterBar";
-import { Tabs } from "../components/ui/Tabs";
-import { purchaseOrders } from "../data/mockPurchaseOrders";
-import { products, getProductBySku } from "../data/mockProducts";
-import { suppliers } from "../data/mockSuppliers";
-import { coverageDays } from "../utils/calculations";
-import { inRange, type IsoRange } from "../utils/dateRange";
-import { TODAY_ISO } from "../utils/constants";
-import { formatCurrency, formatCurrencyCompact, formatNumber } from "../utils/formatters";
-import { IconOrders, IconCart, IconSuppliers, IconCategories } from "../components/ui/icons";
-import { daysBetween, OPEN_PO_STATUSES, REPORTS, type BuyerBuyRow, type CategoryBuyRow, type CategoryMarginRow, type OpenOrderRow, type ProductAlertRow, type ReportKey, type SupplierBuyRow } from "./reports/definitions";
-import { ExportLauncher } from "./reports/ExportLauncher";
+import { Card, CardHeader } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Badge, type BadgeTone } from "../components/ui/Badge";
+import { Skeleton } from "../components/ui/Skeleton";
+import { DataTable, type Column } from "../components/ui/Table";
+import { CollapsibleSection } from "../components/ui/CollapsibleSection";
+import { IconDownload } from "../components/ui/icons";
+import { useToast } from "../context/ToastContext";
+import { formatDate, formatNumber } from "../utils/formatters";
 import {
-  SupplierBuyReport,
-  CategoryBuyReport,
-  BuyerBuyReport,
-  OpenOrdersReport,
-  RotationReport,
-  MarginReport,
-  ProductAlertsReport,
-  SupplierPerfReport,
-} from "./reports/sections";
+  describePurchaseBffError,
+  getExport,
+  toPurchaseBffError,
+  type ExportJobStatus,
+  type ExportJobView,
+} from "../services/purchaseBff";
+import {
+  downloadExportCsv,
+  useExportCatalog,
+  useExportJobs,
+  useLaunchExport,
+  type ExportLaunchState,
+} from "../hooks/useExports";
 
 // ============================================================================
-//  #24 Reportes consolidados
-//  Reportes operativos y estratégicos que la plataforma no tenía centralizados,
-//  cada uno exportable a CSV. Todo se DERIVA de los datos mock existentes
-//  (agregaciones en useMemo); no se inventan campos nuevos.
+//  #24 Reportes — conectado a Exportaciones E13 del purchase-bff.
+//  Las tarjetas salen del catálogo real (GET /exports/catalog); "Generar CSV"
+//  encola un job (202) que el runner del backend procesa: la UI pollea y avisa
+//  honesto si el job sigue en cola (runner apagado en dev). El CSV se descarga
+//  al terminar; "Exportaciones recientes" permite rebajar los ya generados.
+//  Los reportes del prototipo sin fuente real quedan listados aparte, sin
+//  botón de descarga: no se finge data.
 // ============================================================================
+
+/** Descripción corta local por reportId (el título viene del backend). */
+const REPORT_DESCRIPTIONS: Record<string, string> = {
+  recommendations: "Bandeja de reposición pendiente del motor",
+  "purchase-orders": "Órdenes de compra emitidas",
+  receptions: "Recepciones y cumplimiento",
+  claims: "Reclamos a proveedor",
+  suppliers: "Relación y métricas de proveedores",
+  decisions: "Historial de decisiones y resultado E8",
+};
+
+/** Estado del job en la lista de recientes → chip. */
+const JOB_STATUS_UI: Record<ExportJobStatus, { label: string; tone: BadgeTone }> = {
+  pending: { label: "En cola", tone: "amber" },
+  running: { label: "Generando", tone: "blue" },
+  done: { label: "Listo", tone: "green" },
+  failed: { label: "Falló", tone: "red" },
+};
+
+/** Vistas del prototipo aún sin fuente en el servicio de compras. */
+const UPCOMING_REPORTS = [
+  "Compras por categoría",
+  "Compras por comprador",
+  "Rotación y días de inventario",
+  "Margen por categoría y canal",
+  "Productos sin venta / críticos",
+];
+
+const fmtDate = (iso: string | null) => (iso ? formatDate(iso.slice(0, 10)) : "—");
 
 export function ReportsPage() {
-  const [report, setReport] = useState<ReportKey>("compras_proveedor");
-  // Filtro de fechas para los reportes con datos temporales (OC).
-  const [range, setRange] = useState<IsoRange>({ from: "", to: "" });
+  const toast = useToast();
+  const catalog = useExportCatalog();
+  const jobs = useExportJobs();
+  // Al encolar o terminar un job, la lista de recientes se refresca sola.
+  const { states, launch } = useLaunchExport({ onJobsChanged: jobs.refetch });
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // Orden por reporte.
-  const [supplierSort, setSupplierSort] = useState<SortState>({ key: "total", dir: "desc" });
-  const [categorySort, setCategorySort] = useState<SortState>({ key: "total", dir: "desc" });
-  const [buyerSort, setBuyerSort] = useState<SortState>({ key: "total", dir: "desc" });
-  const [openSort, setOpenSort] = useState<SortState>({ key: "expected", dir: "asc" });
-  const [rotationSort, setRotationSort] = useState<SortState>({ key: "rotation", dir: "asc" });
-  const [marginSort, setMarginSort] = useState<SortState>({ key: "avgMargin", dir: "asc" });
-  const [alertSort, setAlertSort] = useState<SortState>({ key: "frozen", dir: "desc" });
-  const [perfSort, setPerfSort] = useState<SortState>({ key: "compliance", dir: "asc" });
+  const pageTitle = "Reportes";
+  const pageDescription =
+    "Exportaciones CSV generadas por el servicio de compras: reposición, órdenes, recepciones, reclamos, proveedores y decisiones.";
 
-  const dateScopesReport =
-    report === "compras_proveedor" ||
-    report === "compras_categoria" ||
-    report === "compras_comprador" ||
-    report === "oc_abiertas";
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando y error (patrón flujo 1).
+  // --------------------------------------------------------------------------
+  if (!catalog.configured) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              generar y descargar los reportes reales del servicio de compras.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-  // OC dentro del rango de fechas (por fecha de creación). Sin rango = todas.
-  const scopedOrders = useMemo(
-    () => purchaseOrders.filter((o) => inRange(o.createdAt, range)),
-    [range]
-  );
+  if (catalog.loading && catalog.items.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
+          aria-busy="true"
+          aria-label="Cargando catálogo de reportes"
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <div className="p-4 space-y-2.5">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-8 w-28" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-  // ---- KPIs globales (sobre las OC en alcance) ----
-  const totalBought = useMemo(
-    () => scopedOrders.reduce((acc, o) => acc + o.totalAmount, 0),
-    [scopedOrders]
-  );
-  const distinctSuppliers = useMemo(
-    () => new Set(scopedOrders.map((o) => o.supplierName)).size,
-    [scopedOrders]
-  );
-  const distinctCategories = useMemo(
-    () =>
-      new Set(
-        products.filter((p) => p.salesLast30Days > 0 || p.availableStock > 0).map((p) => p.category)
-      ).size,
-    []
-  );
+  if (catalog.error && catalog.items.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudo cargar el catálogo de reportes
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{catalog.error.message}</p>
+            <Button className="mt-4" onClick={catalog.refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-  // =====================================================================
-  //  1. Compras por proveedor (suma totalAmount por supplierName)
-  // =====================================================================
-  const supplierRows = useMemo<SupplierBuyRow[]>(() => {
-    const map = new Map<string, { total: number; count: number }>();
-    for (const o of scopedOrders) {
-      const cur = map.get(o.supplierName) ?? { total: 0, count: 0 };
-      cur.total += o.totalAmount;
-      cur.count += 1;
-      map.set(o.supplierName, cur);
-    }
-    return Array.from(map.entries()).map(([name, v]) => ({
-      name,
-      orderCount: v.count,
-      total: v.total,
-      avg: v.count ? v.total / v.count : 0,
-    }));
-  }, [scopedOrders]);
-
-  // =====================================================================
-  //  2. Compras por categoría
-  //  Las OC no traen categoría: se obtiene uniendo cada línea de OC con el
-  //  producto (getProductBySku → category) y sumando quantity * unitCost.
-  //  Solo las OC con detalle de líneas aportan a este reporte; las OC sin
-  //  líneas no se pueden desglosar por categoría (se documenta en pantalla).
-  // =====================================================================
-  const categoryRows = useMemo<CategoryBuyRow[]>(() => {
-    const map = new Map<string, { lines: number; units: number; total: number }>();
-    for (const o of scopedOrders) {
-      if (!o.lines) continue;
-      for (const line of o.lines) {
-        const prod = getProductBySku(line.sku);
-        const category = prod?.category ?? "Sin categoría";
-        const cur = map.get(category) ?? { lines: 0, units: 0, total: 0 };
-        cur.lines += 1;
-        cur.units += line.quantity;
-        cur.total += line.quantity * line.unitCost;
-        map.set(category, cur);
+  // --------------------------------------------------------------------------
+  //  Descarga desde "Exportaciones recientes": el CSV solo viaja en el GET
+  //  por id, así que se re-consulta el job antes de bajar el archivo.
+  // --------------------------------------------------------------------------
+  const handleDownload = async (job: ExportJobView) => {
+    setDownloadingId(job.id);
+    try {
+      const full = await getExport(job.id);
+      if (full.status === "done" && downloadExportCsv(full)) {
+        toast.success(
+          `CSV descargado: ${full.title} (${formatNumber(full.rowCount ?? 0)} filas).`
+        );
+      } else {
+        toast.warning("El CSV de este job aún no está disponible. Refresca la lista.");
+        jobs.refetch();
       }
+    } catch (err) {
+      toast.error(describePurchaseBffError(toPurchaseBffError(err)));
+    } finally {
+      setDownloadingId(null);
     }
-    return Array.from(map.entries()).map(([category, v]) => ({
-      category,
-      lines: v.lines,
-      units: v.units,
-      total: v.total,
-    }));
-  }, [scopedOrders]);
+  };
 
-  const ordersWithLines = useMemo(
-    () => scopedOrders.filter((o) => o.lines && o.lines.length > 0).length,
-    [scopedOrders]
-  );
-
-  // =====================================================================
-  //  3. Compras por comprador (por buyerName)
-  // =====================================================================
-  const buyerRows = useMemo<BuyerBuyRow[]>(() => {
-    const map = new Map<string, { total: number; count: number }>();
-    for (const o of scopedOrders) {
-      const cur = map.get(o.buyerName) ?? { total: 0, count: 0 };
-      cur.total += o.totalAmount;
-      cur.count += 1;
-      map.set(o.buyerName, cur);
-    }
-    return Array.from(map.entries()).map(([name, v]) => ({
-      name,
-      orderCount: v.count,
-      total: v.total,
-      avg: v.count ? v.total / v.count : 0,
-    }));
-  }, [scopedOrders]);
-
-  // =====================================================================
-  //  4. OC abiertas / atrasadas
-  //  Abierta = estado en curso (no recibida/cerrada/cancelada).
-  //  Atrasada = estado "delayed" o cuya fecha esperada ya pasó (vs hoy).
-  // =====================================================================
-  const openOrders = useMemo<OpenOrderRow[]>(() => {
-    return scopedOrders
-      .filter((o) => OPEN_PO_STATUSES.includes(o.status))
-      .map((o) => {
-        const daysToExpected = daysBetween(o.expectedDate, TODAY_ISO);
-        const delayed = o.status === "delayed" || o.delayedDays > 0 || daysToExpected < 0;
-        return { order: o, delayed, daysToExpected };
-      });
-  }, [scopedOrders]);
-
-  const delayedCount = useMemo(() => openOrders.filter((o) => o.delayed).length, [openOrders]);
-  const pendingAmount = useMemo(
-    () => openOrders.reduce((acc, o) => acc + o.order.totalAmount, 0),
-    [openOrders]
-  );
-
-  // =====================================================================
-  //  5. Rotación y días de inventario por producto (desde mockProducts)
-  // =====================================================================
-  const rotationRows = useMemo(() => [...products], []);
-
-  // =====================================================================
-  //  6. Margen por categoría (promedio de productos agrupados por categoría)
-  // =====================================================================
-  const categoryMarginRows = useMemo<CategoryMarginRow[]>(() => {
-    const map = new Map<string, { marginSum: number; count: number; invValue: number }>();
-    for (const p of products) {
-      const cur = map.get(p.category) ?? { marginSum: 0, count: 0, invValue: 0 };
-      cur.marginSum += p.margin;
-      cur.count += 1;
-      cur.invValue += p.cost * p.availableStock;
-      map.set(p.category, cur);
-    }
-    return Array.from(map.entries()).map(([category, v]) => ({
-      category,
-      skuCount: v.count,
-      avgMargin: v.count ? v.marginSum / v.count : 0,
-      inventoryValue: v.invValue,
-    }));
-  }, []);
-
-  // =====================================================================
-  //  7. Productos sin venta (0 ventas 30d con stock) y productos críticos
-  //  (cobertura ≤ lead time, con venta). Usa coverageDays de calculations.
-  // =====================================================================
-  const productAlertRows = useMemo<ProductAlertRow[]>(() => {
-    const rows: ProductAlertRow[] = [];
-    for (const p of products) {
-      const cover = coverageDays(p.availableStock, p.salesLast30Days);
-      if (p.salesLast30Days === 0 && p.availableStock > 0) {
-        rows.push({
-          product: p,
-          type: "sin_venta",
-          reasonLabel: "Sin venta (30d) con stock",
-          coverage: cover,
-          frozenCapital: p.availableStock * p.cost,
-        });
-      } else if (p.salesLast30Days > 0 && cover <= p.supplierLeadTimeDays) {
-        rows.push({
-          product: p,
-          type: "critico",
-          reasonLabel: "Crítico (cobertura ≤ lead time)",
-          coverage: cover,
-          frozenCapital: 0,
-        });
-      }
-    }
-    return rows;
-  }, []);
-
-  const noSalesCount = useMemo(
-    () => productAlertRows.filter((r) => r.type === "sin_venta").length,
-    [productAlertRows]
-  );
-  const criticalCount = useMemo(
-    () => productAlertRows.filter((r) => r.type === "critico").length,
-    [productAlertRows]
-  );
-
-  // =====================================================================
-  //  8. Peores proveedores por cumplimiento (deliveryCompliance ascendente)
-  // =====================================================================
-  const supplierPerfRows = useMemo(() => [...suppliers], []);
+  const jobColumns: Column<ExportJobView>[] = [
+    {
+      key: "title",
+      header: "Reporte",
+      render: (j) => (
+        <div className="min-w-[160px]">
+          <p className="text-sm font-medium text-slate-800">{j.title}</p>
+          <p className="text-xs text-slate-400 font-mono">{j.reportId}</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Estado",
+      render: (j) => (
+        <div className="min-w-[110px]">
+          <Badge tone={JOB_STATUS_UI[j.status].tone} dot>
+            {JOB_STATUS_UI[j.status].label}
+          </Badge>
+          {j.status === "failed" && j.error && (
+            <p className="mt-1 text-xs text-rose-600 max-w-[220px] line-clamp-2" title={j.error}>
+              {j.error}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "rows",
+      header: "Filas",
+      hideOnMobile: true,
+      render: (j) => (
+        <span className="text-sm text-slate-700">
+          {j.rowCount == null ? "—" : formatNumber(j.rowCount)}
+        </span>
+      ),
+    },
+    {
+      key: "created",
+      header: "Creado",
+      hideOnMobile: true,
+      render: (j) => <span className="text-sm text-slate-700">{fmtDate(j.dateCreated)}</span>,
+    },
+    {
+      key: "expires",
+      header: "Expira",
+      hideOnMobile: true,
+      render: (j) => <span className="text-sm text-slate-500">{fmtDate(j.expiresAt)}</span>,
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (j) =>
+        j.status === "done" ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<IconDownload className="w-4 h-4" />}
+            loading={downloadingId === j.id}
+            onClick={() => void handleDownload(j)}
+          >
+            Descargar
+          </Button>
+        ) : null,
+    },
+  ];
 
   return (
     <div>
-      <PageHeader
-        title="Reportes consolidados"
-        description="Reportes operativos y estratégicos de compras, inventario y proveedores. Cada tabla se puede exportar a CSV (Excel)."
-        action={
-          <ExportLauncher
-            report={report}
-            supplierRows={supplierRows}
-            categoryRows={categoryRows}
-            buyerRows={buyerRows}
-            openOrders={openOrders}
-            rotationRows={rotationRows}
-            categoryMarginRows={categoryMarginRows}
-            productAlertRows={productAlertRows}
-            supplierPerfRows={supplierPerfRows}
-          />
-        }
-      />
+      <PageHeader title={pageTitle} description={pageDescription} />
 
-      {/* KPIs resumen */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KpiCard
-          title="Monto comprado"
-          value={formatCurrencyCompact(totalBought)}
-          tone="info"
-          icon={<IconCart className="w-4 h-4" />}
-          description={range.from || range.to ? "En el rango" : "Total OC"}
-        />
-        <KpiCard
-          title="Órdenes de compra"
-          value={formatNumber(scopedOrders.length)}
-          tone="neutral"
-          icon={<IconOrders className="w-4 h-4" />}
-          description="OC en alcance"
-        />
-        <KpiCard
-          title="Proveedores"
-          value={formatNumber(distinctSuppliers)}
-          tone="neutral"
-          icon={<IconSuppliers className="w-4 h-4" />}
-          description="Con compras"
-        />
-        <KpiCard
-          title="Categorías activas"
-          value={formatNumber(distinctCategories)}
-          tone="neutral"
-          icon={<IconCategories className="w-4 h-4" />}
-          description="Con stock o venta"
-        />
+      {/* =================== Catálogo real de reportes =================== */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+        {catalog.items.map((item) => {
+          const state = states[item.reportId];
+          const busy = state?.phase === "queued" || state?.phase === "running";
+          return (
+            <Card key={item.reportId}>
+              <div className="p-4 flex flex-col h-full">
+                <h3 className="text-sm font-semibold text-slate-800">{item.title}</h3>
+                <p className="mt-0.5 text-xs text-slate-500 flex-1">
+                  {REPORT_DESCRIPTIONS[item.reportId] ?? "Exportación del servicio de compras"}
+                </p>
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={busy ? undefined : <IconDownload className="w-4 h-4" />}
+                    loading={busy}
+                    onClick={() => launch(item.reportId)}
+                  >
+                    {busy ? (state?.phase === "running" ? "Generando…" : "En cola…") : "Generar CSV"}
+                  </Button>
+                  <LaunchStatus state={state} />
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+        {catalog.items.length === 0 && (
+          <Card className="md:col-span-2 lg:col-span-3">
+            <div className="p-6 text-center text-sm text-slate-500">
+              El catálogo del servicio no trae reportes disponibles todavía.
+            </div>
+          </Card>
+        )}
       </div>
 
-      <div className="mb-4">
-        <Tabs
-          tabs={REPORTS.map((r) => ({ value: r.value, label: r.label }))}
-          value={report}
-          onChange={(v) => setReport(v as ReportKey)}
+      {/* =================== Exportaciones recientes =================== */}
+      <Card className="mb-4">
+        <CardHeader
+          title="Exportaciones recientes"
+          description="Jobs generados por el servicio; los CSV listos se pueden volver a descargar hasta que expiren."
+          action={
+            <Button variant="ghost" size="sm" loading={jobs.loading} onClick={jobs.refetch}>
+              Refrescar
+            </Button>
+          }
         />
-      </div>
-
-      {/* Filtro de fechas: solo en reportes con datos temporales (OC). */}
-      {dateScopesReport && (
-        <div className="mb-4">
-          <FilterBar
-            searchValue=""
-            onSearchChange={() => {}}
-            searchPlaceholder="Filtra por fecha de creación de la OC"
-            dateRange={{ value: range, onChange: setRange, label: "Todas las fechas" }}
-            onClear={() => setRange({ from: "", to: "" })}
-            summary={`${scopedOrders.length} OC en el rango · monto ${formatCurrency(totalBought)}`}
+        {jobs.error && jobs.items.length === 0 ? (
+          <div className="p-6 text-center">
+            <p className="text-sm text-slate-500">
+              No se pudieron cargar las exportaciones: {jobs.error.message}
+            </p>
+            <Button className="mt-3" variant="secondary" size="sm" onClick={jobs.refetch}>
+              Reintentar
+            </Button>
+          </div>
+        ) : jobs.loading && jobs.items.length === 0 ? (
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando exportaciones">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <DataTable
+            columns={jobColumns}
+            data={jobs.items}
+            rowKey={(j) => j.id}
+            emptyMessage="Aún no has generado exportaciones. Lanza un reporte desde las tarjetas de arriba."
           />
-        </div>
-      )}
+        )}
+      </Card>
 
-      {/* =================== 1. Compras por proveedor =================== */}
-      {report === "compras_proveedor" && (
-        <SupplierBuyReport rows={supplierRows} sort={supplierSort} setSort={setSupplierSort} />
-      )}
-
-      {/* =================== 2. Compras por categoría =================== */}
-      {report === "compras_categoria" && (
-        <CategoryBuyReport
-          rows={categoryRows}
-          sort={categorySort}
-          setSort={setCategorySort}
-          ordersWithLines={ordersWithLines}
-          scopedOrdersCount={scopedOrders.length}
-        />
-      )}
-
-      {/* =================== 3. Compras por comprador =================== */}
-      {report === "compras_comprador" && (
-        <BuyerBuyReport rows={buyerRows} sort={buyerSort} setSort={setBuyerSort} />
-      )}
-
-      {/* =================== 4. OC abiertas / atrasadas =================== */}
-      {report === "oc_abiertas" && (
-        <OpenOrdersReport
-          rows={openOrders}
-          sort={openSort}
-          setSort={setOpenSort}
-          delayedCount={delayedCount}
-          pendingAmount={pendingAmount}
-        />
-      )}
-
-      {/* =================== 5. Rotación e inventario =================== */}
-      {report === "rotacion" && (
-        <RotationReport rows={rotationRows} sort={rotationSort} setSort={setRotationSort} />
-      )}
-
-      {/* =================== 6. Margen por categoría =================== */}
-      {report === "margen_categoria" && (
-        <MarginReport rows={categoryMarginRows} sort={marginSort} setSort={setMarginSort} />
-      )}
-
-      {/* =================== 7. Productos sin venta / críticos =================== */}
-      {report === "alertas_producto" && (
-        <ProductAlertsReport
-          rows={productAlertRows}
-          sort={alertSort}
-          setSort={setAlertSort}
-          noSalesCount={noSalesCount}
-          criticalCount={criticalCount}
-        />
-      )}
-
-      {/* =================== 8. Cumplimiento de proveedores =================== */}
-      {report === "peores_proveedores" && (
-        <SupplierPerfReport rows={supplierPerfRows} sort={perfSort} setSort={setPerfSort} />
-      )}
+      {/* =================== Próximos reportes (sin fuente real) =================== */}
+      <CollapsibleSection
+        id="reports:proximos"
+        title="Próximos reportes"
+        description="Vistas del prototipo que aún no tienen fuente de datos en el servicio de compras."
+        hint={`${UPCOMING_REPORTS.length} en espera`}
+      >
+        <ul className="divide-y divide-slate-100">
+          {UPCOMING_REPORTS.map((name) => (
+            <li key={name} className="flex items-center justify-between gap-3 py-2">
+              <span className="text-sm text-slate-600">{name}</span>
+              <span className="text-xs text-slate-400">Disponible cuando su fuente exista</span>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleSection>
     </div>
   );
 }
 
-// ============================================================================
-//  Columnas CSV por reporte (label + value).
-// ============================================================================
+// ----------------------------------------------------------------------------
+//  Estado visible del lanzamiento junto al botón de cada tarjeta.
+// ----------------------------------------------------------------------------
+
+function LaunchStatus({ state }: { state: ExportLaunchState | undefined }) {
+  if (!state) return null;
+  switch (state.phase) {
+    case "done":
+      return (
+        <Badge tone="green">
+          Descargado ✓ {formatNumber(state.rowCount ?? 0)} filas
+        </Badge>
+      );
+    case "failed":
+      return (
+        <p className="text-xs text-rose-600 line-clamp-2" title={state.error ?? undefined}>
+          Falló: {state.error ?? "error desconocido"}
+        </p>
+      );
+    case "stalled":
+      return (
+        <p className="text-xs text-amber-600">
+          Sigue en cola — reintenta refrescar en “Exportaciones recientes”.
+        </p>
+      );
+    default:
+      return null;
+  }
+}

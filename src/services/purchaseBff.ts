@@ -2615,3 +2615,65 @@ export function createDocument(body: {
     body: JSON.stringify(body),
   });
 }
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Exports E13 (F17)
+// ----------------------------------------------------------------------------
+
+export type ExportJobStatus = "pending" | "running" | "done" | "failed";
+
+export interface ExportCatalogItem {
+  reportId: string;
+  title: string;
+}
+
+export interface ExportJobView {
+  id: string;
+  reportId: string;
+  title: string;
+  status: ExportJobStatus;
+  rowCount: number | null;
+  error: string | null;
+  /** Solo viaja cuando status === "done" (GET por id). */
+  resultCsv?: string;
+  dateCreated: string;
+  finishedAt: string | null;
+  expiresAt: string | null;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Exports E13 (F17)
+// ----------------------------------------------------------------------------
+
+/** GET /exports/catalog — reportes disponibles. */
+export function getExportCatalog(): Promise<{ items: ExportCatalogItem[] }> {
+  return request<{ items: ExportCatalogItem[] }>("/exports/catalog", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /exports — mis jobs recientes. */
+export function listExports(): Promise<{ items: ExportJobView[] }> {
+  return request<{ items: ExportJobView[] }>("/exports", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /exports/:id — polling; en done incluye el CSV. */
+export function getExport(id: string): Promise<ExportJobView> {
+  return request<ExportJobView>(`/exports/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /exports — encola la exportación (202, 🔑). */
+export function createExport(reportId: string): Promise<ExportJobView> {
+  return request<ExportJobView>("/exports", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify({ reportId }),
+  });
+}
