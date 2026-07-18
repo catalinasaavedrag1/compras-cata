@@ -3121,3 +3121,77 @@ export function patchGoal(
     body: JSON.stringify(body),
   });
 }
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Reglas de compra (F20)
+// ----------------------------------------------------------------------------
+
+export type RuleScopeType = "global" | "category" | "supplier" | "buyer";
+
+export interface RuleView {
+  id: string;
+  scopeType: RuleScopeType;
+  /** null en scope global; categoryId / supplierRef / buyerId en el resto. */
+  scopeRef: string | null;
+  /** Clave namespaced (ej: replenishment.target_coverage_days). */
+  key: string;
+  value: unknown;
+  active: boolean;
+  validFrom: string;
+  reason: string;
+  dateModified: string;
+  userModified: string;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Reglas de compra (F20)
+// ----------------------------------------------------------------------------
+
+export interface RuleListData {
+  items: RuleView[];
+  meta: BffPageMeta;
+}
+
+/** GET /rules — reglas con valor parseado (filtro scopeType opcional). */
+export function listRules(params?: {
+  scopeType?: RuleScopeType;
+  page?: number;
+  pageSize?: number;
+}): Promise<RuleListData> {
+  const query = new URLSearchParams();
+  if (params?.scopeType) query.set("scopeType", params.scopeType);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.pageSize) query.set("pageSize", String(params.pageSize));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<RuleListData>(`/rules${suffix}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /rules — alta (líder, 🔑; activa duplicada por alcance+clave ⇒ 409). */
+export function createRule(body: {
+  scopeType: RuleScopeType;
+  scopeRef?: string;
+  key: string;
+  value: unknown;
+  reason: string;
+}): Promise<RuleView> {
+  return request<RuleView>("/rules", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** PATCH /rules/:id — cambiar valor y/o activar-desactivar (motivo obligatorio). */
+export function patchRule(
+  id: string,
+  body: { value?: unknown; active?: boolean; reason: string }
+): Promise<RuleView> {
+  return request<RuleView>(`/rules/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: baseHeaders(),
+    body: JSON.stringify(body),
+  });
+}
