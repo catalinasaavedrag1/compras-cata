@@ -1514,11 +1514,17 @@ export function convertProposal(id: string, version: number): Promise<ConvertRes
 /** GET /purchase-orders?status=&page=&pageSize= — lista (sin líneas). */
 export function listPurchaseOrders(params: {
   status?: PurchaseOrderBffStatus;
+  /** Filtro por proveedor (ficha F11): referenceId de comerce. */
+  supplierId?: string;
+  /** Filtro por SKU en líneas (ficha de producto). */
+  sku?: string;
   page?: number;
   pageSize?: number;
 }): Promise<PurchaseOrderListData> {
   const query = new URLSearchParams();
   if (params.status) query.set("status", params.status);
+  if (params.supplierId) query.set("supplierId", params.supplierId);
+  if (params.sku) query.set("sku", params.sku);
   query.set("page", String(params.page ?? 1));
   query.set("pageSize", String(params.pageSize ?? 24));
   return request<PurchaseOrderListData>(`/purchase-orders?${query.toString()}`, {
@@ -1713,6 +1719,333 @@ export function getBudgetOverview(month?: string): Promise<BudgetOverviewData> {
 /** GET /budget/supplier-spend?days= — compra por proveedor de la ventana. */
 export function getSupplierSpend(days = 90): Promise<SupplierSpendData> {
   return request<SupplierSpendData>(`/budget/supplier-spend?days=${days}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Fichas de proveedor / producto / categoría (F11)
+// ----------------------------------------------------------------------------
+
+/** Versión de condiciones comerciales (historia append-only, vigente primero). */
+export interface SupplierTermsVersion {
+  id: string;
+  validFrom?: string;
+  paymentTermRef?: string | null;
+  discountPct?: number | null;
+  freightPolicy?: string | null;
+  currency?: string;
+  notes?: string | null;
+  version?: number;
+  userCreated?: string;
+}
+
+export interface SupplierSkuTermsRow {
+  id: string;
+  sku: string;
+  moq?: number | null;
+  packMultiple?: number | null;
+  leadTimeDays?: number | null;
+  agreedUnitCostClp?: number | null;
+  validFrom?: string;
+}
+
+export interface SupplierAgreementRow {
+  id: string;
+  title?: string;
+  kind?: string;
+  validFrom?: string;
+  validTo?: string | null;
+  docRef?: string | null;
+  status?: string;
+  dateCreated?: string;
+  userCreated?: string;
+}
+
+export interface SupplierNegotiationRow {
+  id: string;
+  status?: string;
+  topic?: string;
+  minutes?: string;
+  outcome?: Record<string, unknown> | null;
+  authorUserId?: string;
+  version?: number;
+  dateCreated?: string;
+}
+
+/** Fila del catálogo conocido del proveedor (materialización del motor). */
+export interface SupplierCatalogRow {
+  recommendationId: string;
+  sku: string;
+  name: string | null;
+  brand: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  stockAvailable: number | null;
+  dailyVelocity: number | null;
+  coverageDays: number | null;
+  unitCostClp: number | null;
+  moq: number | null;
+  packMultiple: number | null;
+  leadTimeDays: number | null;
+  salesLast30d: number | null;
+  marginPct: number | null;
+  priority: string;
+  status: string;
+}
+
+export interface SupplierFichaAlert {
+  id: string;
+  title: string | null;
+  severity: string | null;
+  status: string | null;
+  refEntity: string | null;
+  refId: string | null;
+  dateCreated: string | null;
+}
+
+/** GET /suppliers/:id — ficha compuesta (relación indispensable; resto degradable). */
+export interface SupplierFichaData {
+  supplierId: string;
+  name: string;
+  rut: string | null;
+  sapCardCode: string | null;
+  status: string;
+  metrics: {
+    compliancePct: number | null;
+    leadTimeDaysObserved: number | null;
+    pendingAmountClp: number | null;
+    asOf: string | null;
+  };
+  evaluation: { period: string; dimensions: Record<string, number> } | null;
+  terms: SupplierTermsVersion[];
+  skuTerms: SupplierSkuTermsRow[];
+  agreements: SupplierAgreementRow[];
+  negotiations: SupplierNegotiationRow[];
+  summary: {
+    ordersTotal: number | null;
+    ordersOpen: number | null;
+    ordersDelayed: number | null;
+    receptionsTotal: number | null;
+    claimsTotal: number | null;
+    claimsOpen: number | null;
+    purchased90Clp: number | null;
+    purchased90Share: number | null;
+    alertsActive: number | null;
+  };
+  catalog: {
+    items: SupplierCatalogRow[];
+    skuCount: number;
+    sales30Units: number | null;
+    avgMarginPct: number | null;
+    stalledCount: number;
+  };
+  alerts: SupplierFichaAlert[];
+  warnings?: BffWarning[];
+}
+
+export interface SupplierRelationRow {
+  id: string;
+  supplierId: string;
+  sapCardCode: string | null;
+  document: string | null;
+  name: string;
+  status: string;
+  compliancePct: number | null;
+  leadTimeDaysObserved: number | null;
+  pendingAmountClp: number | null;
+  metricsAsOf: string | null;
+  version: number;
+}
+
+export interface ProductOrderRow {
+  purchaseOrderId: string | null;
+  number: string | null;
+  status: string | null;
+  supplierId: string | null;
+  createdAt: string | null;
+  expectedDate: string | null;
+  qty: number | null;
+  unitCostClp: number | null;
+}
+
+/** GET /products/:sku — SKU 360 compuesto. */
+export interface ProductFichaData {
+  sku: string;
+  name: string | null;
+  brand: string | null;
+  category: { id: string | null; name: string | null };
+  supplier: { id: string | null; name: string | null };
+  stock: {
+    available: number | null;
+    inTransit: number | null;
+    security: number | null;
+    asOf: string | null;
+    /** true = saldo del snapshot del motor (feed vivo caído). */
+    fromSnapshot: boolean;
+  };
+  cost: { unitCostClp: number | null; priceListId: string | null; asOf: string | null };
+  sales: {
+    dailyVelocity: number | null;
+    salesLast30d: number | null;
+    salesLast90d: number | null;
+    rotation: number | null;
+    marginPct: number | null;
+  };
+  terms: { moq: number | null; packMultiple: number | null; leadTimeDays: number | null };
+  recommendation: {
+    id: string;
+    status: string;
+    priority: string;
+    suggestedQty: number;
+    overrideQty?: number | null;
+    coverageDays?: number | null;
+    version: number;
+    reason?: string | null;
+    risk?: string | null;
+  } | null;
+  orders: ProductOrderRow[];
+  alerts: Array<{
+    id: string;
+    title: string | null;
+    severity: string | null;
+    status: string | null;
+    dateCreated: string | null;
+  }>;
+  warnings?: BffWarning[];
+}
+
+export interface CategoryProductRow {
+  recommendationId: string;
+  sku: string;
+  name: string | null;
+  brand: string | null;
+  supplierId: string | null;
+  supplierName: string | null;
+  stockAvailable: number | null;
+  coverageDays: number | null;
+  salesLast30d: number | null;
+  marginPct: number | null;
+  suggestedAmountClp: number | null;
+  priority: string;
+  status: string;
+}
+
+export interface CategorySupplierRow {
+  supplierId: string;
+  supplierName: string | null;
+  skuCount: number;
+  suggestedAmountClp: number;
+}
+
+/** GET /categories/:id — ficha de categoría en alcance de compras. */
+export interface CategoryFichaData {
+  categoryId: string;
+  name: string;
+  buyerId: string | null;
+  replenishment: {
+    pendingCount: number;
+    byPriority: { stockout_imminent: number; low_stock: number; opportunity: number };
+    suggestedAmountClp: number;
+    sales30Units: number | null;
+    avgMarginPct: number | null;
+  };
+  budget: {
+    month: string;
+    budgetClp: number;
+    committedClp: number;
+    availableClp: number;
+  } | null;
+  suppliers: CategorySupplierRow[];
+  products: CategoryProductRow[];
+  warnings?: BffWarning[];
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Fichas de proveedor / producto / categoría (F11)
+// ----------------------------------------------------------------------------
+
+/** GET /suppliers — panel liviano de relaciones (búsqueda q). */
+export function listSupplierRelations(params?: {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<{ items: SupplierRelationRow[]; meta: ReplenishmentMeta }> {
+  const query = new URLSearchParams();
+  if (params?.q) query.set("q", params.q);
+  query.set("page", String(params?.page ?? 1));
+  query.set("pageSize", String(params?.pageSize ?? 50));
+  return request<{ items: SupplierRelationRow[]; meta: ReplenishmentMeta }>(
+    `/suppliers?${query.toString()}`,
+    { method: "GET", headers: baseHeaders() }
+  );
+}
+
+/** GET /suppliers/:id — ficha compuesta del proveedor. */
+export function getSupplierFicha(supplierId: string): Promise<SupplierFichaData> {
+  return request<SupplierFichaData>(`/suppliers/${encodeURIComponent(supplierId)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** PUT /suppliers/:id/terms — C15b: nueva versión de condiciones (+ SKU terms). */
+export function putSupplierTerms(
+  supplierId: string,
+  body: {
+    paymentTermRef?: string;
+    discountPct?: number;
+    freightPolicy?: string;
+    notes?: string;
+    skuTerms?: Array<{
+      sku: string;
+      moq?: number;
+      packMultiple?: number;
+      leadTimeDays?: number;
+      agreedUnitCostClp?: number;
+    }>;
+  }
+): Promise<{ terms: SupplierTermsVersion; skuTerms: SupplierSkuTermsRow[] }> {
+  return request<{ terms: SupplierTermsVersion; skuTerms: SupplierSkuTermsRow[] }>(
+    `/suppliers/${encodeURIComponent(supplierId)}/terms`,
+    { method: "PUT", headers: baseHeaders(), body: JSON.stringify(body) }
+  );
+}
+
+/** POST /suppliers/:id/negotiations — C15: registrar ronda de negociación. */
+export function createSupplierNegotiation(
+  supplierId: string,
+  body: { topic: string; minutes: string; status?: string; outcome?: Record<string, unknown> }
+): Promise<SupplierNegotiationRow> {
+  return request<SupplierNegotiationRow>(
+    `/suppliers/${encodeURIComponent(supplierId)}/negotiations`,
+    { method: "POST", headers: { ...baseHeaders(), ...idempotency() }, body: JSON.stringify(body) }
+  );
+}
+
+/** POST /suppliers/:id/agreements — registrar acuerdo comercial. */
+export function createSupplierAgreement(
+  supplierId: string,
+  body: { title: string; kind: string; validFrom: string; validTo?: string; docRef?: string }
+): Promise<SupplierAgreementRow> {
+  return request<SupplierAgreementRow>(
+    `/suppliers/${encodeURIComponent(supplierId)}/agreements`,
+    { method: "POST", headers: { ...baseHeaders(), ...idempotency() }, body: JSON.stringify(body) }
+  );
+}
+
+/** GET /products/:sku — ficha de producto (SKU 360). */
+export function getProductFicha(sku: string): Promise<ProductFichaData> {
+  return request<ProductFichaData>(`/products/${encodeURIComponent(sku)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /categories/:id — ficha de categoría (alcance de compras). */
+export function getCategoryFicha(categoryId: string): Promise<CategoryFichaData> {
+  return request<CategoryFichaData>(`/categories/${encodeURIComponent(categoryId)}`, {
     method: "GET",
     headers: baseHeaders(),
   });

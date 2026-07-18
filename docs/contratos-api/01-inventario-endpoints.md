@@ -159,9 +159,9 @@ los comandos llevan ficha completa en `04`.
 | **RFQs** | CRUD + `POST /rfqs/:id/responses` · `POST /rfqs/:id/award` | Award crea proposal/PO |
 | **Receptions** | `GET /receptions` **Q** · `GET /receptions/:id` · `POST /receptions` · `PATCH /receptions/:id` | Al completar emite evento → inventory/SAP |
 | **Claims** | CRUD + `PATCH /claims/:id/resolve` | Resolución `credit_note` emite evento a finance/SAP |
-| **Supplier Relations** | `GET /supplier-relations/:supplierId` · `PUT /supplier-relations/:supplierId/terms` · `POST …/agreements` · `POST …/negotiations` · `GET …/evaluation` · `GET …/compliance` | `supplierId` = ReferenceId de comerce (P3) |
+| **Supplier Relations** | `GET /supplier-relations` **Q** · `GET /supplier-relations/:supplierId` (incluye terms/skuTerms/acuerdos/rondas + última evaluación y métricas de cumplimiento) · `PUT …/terms` (C15b, append-only) · `POST …/negotiations` (C15) · `GET/POST …/agreements` | `supplierId` = ReferenceId de comerce (P3) |
 | **Budget/OTB** | `GET /budget?month&categoryId` · `GET /budget/months` · `GET /budget/supplier-spend?days&scope` · `POST /budget/check` (validación de disponibilidad) · `PATCH /budget/:bucketId` (admin; If-Match, emite `purchase.otb.adjusted`) | `check` lo usa submit/convert; `months`/`supplier-spend` alimentan la vista A12.7 |
-| **Assignments** | `GET /assignments` · `PUT /assignments/:categoryId` | Cartera; alimenta el alcance |
+| **Assignments** | `GET /assignments` (lectura implementada) · `PUT /assignments/:categoryId` (C18, flujo de equipo) | Cartera; alimenta el alcance |
 | **Alerts** | `GET /alerts` **Q** · `POST /alerts/:id/acknowledge` · `/resolve` · `/dismiss` · `POST /alerts` (`x-service-*`: motor de reglas) | Estado del alerta vive aquí (R1) |
 | **Signals** | CRUD + `POST /signals/:id/comments` | Hilo con cursor |
 | **Seasons/Planning** | `GET /seasons` · `GET /seasons/:id/plan` · `PATCH /forecast-adjustments/:sku` · `GET /channel-demand` | Forecast auditable |
