@@ -16,7 +16,6 @@ import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { IconReplenish, IconAlerts, IconPlus, IconClose, IconInfo } from "../components/ui/icons";
 import { PageSkeleton } from "../components/ui/Skeleton";
-import { rfqs } from "../data/mockRfq";
 import { suppliers } from "../data/mockSuppliers";
 import { monthlyPurchaseBudget } from "../data/mockRules";
 import { filterRecommendations, uniqueValues } from "../utils/filters";
@@ -37,6 +36,7 @@ import { ExportButton } from "../components/business/ExportButton";
 import type { PurchaseRecommendation } from "../types/purchasing";
 import { isHiddenByDefault, useReplenishment } from "../hooks/useReplenishment";
 import { ACTIVE_PO_STATUSES, usePurchaseOrders } from "../hooks/usePurchaseOrders";
+import { useOpenRfqCount } from "../hooks/useRfqs";
 import { TODAY_ISO } from "../utils/constants";
 import type { PurchaseBffError } from "../services/purchaseBff";
 
@@ -144,7 +144,9 @@ export function ReplenishmentPage() {
 
   const urgentRecs = visible.filter((r) => r.status === "critical" || r.status === "buy_now");
   const topDecision = urgentRecs[0] ?? visible[0];
-  const openRfqs = rfqs.filter((r) => !["convertida", "rechazada", "vencida"].includes(r.estado));
+  // Cotizaciones vivas reales (flujo 8): señal "en preparación" de la barra
+  // de proceso, con degradación silenciosa a 0 si el servicio no responde.
+  const openRfqCount = useOpenRfqCount();
   // OC reales emitidas / por recibir (barra de proceso). En el contrato real el
   // atraso no es un estado: se deriva de la fecha esperada vencida.
   const emittedOrders = purchaseOrderViews.filter((o) =>
@@ -638,9 +640,9 @@ export function ReplenishmentPage() {
           {
             label: "Preparación",
             detail: "Cotizar y negociar",
-            count: openRfqs.length,
+            count: openRfqCount,
             to: "/comprar/cotizaciones",
-            tone: openRfqs.length > 0 ? "amber" : "neutral",
+            tone: openRfqCount > 0 ? "amber" : "neutral",
           },
           {
             label: "Borrador",

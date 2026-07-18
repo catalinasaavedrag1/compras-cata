@@ -12,7 +12,6 @@ import { IconPlus } from "../components/ui/icons";
 import { usePickupPlan } from "../components/business/LogisticsPlan";
 import { draftBudgetImpact } from "../utils/openToBuy";
 import { recommendations } from "../data/mockRecommendations";
-import { rfqs } from "../data/mockRfq";
 import { getProductBySku, products as allProducts } from "../data/mockProducts";
 import { suppliers as mockSuppliers } from "../data/mockSuppliers";
 import { orderSalesAtRisk, type ConsolidationCandidate } from "../utils/orderConsolidation";
@@ -39,6 +38,7 @@ import {
   type PurchaseOrderRow,
 } from "../hooks/usePurchaseOrders";
 import { usePendingApprovalsCount } from "../hooks/useApprovals";
+import { useOpenRfqCount } from "../hooks/useRfqs";
 import {
   criterionLabelEs,
   describePurchaseBffError,
@@ -250,7 +250,9 @@ export function PurchaseOrdersPage() {
     .reduce((a, o) => a + o.totalAmount, 0);
   const delayedCount = visible.filter((o) => o.status === "delayed").length;
   const draftCount = workingProposals.length;
-  const openRfqs = rfqs.filter((r) => !["convertida", "rechazada", "vencida"].includes(r.estado));
+  // Cotizaciones vivas reales (flujo 8): señal "en preparación" de la barra
+  // de proceso, con degradación silenciosa a 0 si el servicio no responde.
+  const openRfqCount = useOpenRfqCount();
   const emittedOrders = visible.filter((o) => EMITTED_STATUSES.includes(o.status));
   const receivingOrders = visible.filter((o) =>
     ["sent", "confirmed", "partially_received", "delayed"].includes(o.status)
@@ -589,7 +591,7 @@ export function PurchaseOrdersPage() {
           necesidadCount: recommendations.filter(
             (r) => r.status === "critical" || r.status === "buy_now"
           ).length,
-          rfqCount: openRfqs.length,
+          rfqCount: openRfqCount,
           draftCount: count,
           pathname,
           pickupPlan,

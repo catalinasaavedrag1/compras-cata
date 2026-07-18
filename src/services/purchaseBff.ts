@@ -511,6 +511,138 @@ export type ClaimPatchBody =
   | { action: "reject"; reason: string };
 
 // ----------------------------------------------------------------------------
+//  Tipos del contrato — RFQ / Cotizaciones (F8)
+// ----------------------------------------------------------------------------
+
+/**
+ * Máquina de estados real (rfqs.service): draft → sent → (partially_)responded
+ * → awarded | cancelled | expired. `expired` existe en la máquina pero v1 NO lo
+ * auto-setea (sin batch de vencimiento): la UI deriva "vencida" de dueDate.
+ */
+export type RfqStatusBff =
+  | "draft"
+  | "sent"
+  | "partially_responded"
+  | "responded"
+  | "awarded"
+  | "cancelled"
+  | "expired";
+
+/** Fila resumen del listado (toRfqSummary del dominio). */
+export interface RfqSummaryView {
+  id: string;
+  number: string;
+  title: string;
+  buyerId: string;
+  status: RfqStatusBff;
+  dueDate: string | null;
+  lineCount: number;
+  supplierCount: number;
+  respondedCount: number;
+  awardedResponseId: string | null;
+  version: number;
+  dateCreated: string | null;
+}
+
+/** Línea solicitada, con el mejor precio ofertado calculado por el dominio. */
+export interface RfqLineView {
+  id: string;
+  sku: string;
+  skuName: string;
+  qty: number | null;
+  targetUnitCostClp: number | null;
+  bestUnitCostClp: number | null;
+}
+
+/** Proveedor invitado (supplierRef canónico + nameSnap si se conoce). */
+export interface RfqSupplierView {
+  id: string;
+  supplierRef: string;
+  supplierName: string | null;
+  invitedAt: string | null;
+  respondedAt: string | null;
+}
+
+/** Línea cotizada por un proveedor, unida a la solicitada por rfqLineId. */
+export interface RfqResponseLineView {
+  id: string;
+  rfqLineId: string;
+  unitCostClp: number | null;
+  minQty: number | null;
+  comment: string | null;
+}
+
+/** Respuesta completa de un proveedor invitado. */
+export interface RfqResponseView {
+  id: string;
+  rfqSupplierId: string;
+  supplierRef: string | null;
+  receivedAt: string | null;
+  validUntil: string | null;
+  paymentTermRef: string | null;
+  leadTimeDays: number | null;
+  notes: string | null;
+  version: number;
+  lines: RfqResponseLineView[];
+}
+
+/** Detalle de comparación (toRfqDetail): resumen + líneas, invitados y ofertas. */
+export interface RfqDetailView extends RfqSummaryView {
+  lines: RfqLineView[];
+  suppliers: RfqSupplierView[];
+  responses: RfqResponseView[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface RfqListData {
+  items: RfqSummaryView[];
+  meta: BffPageMeta;
+}
+
+/** Línea a cotizar. skuName viaja por contrato pero v1 no lo persiste. */
+export interface CreateRfqLineBody {
+  sku: string;
+  skuName?: string;
+  qty: number;
+  targetUnitCostClp?: number;
+}
+
+/** Cuerpo del POST /rfqs (≥ 1 línea, ≥ 1 proveedor invitado activo). */
+export interface CreateRfqBody {
+  title: string;
+  dueDate?: string;
+  lines: CreateRfqLineBody[];
+  supplierRefs: string[];
+}
+
+/** PATCH de la máquina: `reason` es obligatorio solo en cancel (auditable). */
+export type RfqPatchBody = { action: "send" } | { action: "cancel"; reason: string };
+
+export interface RfqResponseLineBody {
+  rfqLineId: string;
+  unitCostClp: number;
+  minQty?: number;
+  comment?: string;
+}
+
+/** Cuerpo del POST /rfqs/:id/responses (RFQ en sent | partially_responded). */
+export interface CreateRfqResponseBody {
+  supplierRef: string;
+  validUntil?: string;
+  paymentTermRef?: string;
+  leadTimeDays?: number;
+  notes?: string;
+  lines: RfqResponseLineBody[];
+}
+
+/** C20: adjudicar deja la RFQ awarded y crea una propuesta draft (sourceType rfq). */
+export interface AwardRfqResult {
+  rfq: RfqDetailView;
+  proposalId: string;
+}
+
+// ----------------------------------------------------------------------------
 //  Tipos del contrato — Alertas comerciales y campanita (F7)
 // ----------------------------------------------------------------------------
 
@@ -771,6 +903,80 @@ export function patchClaim(
     method: "PATCH",
     headers: { ...baseHeaders(), ...ifMatch(version) },
     body: JSON.stringify(body),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — RFQ / Cotizaciones (F8)
+// ----------------------------------------------------------------------------
+
+/** GET /rfqs — listado resumen con filtros del dominio (status, q, buyerId). */
+export function listRfqs(params: {
+  status?: RfqStatusBff;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<RfqListData> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.q) query.set("q", params.q);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 24));
+  return request<RfqListData>(`/rfqs?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /rfqs/:id — detalle de comparación (la versión viaja en el cuerpo). */
+export function getRfq(id: string): Promise<RfqDetailView> {
+  return request<RfqDetailView>(`/rfqs/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /rfqs — crea la RFQ en `draft` (🔑 idempotente). */
+export function createRfq(body: CreateRfqBody): Promise<RfqDetailView> {
+  return request<RfqDetailView>("/rfqs", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/** PATCH /rfqs/:id — send | cancel (If-Match `"<version>"`). */
+export function patchRfq(id: string, version: number, body: RfqPatchBody): Promise<RfqDetailView> {
+  return request<RfqDetailView>(`/rfqs/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...baseHeaders(), ...ifMatch(version) },
+    body: JSON.stringify(body),
+  });
+}
+
+/** POST /rfqs/:id/responses — registra la oferta de UN invitado (🔑 + If-Match). */
+export function registerRfqResponse(
+  id: string,
+  version: number,
+  body: CreateRfqResponseBody
+): Promise<RfqDetailView> {
+  return request<RfqDetailView>(`/rfqs/${encodeURIComponent(id)}/responses`, {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency(), ...ifMatch(version) },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * POST /rfqs/:id/award — C20: adjudica la oferta elegida. La RFQ queda
+ * `awarded` y en la misma transacción nace una propuesta `draft` que sigue el
+ * circuito normal de Governance (🔑 + If-Match; exige purchase:rfq:award).
+ */
+export function awardRfq(id: string, version: number, responseId: string): Promise<AwardRfqResult> {
+  return request<AwardRfqResult>(`/rfqs/${encodeURIComponent(id)}/award`, {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency(), ...ifMatch(version) },
+    body: JSON.stringify({ responseId }),
   });
 }
 
