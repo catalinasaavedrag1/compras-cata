@@ -1,167 +1,229 @@
 import { useMemo, useState } from "react";
-import { PageHeader } from "../components/ui/PageHeader";
 import { Link, useNavigate } from "react-router-dom";
+import { PageHeader } from "../components/ui/PageHeader";
 import { FilterBar } from "../components/business/FilterBar";
 import { inRange, type IsoRange } from "../utils/dateRange";
 import { KpiCard } from "../components/business/KpiCard";
 import { Tabs } from "../components/ui/Tabs";
 import { Card, CardBody } from "../components/ui/Card";
 import { Drawer } from "../components/ui/Drawer";
+import { Modal } from "../components/ui/Modal";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
+import { Skeleton } from "../components/ui/Skeleton";
 import { SeverityBadge } from "../components/business/PriorityBadge";
-import { StatusBadge } from "../components/business/StatusBadge";
-import { alerts as seedAlerts } from "../data/mockAlerts";
-import { recommendations } from "../data/mockRecommendations";
-import { ALERT_TYPE_LABELS } from "../components/business/alertLabels";
-import { filterAlerts } from "../utils/filters";
-import { formatNumber, formatDate } from "../utils/formatters";
-import { cn } from "../utils/cn";
-import { TODAY_ISO } from "../utils/constants";
-import type { AlertType } from "../types/purchasing";
-import { Badge, type BadgeTone } from "../components/ui/Badge";
-import { useLocalStorage } from "../utils/useLocalStorage";
-import { useOcDraft } from "../context/OcDraftContext";
+import {
+  ALERT_REF_ENTITY_LABEL,
+  ALERT_SEVERITY_TO_UI,
+  ALERT_STATUS_UI,
+  alertRefLink,
+  alertTypeUi,
+  describeAlertConflict,
+  isLiveAlert,
+} from "../components/business/alertBff";
+import { useAlerts } from "../hooks/useAlerts";
 import { useToast } from "../context/ToastContext";
+import { formatDate, formatNumber } from "../utils/formatters";
+import { cn } from "../utils/cn";
 import { IconAlerts, IconCheck } from "../components/ui/icons";
-import type { AlertStatus } from "../types/purchasing";
+import {
+  describePurchaseBffError,
+  type AlertActionBff,
+  type AlertSeverityBff,
+  type AlertView,
+} from "../services/purchaseBff";
+
+// ============================================================================
+//  Alertas (flujo 7) conectadas al purchase-bff-service. El mapeo de la
+//  máquina real (active → acknowledged → resolved | dismissed) y de las
+//  severidades (critical/warning/info → badges Alta/Media/Baja existentes)
+//  vive en components/business/alertBff.ts. Pestañas sobre estados reales:
+//    "Abiertas"    = active | acknowledged (la alerta sigue viva)
+//    "Sin atender" = active · "Atendidas" = acknowledged
+//    "Resueltas" / "Descartadas" = terminales (descartar exige motivo).
+//  Acciones C17 idempotentes (todos los roles tienen purchase:alert:ack).
+// ============================================================================
 
 const TABS = [
-  { value: "active", label: "Activas" },
-  { value: "new", label: "Nuevas" },
-  { value: "in_review", label: "En revisión" },
+  { value: "live", label: "Abiertas" },
+  { value: "active", label: "Sin atender" },
+  { value: "acknowledged", label: "Atendidas" },
   { value: "resolved", label: "Resueltas" },
-  { value: "ignored", label: "Ignoradas" },
+  { value: "dismissed", label: "Descartadas" },
 ];
+
+const SEVERITY_RANK: Record<AlertSeverityBff, number> = { critical: 0, warning: 1, info: 2 };
+
+const PAGE_TITLE = "Alertas comerciales";
+const PAGE_DESCRIPTION = "Problemas que requieren tu atención, con acción sugerida.";
+
+function inTab(alert: AlertView, tab: string): boolean {
+  if (tab === "live") return isLiveAlert(alert.status);
+  return alert.status === tab;
+}
 
 export function AlertsPage() {
   const navigate = useNavigate();
-  const { addItem, hasItem } = useOcDraft();
   const toast = useToast();
-  const [statusOverrides, setStatusOverrides] = useLocalStorage<Record<string, AlertStatus>>(
-    "compras:alert-status",
-    {}
-  );
-  const [tab, setTab] = useState("active");
+  const { alerts, loading, error, configured, refetch, applyAction } = useAlerts();
+
+  const [tab, setTab] = useState("live");
   const [query, setQuery] = useState("");
   const [type, setType] = useState("");
   const [severity, setSeverity] = useState("");
-  const [responsible, setResponsible] = useState("");
   const [dates, setDates] = useState<IsoRange>({ from: "", to: "" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileDetail, setMobileDetail] = useState(false);
+  const [dismissing, setDismissing] = useState<AlertView | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const alerts = useMemo(
-    () =>
-      seedAlerts.map((a) => (statusOverrides[a.id] ? { ...a, status: statusOverrides[a.id] } : a)),
-    [statusOverrides]
-  );
+  // Filtrado por la barra (sin la pestaña): controla KPIs y conteos.
+  const byFilters = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return alerts.filter((a) => {
+      if (severity && a.severity !== severity) return false;
+      if (type && a.type !== type) return false;
+      if (!inRange(a.dateCreated?.slice(0, 10) ?? "", dates)) return false;
+      if (q.length === 0) return true;
+      return [a.title, a.refId, a.ruleKey, alertTypeUi(a.type).label]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [alerts, query, type, severity, dates]);
 
-  const setStatus = (id: string, status: AlertStatus) => {
-    setStatusOverrides((prev) => ({ ...prev, [id]: status }));
-    toast.success(
-      status === "resolved" ? "Alerta marcada como resuelta" : "Alerta marcada en revisión"
-    );
-  };
-
-  // Filtrado por la barra de filtros (sin la pestaña): controla KPIs y conteos
-  const byFilters = useMemo(
-    () =>
-      filterAlerts(alerts, { query, type, severity })
-        .filter((a) => !responsible || a.responsible === responsible)
-        .filter((a) => inRange(a.date, dates)),
-    [alerts, query, type, severity, responsible, dates]
-  );
-
-  const responsibles = useMemo(
-    () =>
-      Array.from(new Set(seedAlerts.map((a) => a.responsible))).sort((x, y) =>
-        x.localeCompare(y, "es")
-      ),
-    []
-  );
+  // Tipos disponibles para el filtro: los presentes en el inbox real.
+  const typeOptions = useMemo(() => {
+    const present = Array.from(new Set(alerts.map((a) => a.type)));
+    return present
+      .map((value) => ({ value, label: alertTypeUi(value).label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "es"));
+  }, [alerts]);
 
   const counts = useMemo(
     () => ({
-      active: byFilters.filter((a) => a.status === "new" || a.status === "in_review").length,
-      new: byFilters.filter((a) => a.status === "new").length,
-      in_review: byFilters.filter((a) => a.status === "in_review").length,
+      live: byFilters.filter((a) => isLiveAlert(a.status)).length,
+      active: byFilters.filter((a) => a.status === "active").length,
+      acknowledged: byFilters.filter((a) => a.status === "acknowledged").length,
       resolved: byFilters.filter((a) => a.status === "resolved").length,
-      ignored: byFilters.filter((a) => a.status === "ignored").length,
+      dismissed: byFilters.filter((a) => a.status === "dismissed").length,
     }),
     [byFilters]
   );
 
-  const filtered = useMemo(() => {
-    let base = byFilters;
-    if (tab === "active") base = base.filter((a) => a.status === "new" || a.status === "in_review");
-    else base = base.filter((a) => a.status === tab);
-    const order = { high: 0, medium: 1, low: 2 };
-    return [...base].sort((a, b) => order[a.severity] - order[b.severity]);
-  }, [byFilters, tab]);
+  const criticalCount = useMemo(
+    () => byFilters.filter((a) => a.severity === "critical" && isLiveAlert(a.status)).length,
+    [byFilters]
+  );
 
-  const highCount = byFilters.filter(
-    (a) => a.severity === "high" && (a.status === "new" || a.status === "in_review")
-  ).length;
+  const filtered = useMemo(() => {
+    return byFilters
+      .filter((a) => inTab(a, tab))
+      .sort(
+        (a, b) =>
+          SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
+          (b.dateCreated ?? "").localeCompare(a.dateCreated ?? "")
+      );
+  }, [byFilters, tab]);
 
   const selected = filtered.find((a) => a.id === selectedId) ?? filtered[0];
 
-  // Acción sugerida concreta según el tipo de alerta
-  const actionForAlert = (a: (typeof filtered)[number]) => {
-    const rec = a.relatedSku
-      ? recommendations.find((r) => r.sku === a.relatedSku && r.suggestedQuantity > 0)
-      : undefined;
-    if (rec) {
-      const added = hasItem(rec.sku);
-      return {
-        label: added ? "Agregado a OC" : "Agregar a OC",
-        disabled: added,
-        onClick: () => {
-          addItem({
-            sku: rec.sku,
-            productName: rec.productName,
-            supplierName: rec.supplierName,
-            quantity: rec.suggestedQuantity,
-            unitCost: rec.unitCost,
-          });
-          toast.success(`${rec.productName} agregado al borrador de OC`, {
-            label: "Ver borrador OC",
-            onClick: () => navigate("/comprar/borradores"),
-          });
-        },
-      };
+  const runAction = async (alert: AlertView, action: AlertActionBff, reason?: string) => {
+    setBusyId(alert.id);
+    const result = await applyAction(alert.id, action, reason);
+    setBusyId(null);
+    if (result.ok) {
+      if (action === "acknowledge") toast.success("Alerta marcada como atendida");
+      else if (action === "resolve") toast.success("Alerta resuelta");
+      else toast.success("Alerta descartada");
+      setDismissing(null);
+      return;
     }
-    if (a.type === "po_delayed")
-      return { label: "Ver órdenes de compra", onClick: () => navigate("/comprar/seguimiento") };
-    if (a.type === "supplier_delay")
-      return { label: "Revisar proveedor", onClick: () => navigate("/proveedores") };
-    if (a.type === "lost_opportunity" || a.type === "no_recent_purchase")
-      return { label: "Ver venta no capturada", onClick: () => navigate("/venta-no-capturada") };
-    if (a.relatedSku)
-      return { label: "Ver producto", onClick: () => navigate(`/productos/${a.relatedSku}`) };
-    return undefined;
+    const info = result.error;
+    if (info.code === "CONFLICT") {
+      // Transición inválida (otra sesión o auto-resolve del motor): la lista ya se recarga.
+      toast.warning(describeAlertConflict(info) ?? describePurchaseBffError(info));
+      setDismissing(null);
+    } else {
+      toast.error(describePurchaseBffError(info));
+    }
   };
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando y error (patrón flujo 1).
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver las alertas reales y gestionarlas contra el servicio de compras.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && alerts.length === 0) {
+    return (
+      <div>
+        <PageHeader title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando alertas">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error && alerts.length === 0) {
+    return (
+      <div>
+        <PageHeader title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudieron cargar las alertas
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <PageHeader
-        title="Alertas comerciales"
-        description="Problemas que requieren tu atención, con acción sugerida."
-      />
+      <PageHeader title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
 
       {/* Filtros arriba: controlan KPIs, conteos y listado */}
       <div className="mb-4">
         <FilterBar
           searchValue={query}
           onSearchChange={setQuery}
-          searchPlaceholder="Buscar por producto, proveedor o SKU"
+          searchPlaceholder="Buscar por título, referencia o tipo"
           resultCount={byFilters.length}
-          summary={`${byFilters.length} alerta${byFilters.length === 1 ? "" : "s"} · ${highCount} alta severidad · ${counts.in_review} en revisión`}
+          summary={`${byFilters.length} alerta${byFilters.length === 1 ? "" : "s"} · ${criticalCount} de severidad alta · ${counts.acknowledged} atendida${counts.acknowledged === 1 ? "" : "s"}`}
           onClear={() => {
             setQuery("");
             setType("");
             setSeverity("");
-            setResponsible("");
             setDates({ from: "", to: "" });
           }}
           dateRange={{ value: dates, onChange: setDates, label: "Fecha de alerta" }}
@@ -172,9 +234,9 @@ export function AlertsPage() {
               value: severity,
               onChange: setSeverity,
               options: [
-                { value: "high", label: "Alta" },
-                { value: "medium", label: "Media" },
-                { value: "low", label: "Baja" },
+                { value: "critical", label: "Alta" },
+                { value: "warning", label: "Media" },
+                { value: "info", label: "Baja" },
               ],
             },
             {
@@ -182,17 +244,7 @@ export function AlertsPage() {
               placeholder: "Tipo de alerta",
               value: type,
               onChange: setType,
-              options: Object.entries(ALERT_TYPE_LABELS).map(([value, label]) => ({
-                value,
-                label,
-              })),
-            },
-            {
-              key: "responsible",
-              placeholder: "Responsable",
-              value: responsible,
-              onChange: setResponsible,
-              options: responsibles.map((r) => ({ value: r, label: r })),
+              options: typeOptions,
             },
           ]}
         />
@@ -200,34 +252,34 @@ export function AlertsPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard
-          title="Alertas activas"
-          value={formatNumber(counts.active)}
+          title="Alertas abiertas"
+          value={formatNumber(counts.live)}
           tone="warn"
           icon={<IconAlerts className="w-4 h-4" />}
-          description="Ver activas"
-          active={tab === "active"}
-          onClick={() => setTab("active")}
+          description="Ver abiertas"
+          active={tab === "live"}
+          onClick={() => setTab("live")}
         />
         <KpiCard
           title="Severidad alta"
-          value={formatNumber(highCount)}
+          value={formatNumber(criticalCount)}
           tone="bad"
           icon={<IconAlerts className="w-4 h-4" />}
           description="Filtrar alta"
-          active={severity === "high"}
+          active={severity === "critical"}
           onClick={() => {
-            setSeverity("high");
-            setTab("active");
+            setSeverity("critical");
+            setTab("live");
           }}
         />
         <KpiCard
-          title="En revisión"
-          value={formatNumber(counts.in_review)}
+          title="Atendidas"
+          value={formatNumber(counts.acknowledged)}
           tone="info"
           icon={<IconAlerts className="w-4 h-4" />}
-          description="Ver en revisión"
-          active={tab === "in_review"}
-          onClick={() => setTab("in_review")}
+          description="Ver atendidas"
+          active={tab === "acknowledged"}
+          onClick={() => setTab("acknowledged")}
         />
         <KpiCard
           title="Resueltas"
@@ -253,14 +305,14 @@ export function AlertsPage() {
           <CardBody>
             <EmptyState
               icon={<IconCheck className="w-6 h-6" />}
-              title={tab === "active" ? "No hay alertas activas" : "Sin alertas en esta vista"}
+              title={tab === "live" ? "No hay alertas abiertas" : "Sin alertas en esta vista"}
               description={
-                tab === "active"
+                tab === "live"
                   ? "Todo está en orden por ahora. Revisa otra pestaña o continúa con la reposición."
                   : "No hay alertas que coincidan con los filtros seleccionados."
               }
               action={
-                tab === "active" ? (
+                tab === "live" ? (
                   <Button variant="secondary" onClick={() => navigate("/comprar/decisiones")}>
                     Ir a reposición
                   </Button>
@@ -284,7 +336,6 @@ export function AlertsPage() {
                       key={a.id}
                       alert={a}
                       selected={selected?.id === a.id}
-                      action={actionForAlert(a)}
                       onClick={() => {
                         setSelectedId(a.id);
                         setMobileDetail(true);
@@ -300,9 +351,10 @@ export function AlertsPage() {
             {selected && (
               <AlertDetail
                 alert={selected}
-                primaryAction={actionForAlert(selected)}
-                onReview={() => setStatus(selected.id, "in_review")}
-                onResolve={() => setStatus(selected.id, "resolved")}
+                busy={busyId === selected.id}
+                onAcknowledge={() => void runAction(selected, "acknowledge")}
+                onResolve={() => void runAction(selected, "resolve")}
+                onDismiss={() => setDismissing(selected)}
               />
             )}
           </div>
@@ -318,48 +370,43 @@ export function AlertsPage() {
         {selected && (
           <AlertDetail
             alert={selected}
-            primaryAction={actionForAlert(selected)}
-            onReview={() => setStatus(selected.id, "in_review")}
-            onResolve={() => setStatus(selected.id, "resolved")}
+            busy={busyId === selected.id}
+            onAcknowledge={() => void runAction(selected, "acknowledge")}
+            onResolve={() => void runAction(selected, "resolve")}
+            onDismiss={() => setDismissing(selected)}
           />
         )}
       </Drawer>
+
+      {dismissing && (
+        <DismissAlertModal
+          alert={dismissing}
+          busy={busyId === dismissing.id}
+          onConfirm={(reason) => void runAction(dismissing, "dismiss", reason)}
+          onClose={() => setDismissing(null)}
+        />
+      )}
     </div>
   );
 }
 
-const TYPE_GROUP: Record<AlertType, { label: string; tone: BadgeTone }> = {
-  stockout: { label: "Stock", tone: "red" },
-  stockout_risk: { label: "Stock", tone: "amber" },
-  overstock: { label: "Stock", tone: "violet" },
-  dead_stock: { label: "Stock", tone: "violet" },
-  no_sales: { label: "Stock", tone: "neutral" },
-  po_delayed: { label: "OC", tone: "red" },
-  supplier_delay: { label: "Proveedor", tone: "amber" },
-  no_supplier: { label: "Proveedor", tone: "red" },
-  unexpected_demand: { label: "Demanda", tone: "blue" },
-  high_suggested_purchase: { label: "Demanda", tone: "blue" },
-  low_margin: { label: "Margen", tone: "amber" },
-  cost_increase: { label: "Margen", tone: "amber" },
-  outdated_cost: { label: "Margen", tone: "neutral" },
-  no_recent_purchase: { label: "Oportunidad", tone: "amber" },
-  season_approaching: { label: "Demanda", tone: "blue" },
-  lost_opportunity: { label: "Oportunidad", tone: "red" },
-};
-
 /** Agrupa alertas por antigüedad (Hoy / Ayer / Esta semana / Anteriores). */
-function groupByTime(items: (typeof seedAlerts)[number][]) {
-  const today = new Date(`${TODAY_ISO}T00:00:00`).getTime();
-  const daysAgo = (iso: string) =>
-    Math.round((today - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
-  const buckets: { key: string; label: string; items: (typeof seedAlerts)[number][] }[] = [
+function groupByTime(items: AlertView[]) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const daysAgo = (iso: string) => {
+    const created = new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
+    if (!Number.isFinite(created)) return 0;
+    return Math.round((today - created) / 86_400_000);
+  };
+  const buckets: { key: string; label: string; items: AlertView[] }[] = [
     { key: "hoy", label: "Hoy", items: [] },
     { key: "ayer", label: "Ayer", items: [] },
     { key: "semana", label: "Esta semana", items: [] },
     { key: "antes", label: "Anteriores", items: [] },
   ];
   for (const a of items) {
-    const d = daysAgo(a.date);
+    const d = a.dateCreated ? daysAgo(a.dateCreated) : 0;
     if (d <= 0) buckets[0].items.push(a);
     else if (d === 1) buckets[1].items.push(a);
     else if (d <= 7) buckets[2].items.push(a);
@@ -368,19 +415,19 @@ function groupByTime(items: (typeof seedAlerts)[number][]) {
   return buckets.filter((b) => b.items.length > 0);
 }
 
+const fmtDate = (iso: string | null) => (iso ? formatDate(iso.slice(0, 10)) : "—");
+
 function AlertRow({
   alert,
   selected,
   onClick,
-  action,
 }: {
-  alert: (typeof seedAlerts)[number];
+  alert: AlertView;
   selected: boolean;
   onClick: () => void;
-  action?: { label: string; onClick: () => void; disabled?: boolean };
 }) {
-  const unread = alert.status === "new";
-  const type = TYPE_GROUP[alert.type];
+  const unattended = alert.status === "active";
+  const type = alertTypeUi(alert.type);
   return (
     <div
       onClick={onClick}
@@ -400,35 +447,27 @@ function AlertRow({
       )}
     >
       <div className="flex items-center gap-1.5 mb-1">
-        <SeverityBadge severity={alert.severity} />
-        <Badge tone={type.tone}>{type.label}</Badge>
-        {unread && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" title="No leída" />}
+        <SeverityBadge severity={ALERT_SEVERITY_TO_UI[alert.severity]} />
+        <Badge tone={type.tone}>{type.group}</Badge>
+        {unattended && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" title="Sin atender" />}
         <div className="flex-1" />
-        <span className="text-xs text-slate-400 flex-shrink-0">{formatDate(alert.date)}</span>
+        <span className="text-xs text-slate-400 flex-shrink-0">{fmtDate(alert.dateCreated)}</span>
       </div>
       <p
         className={cn(
           "text-sm truncate",
-          unread ? "font-semibold text-slate-900" : "font-medium text-slate-700"
+          unattended ? "font-semibold text-slate-900" : "font-medium text-slate-700"
         )}
       >
-        {alert.relatedEntity}
+        {alert.title}
       </p>
-      <p className="text-xs text-slate-500 line-clamp-2">{alert.description}</p>
+      <p className="text-xs text-slate-500 truncate">
+        {ALERT_REF_ENTITY_LABEL[alert.refEntity] ?? alert.refEntity} · {alert.refId}
+      </p>
       <div className="flex items-center gap-2 mt-1.5">
-        <StatusBadge kind="alert" value={alert.status} dot={false} />
-        {action && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              action.onClick();
-            }}
-            disabled={action.disabled}
-            className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:text-slate-400"
-          >
-            {action.label}
-          </button>
-        )}
+        <Badge tone={ALERT_STATUS_UI[alert.status].tone} dot={false}>
+          {ALERT_STATUS_UI[alert.status].label}
+        </Badge>
       </div>
     </div>
   );
@@ -436,59 +475,65 @@ function AlertRow({
 
 function AlertDetail({
   alert,
-  primaryAction,
-  onReview,
+  busy,
+  onAcknowledge,
   onResolve,
+  onDismiss,
 }: {
-  alert: (typeof seedAlerts)[number];
-  primaryAction?: { label: string; onClick: () => void; disabled?: boolean };
-  onReview: () => void;
+  alert: AlertView;
+  busy: boolean;
+  onAcknowledge: () => void;
   onResolve: () => void;
+  onDismiss: () => void;
 }) {
+  const type = alertTypeUi(alert.type);
+  const link = alertRefLink(alert.refEntity, alert.refId);
+  const live = isLiveAlert(alert.status);
   return (
     <Card>
       <div className="p-4 lg:sticky lg:top-20">
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <SeverityBadge severity={alert.severity} />
-          <span className="text-xs font-medium text-slate-500">
-            {ALERT_TYPE_LABELS[alert.type]}
-          </span>
+          <SeverityBadge severity={ALERT_SEVERITY_TO_UI[alert.severity]} />
+          <span className="text-xs font-medium text-slate-500">{type.label}</span>
           <div className="flex-1" />
-          <StatusBadge kind="alert" value={alert.status} dot={false} />
-          <span className="text-xs text-slate-400">{formatDate(alert.date)}</span>
+          <Badge tone={ALERT_STATUS_UI[alert.status].tone} dot={false}>
+            {ALERT_STATUS_UI[alert.status].label}
+          </Badge>
+          <span className="text-xs text-slate-400">{fmtDate(alert.dateCreated)}</span>
         </div>
 
-        {alert.relatedSku ? (
-          <Link
-            to={`/productos/${alert.relatedSku}`}
-            className="text-lg font-semibold text-brand-700 hover:underline"
-          >
-            {alert.relatedEntity}
-          </Link>
-        ) : (
-          <h3 className="text-lg font-semibold text-slate-900">{alert.relatedEntity}</h3>
+        <h3 className="text-lg font-semibold text-slate-900">{alert.title}</h3>
+        <p className="text-sm text-slate-600 mt-1">
+          {ALERT_REF_ENTITY_LABEL[alert.refEntity] ?? alert.refEntity} referida:{" "}
+          <span className="font-mono text-slate-700">{alert.refId}</span>
+        </p>
+
+        {alert.status === "dismissed" && alert.dismissReason && (
+          <div className="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5">
+            <p className="text-xs font-medium text-slate-500">Motivo del descarte</p>
+            <p className="text-sm text-slate-700 mt-0.5">{alert.dismissReason}</p>
+          </div>
         )}
-        <p className="text-sm text-slate-600 mt-1">{alert.description}</p>
-
-        <div className="mt-3 rounded-lg bg-brand-50/60 border border-brand-100 px-3 py-2.5">
-          <p className="text-xs font-medium text-brand-700">Recomendación</p>
-          <p className="text-sm text-slate-700 mt-0.5">{alert.recommendation}</p>
-        </div>
 
         <div className="flex flex-wrap gap-2 mt-3">
-          {primaryAction && (
-            <Button size="sm" disabled={primaryAction.disabled} onClick={primaryAction.onClick}>
-              {primaryAction.label}
+          {link && (
+            <Link to={link.to}>
+              <Button size="sm">{link.label}</Button>
+            </Link>
+          )}
+          {alert.status === "active" && (
+            <Button size="sm" variant="secondary" disabled={busy} onClick={onAcknowledge}>
+              {busy ? "Aplicando…" : "Atender"}
             </Button>
           )}
-          {alert.status === "new" && (
-            <Button size="sm" variant="secondary" onClick={onReview}>
-              Marcar en revisión
+          {live && (
+            <Button size="sm" variant="secondary" disabled={busy} onClick={onResolve}>
+              {busy ? "Aplicando…" : "Resolver"}
             </Button>
           )}
-          {alert.status !== "resolved" && alert.status !== "ignored" && (
-            <Button size="sm" variant="secondary" onClick={onResolve}>
-              Marcar resuelta
+          {live && (
+            <Button size="sm" variant="secondary" disabled={busy} onClick={onDismiss}>
+              Descartar
             </Button>
           )}
         </div>
@@ -499,22 +544,79 @@ function AlertDetail({
           </p>
           <div className="space-y-1 text-sm">
             <div className="flex justify-between gap-2">
-              <span className="text-slate-500">Responsable</span>
-              <span className="text-slate-700">{alert.responsible}</span>
+              <span className="text-slate-500">Comprador</span>
+              <span className="text-slate-700">{alert.buyerId ?? "Toda la mesa"}</span>
             </div>
             <div className="flex justify-between gap-2">
               <span className="text-slate-500">Fecha</span>
-              <span className="text-slate-700">{formatDate(alert.date)}</span>
+              <span className="text-slate-700">{fmtDate(alert.dateCreated)}</span>
             </div>
-            {alert.relatedSku && (
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-500">Regla</span>
+              <span className="font-mono text-slate-700">{alert.ruleKey}</span>
+            </div>
+            {alert.acknowledgedBy && (
               <div className="flex justify-between gap-2">
-                <span className="text-slate-500">SKU</span>
-                <span className="font-mono text-slate-700">{alert.relatedSku}</span>
+                <span className="text-slate-500">Atendida por</span>
+                <span className="text-slate-700">{alert.acknowledgedBy}</span>
+              </div>
+            )}
+            {alert.resolvedAt && (
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Resuelta el</span>
+                <span className="text-slate-700">{fmtDate(alert.resolvedAt)}</span>
               </div>
             )}
           </div>
         </div>
       </div>
     </Card>
+  );
+}
+
+/** Descartar exige motivo (lo valida el dominio): modal mínimo, patrón F4/F5. */
+function DismissAlertModal({
+  alert,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  alert: AlertView;
+  busy: boolean;
+  onConfirm: (reason: string) => void;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Descartar alerta"
+      description={alert.title}
+      footer={
+        <>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button disabled={busy || !reason.trim()} onClick={() => onConfirm(reason.trim())}>
+            {busy ? "Descartando…" : "Descartar alerta"}
+          </Button>
+        </>
+      }
+    >
+      <div>
+        <label className="mb-1 block text-xs font-medium text-slate-600">
+          Motivo del descarte (obligatorio)
+        </label>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={2}
+          maxLength={1000}
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          placeholder="Ej: condición conocida, ya gestionada fuera del sistema…"
+        />
+      </div>
+    </Modal>
   );
 }

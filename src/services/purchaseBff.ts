@@ -511,6 +511,143 @@ export type ClaimPatchBody =
   | { action: "reject"; reason: string };
 
 // ----------------------------------------------------------------------------
+//  Tipos del contrato — Alertas comerciales y campanita (F7)
+// ----------------------------------------------------------------------------
+
+/** Severidades reales del dominio (list-alerts.dto de purchase-service). */
+export type AlertSeverityBff = "critical" | "warning" | "info";
+
+/** Máquina de estados C17: active → acknowledged → resolved | dismissed. */
+export type AlertStatusBff = "active" | "acknowledged" | "resolved" | "dismissed";
+
+/** Transiciones expuestas por el BFF (POST /alerts/:id/<acción>). */
+export type AlertActionBff = "acknowledge" | "resolve" | "dismiss";
+
+/** Alerta comercial del inbox (alert.mapper del dominio vía BFF). */
+export interface AlertView {
+  id: string;
+  dedupeKey: string;
+  ruleKey: string;
+  /** Tipo emitido por el motor E10 (stockout_imminent, sap_failed, …). */
+  type: string;
+  severity: AlertSeverityBff;
+  title: string;
+  /** Entidad referida: recommendation | purchase_order | reception | claim | budget. */
+  refEntity: string;
+  refId: string;
+  /** null = alerta global (visible para toda la mesa de compras). */
+  buyerId: string | null;
+  status: AlertStatusBff;
+  acknowledgedBy: string | null;
+  resolvedAt: string | null;
+  dismissReason: string | null;
+  dateCreated: string | null;
+  version: number;
+}
+
+export interface AlertListData {
+  items: AlertView[];
+  meta: BffPageMeta;
+}
+
+/** Ítem de la campanita compuesta (alertas vivas + flag de lectura). */
+export interface NotificationView {
+  id: string;
+  title: string | null;
+  severity: AlertSeverityBff | null;
+  type: string | null;
+  refEntity: string | null;
+  refId: string | null;
+  dateCreated: string | null;
+  read: boolean;
+  status: string | null;
+}
+
+/** Meta de la campanita: puede venir `partial` si notification-state degradó. */
+export interface NotificationListMeta extends BffPageMeta {
+  partial?: boolean;
+  warnings?: BffWarning[];
+}
+
+export interface NotificationListData {
+  items: NotificationView[];
+  meta: NotificationListMeta;
+}
+
+/** Estado de lectura que devuelve el PATCH (notification-state del dominio). */
+export interface NotificationReadState {
+  userId?: string;
+  ids?: string[];
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Alertas comerciales (F7)
+// ----------------------------------------------------------------------------
+
+/** GET /alerts — inbox de alertas con filtros del dominio. */
+export function listAlerts(params: {
+  status?: AlertStatusBff;
+  severity?: AlertSeverityBff;
+  type?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<AlertListData> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.severity) query.set("severity", params.severity);
+  if (params.type) query.set("type", params.type);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 24));
+  return request<AlertListData>(`/alerts?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/**
+ * POST /alerts/:id/acknowledge|resolve|dismiss — transición C17. Idempotente
+ * por diseño (repetir sobre el estado destino ⇒ 200 sin cambio), por eso NO
+ * viaja If-Match ni clave de idempotencia (verificado en el controller BFF).
+ * `reason` es obligatorio solo en dismiss (lo valida el dominio).
+ */
+export function alertAction(
+  id: string,
+  action: AlertActionBff,
+  reason?: string
+): Promise<AlertView> {
+  return request<AlertView>(`/alerts/${encodeURIComponent(id)}/${action}`, {
+    method: "POST",
+    headers: baseHeaders(),
+    body: JSON.stringify(action === "dismiss" ? { reason: reason ?? "" } : {}),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Campanita de notificaciones (F7)
+// ----------------------------------------------------------------------------
+
+/**
+ * GET /notifications — alertas vivas (active + acknowledged) con el estado de
+ * lectura del usuario. Si notification-state degrada, todo llega como
+ * no-leído y meta trae `partial` + warnings (la campanita nunca se cae).
+ */
+export function getNotifications(): Promise<NotificationListData> {
+  return request<NotificationListData>("/notifications", {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** PATCH /notifications/read — marca ids como leídos (idempotente). */
+export function markNotificationsRead(ids: string[]): Promise<NotificationReadState> {
+  return request<NotificationReadState>("/notifications/read", {
+    method: "PATCH",
+    headers: baseHeaders(),
+    body: JSON.stringify({ ids }),
+  });
+}
+
+// ----------------------------------------------------------------------------
 //  API pública — Recepciones (F4)
 // ----------------------------------------------------------------------------
 
@@ -730,13 +867,22 @@ export interface DashboardAgendaOkSection {
 
 export type DashboardAgendaSection = DashboardAgendaOkSection | DashboardDegradedSection;
 
+/** Sección alertas (F7): conteo de activas por severidad, fresca y degradable. */
+export interface DashboardAlertsOkSection {
+  status: "ok";
+  activeCount: number;
+  bySeverity: { critical: number; warning: number; info: number };
+}
+
+export type DashboardAlertsSection = DashboardAlertsOkSection | DashboardDegradedSection;
+
 export interface DashboardSections {
   replenishment: DashboardReplenishmentSection;
   /** Solo viene si la sesión tiene purchase:proposal:approve. */
   approvals?: DashboardApprovalsSection;
   budget: DashboardBudgetSection;
   agenda: DashboardAgendaSection;
-  alerts: DashboardUnavailableSection;
+  alerts: DashboardAlertsSection;
   signals: DashboardUnavailableSection;
 }
 

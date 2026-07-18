@@ -1,14 +1,43 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { useLocalStorage } from "../utils/useLocalStorage";
-import { alertService, purchaseOrderService, signalService } from "../services";
-import { ALERT_TYPE_LABELS } from "../components/business/alertLabels";
-import { SIGNAL_TYPE } from "../components/business/signalLabels";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useAuth } from "./AuthContext";
+import {
+  ALERT_REF_ENTITY_LABEL,
+  alertRefLink,
+  alertTypeUi,
+} from "../components/business/alertBff";
+import {
+  getNotifications,
+  isPurchaseBffConfigured,
+  markNotificationsRead,
+  toPurchaseBffError,
+  type NotificationView,
+  type PurchaseBffError,
+} from "../services/purchaseBff";
 
 // ============================================================================
-//  Centro de notificaciones. Cada notificación apunta a un registro/módulo
-//  para permitir navegación contextual (clic -> abrir lo relacionado).
-//  Se derivan de alertas activas y órdenes de compra atrasadas.
+//  Centro de notificaciones (flujo 7) conectado al purchase-bff-service:
+//  GET /notifications compone las alertas vivas (active + acknowledged) con el
+//  estado de lectura por usuario del dominio (notification-state). Aquí ya no
+//  hay notificaciones derivadas de mocks ni lectura en localStorage
+//  ("compras:notif-read" desapareció): leer = PATCH /notifications/read.
+//  - Polling suave: refresco cada 60 s con cleanup + refresh() al abrir el
+//    panel (patrón usePurchaseOrders, flujo 3).
+//  - Provider global: sin BFF configurado o sin sesión la campanita queda
+//    vacía en silencio (no redirige por su cuenta, igual que ClaimsProvider).
+//  - Si notification-state degradó, el BFF avisa con meta.partial: todo llega
+//    como no-leído y el panel lo indica sin caerse.
 // ============================================================================
+
+const POLL_INTERVAL_MS = 60_000;
 
 export type NotifTone = "info" | "warning" | "danger";
 
@@ -26,74 +55,111 @@ export interface AppNotification {
 interface NotificationContextValue {
   notifications: AppNotification[];
   unreadCount: number;
+  /** Alertas vivas de severidad crítica (badge del menú "Alertas"). */
+  criticalCount: number;
+  /** ¿Hay VITE_PURCHASE_BFF_URL configurada? */
+  configured: boolean;
+  error: PurchaseBffError | null;
+  /** true cuando el estado de lectura degradó (todo se muestra no-leído). */
+  partial: boolean;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  /** Refresca la campanita (se invoca al abrir el panel). */
+  refresh: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
-function buildNotifications(readIds: string[]): AppNotification[] {
-  const read = new Set(readIds);
-  const out: AppNotification[] = [];
+/** Severidad de la alerta → tono visual del panel existente. */
+function toneOf(severity: string | null): NotifTone {
+  if (severity === "critical") return "danger";
+  if (severity === "warning") return "warning";
+  return "info";
+}
 
-  for (const a of alertService.list()) {
-    if (a.status === "resolved" || a.status === "ignored") continue;
-    out.push({
-      id: `alr-${a.id}`,
-      title: ALERT_TYPE_LABELS[a.type] ?? "Alerta comercial",
-      message: a.description,
-      tone: a.severity === "high" ? "danger" : a.severity === "medium" ? "warning" : "info",
-      date: a.date,
-      moduleKey: "alertas",
-      route: a.relatedSku ? `/productos/${a.relatedSku}` : "/alertas",
-      read: read.has(`alr-${a.id}`),
-    });
-  }
-
-  for (const s of signalService.list()) {
-    if (s.status === "resolved" || s.status === "rejected") continue;
-    out.push({
-      id: `sig-${s.id}`,
-      title: `Señal de ventas · ${SIGNAL_TYPE[s.type].short}`,
-      message: `${s.productName} — ${s.store} · ${s.reportedBy}`,
-      tone: s.priority === "high" ? "danger" : s.priority === "medium" ? "warning" : "info",
-      date: s.date.slice(0, 10),
-      moduleKey: "senales",
-      route: "/senales-ventas",
-      read: read.has(`sig-${s.id}`),
-    });
-  }
-
-  for (const o of purchaseOrderService.list()) {
-    if (o.status !== "delayed") continue;
-    out.push({
-      id: `po-${o.id}`,
-      title: "Orden de compra atrasada",
-      message: `${o.number} · ${o.supplierName} · ${o.delayedDays} días de atraso`,
-      tone: "danger",
-      date: o.expectedDate,
-      moduleKey: "ordenes",
-      route: "/ordenes-compra",
-      read: read.has(`po-${o.id}`),
-    });
-  }
-
-  // Más recientes primero
-  return out.sort((a, b) => (a.date < b.date ? 1 : -1));
+/** Ítem de la campanita del BFF → notificación del panel (navegación incluida). */
+function toAppNotification(item: NotificationView): AppNotification {
+  const refLabel =
+    item.refEntity !== null ? (ALERT_REF_ENTITY_LABEL[item.refEntity] ?? item.refEntity) : null;
+  return {
+    id: item.id,
+    title: item.title ?? alertTypeUi(item.type).label,
+    message: refLabel !== null ? `${refLabel} · ${item.refId ?? "—"}` : alertTypeUi(item.type).label,
+    tone: toneOf(item.severity),
+    date: item.dateCreated?.slice(0, 10) ?? "",
+    moduleKey: "alertas",
+    route: alertRefLink(item.refEntity, item.refId)?.to ?? "/alertas",
+    read: item.read,
+  };
 }
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [readIds, setReadIds] = useLocalStorage<string[]>("compras:notif-read", []);
+  const configured = isPurchaseBffConfigured();
+  const { authenticated } = useAuth();
+
+  const [items, setItems] = useState<NotificationView[]>([]);
+  const [error, setError] = useState<PurchaseBffError | null>(null);
+  const [partial, setPartial] = useState(false);
+  const loadSeqRef = useRef(0);
+
+  const load = useCallback(async () => {
+    if (!configured || !authenticated) return;
+    const seq = ++loadSeqRef.current;
+    try {
+      const page = await getNotifications();
+      if (seq !== loadSeqRef.current) return;
+      setItems(page.items);
+      setPartial(page.meta.partial === true);
+      setError(null);
+    } catch (err) {
+      if (seq !== loadSeqRef.current) return;
+      const info = toPurchaseBffError(err);
+      // Sin sesión válida: campanita vacía (provider global, no redirige).
+      if (info.code === "UNAUTHENTICATED") setItems([]);
+      else setError(info);
+    }
+  }, [configured, authenticated]);
+
+  // Carga inicial + polling suave cada 60 s (con cleanup del intervalo).
+  useEffect(() => {
+    if (!configured || !authenticated) return;
+    void load();
+    const timer = setInterval(() => {
+      void load();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [load, configured, authenticated]);
+
+  /**
+   * Marca ids como leídos: optimista en la vista + PATCH idempotente al BFF.
+   * Un fallo se ignora en silencio (el próximo poll trae la verdad).
+   */
+  const persistRead = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    setItems((prev) => prev.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n)));
+    void markNotificationsRead(ids).catch(() => undefined);
+  }, []);
+
+  // Identidad estable: el panel la usa como dependencia de su efecto de apertura.
+  const refresh = useCallback(() => {
+    void load();
+  }, [load]);
 
   const value = useMemo<NotificationContextValue>(() => {
-    const notifications = buildNotifications(readIds);
+    const notifications = items.map(toAppNotification);
     return {
       notifications,
       unreadCount: notifications.filter((n) => !n.read).length,
-      markRead: (id) => setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id])),
-      markAllRead: () => setReadIds(notifications.map((n) => n.id)),
+      criticalCount: items.filter((n) => n.severity === "critical").length,
+      configured,
+      error,
+      partial,
+      markRead: (id) => persistRead([id]),
+      markAllRead: () =>
+        persistRead(items.filter((n) => !n.read).map((n) => n.id)),
+      refresh,
     };
-  }, [readIds, setReadIds]);
+  }, [items, configured, error, partial, persistRead, refresh]);
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }

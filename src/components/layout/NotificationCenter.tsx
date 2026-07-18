@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useNotifications, type NotifTone } from "../../context/NotificationContext";
@@ -14,9 +14,15 @@ const toneBar: Record<NotifTone, string> = {
 
 export function NotificationCenter() {
   const navigate = useNavigate();
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead, refresh, configured, error, partial } =
+    useNotifications();
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Al abrir el panel se refresca la campanita (además del polling de fondo).
+  useEffect(() => {
+    if (open) refresh();
+  }, [open, refresh]);
 
   const openItem = (id: string, route: string) => {
     markRead(id);
@@ -53,7 +59,22 @@ export function NotificationCenter() {
         )}
       </div>
       <div className="flex-1 overflow-y-auto scrollbar-thin sm:flex-none sm:max-h-[70vh] pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
-        {notifications.length === 0 ? (
+        {partial && (
+          <p className="px-4 py-2 text-xs text-amber-600 border-b border-amber-100 bg-amber-50/60">
+            Estado de lectura no disponible: se muestra todo como no leído.
+          </p>
+        )}
+        {!configured ? (
+          <p className="px-4 py-6 text-sm text-slate-500 text-center">
+            Conexión no configurada: define{" "}
+            <code className="font-mono text-slate-600">VITE_PURCHASE_BFF_URL</code> para ver tus
+            notificaciones.
+          </p>
+        ) : error && notifications.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-slate-500 text-center">
+            No se pudieron cargar las notificaciones. Se reintenta automáticamente.
+          </p>
+        ) : notifications.length === 0 ? (
           <p className="px-4 py-6 text-sm text-slate-500 text-center">
             No tienes notificaciones. Todo en orden.
           </p>

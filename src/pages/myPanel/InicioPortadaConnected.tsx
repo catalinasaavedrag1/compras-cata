@@ -7,6 +7,7 @@ import { useDashboard } from "../../hooks/useDashboard";
 import { useProposals } from "../../hooks/useProposals";
 import type {
   DashboardAgendaSection,
+  DashboardAlertsSection,
   DashboardApprovalsSection,
   DashboardBudgetSection,
   DashboardReplenishmentSection,
@@ -176,6 +177,40 @@ function toOtbLabel(budget: DashboardBudgetSection): { label: string; muted: boo
   };
 }
 
+/**
+ * Entrada de alertas activas para "Trabajo pendiente" (sections.alerts, F7).
+ * Sección degradable: sin dato se muestra "—" en vez de inventar un conteo.
+ */
+function toAlertsPending(alerts: DashboardAlertsSection): PendingWork {
+  if (alerts.status === "degraded") {
+    return {
+      id: "alertas",
+      label: "Alertas comerciales activas",
+      detail: "No disponible por ahora",
+      count: null,
+      tone: "amber",
+      to: "/alertas",
+    };
+  }
+  const { critical, warning } = alerts.bySeverity;
+  const detail =
+    alerts.activeCount === 0
+      ? "Sin alertas activas"
+      : critical > 0
+        ? `${formatNumber(critical)} de severidad alta`
+        : warning > 0
+          ? `${formatNumber(warning)} de severidad media`
+          : "Solo informativas";
+  return {
+    id: "alertas",
+    label: "Alertas comerciales activas",
+    detail,
+    count: alerts.activeCount,
+    tone: critical > 0 ? "red" : "amber",
+    to: "/alertas",
+  };
+}
+
 /** Entrada de aprobaciones para "Trabajo pendiente" (solo si la sección viene). */
 function toApprovalsPending(approvals: DashboardApprovalsSection): PendingWork {
   if (approvals.status === "degraded") {
@@ -271,7 +306,7 @@ export function InicioPortadaConnected({
     );
   }
 
-  const { replenishment, approvals, budget, agenda } = data.sections;
+  const { replenishment, approvals, budget, agenda, alerts } = data.sections;
 
   const priorities = toPriorities(replenishment, data.asOf);
   const agendaView = toAgendaView(agenda);
@@ -312,6 +347,7 @@ export function InicioPortadaConnected({
       to: "/comprar/borradores",
     },
     ...(approvals ? [toApprovalsPending(approvals)] : []),
+    toAlertsPending(alerts),
     {
       id: "proveedores",
       label: "Proveedores por contactar",
