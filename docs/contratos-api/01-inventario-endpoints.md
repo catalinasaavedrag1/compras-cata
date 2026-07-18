@@ -151,7 +151,7 @@ los comandos llevan ficha completa en `04`.
 
 | Módulo | Endpoints | Notas |
 |---|---|---|
-| **Recommendations** | `POST /recommendations/search` **Q** · `GET /recommendations/:id` · `PATCH /recommendations/:id` (override/ignore/snooze) · `GET /recommendations/summary` | El motor materializa; search devuelve página rankeada con datos precalculados |
+| **Recommendations** | `POST /recommendations/search` **Q** · `GET /recommendations/:id` · `PATCH /recommendations/:id` (override/ignore/snooze) · `GET /recommendations/summary` · `POST /recommendations/engine/run` (`x-service-*`: pasada E7 on-demand) | El motor materializa; search devuelve página rankeada con datos precalculados |
 | **Proposals** | `GET /proposals` **Q** · `GET /proposals/:id` · `POST /proposals` · `PATCH /proposals/:id` · `POST /proposals/:id/lines` · `PATCH /proposals/:id/lines/:lineId` · `DELETE …/lines/:lineId` · `POST /proposals/:id/submit` · `/cancel` · `/duplicate` · `/convert` · `GET /proposals/:id/simulation` · `POST /simulations` · `POST /proposals/:id/comments` | Todas las transiciones con `If-Match` + `idempotency-key` |
 | **Purchase Orders** | `GET /purchase-orders` **Q** · `GET /purchase-orders/:id` · `POST /purchase-orders/:id/send` · `/cancel` · `GET /purchase-orders/:id/sap-status` · `PATCH /purchase-orders/:id/status` (interno: conciliación) | `PATCH status` solo `x-service-*` (workers/eventos) |
 | **Approvals** | `GET /approvals` **Q** · `GET /approvals/:id` · `POST /approvals/:id/approve` · `/reject` · `/request-changes` | Guard líder server-side |
