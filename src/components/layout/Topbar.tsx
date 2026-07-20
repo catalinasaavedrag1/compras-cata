@@ -26,7 +26,7 @@ import { useGlobalSearch, type GlobalSearchType } from "../../hooks/useGlobalSea
 export function TopbarActions() {
   const navigate = useNavigate();
   const { count } = useOcDraft();
-  const { buyer, setBuyer, buyers } = useBuyer();
+  const { buyer, setBuyer, buyers, buyerLabel, labelFor } = useBuyer();
   const { role, setRole, persona } = useRole();
   const { compact, toggle: toggleDensity } = useDensity();
   const { email, logout } = useAuth();
@@ -256,7 +256,7 @@ export function TopbarActions() {
             >
               {buyers.map((b) => (
                 <option key={b} value={b}>
-                  {b}
+                  {labelFor(b)}
                 </option>
               ))}
             </select>
@@ -275,7 +275,7 @@ export function TopbarActions() {
           aria-haspopup="menu"
           aria-expanded={acctOpen}
         >
-          {role === "lider" ? persona.initials : initials(buyer)}
+          {role === "lider" ? persona.initials : initials(buyerLabel)}
         </button>
         {acctOpen && (
           <div
@@ -284,7 +284,7 @@ export function TopbarActions() {
           >
             <div className="px-4 py-3 border-b border-slate-100">
               <p className="text-sm font-medium text-slate-800 truncate">
-                {role === "lider" ? persona.name : buyer}
+                {role === "lider" ? persona.name : buyerLabel}
               </p>
               <p className="text-xs text-slate-400 truncate">
                 {email || (role === "lider" ? "Líder de Compras" : "Comprador")}

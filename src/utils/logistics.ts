@@ -1,6 +1,5 @@
 import type { ProductLogistics, VehicleClass } from "../types/purchasing";
-import { getProductBySku } from "../data/mockProducts";
-import { productLogistics, TRUCKS, EXTRA_CENTER_COST, VEHICLE_LABEL } from "../data/logistics";
+import { TRUCKS, EXTRA_CENTER_COST, VEHICLE_LABEL } from "../data/logistics";
 import { formatDate } from "./formatters";
 
 // ============================================================================
@@ -96,23 +95,22 @@ export function resolvePickupLines(lines: PickupLineInput[]): PickupParcel[] {
   return lines
     .filter((l) => l.quantity > 0)
     .map((l) => {
-      const product = getProductBySku(l.sku);
-      // Producto sin maestro: ficha logística mínima para no romper el cálculo.
-      const log: ProductLogistics = product
-        ? productLogistics(product)
-        : {
-            pesoUnitarioKg: 2,
-            volumenM3: 0.01,
-            apilable: true,
-            fragil: false,
-            sobredimensionado: false,
-            cargaPesada: false,
-            manipulacion: "manual",
-            vehiculoMinimo: "camion_3_4",
-            centroRetiro: "CD Santiago",
-            fechaDisponible: "",
-            grupoCarga: "general",
-          };
+      // El contrato real no expone atributos físicos por SKU (peso/volumen):
+      // se estima con un perfil estándar de bulto. La simulación de retiro es
+      // una estimación, no un ruteo real ni dato por producto.
+      const log: ProductLogistics = {
+        pesoUnitarioKg: 2,
+        volumenM3: 0.01,
+        apilable: true,
+        fragil: false,
+        sobredimensionado: false,
+        cargaPesada: false,
+        manipulacion: "manual",
+        vehiculoMinimo: "camion_3_4",
+        centroRetiro: "CD Santiago",
+        fechaDisponible: "",
+        grupoCarga: "general",
+      };
       return {
         ...l,
         log,
