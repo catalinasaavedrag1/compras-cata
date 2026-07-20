@@ -1524,6 +1524,8 @@ export function listPurchaseOrders(params: {
   supplierId?: string;
   /** Filtro por SKU en líneas (ficha de producto). */
   sku?: string;
+  /** Match por contención sobre el número real (búsqueda global). */
+  number?: string;
   page?: number;
   pageSize?: number;
 }): Promise<PurchaseOrderListData> {
@@ -1531,6 +1533,7 @@ export function listPurchaseOrders(params: {
   if (params.status) query.set("status", params.status);
   if (params.supplierId) query.set("supplierId", params.supplierId);
   if (params.sku) query.set("sku", params.sku);
+  if (params.number) query.set("number", params.number);
   query.set("page", String(params.page ?? 1));
   query.set("pageSize", String(params.pageSize ?? 24));
   return request<PurchaseOrderListData>(`/purchase-orders?${query.toString()}`, {

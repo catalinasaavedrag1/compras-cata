@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "../ui/Input";
 import {
@@ -20,20 +20,8 @@ import { cn } from "../../utils/cn";
 import { NotificationCenter } from "./NotificationCenter";
 import { BackendStatus } from "./BackendStatus";
 import { TODAY_ISO } from "../../utils/constants";
-import { formatDate, formatNumber, productLabel } from "../../utils/formatters";
-import { products as mockProducts } from "../../data/mockProducts";
-import { suppliers as mockSuppliers } from "../../data/mockSuppliers";
-import { purchaseOrders as mockPOs } from "../../data/mockPurchaseOrders";
-import { categories as mockCategories } from "../../data/mockCategories";
-import { useCollection } from "../../context/DataContext";
-import type { Product, Supplier, PurchaseOrder, Category } from "../../types/purchasing";
-
-interface SearchResult {
-  type: "product" | "supplier" | "order" | "category";
-  title: string;
-  subtitle: string;
-  to: string;
-}
+import { formatDate } from "../../utils/formatters";
+import { useGlobalSearch, type GlobalSearchType } from "../../hooks/useGlobalSearch";
 
 export function TopbarActions() {
   const navigate = useNavigate();
@@ -62,11 +50,6 @@ export function TopbarActions() {
     };
   }, [acctOpen]);
 
-  const products = useCollection<Product>("products", mockProducts);
-  const suppliers = useCollection<Supplier>("suppliers", mockSuppliers);
-  const purchaseOrders = useCollection<PurchaseOrder>("purchase-orders", mockPOs);
-  const categories = useCollection<Category>("categories", mockCategories);
-
   const switchRole = (r: "comprador" | "lider") => {
     if (r === role) return;
     setRole(r);
@@ -75,6 +58,8 @@ export function TopbarActions() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Búsqueda global real (motor, paneles F12 y OC por número), con debounce.
+  const { results, loading, error, configured } = useGlobalSearch(search);
 
   // Atajo global: ⌘K / Ctrl+K (o "/") enfoca el buscador desde cualquier vista.
   useEffect(() => {
@@ -95,57 +80,6 @@ export function TopbarActions() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const results = useMemo<SearchResult[]>(() => {
-    const q = search.trim().toLowerCase();
-    if (q.length < 2) return [];
-    const out: SearchResult[] = [];
-
-    for (const p of products) {
-      if (`${p.sku} ${p.name} ${p.brand}`.toLowerCase().includes(q)) {
-        out.push({
-          type: "product",
-          title: productLabel(p.name, p.sku),
-          subtitle: `${p.brand} · ${p.category} · disp. ${formatNumber(p.availableStock)}`,
-          to: `/productos/${p.sku}`,
-        });
-      }
-      if (out.filter((r) => r.type === "product").length >= 5) break;
-    }
-    for (const s of suppliers) {
-      if (`${s.name} ${s.rut}`.toLowerCase().includes(q)) {
-        out.push({
-          type: "supplier",
-          title: s.name,
-          subtitle: `${s.rut} · ${s.categories.join(", ")}`,
-          to: `/proveedores/${s.id}`,
-        });
-      }
-      if (out.filter((r) => r.type === "supplier").length >= 3) break;
-    }
-    for (const c of categories) {
-      if (c.name.toLowerCase().includes(q)) {
-        out.push({
-          type: "category",
-          title: c.name,
-          subtitle: `Categoría · ${formatNumber(c.activeSkus)} SKU · ${c.buyer}`,
-          to: `/categorias/${c.id}`,
-        });
-      }
-      if (out.filter((r) => r.type === "category").length >= 3) break;
-    }
-    for (const o of purchaseOrders) {
-      if (`${o.number} ${o.supplierName}`.toLowerCase().includes(q)) {
-        out.push({
-          type: "order",
-          title: o.number,
-          subtitle: `${o.supplierName} · espera ${formatDate(o.expectedDate)}`,
-          to: "/comprar/seguimiento",
-        });
-      }
-      if (out.filter((r) => r.type === "order").length >= 3) break;
-    }
-    return out;
-  }, [search, products, suppliers, categories, purchaseOrders]);
 
   const go = (to: string) => {
     setOpen(false);
@@ -159,7 +93,7 @@ export function TopbarActions() {
     else if (search.trim()) go(`/productos?q=${encodeURIComponent(search.trim())}`);
   };
 
-  const iconFor = (t: SearchResult["type"]) =>
+  const iconFor = (t: GlobalSearchType) =>
     t === "product" ? (
       <IconProducts className="w-4 h-4 text-slate-400" />
     ) : t === "supplier" ? (
@@ -211,9 +145,15 @@ export function TopbarActions() {
 
         {open && search.trim().length >= 2 && (
           <div className="absolute mt-1.5 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden max-h-[70vh] overflow-y-auto scrollbar-thin">
-            {results.length === 0 ? (
+            {!configured ? (
               <p className="px-4 py-3 text-sm text-slate-500">
-                Sin resultados para “{search.trim()}”.
+                Servicio de compras no configurado (VITE_PURCHASE_BFF_URL).
+              </p>
+            ) : results.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-slate-500">
+                {loading
+                  ? "Buscando…"
+                  : (error ?? `Sin resultados para “${search.trim()}”.`)}
               </p>
             ) : (
               (["product", "supplier", "category", "order"] as const).map((type) => {
