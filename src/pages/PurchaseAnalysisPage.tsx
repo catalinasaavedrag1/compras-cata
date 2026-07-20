@@ -8,33 +8,40 @@ import { FilterBar } from "../components/business/FilterBar";
 import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { Tabs } from "../components/ui/Tabs";
 import { Button } from "../components/ui/Button";
+import { Skeleton } from "../components/ui/Skeleton";
 import { HelpNote } from "../components/business/HelpNote";
-import { products as mockProducts } from "../data/mockProducts";
-import { useCollection } from "../context/DataContext";
-import { useBuyer } from "../context/BuyerContext";
-import { useRole } from "../context/RoleContext";
+import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
+import { useProductsCatalog, type ProductCatalogRow } from "../hooks/useProductsCatalog";
 import { useUrlState } from "../utils/useUrlState";
-import { uniqueValues } from "../utils/filters";
-import { coverageDays } from "../utils/calculations";
 import { productPath, supplierPath } from "../utils/entityLinks";
 import {
   formatCurrency,
-  formatCurrencyCompact,
+  formatDays,
   formatNumber,
   formatPercent,
 } from "../utils/formatters";
 import { IconSales, IconProducts, IconAlerts, IconBox } from "../components/ui/icons";
-import type { Product } from "../types/purchasing";
+
+// ============================================================================
+//  Ranking & liquidación — conectado al motor de compras (useProductsCatalog).
+//  ---------------------------------------------------------------------------
+//  REAL: venta 30d en UNIDADES, margen %, cobertura, stock y costo unitario.
+//  Rankings de productos, proveedores y marcas se agregan sobre las filas
+//  reales; los candidatos a liquidar salen de señales reales (sin rotación,
+//  margen bajo, sobrestock por cobertura).
+//  DEGRADA: la "venta $" (unidades × precio de venta) NO existe — se reemplaza
+//  por venta 30d en UNIDADES; el valor de stock se muestra A COSTO. El alcance
+//  "mi cartera / todas" lo resuelve el backend (scope del hook).
+// ============================================================================
 
 const TOP_LIMIT = 100;
-// Umbrales del análisis de liquidación / descontinuación.
 const OVERSTOCK_COVERAGE_DAYS = 120; // sobrestock: cobertura muy alta con venta activa
 const LOW_MARGIN_PCT = 20; // margen bajo
 
 type LiquidationReason = "no_rotation" | "overstock" | "low_margin";
 
 interface LiquidationCandidate {
-  product: Product;
+  row: ProductCatalogRow;
   reason: LiquidationReason;
   severity: number; // mayor = más urgente
   metricLabel: string;
@@ -47,66 +54,62 @@ interface LiquidationCandidate {
 interface AggregateRow {
   key: string;
   name: string;
+  supplierId: string | null;
   skuCount: number;
-  sales30: number;
-  avgMargin: number;
-  stockValue: number;
+  units30: number;
+  avgMargin: number | null;
+  stockValue: number | null;
 }
 
-/** Marca de rotación legible (verde alta, ámbar media, roja baja/nula). */
-function rotationTone(rotation: number): BadgeTone {
-  if (rotation >= 8) return "green";
-  if (rotation >= 4) return "amber";
-  return "red";
-}
-
-function rotationLabel(rotation: number): string {
-  if (rotation >= 8) return "Alta rotación";
-  if (rotation >= 4) return "Rotación media";
-  return "Baja rotación";
+/** Capital a costo inmovilizado (stock × costo). null si falta stock o costo. */
+function stockCostValue(p: ProductCatalogRow): number | null {
+  if (p.stockAvailable === null || p.unitCost === null) return null;
+  return p.stockAvailable * p.unitCost;
 }
 
 /** Construye la lista de candidatos a liquidar/descontinuar con su motivo. */
-function buildLiquidationCandidate(p: Product): LiquidationCandidate | null {
-  const cover = coverageDays(p.availableStock, p.salesLast30Days);
-
+function buildLiquidationCandidate(p: ProductCatalogRow): LiquidationCandidate | null {
   // 1) Sin rotación: no vendió en 30 días pero tiene stock parado.
-  if (p.salesLast30Days === 0 && p.availableStock > 0) {
+  if (p.sales30Units === 0 && (p.stockAvailable ?? 0) > 0) {
+    const capital = stockCostValue(p);
     return {
-      product: p,
+      row: p,
       reason: "no_rotation",
-      severity: 3 + Math.min((p.availableStock * p.cost) / 1_000_000, 5),
-      metricLabel: "Capital detenido",
-      metricValue: formatCurrency(p.availableStock * p.cost),
+      severity: 3 + Math.min((capital ?? 0) / 1_000_000, 5),
+      metricLabel: "Capital detenido (costo)",
+      metricValue: capital === null ? "—" : formatCurrency(capital),
       tone: "red",
       reasonLabel: "Sin rotación (0 ventas 30d)",
-      // Surtido redundante / descontinuar: racionalizar el catálogo.
       action: { label: "Revisar surtido", to: "/surtido-redundante" },
     };
   }
 
-  // 2) Margen negativo o bajo: vende, pero no deja margen.
-  if (p.margin < LOW_MARGIN_PCT) {
+  // 2) Margen bajo o negativo: vende, pero deja poco margen.
+  if (p.marginPct !== null && p.marginPct < LOW_MARGIN_PCT) {
     return {
-      product: p,
+      row: p,
       reason: "low_margin",
-      severity: p.margin <= 0 ? 4 : 2,
+      severity: p.marginPct <= 0 ? 4 : 2,
       metricLabel: "Margen",
-      metricValue: formatPercent(p.margin),
-      tone: p.margin <= 0 ? "red" : "amber",
-      reasonLabel: p.margin <= 0 ? "Margen negativo" : "Margen bajo",
+      metricValue: formatPercent(p.marginPct),
+      tone: p.marginPct <= 0 ? "red" : "amber",
+      reasonLabel: p.marginPct <= 0 ? "Margen negativo" : "Margen bajo",
       action: { label: "Ver producto", to: productPath(p.sku) },
     };
   }
 
   // 3) Sobrestock: cobertura muy alta aun teniendo venta → liberar capital.
-  if (cover >= OVERSTOCK_COVERAGE_DAYS && p.salesLast30Days > 0) {
+  if (
+    p.coverageDays !== null &&
+    p.coverageDays >= OVERSTOCK_COVERAGE_DAYS &&
+    (p.sales30Units ?? 0) > 0
+  ) {
     return {
-      product: p,
+      row: p,
       reason: "overstock",
-      severity: 1 + Math.min(cover / 200, 2),
+      severity: 1 + Math.min(p.coverageDays / 200, 2),
       metricLabel: "Cobertura",
-      metricValue: cover >= 999 ? "+999 días" : `${formatNumber(cover)} días`,
+      metricValue: p.coverageDays >= 999 ? "+999 días" : formatDays(p.coverageDays),
       tone: "amber",
       reasonLabel: "Sobrestock (cobertura muy alta)",
       action: { label: "Crear campaña de liquidación", to: "/campanas" },
@@ -118,16 +121,8 @@ function buildLiquidationCandidate(p: Product): LiquidationCandidate | null {
 
 export function PurchaseAnalysisPage() {
   const navigate = useNavigate();
-  const allProducts = useCollection<Product>("products", mockProducts);
-  const { role } = useRole();
-  const { myCategories } = useBuyer();
-
-  // Alcance: el comprador ve sus categorías; el líder ve todo el catálogo.
-  const scoped = useMemo(
-    () =>
-      role === "lider" ? allProducts : allProducts.filter((p) => myCategories.includes(p.category)),
-    [allProducts, role, myCategories]
-  );
+  const { scope, setScope } = useCategoryScope();
+  const { rows, meta, loading, error, configured, refetch } = useProductsCatalog();
 
   const [tab, setTab] = useUrlState("tab", "productos");
   const [query, setQuery] = useUrlState("q");
@@ -135,44 +130,44 @@ export function PurchaseAnalysisPage() {
   const [brand, setBrand] = useUrlState("marca");
   const [supplier, setSupplier] = useUrlState("prov");
 
-  // Orden por columna en cada tabla (por defecto, venta 30d descendente).
   const [productSort, setProductSort] = useState<SortState>({ key: "sales", dir: "desc" });
-  const [supplierSort, setSupplierSort] = useState<SortState>({ key: "sales30", dir: "desc" });
-  const [brandSort, setBrandSort] = useState<SortState>({ key: "sales30", dir: "desc" });
+  const [supplierSort, setSupplierSort] = useState<SortState>({ key: "units30", dir: "desc" });
+  const [brandSort, setBrandSort] = useState<SortState>({ key: "units30", dir: "desc" });
+
   // --- KPIs sobre el alcance ---
-  const totalSales30 = useMemo(
-    () => scoped.reduce((acc, p) => acc + p.salesLast30Days * p.price, 0),
-    [scoped]
+  const totalUnits30 = useMemo(
+    () => rows.reduce((acc, p) => acc + (p.sales30Units ?? 0), 0),
+    [rows]
   );
   const liquidationCandidates = useMemo(
     () =>
-      scoped
+      rows
         .map(buildLiquidationCandidate)
         .filter((c): c is LiquidationCandidate => c !== null)
         .sort((a, b) => b.severity - a.severity),
-    [scoped]
+    [rows]
   );
   const noRotationCount = useMemo(
-    () => scoped.filter((p) => p.salesLast30Days === 0 && p.availableStock > 0).length,
-    [scoped]
+    () => rows.filter((p) => p.sales30Units === 0 && (p.stockAvailable ?? 0) > 0).length,
+    [rows]
   );
 
   // --- Tab Top productos ---
   const filteredProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return scoped.filter((p) => {
-      if (q && ![p.sku, p.name, p.brand].some((h) => h.toLowerCase().includes(q))) return false;
-      if (category && p.category !== category) return false;
+    return rows.filter((p) => {
+      if (q && !`${p.sku} ${p.name} ${p.brand ?? ""}`.toLowerCase().includes(q)) return false;
+      if (category && p.categoryName !== category) return false;
       if (brand && p.brand !== brand) return false;
       if (supplier && p.supplierName !== supplier) return false;
       return true;
     });
-  }, [scoped, query, category, brand, supplier]);
+  }, [rows, query, category, brand, supplier]);
 
   const topProducts = useMemo(
     () =>
       [...filteredProducts]
-        .sort((a, b) => b.salesLast30Days - a.salesLast30Days)
+        .sort((a, b) => (b.sales30Units ?? 0) - (a.sales30Units ?? 0))
         .slice(0, TOP_LIMIT),
     [filteredProducts]
   );
@@ -184,41 +179,135 @@ export function PurchaseAnalysisPage() {
     setSupplier("");
   };
 
+  const uniqueOptions = (pick: (p: ProductCatalogRow) => string | null) =>
+    Array.from(new Set(rows.map(pick).filter((v): v is string => !!v)))
+      .sort((a, b) => a.localeCompare(b, "es"))
+      .map((v) => ({ value: v, label: v }));
+
   // --- Agregaciones por proveedor y marca ---
   const aggregate = useCallback(
-    (keyOf: (p: Product) => string): AggregateRow[] => {
+    (keyOf: (p: ProductCatalogRow) => string | null): AggregateRow[] => {
       const map = new Map<
         string,
-        { name: string; skuCount: number; sales30: number; marginSum: number; stockValue: number }
+        {
+          name: string;
+          supplierId: string | null;
+          skuCount: number;
+          units30: number;
+          marginSum: number;
+          marginCount: number;
+          stockValue: number;
+          costCount: number;
+        }
       >();
-      for (const p of scoped) {
+      for (const p of rows) {
         const name = keyOf(p) || "Sin asignar";
-        const cur = map.get(name) ?? { name, skuCount: 0, sales30: 0, marginSum: 0, stockValue: 0 };
+        const cur =
+          map.get(name) ??
+          {
+            name,
+            supplierId: null,
+            skuCount: 0,
+            units30: 0,
+            marginSum: 0,
+            marginCount: 0,
+            stockValue: 0,
+            costCount: 0,
+          };
         cur.skuCount += 1;
-        cur.sales30 += p.salesLast30Days * p.price;
-        cur.marginSum += p.margin;
-        cur.stockValue += p.cost * p.availableStock;
+        cur.units30 += p.sales30Units ?? 0;
+        if (p.marginPct !== null) {
+          cur.marginSum += p.marginPct;
+          cur.marginCount += 1;
+        }
+        const v = stockCostValue(p);
+        if (v !== null) {
+          cur.stockValue += v;
+          cur.costCount += 1;
+        }
+        if (cur.supplierId === null && p.supplierId) cur.supplierId = p.supplierId;
         map.set(name, cur);
       }
       return Array.from(map.values())
         .map((v) => ({
           key: v.name,
           name: v.name,
+          supplierId: v.supplierId,
           skuCount: v.skuCount,
-          sales30: v.sales30,
-          avgMargin: v.skuCount ? v.marginSum / v.skuCount : 0,
-          stockValue: v.stockValue,
+          units30: v.units30,
+          avgMargin: v.marginCount ? v.marginSum / v.marginCount : null,
+          stockValue: v.costCount ? v.stockValue : null,
         }))
-        .sort((a, b) => b.sales30 - a.sales30);
+        .sort((a, b) => b.units30 - a.units30);
     },
-    [scoped]
+    [rows]
   );
 
   const supplierRows = useMemo(() => aggregate((p) => p.supplierName), [aggregate]);
   const brandRows = useMemo(() => aggregate((p) => p.brand), [aggregate]);
 
+  const pageTitle = "Ranking & liquidación";
+  const pageDescription =
+    "Comprar bien: top productos, proveedores y marcas por venta en unidades, y qué liquidar o descontinuar.";
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión (patrón flujo 1 / Productos).
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver el ranking real del motor de compras.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && meta === null && !error) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando ranking">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error && meta === null) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">No se pudo cargar el ranking</p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   // --- Columnas ---
-  const productColumns: Column<Product>[] = [
+  const productColumns: Column<ProductCatalogRow>[] = [
     {
       key: "product",
       header: "Producto",
@@ -236,27 +325,27 @@ export function PurchaseAnalysisPage() {
       header: "Categoría",
       hideOnMobile: true,
       sortable: true,
-      sortValue: (p) => p.category,
-      render: (p) => <span className="text-sm text-slate-600">{p.category}</span>,
+      sortValue: (p) => p.categoryName ?? "",
+      render: (p) => <span className="text-sm text-slate-600">{p.categoryName ?? "—"}</span>,
     },
     {
       key: "brand",
       header: "Marca",
       hideOnMobile: true,
       sortable: true,
-      sortValue: (p) => p.brand,
-      render: (p) => <span className="text-sm text-slate-600">{p.brand}</span>,
+      sortValue: (p) => p.brand ?? "",
+      render: (p) => <span className="text-sm text-slate-600">{p.brand ?? "—"}</span>,
     },
     {
       key: "supplier",
       header: "Proveedor",
       hideOnMobile: true,
       sortable: true,
-      sortValue: (p) => p.supplierName,
+      sortValue: (p) => p.supplierName ?? "",
       render: (p) =>
         p.supplierName ? (
           <Link
-            to={supplierPath(p.supplierName)}
+            to={supplierPath(p.supplierId)}
             className="text-sm text-slate-700 hover:text-brand-700 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
@@ -268,12 +357,14 @@ export function PurchaseAnalysisPage() {
     },
     {
       key: "sales",
-      header: "Venta 30d",
+      header: "Venta 30d (u.)",
       align: "right",
       sortable: true,
-      sortValue: (p) => p.salesLast30Days,
+      sortValue: (p) => p.sales30Units ?? 0,
       render: (p) => (
-        <span className="font-semibold text-slate-900">{formatNumber(p.salesLast30Days)}</span>
+        <span className="font-semibold text-slate-900">
+          {p.sales30Units === null ? "—" : formatNumber(p.sales30Units)}
+        </span>
       ),
     },
     {
@@ -282,12 +373,15 @@ export function PurchaseAnalysisPage() {
       align: "right",
       hideOnMobile: true,
       sortable: true,
-      sortValue: (p) => p.availableStock,
-      render: (p) => (
-        <span className={p.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>
-          {formatNumber(p.availableStock)}
-        </span>
-      ),
+      sortValue: (p) => p.stockAvailable ?? 0,
+      render: (p) =>
+        p.stockAvailable === null ? (
+          <span className="text-slate-300">—</span>
+        ) : (
+          <span className={p.stockAvailable <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>
+            {formatNumber(p.stockAvailable)}
+          </span>
+        ),
     },
     {
       key: "coverage",
@@ -295,34 +389,32 @@ export function PurchaseAnalysisPage() {
       align: "right",
       hideOnMobile: true,
       sortable: true,
-      sortValue: (p) => coverageDays(p.availableStock, p.salesLast30Days),
-      render: (p) => {
-        const c = coverageDays(p.availableStock, p.salesLast30Days);
-        return (
-          <span className="text-slate-700">{c >= 999 ? "+999 d" : `${formatNumber(c)} d`}</span>
-        );
-      },
+      sortValue: (p) => p.coverageDays ?? 0,
+      render: (p) =>
+        p.coverageDays === null ? (
+          <span className="text-slate-300">—</span>
+        ) : (
+          <span className="text-slate-700">
+            {p.coverageDays >= 999 ? "+999 d" : formatDays(p.coverageDays)}
+          </span>
+        ),
     },
     {
       key: "margin",
       header: "Margen %",
       align: "right",
       sortable: true,
-      sortValue: (p) => p.margin,
-      render: (p) => (
-        <span
-          className={p.margin < LOW_MARGIN_PCT ? "text-amber-600 font-medium" : "text-slate-700"}
-        >
-          {formatPercent(p.margin)}
-        </span>
-      ),
-    },
-    {
-      key: "rotation",
-      header: "Rotación",
-      sortable: true,
-      sortValue: (p) => p.rotation,
-      render: (p) => <Badge tone={rotationTone(p.rotation)}>{rotationLabel(p.rotation)}</Badge>,
+      sortValue: (p) => p.marginPct ?? 0,
+      render: (p) =>
+        p.marginPct === null ? (
+          <span className="text-slate-300">—</span>
+        ) : (
+          <span
+            className={p.marginPct < LOW_MARGIN_PCT ? "text-amber-600 font-medium" : "text-slate-700"}
+          >
+            {formatPercent(p.marginPct)}
+          </span>
+        ),
     },
   ];
 
@@ -333,9 +425,9 @@ export function PurchaseAnalysisPage() {
       sortable: true,
       sortValue: (r) => r.name,
       render: (r) =>
-        entityLabel === "Proveedor" && r.name !== "Sin asignar" ? (
+        entityLabel === "Proveedor" && r.supplierId ? (
           <Link
-            to={supplierPath(r.name)}
+            to={supplierPath(r.supplierId)}
             className="font-medium text-slate-800 hover:text-brand-700 hover:underline"
           >
             {r.name}
@@ -353,14 +445,12 @@ export function PurchaseAnalysisPage() {
       render: (r) => formatNumber(r.skuCount),
     },
     {
-      key: "sales30",
-      header: "Venta 30d",
+      key: "units30",
+      header: "Venta 30d (u.)",
       align: "right",
       sortable: true,
-      sortValue: (r) => r.sales30,
-      render: (r) => (
-        <span className="font-semibold text-slate-900">{formatCurrency(r.sales30)}</span>
-      ),
+      sortValue: (r) => r.units30,
+      render: (r) => <span className="font-semibold text-slate-900">{formatNumber(r.units30)}</span>,
     },
     {
       key: "avgMargin",
@@ -368,23 +458,31 @@ export function PurchaseAnalysisPage() {
       align: "right",
       hideOnMobile: true,
       sortable: true,
-      sortValue: (r) => r.avgMargin,
-      render: (r) => (
-        <span
-          className={r.avgMargin < LOW_MARGIN_PCT ? "text-amber-600 font-medium" : "text-slate-700"}
-        >
-          {formatPercent(r.avgMargin)}
-        </span>
-      ),
+      sortValue: (r) => r.avgMargin ?? -1,
+      render: (r) =>
+        r.avgMargin === null ? (
+          <span className="text-slate-300">—</span>
+        ) : (
+          <span
+            className={r.avgMargin < LOW_MARGIN_PCT ? "text-amber-600 font-medium" : "text-slate-700"}
+          >
+            {formatPercent(r.avgMargin)}
+          </span>
+        ),
     },
     {
       key: "stockValue",
-      header: "Valor stock",
+      header: "Valor stock (costo)",
       align: "right",
       hideOnMobile: true,
       sortable: true,
-      sortValue: (r) => r.stockValue,
-      render: (r) => <span className="text-slate-700">{formatCurrency(r.stockValue)}</span>,
+      sortValue: (r) => r.stockValue ?? -1,
+      render: (r) =>
+        r.stockValue === null ? (
+          <span className="text-slate-300">—</span>
+        ) : (
+          <span className="text-slate-700">{formatCurrency(r.stockValue)}</span>
+        ),
     },
   ];
 
@@ -394,9 +492,10 @@ export function PurchaseAnalysisPage() {
       header: "Producto",
       render: (c) => (
         <div className="min-w-[200px]">
-          <p className="font-medium text-slate-800 leading-snug">{c.product.name}</p>
+          <p className="font-medium text-slate-800 leading-snug">{c.row.name}</p>
           <p className="text-xs font-mono text-slate-400">
-            {c.product.sku} · {c.product.category}
+            {c.row.sku}
+            {c.row.categoryName ? ` · ${c.row.categoryName}` : ""}
           </p>
         </div>
       ),
@@ -436,29 +535,28 @@ export function PurchaseAnalysisPage() {
     },
   ];
 
-  const scopeLabel = role === "lider" ? "Todo el catálogo" : "Tus categorías";
-
   return (
     <div>
       <PageHeader
-        title="Ranking & liquidación"
-        description={`Comprar bien: top productos, proveedores y marcas, y qué liquidar o descontinuar. Alcance: ${scopeLabel.toLowerCase()}.`}
+        title={pageTitle}
+        description={pageDescription}
+        action={<ScopeToggle scope={scope} onChange={setScope} />}
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard
           title="SKUs en alcance"
-          value={formatNumber(scoped.length)}
+          value={formatNumber(rows.length)}
           tone="info"
           icon={<IconProducts className="w-4 h-4" />}
-          description={scopeLabel}
+          description={scope === "mine" ? "Mi cartera" : "Todas"}
         />
         <KpiCard
-          title="Venta 30d"
-          value={formatCurrencyCompact(totalSales30)}
+          title="Venta 30d (u.)"
+          value={formatNumber(totalUnits30)}
           tone="good"
           icon={<IconSales className="w-4 h-4" />}
-          description="Suma del alcance"
+          description="Suma de unidades"
         />
         <KpiCard
           title="Candidatos a liquidar"
@@ -508,7 +606,7 @@ export function PurchaseAnalysisPage() {
             onSearchChange={setQuery}
             searchPlaceholder="Buscar SKU, producto o marca"
             resultCount={Math.min(filteredProducts.length, TOP_LIMIT)}
-            summary={`Top ${Math.min(filteredProducts.length, TOP_LIMIT)} de ${filteredProducts.length} productos por venta 30d`}
+            summary={`Top ${Math.min(filteredProducts.length, TOP_LIMIT)} de ${filteredProducts.length} productos por venta 30d (u.)`}
             onClear={clearFilters}
             selects={[
               {
@@ -516,27 +614,21 @@ export function PurchaseAnalysisPage() {
                 placeholder: "Categoría",
                 value: category,
                 onChange: setCategory,
-                options: uniqueValues(scoped, (p) => p.category).map((c) => ({
-                  value: c,
-                  label: c,
-                })),
+                options: uniqueOptions((p) => p.categoryName),
               },
               {
                 key: "brand",
                 placeholder: "Marca",
                 value: brand,
                 onChange: setBrand,
-                options: uniqueValues(scoped, (p) => p.brand).map((c) => ({ value: c, label: c })),
+                options: uniqueOptions((p) => p.brand),
               },
               {
                 key: "prov",
                 placeholder: "Proveedor",
                 value: supplier,
                 onChange: setSupplier,
-                options: uniqueValues(
-                  scoped.filter((p) => p.supplierName),
-                  (p) => p.supplierName
-                ).map((c) => ({ value: c, label: c })),
+                options: uniqueOptions((p) => p.supplierName),
               },
             ]}
           />
@@ -561,32 +653,36 @@ export function PurchaseAnalysisPage() {
                     <div className="min-w-0">
                       <p className="font-medium text-slate-800 leading-snug truncate">{p.name}</p>
                       <p className="text-xs text-slate-500">
-                        {p.category} · {p.brand}
+                        {[p.categoryName, p.brand].filter(Boolean).join(" · ") || "—"}
                       </p>
                     </div>
-                    <Badge tone={rotationTone(p.rotation)}>{rotationLabel(p.rotation)}</Badge>
+                    <span className="text-sm font-semibold text-slate-900 flex-shrink-0">
+                      {p.sales30Units === null ? "—" : `${formatNumber(p.sales30Units)} u.`}
+                    </span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
                     <div>
-                      <p className="text-xs text-slate-400">Venta 30d</p>
-                      <p className="font-semibold text-slate-900">
-                        {formatNumber(p.salesLast30Days)}
+                      <p className="text-xs text-slate-400">Stock</p>
+                      <p className="text-slate-700">
+                        {p.stockAvailable === null ? "—" : formatNumber(p.stockAvailable)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Stock</p>
-                      <p className="text-slate-700">{formatNumber(p.availableStock)}</p>
+                      <p className="text-xs text-slate-400">Cobertura</p>
+                      <p className="text-slate-700">
+                        {p.coverageDays === null ? "—" : formatDays(p.coverageDays)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Margen</p>
                       <p
                         className={
-                          p.margin < LOW_MARGIN_PCT
+                          p.marginPct !== null && p.marginPct < LOW_MARGIN_PCT
                             ? "text-amber-600 font-medium"
                             : "text-slate-700"
                         }
                       >
-                        {formatPercent(p.margin)}
+                        {p.marginPct === null ? "—" : formatPercent(p.marginPct)}
                       </p>
                     </div>
                   </div>
@@ -601,7 +697,7 @@ export function PurchaseAnalysisPage() {
         <Card>
           <CardHeader
             title="Top proveedores"
-            description="Agregado del alcance, ordenado por venta de 30 días."
+            description="Agregado del alcance, ordenado por venta de 30 días en unidades."
           />
           <DataTable
             columns={aggregateColumns("Proveedor")}
@@ -609,17 +705,18 @@ export function PurchaseAnalysisPage() {
             rowKey={(r) => r.key}
             sort={supplierSort}
             onSortChange={makeToggleSort(setSupplierSort)}
-            onRowClick={(r) => r.name !== "Sin asignar" && navigate(supplierPath(r.name))}
+            onRowClick={(r) => r.supplierId && navigate(supplierPath(r.supplierId))}
             mobileCard={(r) => (
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800 truncate">{r.name}</p>
                   <p className="text-xs text-slate-500">
-                    {formatNumber(r.skuCount)} SKUs · margen {formatPercent(r.avgMargin)}
+                    {formatNumber(r.skuCount)} SKUs
+                    {r.avgMargin !== null && <> · margen {formatPercent(r.avgMargin)}</>}
                   </p>
                 </div>
                 <span className="text-sm font-semibold text-slate-900 flex-shrink-0">
-                  {formatCurrencyCompact(r.sales30)}
+                  {formatNumber(r.units30)} u.
                 </span>
               </div>
             )}
@@ -631,7 +728,7 @@ export function PurchaseAnalysisPage() {
         <Card>
           <CardHeader
             title="Top marcas"
-            description="Agregado del alcance, ordenado por venta de 30 días."
+            description="Agregado del alcance, ordenado por venta de 30 días en unidades."
           />
           <DataTable
             columns={aggregateColumns("Marca")}
@@ -644,11 +741,12 @@ export function PurchaseAnalysisPage() {
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800 truncate">{r.name}</p>
                   <p className="text-xs text-slate-500">
-                    {formatNumber(r.skuCount)} SKUs · margen {formatPercent(r.avgMargin)}
+                    {formatNumber(r.skuCount)} SKUs
+                    {r.avgMargin !== null && <> · margen {formatPercent(r.avgMargin)}</>}
                   </p>
                 </div>
                 <span className="text-sm font-semibold text-slate-900 flex-shrink-0">
-                  {formatCurrencyCompact(r.sales30)}
+                  {formatNumber(r.units30)} u.
                 </span>
               </div>
             )}
@@ -662,8 +760,8 @@ export function PurchaseAnalysisPage() {
             Marcamos un producto para <b>liquidar o descontinuar</b> cuando: no rotó (0 ventas en 30
             días con stock disponible), tiene <b>margen bajo o negativo</b> (&lt; {LOW_MARGIN_PCT}
             %), o está en <b>sobrestock</b> (cobertura sobre {OVERSTOCK_COVERAGE_DAYS} días aun con
-            venta). Están ordenados por severidad: primero lo que más capital detiene o peor margen
-            deja.
+            venta). El capital detenido se muestra <b>a costo</b> (no hay precio de venta). Ordenados
+            por severidad.
           </HelpNote>
           <Card>
             <CardHeader
@@ -678,16 +776,17 @@ export function PurchaseAnalysisPage() {
             <DataTable
               columns={liquidationColumns}
               data={liquidationCandidates}
-              rowKey={(c) => c.product.sku}
-              onRowClick={(c) => navigate(productPath(c.product.sku))}
+              rowKey={(c) => c.row.sku}
+              onRowClick={(c) => navigate(productPath(c.row.sku))}
               emptyMessage="No hay productos para liquidar o descontinuar en tu alcance."
               mobileCard={(c) => (
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium text-slate-800 truncate">{c.product.name}</p>
+                      <p className="font-medium text-slate-800 truncate">{c.row.name}</p>
                       <p className="text-xs text-slate-500">
-                        {c.product.sku} · {c.product.category}
+                        {c.row.sku}
+                        {c.row.categoryName ? ` · ${c.row.categoryName}` : ""}
                       </p>
                     </div>
                     <Badge tone={c.tone}>{c.reasonLabel}</Badge>

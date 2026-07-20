@@ -1,279 +1,135 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import type {
-  Product,
-  CampaignProductLine,
-  CreatedCampaign,
-  PromoChannel,
-} from "../../types/purchasing";
-import {
-  analyzeCatalog,
-  ACTION_LABEL,
-  TIER_LABEL,
-  type RedundancyAction,
-  type RedundantCandidate,
-} from "../../utils/catalogOptimization";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import type { ProductCatalogRow } from "../../hooks/useProductsCatalog";
 import { Card, CardBody } from "../ui/Card";
-import { Badge, type BadgeTone } from "../ui/Badge";
-import { Button } from "../ui/Button";
+import { Badge } from "../ui/Badge";
 import { EmptyState } from "../ui/EmptyState";
 import { KpiCard } from "./KpiCard";
 import { HelpNote } from "./HelpNote";
 import { ExportButton } from "./ExportButton";
-import { CampaignBuilderModal } from "./CampaignBuilderModal";
-import { useLocalStorage } from "../../utils/useLocalStorage";
-import { useToast } from "../../context/ToastContext";
-import { cn } from "../../utils/cn";
+import { productPath } from "../../utils/entityLinks";
 import type { CsvColumn } from "../../utils/exportCsv";
-import { formatCurrencyCompact, formatNumber, formatPercent } from "../../utils/formatters";
-import { IconCategories, IconProducts, IconInventory, IconCheck, IconCampaign } from "../ui/icons";
+import { formatCurrency, formatCurrencyCompact, formatNumber } from "../../utils/formatters";
+import { IconCategories, IconProducts, IconInventory, IconCheck } from "../ui/icons";
+
+// ============================================================================
+//  Surtido redundante — sobre filas reales del motor (ProductCatalogRow).
+//  ---------------------------------------------------------------------------
+//  La redundancia fina "una opción por gama de precio dentro de un tipo de
+//  producto" exige subcategoría y precio de venta, que el motor NO entrega. Con
+//  los datos reales (categoría, stock, costo, venta en unidades) el proxy
+//  honesto es: SKUs SIN ROTACIÓN (0 ventas 30d) con stock disponible, agrupados
+//  por categoría — capital inmovilizado que conviene racionalizar. El capital se
+//  muestra A COSTO (stock × costo). No se arma campaña de liquidación porque no
+//  hay precio de venta para calcular el precio con descuento.
+// ============================================================================
 
 interface CatalogRedundancyProps {
-  /** Productos del ámbito (una categoría o todo el catálogo). */
-  products: Product[];
+  rows: ProductCatalogRow[];
   /** Muestra la fila de KPIs resumen (true por defecto). */
   showSummary?: boolean;
-  /** Etiqueta del ámbito para nombrar la campaña de liquidación (ej. categoría). */
-  scopeLabel?: string;
 }
 
-const actionTone: Record<RedundancyAction, BadgeTone> = {
-  liquidate: "amber",
-  discontinue: "red",
-  review: "slate",
-};
+interface RedundantCandidate {
+  row: ProductCatalogRow;
+  tiedCapital: number | null;
+}
 
-/** Descuento sugerido por defecto para una campaña de liquidación. */
-const LIQUIDATION_DISCOUNT = 30;
-
-/** Fila plana para exportar a CSV (candidato + contexto de su grupo). */
-interface ExportRow {
-  candidate: RedundantCandidate;
+interface RedundancyGroup {
   category: string;
-  subcategory: string;
+  categoryId: string | null;
+  candidates: RedundantCandidate[];
+  freeableCapital: number;
 }
 
-const exportColumns: CsvColumn<ExportRow>[] = [
-  { label: "SKU", value: (r) => r.candidate.product.sku },
-  { label: "Producto", value: (r) => r.candidate.product.name },
-  { label: "Categoría", value: (r) => r.category },
-  { label: "Subcategoría", value: (r) => r.subcategory },
-  { label: "Acción sugerida", value: (r) => ACTION_LABEL[r.candidate.action] },
-  { label: "Conservar (líder)", value: (r) => r.candidate.leaderName },
-  { label: "Venta 30d", value: (r) => r.candidate.product.salesLast30Days },
-  { label: "Stock disponible", value: (r) => r.candidate.product.availableStock },
-  { label: "Días inventario", value: (r) => r.candidate.product.inventoryDays },
-  { label: "Capital inmovilizado", value: (r) => r.candidate.tiedCapital },
+/** Capital a costo (stock × costo). null si falta stock o costo. */
+function tiedCapitalOf(p: ProductCatalogRow): number | null {
+  if (p.stockAvailable === null || p.unitCost === null) return null;
+  return p.stockAvailable * p.unitCost;
+}
+
+const exportColumns: CsvColumn<RedundantCandidate>[] = [
+  { label: "SKU", value: (r) => r.row.sku },
+  { label: "Producto", value: (r) => r.row.name },
+  { label: "Categoría", value: (r) => r.row.categoryName ?? "" },
+  { label: "Proveedor", value: (r) => r.row.supplierName ?? "" },
+  { label: "Venta 30d (u.)", value: (r) => r.row.sales30Units ?? "" },
+  { label: "Stock disponible", value: (r) => r.row.stockAvailable ?? "" },
+  { label: "Capital a costo", value: (r) => r.tiedCapital ?? "" },
 ];
 
-type RedundancyFilter = "all" | RedundancyAction | "reactivate";
+export function CatalogRedundancy({ rows, showSummary = true }: CatalogRedundancyProps) {
+  const groups = useMemo<RedundancyGroup[]>(() => {
+    const byCat = new Map<string, RedundancyGroup>();
+    for (const p of rows) {
+      if (!(p.sales30Units === 0 && (p.stockAvailable ?? 0) > 0)) continue;
+      const category = p.categoryName ?? "Sin categoría";
+      const g =
+        byCat.get(category) ??
+        { category, categoryId: p.categoryId, candidates: [], freeableCapital: 0 };
+      const tiedCapital = tiedCapitalOf(p);
+      g.candidates.push({ row: p, tiedCapital });
+      g.freeableCapital += tiedCapital ?? 0;
+      byCat.set(category, g);
+    }
+    return Array.from(byCat.values())
+      .map((g) => ({
+        ...g,
+        candidates: [...g.candidates].sort(
+          (a, b) => (b.tiedCapital ?? 0) - (a.tiedCapital ?? 0)
+        ),
+      }))
+      .sort((a, b) => b.freeableCapital - a.freeableCapital);
+  }, [rows]);
 
-/** Un tipo de producto (subcategoría) con exceso de variedad. */
-function GroupCard({
-  group,
-  filter,
-}: {
-  group: ReturnType<typeof analyzeCatalog>["groups"][number];
-  filter: RedundancyFilter;
-}) {
-  const keepers =
-    filter === "reactivate" ? group.keepers.filter((k) => k.reactivate) : group.keepers;
-  const candidates =
-    filter === "all"
-      ? group.candidates
-      : filter === "reactivate"
-        ? []
-        : group.candidates.filter((c) => c.action === filter);
+  const allCandidates = useMemo(() => groups.flatMap((g) => g.candidates), [groups]);
+  const candidateCount = allCandidates.length;
 
-  return (
-    <Card>
-      <CardBody className="space-y-2.5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-800 truncate">{group.subcategory}</p>
-            <p className="text-xs text-slate-500">
-              {group.category} · {group.members.length} SKUs · bastan {group.keepers.length}
-            </p>
-          </div>
-          <span className="flex-shrink-0 text-right">
-            <span className="block text-xs text-slate-400">Capital liberable</span>
-            <span className="block text-sm font-semibold text-rose-600">
-              {formatCurrencyCompact(group.freeableCapital)}
-            </span>
-          </span>
-        </div>
-
-        {/* Surtido sugerido: uno por gama */}
-        {keepers.length > 0 && (
-          <>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Conservar (uno por gama)
-            </p>
-            {keepers.map((k) => (
-              <Link
-                key={k.product.sku}
-                to={`/productos/${k.product.sku}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 hover:border-emerald-300"
-              >
-                <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{k.product.sku}</span>
-                  <p className="text-sm font-medium text-slate-800 truncate">{k.product.name}</p>
-                  <p className="text-xs text-slate-500">
-                    gama {TIER_LABEL[k.segment]} · vende {formatNumber(k.product.salesLast30Days)}
-                    /mes · rota {formatNumber(k.product.rotation)}× · margen{" "}
-                    {formatPercent(k.product.margin, 0)}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <Badge tone="green" dot>
-                    Conservar
-                  </Badge>
-                  {k.reactivate && <Badge tone="amber">Reactivar compra</Badge>}
-                </div>
-              </Link>
-            ))}
-          </>
-        )}
-
-        {/* Redundantes: sobran en su gama */}
-        {candidates.length > 0 && (
-          <>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 pt-0.5">
-              Sobran
-            </p>
-            {candidates.map((c) => (
-              <Link
-                key={c.product.sku}
-                to={`/productos/${c.product.sku}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-              >
-                <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{c.product.sku}</span>
-                  <p className="text-sm font-medium text-slate-800 truncate">{c.product.name}</p>
-                  <p className="text-xs text-slate-500 line-clamp-2">{c.reason}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <Badge tone={actionTone[c.action]}>{ACTION_LABEL[c.action]}</Badge>
-                  <span className="text-xs text-slate-500">
-                    {formatCurrencyCompact(c.tiedCapital)}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </>
-        )}
-      </CardBody>
-    </Card>
-  );
-}
-
-/**
- * Vista de catálogo optimizado: SKUs redundantes por subcategoría, con el SKU
- * a conservar, el motivo, la acción sugerida y el capital liberable. Permite
- * exportar la lista y lanzar una campaña de liquidación con los SKUs con stock.
- * Reutilizable en la página global y en la pestaña del detalle de categoría.
- */
-export function CatalogRedundancy({
-  products,
-  showSummary = true,
-  scopeLabel,
-}: CatalogRedundancyProps) {
-  const navigate = useNavigate();
-  const toast = useToast();
-  const [, setCampaigns] = useLocalStorage<CreatedCampaign[]>("compras:campaigns", []);
-  const [campaignOpen, setCampaignOpen] = useState(false);
-  const [filter, setFilter] = useState<RedundancyFilter>("all");
-
-  const analysis = analyzeCatalog(products);
-
-  if (analysis.candidateCount === 0) {
+  if (candidateCount === 0) {
     return (
       <Card>
         <CardBody>
           <EmptyState
-            title="Catálogo sano"
-            description="No se detectaron SKUs redundantes en este ámbito. Cada subcategoría tiene un surtido diferenciado."
+            title="Sin SKUs redundantes"
+            description="No hay SKUs sin rotación con stock en este ámbito: el surtido está trabajando. La redundancia fina por gama de precio requiere subcategoría y precio de venta (no disponibles)."
           />
         </CardBody>
       </Card>
     );
   }
 
-  const allCandidates = analysis.groups.flatMap((g) => g.candidates);
-  const liquidateCount = allCandidates.filter((c) => c.action === "liquidate").length;
-  const discontinueCount = allCandidates.filter((c) => c.action === "discontinue").length;
-
-  const allFilterOptions: { key: RedundancyFilter; label: string; count: number }[] = [
-    { key: "all", label: "Todos", count: analysis.candidateCount },
-    { key: "liquidate", label: "Liquidar", count: liquidateCount },
-    { key: "discontinue", label: "Descontinuar", count: discontinueCount },
-    { key: "reactivate", label: "Reactivar compra", count: analysis.reactivateCount },
-  ];
-  const filterOptions = allFilterOptions.filter((o) => o.key === "all" || o.count > 0);
-
-  const visibleGroups = analysis.groups.filter((g) => {
-    if (filter === "all") return true;
-    if (filter === "reactivate") return g.keepers.some((k) => k.reactivate);
-    return g.candidates.some((c) => c.action === filter);
-  });
-
-  const exportRows: ExportRow[] = analysis.groups.flatMap((g) =>
-    g.candidates.map((candidate) => ({
-      candidate,
-      category: g.category,
-      subcategory: g.subcategory,
-    }))
-  );
-
-  // Líneas para la campaña de liquidación: redundantes con stock disponible.
-  const liquidationLines: CampaignProductLine[] = allCandidates
-    .filter((c) => c.product.availableStock > 0)
-    .map((c) => ({
-      sku: c.product.sku,
-      productName: c.product.name,
-      basePrice: c.product.price,
-      discountPct: LIQUIDATION_DISCOUNT,
-      campaignPrice: Math.round(c.product.price * (1 - LIQUIDATION_DISCOUNT / 100)),
-      availableStock: c.product.availableStock,
-    }));
-
-  const handleCampaignSave = (campaign: CreatedCampaign) => {
-    setCampaigns((prev) => [campaign, ...prev]);
-    setCampaignOpen(false);
-    toast.success(`Campaña “${campaign.name}” creada con ${campaign.products.length} producto(s)`, {
-      label: "Ver campañas",
-      onClick: () => navigate("/anticipacion"),
-    });
-  };
+  const saturatedCategories = groups.filter((g) => g.candidates.length >= 2).length;
+  const freeableCapital = groups.reduce((s, g) => s + g.freeableCapital, 0);
+  const redundantShare = rows.length > 0 ? candidateCount / rows.length : 0;
 
   return (
     <div className="space-y-4">
       {showSummary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard
-            title="Subcategorías saturadas"
-            value={formatNumber(analysis.saturatedSubcategories)}
+            title="Categorías con solapamiento"
+            value={formatNumber(saturatedCategories)}
             tone="warn"
             icon={<IconCategories className="w-4 h-4" />}
-            description="con SKUs que se solapan"
+            description="≥ 2 SKUs sin rotación"
           />
           <KpiCard
             title="SKUs redundantes"
-            value={formatNumber(analysis.candidateCount)}
+            value={formatNumber(candidateCount)}
             tone="bad"
             icon={<IconProducts className="w-4 h-4" />}
-            description={`${formatPercent(analysis.redundantShare * 100, 0)} del surtido`}
+            description={`${Math.round(redundantShare * 100)}% del surtido`}
           />
           <KpiCard
-            title="Capital liberable"
-            value={formatCurrencyCompact(analysis.freeableCapital)}
+            title="Capital liberable (costo)"
+            value={formatCurrencyCompact(freeableCapital)}
             tone="info"
             icon={<IconInventory className="w-4 h-4" />}
             description="inmovilizado en redundantes"
           />
           <KpiCard
             title="SKUs analizados"
-            value={formatNumber(analysis.totalSkus)}
+            value={formatNumber(rows.length)}
             tone="neutral"
             icon={<IconCheck className="w-4 h-4" />}
             description="en el ámbito"
@@ -281,60 +137,67 @@ export function CatalogRedundancy({
         </div>
       )}
 
-      <HelpNote variant="tip" title="¿Qué es “redundante”?">
-        Cuando dentro del mismo tipo de producto y <strong>gama de precio</strong> (económica,
-        media, premium) hay varias opciones, basta con la{" "}
-        <strong>mejor por venta, rotación y margen</strong>. Las demás de esa gama sobran: se
-        sugiere <strong>liquidar</strong> (con stock) o <strong>descontinuar</strong> (sin ventas).
-        Si la mejor está marcada “no comprar”, se sugiere <strong>reactivarla</strong>.
+      <HelpNote variant="tip" title="Qué es “redundante” aquí:">
+        Con los datos del motor no se puede afinar por <strong>gama de precio</strong> dentro de un
+        tipo de producto (falta subcategoría y precio de venta). El proxy honesto son los SKUs{" "}
+        <strong>sin rotación</strong> (0 ventas en 30 días) con <strong>stock disponible</strong>,
+        agrupados por categoría: capital <strong>a costo</strong> que conviene liquidar o
+        descontinuar.
       </HelpNote>
 
-      {/* Filtros por acción + acciones (exportar / campaña de liquidación). */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
-          {filterOptions.map((o) => (
-            <button
-              key={o.key}
-              onClick={() => setFilter(o.key)}
-              className={cn(
-                "whitespace-nowrap flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
-                filter === o.key
-                  ? "border-brand-300 bg-brand-50 text-brand-700"
-                  : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-              )}
-            >
-              {o.label} ({formatNumber(o.count)})
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <ExportButton filename="catalogo-redundantes" rows={exportRows} columns={exportColumns} />
-          {liquidationLines.length > 0 && (
-            <Button
-              size="sm"
-              icon={<IconCampaign className="w-4 h-4" />}
-              onClick={() => setCampaignOpen(true)}
-            >
-              Crear campaña de liquidación ({liquidationLines.length})
-            </Button>
-          )}
-        </div>
+      <div className="flex items-center justify-end">
+        <ExportButton
+          filename="catalogo-redundantes"
+          rows={allCandidates}
+          columns={exportColumns}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {visibleGroups.map((g) => (
-          <GroupCard key={`${g.category}-${g.subcategory}`} group={g} filter={filter} />
+        {groups.map((g) => (
+          <Card key={g.category}>
+            <CardBody className="space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{g.category}</p>
+                  <p className="text-xs text-slate-500">
+                    {g.candidates.length} SKU sin rotación con stock
+                  </p>
+                </div>
+                <span className="flex-shrink-0 text-right">
+                  <span className="block text-xs text-slate-400">Capital liberable</span>
+                  <span className="block text-sm font-semibold text-rose-600">
+                    {formatCurrencyCompact(g.freeableCapital)}
+                  </span>
+                </span>
+              </div>
+
+              {g.candidates.map((c) => (
+                <Link
+                  key={c.row.sku}
+                  to={productPath(c.row.sku)}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+                >
+                  <div className="min-w-0">
+                    <span className="text-xs font-mono text-slate-400">{c.row.sku}</span>
+                    <p className="text-sm font-medium text-slate-800 truncate">{c.row.name}</p>
+                    <p className="text-xs text-slate-500">
+                      0 ventas 30d · stock{" "}
+                      {c.row.stockAvailable === null ? "—" : formatNumber(c.row.stockAvailable)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <Badge tone="amber">Liquidar / descontinuar</Badge>
+                    <span className="text-xs text-slate-500">
+                      {c.tiedCapital === null ? "—" : formatCurrency(c.tiedCapital)}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </CardBody>
+          </Card>
         ))}
       </div>
-
-      <CampaignBuilderModal
-        open={campaignOpen}
-        onClose={() => setCampaignOpen(false)}
-        onSave={handleCampaignSave}
-        initialName={scopeLabel ? `Liquidación ${scopeLabel}` : "Liquidación de surtido"}
-        initialLines={liquidationLines}
-        initialChannels={["web", "marketplace"] as PromoChannel[]}
-      />
     </div>
   );
 }
