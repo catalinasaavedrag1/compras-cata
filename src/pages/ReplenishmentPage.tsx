@@ -16,8 +16,7 @@ import { Select } from "../components/ui/Select";
 import { Badge } from "../components/ui/Badge";
 import { IconReplenish, IconAlerts, IconPlus, IconClose, IconInfo } from "../components/ui/icons";
 import { PageSkeleton } from "../components/ui/Skeleton";
-import { suppliers } from "../data/mockSuppliers";
-import { monthlyPurchaseBudget } from "../data/mockRules";
+import { useBudget } from "../hooks/useBudget";
 import { filterRecommendations, uniqueValues } from "../utils/filters";
 import { coverageDays } from "../utils/calculations";
 import { cn } from "../utils/cn";
@@ -77,6 +76,9 @@ export function ReplenishmentPage() {
   // recomendaciones y los overrides/ignoradas en localStorage).
   const { rows, meta, warnings, loading, error, configured, refetch, applyAction } =
     useReplenishment();
+  // Presupuesto real del mes (OTB, flujo 9); null = sin presupuesto configurado.
+  const { data: budgetData } = useBudget();
+  const monthBudget = budgetData?.month ? budgetData.totals.budgetClp : null;
 
   // OC reales (flujo 3): señal "OC abierta" por SKU y contadores de la barra de
   // proceso. Con líneas de las OC activas; sin polling SAP en esta vista.
@@ -165,12 +167,14 @@ export function ReplenishmentPage() {
     .filter((r) => r.status === "overstock")
     .reduce((a, r) => a + (r.availableStock - r.maxStock) * r.unitCost, 0);
 
-  // Presupuesto
-  const budgetUsedPct = (totalSuggested / monthlyPurchaseBudget) * 100;
-  const overBudget = totalSuggested > monthlyPurchaseBudget;
-  const budgetAvailable = monthlyPurchaseBudget - totalSuggested;
+  // Presupuesto (OTB real; sin presupuesto ⇒ los derivados degradan)
+  const budgetUsedPct =
+    monthBudget !== null && monthBudget > 0 ? (totalSuggested / monthBudget) * 100 : 0;
+  const overBudget = monthBudget !== null && totalSuggested > monthBudget;
+  const budgetAvailable = monthBudget !== null ? monthBudget - totalSuggested : null;
   const criticalCapital = urgentRecs.reduce((a, r) => a + r.suggestedPurchaseAmount, 0);
-  const uncoveredCriticalCapital = Math.max(0, criticalCapital - Math.max(0, budgetAvailable));
+  const uncoveredCriticalCapital =
+    budgetAvailable === null ? 0 : Math.max(0, criticalCapital - Math.max(0, budgetAvailable));
   const budgetTone = overBudget ? "bad" : budgetUsedPct > 80 ? "warn" : "good";
   const budgetBar = overBudget
     ? "bg-rose-500"
@@ -217,7 +221,8 @@ export function ReplenishmentPage() {
 
   const selectedRecs = filtered.filter((r) => selected.includes(r.id));
   const selectedTotal = selectedRecs.reduce((a, r) => a + r.suggestedPurchaseAmount, 0);
-  const selectedExcess = Math.max(0, selectedTotal - Math.max(0, budgetAvailable));
+  const selectedExcess =
+    budgetAvailable === null ? 0 : Math.max(0, selectedTotal - Math.max(0, budgetAvailable));
   const selectedSupplierCount = new Set(selectedRecs.map((r) => r.supplierName)).size;
 
   const addSelectedToOc = () => {
@@ -687,16 +692,20 @@ export function ReplenishmentPage() {
                 {formatCurrencyCompact(totalSuggested)}
               </span>
               <span className="text-sm text-slate-400">
-                usado de {formatCurrencyCompact(monthlyPurchaseBudget)}
+                {monthBudget === null
+                  ? "sugerido este mes (sin presupuesto OTB configurado)"
+                  : `usado de ${formatCurrencyCompact(monthBudget)}`}
               </span>
             </div>
           </div>
           <div className="flex-1">
             <div className="flex items-center justify-between text-xs mb-1.5">
               <span className={overBudget ? "text-rose-600 font-medium" : "text-slate-500"}>
-                {overBudget
-                  ? `Excede el presupuesto en ${formatCurrency(totalSuggested - monthlyPurchaseBudget)}`
-                  : `Disponible: ${formatCurrency(monthlyPurchaseBudget - totalSuggested)}`}
+                {monthBudget === null
+                  ? "Define el presupuesto del mes en Presupuesto (OTB) para ver el avance."
+                  : overBudget
+                    ? `Excede el presupuesto en ${formatCurrency(totalSuggested - monthBudget)}`
+                    : `Disponible: ${formatCurrency(monthBudget - totalSuggested)}`}
               </span>
               <span className="font-medium text-slate-600">
                 {formatPercent(budgetUsedPct, 0)} usado
@@ -1033,7 +1042,8 @@ export function ReplenishmentPage() {
             {formatCurrency(selectedTotal)}
           </span>
           <span className="text-xs text-white/80">
-            disponible {formatCurrency(Math.max(0, budgetAvailable))}
+            disponible{" "}
+            {budgetAvailable === null ? "—" : formatCurrency(Math.max(0, budgetAvailable))}
           </span>
           {selectedExcess > 0 && (
             <span className="rounded-full bg-white/15 px-2 py-1 text-xs font-medium">
@@ -1170,7 +1180,10 @@ export function ReplenishmentPage() {
               label="Proveedor"
               value={editSupplier}
               onChange={(e) => setEditSupplier(e.target.value)}
-              options={suppliers.map((s) => ({ value: s.name, label: s.name }))}
+              options={[...new Set(recs.map((r) => r.supplierName))].map((name) => ({
+                value: name,
+                label: name,
+              }))}
             />
             <Input
               label="Motivo del ajuste (obligatorio)"
