@@ -11,9 +11,12 @@ import { PurchaseProcessBar } from "../components/business/PurchaseProcessBar";
 import { IconPlus } from "../components/ui/icons";
 import { usePickupPlan } from "../components/business/LogisticsPlan";
 import { draftBudgetImpact } from "../utils/openToBuy";
-import { recommendations } from "../data/mockRecommendations";
-import { getProductBySku, products as allProducts } from "../data/mockProducts";
-import { suppliers as mockSuppliers } from "../data/mockSuppliers";
+import {
+  useDraftEnrichment,
+  useDraftSkuSearch,
+  useDraftSuggestions,
+} from "../hooks/useDraftEnrichment";
+import type { ReplenishmentRow } from "../services/purchaseBff";
 import { orderSalesAtRisk, type ConsolidationCandidate } from "../utils/orderConsolidation";
 import {
   OrderDetailModal,
@@ -217,12 +220,10 @@ export function PurchaseOrdersPage() {
             : 0;
       map.set(
         o.id,
-        orderSalesAtRisk(o.lines, arrivalDays, (sku) => {
-          const p = getProductBySku(sku);
-          return p
-            ? { availableStock: p.availableStock, salesLast30Days: p.salesLast30Days, price: p.price }
-            : undefined;
-        })
+        // El motor solo conoce los SKU con recomendación viva; para las líneas
+        // de OC arbitrarias no hay fuente real de venta por SKU: se degrada a
+        // sin estimación (el orden cae a días de atraso), nunca inventada.
+        orderSalesAtRisk(o.lines, arrivalDays, () => undefined)
       );
     });
     return map;
@@ -259,6 +260,10 @@ export function PurchaseOrdersPage() {
     ["sent", "confirmed", "partially_received", "delayed"].includes(o.status)
   );
 
+  // Enriquecimiento REAL del borrador: fila del motor por SKU y panel de
+  // proveedor por nombre. "—"/"…" donde no hay dato (nunca inventado).
+  const { rowBySku, supplierByName, loading: enrichLoading } = useDraftEnrichment(items);
+
   // Líneas del borrador agrupadas por proveedor (una OC no mezcla proveedores).
   const supplierGroups = useMemo(() => {
     const m = new Map<string, OcDraftItem[]>();
@@ -279,12 +284,12 @@ export function PurchaseOrdersPage() {
           ? `${supplierGroups.length} proveedores`
           : "Sin proveedor";
     const critical = items.filter((i) => {
-      const p = getProductBySku(i.sku);
-      return !!p && p.availableStock <= 0;
+      const r = rowBySku.get(i.sku);
+      return r?.stock?.available != null && r.stock.available <= 0;
     }).length;
     const overSuggested = items.filter((i) => {
-      const rec = recommendations.find((r) => r.sku === i.sku);
-      return rec ? i.quantity > rec.suggestedQuantity * 1.2 : false;
+      const r = rowBySku.get(i.sku);
+      return r && r.suggestedQty > 0 ? i.quantity > r.suggestedQty * 1.2 : false;
     }).length;
     const openOverlap = items.filter((i) =>
       orders.some(
@@ -295,18 +300,23 @@ export function PurchaseOrdersPage() {
       )
     ).length;
     const highCoverage = items.filter((i) => {
-      const p = getProductBySku(i.sku);
+      const r = rowBySku.get(i.sku);
+      const avail = r?.stock?.available;
+      const sales = r?.salesLast30d;
       return (
-        !!p &&
-        p.salesLast30Days > 0 &&
-        coverageDays(p.availableStock + i.quantity, p.salesLast30Days) > 90
+        avail != null &&
+        sales != null &&
+        sales > 0 &&
+        coverageDays(avail + i.quantity, sales) > 90
       );
     }).length;
     const futureCoverageValues = items
       .map((i) => {
-        const p = getProductBySku(i.sku);
-        if (!p || p.salesLast30Days <= 0) return null;
-        return coverageDays(p.availableStock + i.quantity, p.salesLast30Days);
+        const r = rowBySku.get(i.sku);
+        const avail = r?.stock?.available;
+        const sales = r?.salesLast30d;
+        if (avail == null || sales == null || sales <= 0) return null;
+        return coverageDays(avail + i.quantity, sales);
       })
       .filter((v): v is number => v !== null);
     const avgCoverage =
@@ -322,7 +332,7 @@ export function PurchaseOrdersPage() {
       highCoverage,
       avgCoverage,
     };
-  }, [items, orders, supplierGroups]);
+  }, [items, orders, supplierGroups, rowBySku]);
 
   // Plan de retiro en vivo: se recalcula al agregar/cambiar líneas del borrador.
   const pickupLines = useMemo(
@@ -342,58 +352,47 @@ export function PurchaseOrdersPage() {
 
   const selectedDraftItem = items.find((i) => i.sku === draftContextSku) ?? items[0] ?? null;
 
-  // Sugerencias que aún no están en el borrador
-  const pendingSuggestions = recommendations.filter(
-    (r) => r.suggestedQuantity > 0 && !hasItem(r.sku)
+  // Sugerencias reales del motor (pendientes urgentes) aún no en el borrador.
+  const { suggestions } = useDraftSuggestions();
+  const pendingSuggestions = useMemo(
+    () => suggestions.filter((r) => !hasItem(r.sku)),
+    [suggestions, hasItem]
   );
 
-  // Búsqueda de cualquier producto para agregar al borrador.
-  const searchResults = useMemo(() => {
-    const q = prodSearch.trim().toLowerCase();
-    if (q.length < 2) return [];
-    return allProducts
-      .filter((p) => `${p.sku} ${p.name} ${p.brand}`.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [prodSearch]);
+  // Búsqueda real de productos del motor para agregar al borrador.
+  const { results: searchResults } = useDraftSkuSearch(prodSearch);
 
-  const addProduct = (sku: string) => {
-    const p = getProductBySku(sku);
-    if (!p) return;
-    const rec = recommendations.find((r) => r.sku === sku);
-    // Catálogo mock sin referencia real (recommendationId/supplierId): el
-    // contexto avisa "flujo posterior" y no simula estado local.
+  // Agrega una fila real del motor al borrador (con recommendationId/ids reales
+  // que habilitan la línea vía el contrato de propuestas).
+  const addProduct = (row: ReplenishmentRow) => {
     const added = addItem({
-      sku: p.sku,
-      productName: p.name,
-      supplierName: p.supplierName || "Sin proveedor",
-      quantity:
-        rec?.suggestedQuantity && rec.suggestedQuantity > 0
-          ? rec.suggestedQuantity
-          : Math.max(1, p.minStock ?? 1),
-      unitCost: p.cost,
-      discountPct: p.descuentoVigentePct,
+      sku: row.sku,
+      productName: row.name,
+      supplierName: row.supplier.name || "Sin proveedor",
+      quantity: row.suggestedQty > 0 ? row.suggestedQty : Math.max(1, row.minStock ?? 1),
+      unitCost: row.cost?.unitCost ?? 0,
+      recommendationId: row.recommendationId,
+      supplierId: row.supplier.id ?? undefined,
+      categoryId: row.category.id ?? undefined,
     });
     if (!added) return;
-    toast.success(`${p.name} agregado al borrador`);
+    toast.success(`${row.name} agregado al borrador`);
     setProdSearch("");
   };
 
-  // Proveedor por nombre (para leer su mínimo de compra en el coach).
-  const supplierByName = useMemo(() => {
-    const m = new Map<string, (typeof mockSuppliers)[number]>();
-    mockSuppliers.forEach((s) => m.set(s.name, s));
-    return m;
-  }, []);
-
-  // Agrega al borrador un candidato de consolidación con su cantidad sugerida.
+  // Agrega al borrador un candidato de consolidación, recuperando los ids
+  // reales de su fila del motor cuando existe.
   const addCandidate = (supplierName: string, c: ConsolidationCandidate) => {
+    const row = suggestions.find((r) => r.sku === c.sku);
     const added = addItem({
       sku: c.sku,
       productName: c.productName,
       supplierName,
       quantity: c.suggestedQty,
       unitCost: c.unitCost,
-      discountPct: c.discountPct,
+      recommendationId: row?.recommendationId,
+      supplierId: row?.supplier.id ?? undefined,
+      categoryId: row?.category.id ?? undefined,
     });
     if (!added) return;
     toast.success(`${c.productName} agregado — consolidado con ${supplierName}`);
@@ -592,9 +591,7 @@ export function PurchaseOrdersPage() {
 
       <PurchaseProcessBar
         stages={buildOrderProcessStages({
-          necesidadCount: recommendations.filter(
-            (r) => r.status === "critical" || r.status === "buy_now"
-          ).length,
+          necesidadCount: suggestions.length,
           rfqCount: openRfqCount,
           draftCount: count,
           pathname,
@@ -697,7 +694,9 @@ export function PurchaseOrdersPage() {
         removeItem={removeItem}
         setDraftContextSku={setDraftContextSku}
         items={items}
+        rowBySku={rowBySku}
         supplierByName={supplierByName}
+        contextLoading={enrichLoading}
         addCandidate={addCandidate}
         pickupPlan={pickupPlan}
         pendingSuggestions={pendingSuggestions}

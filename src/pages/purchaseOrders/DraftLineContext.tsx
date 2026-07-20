@@ -2,16 +2,13 @@ import { Button } from "../../components/ui/Button";
 import { Tabs } from "../../components/ui/Tabs";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
-import { LandedCostBreakdown } from "../../components/business/LandedCost";
-import { getProductBySku } from "../../data/mockProducts";
-import { recommendations } from "../../data/mockRecommendations";
-import { suppliers as mockSuppliers } from "../../data/mockSuppliers";
 import { coverageDays } from "../../utils/calculations";
 import { formatCurrency, formatCurrencyCompact, formatNumber } from "../../utils/formatters";
 import { lineNet, type OcDraftItem } from "../../context/OcDraftContext";
 import { buyScenarios, type RiskLevel } from "../../utils/buyScenarios";
 import { cn } from "../../utils/cn";
-import type { PurchaseOrder } from "../../types/purchasing";
+import type { ReplenishmentRow, SupplierPanelRow } from "../../services/purchaseBff";
+import type { Product, PurchaseOrder } from "../../types/purchasing";
 import { CLOSED_ORDER_STATUSES } from "../../types/purchasing";
 
 const RISK_TONE: Record<RiskLevel, "green" | "amber" | "red"> = {
@@ -20,8 +17,20 @@ const RISK_TONE: Record<RiskLevel, "green" | "amber" | "red"> = {
   alto: "red",
 };
 
+/**
+ * Contexto de línea del borrador sobre FUENTES REALES:
+ * - `row`: fila del motor de reposición para el SKU (stock, venta, cobertura,
+ *   sugerido, lead time). null = el SKU no está en el universo del motor.
+ * - `supplierPanel`: fila real del panel de proveedores (cumplimiento, lead
+ *   time observado). null = sin match en el panel.
+ * Cualquier dato sin fuente real se muestra como "—" ("…" mientras carga):
+ * jamás un número inventado.
+ */
 export function DraftLineContext({
   item,
+  row,
+  supplierPanel,
+  contextLoading,
   orders,
   tab,
   onTabChange,
@@ -29,30 +38,48 @@ export function DraftLineContext({
   onOpenProduct,
 }: {
   item: OcDraftItem;
+  row: ReplenishmentRow | null;
+  supplierPanel: SupplierPanelRow | null;
+  contextLoading: boolean;
   orders: PurchaseOrder[];
   tab: string;
   onTabChange: (value: string) => void;
   onQuantityChange: (quantity: number) => void;
   onOpenProduct: () => void;
 }) {
-  const product = getProductBySku(item.sku);
-  const rec = recommendations.find((r) => r.sku === item.sku);
-  const supplier = mockSuppliers.find((s) => s.name === item.supplierName);
+  // "—" = sin fuente real; "…" = el dato del motor aún viene en camino.
+  const ph = contextLoading ? "…" : "—";
+  const stockAvailable = row?.stock?.available ?? null;
+  const sales30 = row?.salesLast30d ?? null;
+  const currentCoverage =
+    row?.coverageDays ??
+    (stockAvailable !== null && sales30 !== null && sales30 > 0
+      ? coverageDays(stockAvailable, sales30)
+      : null);
+  const futureCoverage =
+    stockAvailable !== null && sales30 !== null && sales30 > 0
+      ? coverageDays(stockAvailable + item.quantity, sales30)
+      : null;
+  const suggestedQty = row && row.suggestedQty > 0 ? row.suggestedQty : null;
+  const deltaVsSuggested = suggestedQty !== null ? item.quantity - suggestedQty : null;
+  const leadTimeDays = row?.leadTimeDays ?? supplierPanel?.leadTimeDaysObserved ?? null;
   const openOrders = orders.filter(
     (o) =>
       o.supplierName === item.supplierName &&
       !CLOSED_ORDER_STATUSES.includes(o.status) &&
       o.lines?.some((line) => line.sku === item.sku)
   );
-  const currentCoverage = product
-    ? coverageDays(product.availableStock, product.salesLast30Days)
-    : 0;
-  const futureCoverage =
-    product && product.salesLast30Days > 0
-      ? coverageDays(product.availableStock + item.quantity, product.salesLast30Days)
-      : 0;
-  const suggestedQty = rec?.suggestedQuantity ?? item.quantity;
-  const deltaVsSuggested = item.quantity - suggestedQty;
+  // Escenarios solo con datos reales: buyScenarios usa únicamente estos campos
+  // del producto (venta 30d, stock disponible, lead time y múltiplo de compra).
+  const scenarioProduct =
+    stockAvailable !== null && sales30 !== null && sales30 > 0 && leadTimeDays !== null
+      ? ({
+          availableStock: stockAvailable,
+          salesLast30Days: sales30,
+          supplierLeadTimeDays: leadTimeDays,
+          multiploCompra: row?.packMultiple ?? item.packMultiple ?? undefined,
+        } as Product)
+      : null;
 
   return (
     <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-3">
@@ -66,7 +93,7 @@ export function DraftLineContext({
           </h3>
           <p className="text-xs text-slate-500">
             {item.sku} · cantidad OC {formatNumber(item.quantity)} u. · sugerido{" "}
-            {formatNumber(suggestedQty)} u.
+            {suggestedQty !== null ? `${formatNumber(suggestedQty)} u.` : ph}
           </p>
         </div>
         <Button size="sm" variant="secondary" onClick={onOpenProduct}>
@@ -91,10 +118,16 @@ export function DraftLineContext({
         <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <DraftMetric
             label="Stock"
-            value={product ? `${formatNumber(product.availableStock)} u.` : "n/a"}
+            value={stockAvailable !== null ? `${formatNumber(stockAvailable)} u.` : ph}
           />
-          <DraftMetric label="Cobertura actual" value={product ? `${currentCoverage} d` : "n/a"} />
-          <DraftMetric label="Cobertura futura" value={product ? `${futureCoverage} d` : "n/a"} />
+          <DraftMetric
+            label="Cobertura actual"
+            value={currentCoverage !== null ? `${currentCoverage} d` : ph}
+          />
+          <DraftMetric
+            label="Cobertura futura"
+            value={futureCoverage !== null ? `${futureCoverage} d` : ph}
+          />
           <DraftMetric
             label="OC abiertas"
             value={
@@ -106,80 +139,98 @@ export function DraftLineContext({
         </div>
       )}
 
-      {tab === "escenarios" && product && (
+      {tab === "escenarios" && (
         <div className="mt-3">
-          <p className="mb-2 text-xs text-slate-500">
-            Compara el costo completo de cada opción antes de decidir. Un descuento por volumen
-            inmoviliza más capital y arriesga sobrestock.
-          </p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {buyScenarios(product, suggestedQty, item.unitCost, item.discountPct ?? 0).map((s) => {
-              const active = item.quantity === s.qty;
-              return (
-                <div
-                  key={s.key}
-                  className={cn(
-                    "flex flex-col rounded-lg border p-3",
-                    s.recommended
-                      ? "border-brand-300 bg-white ring-1 ring-brand-100"
-                      : "border-slate-200 bg-white"
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{s.label}</p>
-                    {s.recommended && <Badge tone="blue">Sugerido</Badge>}
-                  </div>
-                  <p className="mt-1 text-lg font-semibold text-slate-900">
-                    {formatNumber(s.qty)} u.
-                  </p>
-                  <dl className="mt-2 space-y-1 text-xs">
-                    <ScenarioRow label="Inversión" value={formatCurrencyCompact(s.investment)} />
-                    <ScenarioRow label="Cobertura" value={`${s.coverageDays} d`} />
-                    <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Riesgo quiebre</dt>
-                      <Badge tone={RISK_TONE[s.stockoutRisk]}>{s.stockoutRisk}</Badge>
+          {scenarioProduct ? (
+            <>
+              <p className="mb-2 text-xs text-slate-500">
+                Compara el costo completo de cada opción antes de decidir. Un descuento por volumen
+                inmoviliza más capital y arriesga sobrestock.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {buyScenarios(
+                  scenarioProduct,
+                  suggestedQty ?? item.quantity,
+                  item.unitCost,
+                  item.discountPct ?? 0
+                ).map((s) => {
+                  const active = item.quantity === s.qty;
+                  return (
+                    <div
+                      key={s.key}
+                      className={cn(
+                        "flex flex-col rounded-lg border p-3",
+                        s.recommended
+                          ? "border-brand-300 bg-white ring-1 ring-brand-100"
+                          : "border-slate-200 bg-white"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-900">{s.label}</p>
+                        {s.recommended && <Badge tone="blue">Sugerido</Badge>}
+                      </div>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">
+                        {formatNumber(s.qty)} u.
+                      </p>
+                      <dl className="mt-2 space-y-1 text-xs">
+                        <ScenarioRow label="Inversión" value={formatCurrencyCompact(s.investment)} />
+                        <ScenarioRow label="Cobertura" value={`${s.coverageDays} d`} />
+                        <div className="flex items-center justify-between">
+                          <dt className="text-slate-500">Riesgo quiebre</dt>
+                          <Badge tone={RISK_TONE[s.stockoutRisk]}>{s.stockoutRisk}</Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <dt className="text-slate-500">Riesgo sobrestock</dt>
+                          <Badge tone={RISK_TONE[s.overstockRisk]}>{s.overstockRisk}</Badge>
+                        </div>
+                        <ScenarioRow
+                          label="Descuento"
+                          value={s.discountPct > 0 ? `${s.discountPct}%` : "—"}
+                        />
+                        {s.volumeSaving > 0 && (
+                          <ScenarioRow
+                            label="Ahorro volumen"
+                            value={formatCurrencyCompact(s.volumeSaving)}
+                          />
+                        )}
+                      </dl>
+                      <p className="mt-2 text-[11px] leading-snug text-slate-400">{s.note}</p>
+                      <Button
+                        size="sm"
+                        variant={active ? "secondary" : "primary"}
+                        disabled={active}
+                        className="mt-2"
+                        onClick={() => onQuantityChange(s.qty)}
+                      >
+                        {active ? "Aplicado" : "Aplicar"}
+                      </Button>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Riesgo sobrestock</dt>
-                      <Badge tone={RISK_TONE[s.overstockRisk]}>{s.overstockRisk}</Badge>
-                    </div>
-                    <ScenarioRow
-                      label="Descuento"
-                      value={s.discountPct > 0 ? `${s.discountPct}%` : "—"}
-                    />
-                    {s.volumeSaving > 0 && (
-                      <ScenarioRow
-                        label="Ahorro volumen"
-                        value={formatCurrencyCompact(s.volumeSaving)}
-                      />
-                    )}
-                  </dl>
-                  <p className="mt-2 text-[11px] leading-snug text-slate-400">{s.note}</p>
-                  <Button
-                    size="sm"
-                    variant={active ? "secondary" : "primary"}
-                    disabled={active}
-                    className="mt-2"
-                    onClick={() => onQuantityChange(s.qty)}
-                  >
-                    {active ? "Aplicado" : "Aplicar"}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">
+              {contextLoading
+                ? "Cargando datos del motor…"
+                : "Sin datos reales de venta, stock o lead time del motor para simular escenarios de este SKU."}
+            </p>
+          )}
         </div>
       )}
 
       {tab === "inventario" && (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {(product?.stockByLocation ?? []).slice(0, 3).map((loc) => (
-            <div key={loc.locationName} className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs font-medium text-slate-500">{loc.locationName}</p>
+          {[
+            { label: "Disponible", value: row?.stock?.available ?? null },
+            { label: "En tránsito", value: row?.stock?.inTransit ?? null },
+            { label: "Stock de seguridad", value: row?.stock?.security ?? null },
+          ].map((slot) => (
+            <div key={slot.label} className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-xs font-medium text-slate-500">{slot.label}</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
-                {formatNumber(loc.available)} u.
+                {slot.value !== null ? `${formatNumber(slot.value)} u.` : ph}
               </p>
-              <p className="text-xs text-slate-400">comprometido {formatNumber(loc.committed)}</p>
             </div>
           ))}
           {openOrders.length > 0 && (
@@ -199,19 +250,23 @@ export function DraftLineContext({
         <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <DraftMetric
             label="Venta 30d"
-            value={product ? `${formatNumber(product.salesLast30Days)} u.` : "n/a"}
+            value={sales30 !== null ? `${formatNumber(sales30)} u.` : ph}
           />
           <DraftMetric
             label="Venta 90d"
-            value={product ? `${formatNumber(product.salesLast90Days)} u.` : "n/a"}
+            value={row?.salesLast90d != null ? `${formatNumber(row.salesLast90d)} u.` : ph}
           />
           <DraftMetric
             label="Rotación"
-            value={product ? `${formatNumber(product.rotation)}x` : "n/a"}
+            value={row?.rotation != null ? `${formatNumber(row.rotation)}x` : ph}
           />
           <DraftMetric
             label="Variación OC"
-            value={`${deltaVsSuggested > 0 ? "+" : ""}${formatNumber(deltaVsSuggested)} u.`}
+            value={
+              deltaVsSuggested !== null
+                ? `${deltaVsSuggested > 0 ? "+" : ""}${formatNumber(deltaVsSuggested)} u.`
+                : ph
+            }
           />
         </div>
       )}
@@ -224,22 +279,24 @@ export function DraftLineContext({
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-900">{item.supplierName}</p>
             <p className="text-xs text-slate-500">
-              Cumplimiento {supplier ? `${supplier.deliveryCompliance}%` : "n/a"} · lead time{" "}
-              {supplier ? `${supplier.averageLeadTimeDays} d` : "n/a"}
+              Cumplimiento{" "}
+              {supplierPanel?.compliancePct != null
+                ? `${formatNumber(supplierPanel.compliancePct)}%`
+                : ph}{" "}
+              · lead time {leadTimeDays !== null ? `${leadTimeDays} d` : ph}
             </p>
           </div>
-          {product ? (
-            <LandedCostBreakdown product={product} unitCost={item.unitCost} />
-          ) : (
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Rentabilidad
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                Costo {formatCurrency(item.unitCost)} · línea {formatCurrency(lineNet(item))}
-              </p>
-            </div>
-          )}
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Rentabilidad
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              Costo {formatCurrency(item.unitCost)} · línea {formatCurrency(lineNet(item))}
+            </p>
+            <p className="text-xs text-slate-500">
+              Margen {row?.marginPct != null ? `${formatNumber(row.marginPct)}%` : ph}
+            </p>
+          </div>
         </div>
       )}
 
@@ -256,7 +313,7 @@ export function DraftLineContext({
         <div className="text-sm text-slate-500">
           Después de comprar:{" "}
           <span className="font-semibold text-slate-900">
-            {product ? `${futureCoverage} días` : "sin cálculo"}
+            {futureCoverage !== null ? `${futureCoverage} días` : "sin datos de venta"}
           </span>
         </div>
       </div>

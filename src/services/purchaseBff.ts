@@ -3198,3 +3198,174 @@ export function patchRule(
     body: JSON.stringify(body),
   });
 }
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — NPI: nuevos productos (F25)
+// ----------------------------------------------------------------------------
+
+export type NpiStage =
+  | "proposed"
+  | "approved"
+  | "pilot"
+  | "evaluation"
+  | "scaled"
+  | "rejected";
+
+export type NpiRisk = "low" | "medium" | "high";
+
+export interface NpiCandidateView {
+  id: string;
+  name: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  supplierRef: string | null;
+  supplierName: string | null;
+  costClp: number | null;
+  suggestedPriceClp: number | null;
+  comparableSku: string | null;
+  targetMarket: string | null;
+  initialBuyQty: number | null;
+  pilotStores: number | null;
+  initialForecastMonthly: number | null;
+  risk: NpiRisk;
+  stage: NpiStage;
+  pilotResult: string | null;
+  stageReason: string | null;
+  buyerId: string;
+  version: number;
+  dateCreated: string;
+  dateModified: string;
+}
+
+export interface NpiListData {
+  items: NpiCandidateView[];
+  meta: BffPageMeta;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — NPI (F25)
+// ----------------------------------------------------------------------------
+
+/** GET /npi — candidatos (filtros stage/buyerId/q). */
+export function listNpi(params?: {
+  stage?: NpiStage;
+  buyerId?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<NpiListData> {
+  const query = new URLSearchParams();
+  if (params?.stage) query.set("stage", params.stage);
+  if (params?.buyerId) query.set("buyerId", params.buyerId);
+  if (params?.q) query.set("q", params.q);
+  query.set("page", String(params?.page ?? 1));
+  query.set("pageSize", String(params?.pageSize ?? 50));
+  return request<NpiListData>(`/npi?${query.toString()}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** GET /npi/:id — detalle del candidato. */
+export function getNpi(id: string): Promise<NpiCandidateView> {
+  return request<NpiCandidateView>(`/npi/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}
+
+/** POST /npi — proponer nuevo producto (🔑). */
+export function createNpi(body: {
+  name: string;
+  categoryId?: string;
+  categoryName?: string;
+  supplierRef?: string;
+  supplierName?: string;
+  costClp?: number;
+  suggestedPriceClp?: number;
+  comparableSku?: string;
+  targetMarket?: string;
+  initialBuyQty?: number;
+  pilotStores?: number;
+  initialForecastMonthly?: number;
+  risk: NpiRisk;
+}): Promise<NpiCandidateView> {
+  return request<NpiCandidateView>("/npi", {
+    method: "POST",
+    headers: { ...baseHeaders(), ...idempotency() },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * PATCH /npi/:id — avanzar etapa y/o editar (If-Match).
+ * aprobar/escalar/rechazar exige purchase:npi:approve (líder);
+ * rechazar exige reason (≥5).
+ */
+export function patchNpi(
+  id: string,
+  version: number,
+  body: {
+    stage?: Exclude<NpiStage, "proposed">;
+    reason?: string;
+    pilotResult?: string;
+    costClp?: number;
+    suggestedPriceClp?: number;
+    initialBuyQty?: number;
+    pilotStores?: number;
+    initialForecastMonthly?: number;
+    risk?: NpiRisk;
+  }
+): Promise<NpiCandidateView> {
+  return request<NpiCandidateView>(`/npi/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...baseHeaders(), "If-Match": `"${version}"` },
+    body: JSON.stringify(body),
+  });
+}
+
+// ----------------------------------------------------------------------------
+//  Tipos del contrato — Vigilancia de precios de compra (F26)
+// ----------------------------------------------------------------------------
+
+export interface PriceChangeView {
+  sku: string;
+  skuName: string;
+  categoryId: string;
+  supplierRef: string;
+  /** Costo acordado vigente (SkuTerms); null si no hay acuerdo. */
+  agreedUnitCostClp: number | null;
+  previousCostClp: number;
+  previousAt: string;
+  currentCostClp: number;
+  currentAt: string;
+  currentPoNumber: string;
+  /** Variación % del último costo real vs el anterior. */
+  deltaPct: number;
+  purchasesInWindow: number;
+}
+
+export interface PriceChangesData {
+  windowDays: number;
+  items: PriceChangeView[];
+  total: number;
+}
+
+// ----------------------------------------------------------------------------
+//  API pública — Vigilancia de precios (F26)
+// ----------------------------------------------------------------------------
+
+/** GET /price-watch/changes — alzas/bajas de costo real por SKU. */
+export function listPriceChanges(params?: {
+  windowDays?: number;
+  minPct?: number;
+}): Promise<PriceChangesData> {
+  const query = new URLSearchParams();
+  if (params?.windowDays) query.set("windowDays", String(params.windowDays));
+  if (params?.minPct !== undefined) query.set("minPct", String(params.minPct));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<PriceChangesData>(`/price-watch/changes${suffix}`, {
+    method: "GET",
+    headers: baseHeaders(),
+  });
+}

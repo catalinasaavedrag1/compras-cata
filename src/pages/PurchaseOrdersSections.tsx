@@ -40,17 +40,17 @@ import {
   type SapSyncView,
 } from "../services/purchaseBff";
 import { type PurchaseOrderRow } from "../hooks/usePurchaseOrders";
-import { getProductBySku, products as allProducts } from "../data/mockProducts";
-import { recommendations } from "../data/mockRecommendations";
 import {
-  supplierMinimumStatus,
-  consolidationCandidates,
+  consolidationCandidatesFromSuggestions,
+} from "../hooks/useDraftEnrichment";
+import type { ReplenishmentRow, SupplierPanelRow } from "../services/purchaseBff";
+import {
   earliestOrderBy,
   type ConsolidationCandidate,
 } from "../utils/orderConsolidation";
 import { TODAY_ISO } from "../utils/constants";
 import type { PickupPlan } from "../utils/logistics";
-import type { PurchaseOrder, Supplier } from "../types/purchasing";
+import type { PurchaseOrder } from "../types/purchasing";
 
 // ----------------------------------------------------------------------------
 //  Sincronización SAP: chip de estado (única ventana a SAP para el usuario)
@@ -996,7 +996,9 @@ export function OrderDraftDrawer({
   removeItem,
   setDraftContextSku,
   items,
+  rowBySku,
   supplierByName,
+  contextLoading,
   addCandidate,
   pickupPlan,
   pendingSuggestions,
@@ -1014,9 +1016,9 @@ export function OrderDraftDrawer({
   totalAmount: number;
   prodSearch: string;
   setProdSearch: (value: string) => void;
-  searchResults: (typeof allProducts)[number][];
+  searchResults: ReplenishmentRow[];
   hasItem: (sku: string) => boolean;
-  addProduct: (sku: string) => void;
+  addProduct: (row: ReplenishmentRow) => void;
   meta: OcDraftMeta;
   setMeta: (patch: Partial<OcDraftMeta>) => void;
   selectedDraftItem: OcDraftItem | null;
@@ -1028,10 +1030,12 @@ export function OrderDraftDrawer({
   removeItem: (sku: string) => void;
   setDraftContextSku: (sku: string) => void;
   items: OcDraftItem[];
-  supplierByName: Map<string, Supplier>;
+  rowBySku: Map<string, ReplenishmentRow | null>;
+  supplierByName: Map<string, SupplierPanelRow | null>;
+  contextLoading: boolean;
   addCandidate: (supplierName: string, c: ConsolidationCandidate) => void;
   pickupPlan: PickupPlan;
-  pendingSuggestions: (typeof recommendations)[number][];
+  pendingSuggestions: ReplenishmentRow[];
 }) {
   return (
     <Drawer
@@ -1082,7 +1086,7 @@ export function OrderDraftDrawer({
                     <button
                       key={p.sku}
                       disabled={added}
-                      onClick={() => addProduct(p.sku)}
+                      onClick={() => addProduct(p)}
                       className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-60 disabled:cursor-default"
                     >
                       <span className="min-w-0">
@@ -1090,7 +1094,8 @@ export function OrderDraftDrawer({
                           {p.name}
                         </span>
                         <span className="block text-xs text-slate-400">
-                          {p.sku} · {p.supplierName || "Sin proveedor"} · {formatCurrency(p.cost)}
+                          {p.sku} · {p.supplier.name || "Sin proveedor"} ·{" "}
+                          {p.cost ? formatCurrency(p.cost.unitCost) : "—"}
                         </span>
                       </span>
                       <span
@@ -1165,6 +1170,9 @@ export function OrderDraftDrawer({
             {selectedDraftItem && (
               <DraftLineContext
                 item={selectedDraftItem}
+                row={rowBySku.get(selectedDraftItem.sku) ?? null}
+                supplierPanel={supplierByName.get(selectedDraftItem.supplierName) ?? null}
+                contextLoading={contextLoading}
                 orders={orders}
                 tab={draftContextTab}
                 onTabChange={setDraftContextTab}
@@ -1176,31 +1184,31 @@ export function OrderDraftDrawer({
             {/* Líneas agrupadas por proveedor */}
             {supplierGroups.map(([supplierName, groupItems]) => {
               const net = groupItems.reduce((a, i) => a + lineNet(i), 0);
-              const units = groupItems.reduce((a, i) => a + i.quantity, 0);
-              const supplier = supplierByName.get(supplierName);
-              const leadTime =
-                supplier?.averageLeadTimeDays ??
-                getProductBySku(groupItems[0]?.sku)?.supplierLeadTimeDays ??
-                7;
-              const minimum = supplierMinimumStatus(supplier, net, units);
-              const candidates = consolidationCandidates({
+              const supplierPanel = supplierByName.get(supplierName) ?? null;
+              // El panel de proveedores no expone mínimo de compra: sin fuente
+              // real, el coach no muestra ese badge (no se inventa).
+              const minimum = null;
+              const draftSkus = new Set(items.map((i) => i.sku));
+              const candidates = consolidationCandidatesFromSuggestions(
+                pendingSuggestions,
                 supplierName,
-                draftSkus: new Set(items.map((i) => i.sku)),
-                products: allProducts,
-                recommendations,
-                horizonDays: leadTime + 30,
-                todayISO: TODAY_ISO,
-                limit: 3,
-              });
+                draftSkus,
+                3
+              );
               const orderBy = earliestOrderBy(
                 groupItems
-                  .map((i) => getProductBySku(i.sku))
-                  .filter((p): p is NonNullable<typeof p> => !!p)
-                  .map((p) => ({
-                    availableStock: p.availableStock,
-                    salesLast30Days: p.salesLast30Days,
-                    leadTimeDays: p.supplierLeadTimeDays,
-                  })),
+                  .map((i) => {
+                    const r = rowBySku.get(i.sku);
+                    const avail = r?.stock?.available;
+                    const sales = r?.salesLast30d;
+                    const lt = r?.leadTimeDays ?? supplierPanel?.leadTimeDaysObserved;
+                    if (avail == null || sales == null || lt == null) return null;
+                    return { availableStock: avail, salesLast30Days: sales, leadTimeDays: lt };
+                  })
+                  .filter(
+                    (l): l is { availableStock: number; salesLast30Days: number; leadTimeDays: number } =>
+                      l !== null
+                  ),
                 TODAY_ISO
               );
               return (
@@ -1364,21 +1372,21 @@ export function OrderDraftDrawer({
             <div className="space-y-2">
               {pendingSuggestions.slice(0, 6).map((r) => (
                 <div
-                  key={r.id}
+                  key={r.recommendationId}
                   className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{r.productName}</p>
+                    <p className="text-sm font-medium text-slate-800 truncate">{r.name}</p>
                     <p className="text-xs text-slate-500">
-                      {r.supplierName} · {formatNumber(r.suggestedQuantity)} u. ·{" "}
-                      {formatCurrency(r.suggestedPurchaseAmount)}
+                      {r.supplier.name || "Sin proveedor"} · {formatNumber(r.suggestedQty)} u. ·{" "}
+                      {r.suggestedAmountClp != null ? formatCurrency(r.suggestedAmountClp) : "—"}
                     </p>
                   </div>
                   <Button
                     size="sm"
                     variant="secondary"
                     icon={<IconPlus className="w-3.5 h-3.5" />}
-                    onClick={() => addProduct(r.sku)}
+                    onClick={() => addProduct(r)}
                   >
                     Agregar
                   </Button>
