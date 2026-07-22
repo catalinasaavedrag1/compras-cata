@@ -1,13 +1,16 @@
-import type { Product, Supplier } from "../../types/purchasing";
+import type { ReplenishmentRecommendation } from "../../hooks/useReplenishment";
 
 // ============================================================================
 //  Tipos de la vista "Mi cartera" (Inicio del comprador).
-//  Filas y agrupaciones derivadas de la cartera para el resumen ejecutivo,
-//  productos clave, marcas, proveedores y oportunidades.
+//  Filas derivadas de las fuentes reales del purchase-bff (motor de
+//  reposición, paneles F12 y desempeño F19). Las agrupaciones que dependían
+//  del maestro mock de productos (roles, marcas) se eliminaron: no existen
+//  en el contrato actual.
 // ============================================================================
 
+/** Fila de riesgo de quiebre, construida sobre la recomendación real del motor. */
 export interface RiskRow {
-  product: Product;
+  rec: ReplenishmentRecommendation;
   coverage: number;
   stockoutDate: string | null;
   suggestedQty: number;
@@ -32,32 +35,13 @@ export interface AgendaItem {
   impactValue: number;
 }
 
+/** Ritmo de venta 30d vs promedio 90d/3, derivado de las filas reales del motor. */
 export interface SalesPaceRow {
-  product: Product;
+  rec: ReplenishmentRecommendation;
   expected30: number;
   diffUnits: number;
   diffPct: number;
   coverage: number;
-}
-
-export type PortfolioProductRole =
-  | "Estrella"
-  | "Tractor"
-  | "Margen"
-  | "Emergente"
-  | "Deterioro"
-  | "Detenido"
-  | "Riesgo";
-
-export interface KeyProductRow {
-  product: Product;
-  role: PortfolioProductRole;
-  salesValue: number;
-  grossProfit: number;
-  gmroi: number;
-  growthPct: number;
-  coverage: number;
-  reason: string;
 }
 
 export type PortfolioFocus =
@@ -67,29 +51,25 @@ export type PortfolioFocus =
   | "proveedores"
   | "oportunidades";
 
-export interface BrandPortfolioRow {
-  brand: string;
-  sales: number;
-  margin: number;
-  inventory: number;
-  growth: number;
-  stockouts: number;
-  skus: number;
-}
-
-export interface SupplierPortfolioRow {
-  supplier: Supplier;
-  sales: number;
-  stalled: number;
-  skus: number;
-  alternatives: number;
-  dependency: number;
-}
-
 export interface PortfolioOpportunity {
   title: string;
   label: string;
   detail: string;
   to: string;
   tone: "blue" | "green" | "amber";
+}
+
+/** Contador del resumen de oportunidades (null = fuente no disponible). */
+export interface OpportunitySummaryItem {
+  label: string;
+  count: number | null;
+  tone: "green" | "blue" | "amber" | "violet";
+  to: string;
+}
+
+/** Foco accionable de "Principales focos" (solo se listan los calculables). */
+export interface PortfolioFoco {
+  dot: string;
+  text: string;
+  to: string;
 }

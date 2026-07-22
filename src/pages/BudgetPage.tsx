@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
-import { Card } from "../components/ui/Card";
+import { Card, CardHeader, CardBody } from "../components/ui/Card";
 import { Select } from "../components/ui/Select";
+import { Button } from "../components/ui/Button";
+import { Skeleton } from "../components/ui/Skeleton";
 import { DataTable, type Column } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
 import { HelpNote } from "../components/business/HelpNote";
@@ -10,19 +12,15 @@ import { InfoHint } from "../components/business/InfoHint";
 import { Badge, type BadgeTone } from "../components/ui/Badge";
 import { cn } from "../utils/cn";
 import {
-  BUDGET_MONTHS,
-  DEFAULT_BUDGET_MONTH,
+  computeOtb,
   formatBudgetMonth,
   type BudgetStatus,
-} from "../data/mockBudgets";
-import { computeOtb, type CategoryOtb } from "../utils/openToBuy";
-import { suppliers } from "../data/mockSuppliers";
+  type CategoryOtb,
+} from "../utils/openToBuy";
 import { supplierPath } from "../utils/entityLinks";
 import { Link } from "react-router-dom";
-import { CardHeader, CardBody } from "../components/ui/Card";
 import { useOcDraft } from "../context/OcDraftContext";
-import { useLocalStorage } from "../utils/useLocalStorage";
-import type { PurchaseOrder } from "../types/purchasing";
+import { useBudget, useSupplierSpend } from "../hooks/useBudget";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "../utils/formatters";
 import { IconInventory, IconCart, IconBox, IconAlerts } from "../components/ui/icons";
 
@@ -59,37 +57,112 @@ function UsageBar({ row }: { row: CategoryOtb }) {
   );
 }
 
+/** Compra por proveedor (ventana móvil real del dominio) + concentración. */
+function SupplierSpendCard() {
+  const { data, loading, error, refetch } = useSupplierSpend(90);
+
+  const rows = data?.items ?? [];
+  const topSupplier = rows[0];
+  const namesStale = (data?.warnings ?? []).some((w) => w.code === "SUPPLIER_DATA_STALE");
+
+  return (
+    <Card className="mt-4">
+      <CardHeader
+        title={`Compra por proveedor (${data?.windowDays ?? 90} días)`}
+        description="En qué proveedores se concentra el gasto. La dependencia excesiva es un riesgo."
+      />
+      <CardBody>
+        {loading && rows.length === 0 && (
+          <div className="space-y-2.5" aria-busy="true" aria-label="Cargando compra por proveedor">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-4 w-40 flex-shrink-0" />
+                <Skeleton className="h-2 flex-1 rounded-full" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            ))}
+          </div>
+        )}
+        {!loading && error && rows.length === 0 && (
+          <div className="py-4 text-center">
+            <p className="text-sm text-slate-500">No se pudo cargar la compra por proveedor.</p>
+            <Button className="mt-3" size="sm" variant="secondary" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        )}
+        {!loading && !error && rows.length === 0 && (
+          <p className="py-4 text-center text-sm text-slate-500">
+            Sin órdenes de compra en la ventana. El gasto por proveedor aparecerá al emitir OC.
+          </p>
+        )}
+        {rows.length > 0 && (
+          <>
+            {namesStale && (
+              <p className="mb-2 text-xs text-slate-400">
+                Nombres de proveedor no disponibles; se muestra la referencia interna.
+              </p>
+            )}
+            {topSupplier && topSupplier.share > 0.3 && (
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <IconAlerts className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
+                <span>
+                  Concentración alta: <b>{topSupplier.supplierName}</b> representa el{" "}
+                  {formatPercent(topSupplier.share * 100, 0)} de la compra. Evalúa alternativas para
+                  reducir dependencia.
+                </span>
+              </div>
+            )}
+            <div className="space-y-2">
+              {rows.slice(0, 8).map((s) => (
+                <div key={s.supplierId} className="flex items-center gap-3">
+                  <Link
+                    to={supplierPath(s.supplierId)}
+                    className="w-40 flex-shrink-0 truncate text-sm font-medium text-slate-700 hover:text-brand-700 hover:underline"
+                  >
+                    {s.supplierName}
+                  </Link>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className={cn(
+                        "h-full rounded-full",
+                        s.share > 0.3 ? "bg-amber-400" : "bg-brand-500"
+                      )}
+                      style={{ width: `${Math.round(s.share * 100)}%` }}
+                    />
+                  </div>
+                  <span className="w-12 flex-shrink-0 text-right text-xs font-medium text-slate-500">
+                    {formatPercent(s.share * 100, 0)}
+                  </span>
+                  <span className="w-20 flex-shrink-0 text-right text-sm font-semibold text-slate-900">
+                    {formatCurrencyCompact(s.totalClp)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
 export function BudgetPage() {
-  const [month, setMonth] = useState<string>(DEFAULT_BUDGET_MONTH);
+  // undefined = mes efectivo del BFF (el más reciente configurado).
+  const [month, setMonth] = useState<string | undefined>(undefined);
   const [query, setQuery] = useState("");
   const [estado, setEstado] = useState("");
   const { items: draftItems, count: draftCount } = useOcDraft();
-  const [createdOrders] = useLocalStorage<PurchaseOrder[]>("compras:po-created", []);
+  const { data, loading, error, configured, refetch } = useBudget(month);
 
-  // Open-to-Buy en vivo: el borrador y las OC creadas consumen presupuesto.
+  const effectiveMonth = data?.month ?? month ?? null;
+  const months = data?.months ?? [];
+
+  // Open-to-Buy en vivo: buckets reales + el borrador en curso por categoría.
   const views = useMemo(
-    () => computeOtb(month, draftItems, createdOrders),
-    [month, draftItems, createdOrders]
+    () => computeOtb(data?.items ?? [], draftItems),
+    [data, draftItems]
   );
-
-  // Compra por proveedor (90 días) y concentración: presupuesto por proveedor y
-  // alerta de dependencia excesiva.
-  const supplierSpend = useMemo(() => {
-    const active = suppliers.filter((s) => s.purchasedAmountLast90Days > 0);
-    const total = active.reduce((a, s) => a + s.purchasedAmountLast90Days, 0);
-    return {
-      total,
-      rows: active
-        .map((s) => ({
-          id: s.id,
-          name: s.name,
-          amount: s.purchasedAmountLast90Days,
-          share: total > 0 ? s.purchasedAmountLast90Days / total : 0,
-        }))
-        .sort((a, b) => b.amount - a.amount),
-    };
-  }, []);
-  const topSupplier = supplierSpend.rows[0];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -108,11 +181,10 @@ export function BudgetPage() {
       (acc, v) => {
         acc.presupuesto += v.presupuesto;
         acc.comprometido += v.comprometido;
-        acc.recibido += v.recibido;
         acc.enBorrador += v.enBorrador;
         return acc;
       },
-      { presupuesto: 0, comprometido: 0, recibido: 0, enBorrador: 0 }
+      { presupuesto: 0, comprometido: 0, enBorrador: 0 }
     );
   }, [views]);
 
@@ -128,6 +200,91 @@ export function BudgetPage() {
     setQuery("");
     setEstado("");
   };
+
+  const pageTitle = "Presupuesto por categoría";
+  const pageDescription =
+    "Open-to-Buy: cuánto puedes comprar en cada categoría después de descontar lo ya comprometido y lo que estás armando en el borrador.";
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando y error (patrón flujo 1).
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver el presupuesto real (Open-to-Buy) del servicio de compras.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && !data) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando presupuesto">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-4 w-40 flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudo cargar el presupuesto
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Presupuesto no configurado en el dominio: estado vacío honesto.
+  if (data && data.month === null) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Presupuesto no configurado</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Aún no hay buckets de Open-to-Buy definidos para ninguna categoría. Cuando el área de
+              finanzas los configure, verás aquí el presupuesto del mes y su consumo.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const columns: Column<CategoryOtb>[] = [
     {
@@ -206,17 +363,19 @@ export function BudgetPage() {
   return (
     <div>
       <PageHeader
-        title="Presupuesto por categoría"
-        description="Open-to-Buy: cuánto puedes comprar en cada categoría después de descontar lo ya comprometido y lo que estás armando en el borrador."
+        title={pageTitle}
+        description={pageDescription}
         action={
-          <div className="w-44">
-            <Select
-              aria-label="Mes del presupuesto"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              options={BUDGET_MONTHS.map((m) => ({ value: m, label: formatBudgetMonth(m) }))}
-            />
-          </div>
+          months.length > 0 && effectiveMonth ? (
+            <div className="w-44">
+              <Select
+                aria-label="Mes del presupuesto"
+                value={effectiveMonth}
+                onChange={(e) => setMonth(e.target.value)}
+                options={months.map((m) => ({ value: m, label: formatBudgetMonth(m) }))}
+              />
+            </div>
+          ) : undefined
         }
         help={
           <InfoHint label="Qué es el disponible (OTB)">
@@ -239,7 +398,7 @@ export function BudgetPage() {
           value={formatCurrencyCompact(totals.presupuesto)}
           tone="info"
           icon={<IconInventory className="w-4 h-4" />}
-          description={formatBudgetMonth(month)}
+          description={effectiveMonth ? formatBudgetMonth(effectiveMonth) : "—"}
         />
         <KpiCard
           title="Comprometido"
@@ -272,11 +431,12 @@ export function BudgetPage() {
         </HelpNote>
       )}
 
-      {excedidas.length > 0 && (
+      {excedidas.length > 0 && effectiveMonth && (
         <HelpNote variant="tip" className="mb-4">
           <b>{excedidas.length}</b> categoría{excedidas.length === 1 ? "" : "s"} quedaría
-          {excedidas.length === 1 ? "" : "n"} sobre presupuesto en {formatBudgetMonth(month)}:{" "}
-          {excedidas.map((v) => v.categoria).join(", ")}. Revisa antes de emitir la orden de compra.
+          {excedidas.length === 1 ? "" : "n"} sobre presupuesto en{" "}
+          {formatBudgetMonth(effectiveMonth)}: {excedidas.map((v) => v.categoria).join(", ")}.
+          Revisa antes de emitir la orden de compra.
         </HelpNote>
       )}
 
@@ -307,7 +467,7 @@ export function BudgetPage() {
         <DataTable
           columns={columns}
           data={filtered}
-          rowKey={(v) => v.categoria}
+          rowKey={(v) => v.categoryId}
           rowClassName={(v) =>
             v.estado === "excedido"
               ? "bg-rose-50/60"
@@ -353,52 +513,7 @@ export function BudgetPage() {
         />
       </Card>
 
-      {/* Presupuesto / gasto por proveedor + concentración */}
-      <Card className="mt-4">
-        <CardHeader
-          title="Compra por proveedor (90 días)"
-          description="En qué proveedores se concentra el gasto. La dependencia excesiva es un riesgo."
-        />
-        <CardBody>
-          {topSupplier && topSupplier.share > 0.3 && (
-            <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              <IconAlerts className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
-              <span>
-                Concentración alta: <b>{topSupplier.name}</b> representa el{" "}
-                {formatPercent(topSupplier.share * 100, 0)} de la compra. Evalúa alternativas para
-                reducir dependencia.
-              </span>
-            </div>
-          )}
-          <div className="space-y-2">
-            {supplierSpend.rows.slice(0, 8).map((s) => (
-              <div key={s.id} className="flex items-center gap-3">
-                <Link
-                  to={supplierPath(s.name)}
-                  className="w-40 flex-shrink-0 truncate text-sm font-medium text-slate-700 hover:text-brand-700 hover:underline"
-                >
-                  {s.name}
-                </Link>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className={cn(
-                      "h-full rounded-full",
-                      s.share > 0.3 ? "bg-amber-400" : "bg-brand-500"
-                    )}
-                    style={{ width: `${Math.round(s.share * 100)}%` }}
-                  />
-                </div>
-                <span className="w-12 flex-shrink-0 text-right text-xs font-medium text-slate-500">
-                  {formatPercent(s.share * 100, 0)}
-                </span>
-                <span className="w-20 flex-shrink-0 text-right text-sm font-semibold text-slate-900">
-                  {formatCurrencyCompact(s.amount)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </CardBody>
-      </Card>
+      <SupplierSpendCard />
     </div>
   );
 }

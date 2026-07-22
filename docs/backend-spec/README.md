@@ -19,6 +19,11 @@ Fecha ancla de la demo: `TODAY_ISO = 2026-06-24` (el backend debe exponer fecha 
 10. [`10-decisiones-pendientes.md`](10-decisiones-pendientes.md) — decisiones de negocio/modelado abiertas, con alternativa razonable propuesta.
 11. [`11-validacion-vista-por-vista.md`](11-validacion-vista-por-vista.md) — auditoría del código real vista por vista: rutas y enums corregidos, escrituras ocultas e inconsistencias detectadas.
 
+> **Paso siguiente — diseño de arquitectura:** [`../arquitectura-backend/README.md`](../arquitectura-backend/README.md)
+> toma esta especificación + la verificación real de los microservicios existentes y define la
+> arquitectura de `purchase-service` y `purchase-bff-service` (delimitación de dominio, responsabilidades,
+> flujos, matriz, entidades, datos externos, eventos, riesgos y propuesta final). Aún sin código.
+
 ---
 
 ## Resumen ejecutivo

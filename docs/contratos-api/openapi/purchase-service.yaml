@@ -1,0 +1,598 @@
+openapi: 3.0.3
+info:
+  title: purchase-service
+  version: 0.1.0-preliminar
+  description: >
+    Contrato preliminar del servicio de dominio de Compras. Consumido por purchase-bff-service y
+    workers internos; NUNCA por el frontend. Convenciones de servicio de dominio (00 §1): respuestas
+    crudas sin envoltorio; colecciones {items,total,page,pageSize} + header x-janis-total; errores
+    {statusCode, error:{code,message,details}, timestamp}. Cobertura: flujo vertical estrella; los
+    módulos restantes (01-B) replican estos patrones. NO implementar aún.
+servers:
+  - url: /api/purchase/v1
+security:
+  - gatewayUser: []
+  - serviceKey: []
+
+tags:
+  - { name: recommendations }
+  - { name: proposals }
+  - { name: approvals }
+  - { name: purchase-orders }
+  - { name: receptions }
+  - { name: budget }
+  - { name: assignments }
+  - { name: alerts }
+  - { name: internal }
+
+paths:
+  /recommendations/search:
+    post:
+      tags: [recommendations]
+      summary: Página rankeada de recomendaciones (motor materializado)
+      operationId: searchRecommendations
+      parameters: [ { $ref: '#/components/parameters/UserHeaders' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecommendationSearch' }
+      responses:
+        '200':
+          description: OK
+          headers:
+            x-janis-total: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendationPage' }
+              example:
+                items:
+                  - id: rec-2026-018842
+                    sku: HT-TAL-0450
+                    supplierId: SUP-023
+                    categoryId: cat-herramientas
+                    buyerId: catalina
+                    priority: stockout_imminent
+                    suggestedQty: 96
+                    coverageDays: 4.4
+                    dailyVelocity: 3.2
+                    velocityAsOf: '2026-07-16T23:59:59Z'
+                    stockSnapshot: { available: 14, inTransit: 24, asOf: '2026-07-17T11:20:00Z' }
+                    unitCostClp: 38990
+                    status: pending
+                    version: 3
+                total: 87
+                page: 1
+                pageSize: 60
+        '400': { $ref: '#/components/responses/DomainError' }
+
+  /recommendations/{id}:
+    patch:
+      tags: [recommendations]
+      summary: Override / ignore / snooze (C19, auditable, reason obligatorio)
+      operationId: patchRecommendation
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, reason]
+              properties:
+                action: { type: string, enum: [override, ignore, snooze] }
+                qty: { type: integer, minimum: 1 }
+                snoozeUntil: { type: string, format: date }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200': { description: Recomendación actualizada (cruda) }
+        '409': { $ref: '#/components/responses/DomainError' }
+
+  /proposals:
+    post:
+      tags: [proposals]
+      summary: Crear propuesta (C1)
+      operationId: createProposal
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                note: { type: string }
+                lines: { type: array, items: { $ref: '#/components/schemas/NewLine' } }
+      responses:
+        '201':
+          description: Propuesta creada (cruda)
+          headers: { Location: { schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProposalEntity' }
+        '409': { $ref: '#/components/responses/DomainError' }
+        '422': { $ref: '#/components/responses/DomainError' }
+    get:
+      tags: [proposals]
+      summary: Listar propuestas
+      operationId: listProposals
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: buyerId, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 60, maximum: 500 } }
+      responses:
+        '200':
+          description: '{items,total,page,pageSize}'
+          headers: { x-janis-total: { schema: { type: integer } } }
+
+  /proposals/{id}:
+    get:
+      tags: [proposals]
+      summary: Detalle de propuesta
+      operationId: getProposal
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200':
+          description: OK (ETag = version)
+          headers: { ETag: { schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProposalEntity' }
+        '404': { $ref: '#/components/responses/DomainError' }
+    patch:
+      tags: [proposals]
+      summary: Editar metadatos (C2)
+      operationId: patchProposal
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { description: OK }
+
+  /proposals/{id}/lines:
+    post:
+      tags: [proposals]
+      summary: Agregar línea (C3) — resuelve costo vigente vía pricing
+      operationId: addLine
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewLine' }
+      responses:
+        '201': { description: Propuesta recalculada }
+        '422': { $ref: '#/components/responses/DomainError' }
+
+  /proposals/{id}/lines/{lineId}:
+    patch:
+      tags: [proposals]
+      summary: Actualizar cantidad (C4) — If-Match con versión de línea
+      operationId: updateLine
+      parameters: [ { $ref: '#/components/parameters/Id' }, { name: lineId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { description: OK }
+        '409': { $ref: '#/components/responses/DomainError' }
+    delete:
+      tags: [proposals]
+      summary: Eliminar línea (C5)
+      operationId: deleteLine
+      parameters: [ { $ref: '#/components/parameters/Id' }, { name: lineId, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { description: OK }
+
+  /proposals/{id}/submit:
+    post:
+      tags: [proposals]
+      summary: Enviar a revisión (C7) — evalúa Governance y OTB
+      description: >
+        Precondiciones: draft, ≥1 línea, sin COST_MISSING, OTB ok (budget/check), MOQ agregado,
+        proveedor activo. Transición: in_review (crea Approval pending) o approved directo.
+        Emite purchase.proposal.submitted (+approval.requested) vía Outbox y traza.
+      operationId: submitProposal
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { description: Propuesta con estado nuevo y approval embebida si aplica }
+        '409': { $ref: '#/components/responses/DomainError' }
+        '422': { $ref: '#/components/responses/DomainError' }
+
+  /proposals/{id}/convert:
+    post:
+      tags: [proposals]
+      summary: Convertir en OC(s) (C13) — transacción con outbox SAP
+      description: >
+        Revalida costo/OTB/proveedor (revalidar-al-confirmar). Crea 1 OC por proveedor con
+        sapSync=pending e integrationKey única po:<id>:opor. Consume OTB. 202: la emisión a SAP la
+        drena el worker E11 (ver 05-integracion-sap).
+      operationId: convertProposal
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '202': { description: '{ proposalId, status: converted, purchaseOrders[] }' }
+        '409': { $ref: '#/components/responses/DomainError' }
+        '422': { $ref: '#/components/responses/DomainError' }
+
+  /approvals:
+    get:
+      tags: [approvals]
+      summary: Bandeja de aprobaciones
+      operationId: listApprovals
+      parameters:
+        - { name: state, in: query, schema: { type: string, default: pending } }
+      responses:
+        '200': { description: '{items,total,page,pageSize}' }
+
+  /approvals/{id}/approve:
+    post:
+      tags: [approvals]
+      summary: Aprobar (C8) — permiso purchase:proposal:approve, server-side
+      operationId: approve
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '200': { description: approval approved; propuesta approved (FK real) }
+        '403': { $ref: '#/components/responses/DomainError' }
+        '409': { $ref: '#/components/responses/DomainError' }
+
+  /approvals/{id}/reject:
+    post:
+      tags: [approvals]
+      summary: Rechazar (C9, reason obligatorio)
+      operationId: reject
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [reason], properties: { reason: { type: string } } }
+      responses:
+        '200': { description: rejected }
+
+  /approvals/{id}/request-changes:
+    post:
+      tags: [approvals]
+      summary: Solicitar corrección (C10) — propuesta vuelve editable
+      operationId: requestChanges
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [reason], properties: { reason: { type: string } } }
+      responses:
+        '200': { description: observed / changes_requested }
+
+  /purchase-orders:
+    get:
+      tags: [purchase-orders]
+      summary: Listar OC
+      operationId: listPurchaseOrders
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: supplierId, in: query, schema: { type: string } }
+        - { name: number, in: query, schema: { type: string } }
+      responses:
+        '200': { description: '{items,total,page,pageSize}' }
+
+  /purchase-orders/{id}:
+    get:
+      tags: [purchase-orders]
+      summary: Detalle de OC (líneas, sapSync, FK a approval/recepciones)
+      operationId: getPurchaseOrder
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderEntity' }
+
+  /purchase-orders/{id}/send:
+    post:
+      tags: [purchase-orders]
+      summary: (Re)enviar a SAP/proveedor (C14) — re-encola outbox si failed
+      operationId: sendPurchaseOrder
+      parameters: [ { $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/IfMatch' } ]
+      responses:
+        '202': { description: encolado; sapSync=pending }
+
+  /purchase-orders/{id}/status:
+    patch:
+      tags: [internal]
+      summary: Conciliación de estado (SOLO x-service-*; workers/eventos SAP)
+      operationId: reconcileStatus
+      security: [ { serviceKey: [] } ]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string }
+                sapSync: { $ref: '#/components/schemas/SapSyncPatch' }
+                source: { type: string, example: 'sap-outbox-worker' }
+      responses:
+        '200': { description: conciliado (idempotente por estado) }
+
+  /receptions:
+    post:
+      tags: [receptions]
+      summary: Registrar recepción contra OC (C21)
+      operationId: createReception
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purchaseOrderId, warehouseId, items]
+              properties:
+                purchaseOrderId: { type: string }
+                warehouseId: { type: string }
+                packingSlip: { type: string }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [lineId, qtyReceived]
+                    properties:
+                      lineId: { type: string }
+                      qtyReceived: { type: number, minimum: 0 }
+                      condition: { type: string, enum: [ok, damaged, wrong_item] }
+                      note: { type: string }
+      responses:
+        '201': { description: Reception(checking); al completar emite purchase.reception.completed }
+        '422': { $ref: '#/components/responses/DomainError' }
+
+  /budget/check:
+    post:
+      tags: [budget]
+      summary: Validar disponibilidad OTB (usado por submit/convert; también consultable)
+      operationId: checkBudget
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountClp, categoryId, month]
+              properties:
+                amountClp: { type: integer }
+                categoryId: { type: string }
+                month: { type: string, example: '2026-07' }
+      responses:
+        '200':
+          description: resultado
+          content:
+            application/json:
+              example: { allowed: true, bucketId: otb-2026-07-herr, remainingClp: 35600000 }
+
+  /assignments:
+    get:
+      tags: [assignments]
+      summary: Cartera comprador↔categoría (fuente del alcance de autorización)
+      operationId: listAssignments
+      responses:
+        '200': { description: '{items:[{categoryId, buyerId, since}],total,…}' }
+
+  /assignments/{categoryId}:
+    put:
+      tags: [assignments]
+      summary: Reasignar categoría (C18, permiso assignment:admin)
+      operationId: assignCategory
+      parameters:
+        - { name: categoryId, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [buyerId], properties: { buyerId: { type: string } } }
+      responses:
+        '200': { description: reasignada; evento assignment.changed }
+
+  /alerts:
+    get:
+      tags: [alerts]
+      summary: Alertas con estado (dueño del inbox — notification solo despacha push)
+      operationId: listAlerts
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: buyerId, in: query, schema: { type: string } }
+      responses:
+        '200': { description: '{items,total,page,pageSize}' }
+    post:
+      tags: [internal]
+      summary: Crear alerta (SOLO x-service-*; motor de reglas E10)
+      operationId: createAlert
+      security: [ { serviceKey: [] } ]
+      responses:
+        '201': { description: creada; dispara notification/trigger }
+
+  /alerts/{id}/acknowledge:
+    post:
+      tags: [alerts]
+      summary: Atender (C17; idempotente por transición)
+      operationId: acknowledgeAlert
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200': { description: acknowledged }
+
+components:
+  securitySchemes:
+    gatewayUser:
+      type: apiKey
+      in: header
+      name: x-user-id
+      description: >
+        Identidad propagada por purchase-bff (modelo GatewayUserGuard): x-user-id + x-client +
+        x-user-permissions (CSV de purchase:*) + x-plataforma-id + x-buyer-id + x-scope +
+        x-correlation-id.
+    serviceKey:
+      type: apiKey
+      in: header
+      name: x-service-api-key
+      description: Auth servicio-a-servicio (x-service-api-key/-secret/-client) para workers/eventos.
+
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string } }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: { type: string }
+      description: Optimistic locking con campo version; desajuste ⇒ 409 CONFLICT_ERROR
+    IdempotencyKey:
+      name: idempotency-key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+      description: Falta ⇒ 409; misma key+payload ⇒ replay; misma key+payload distinto ⇒ 409
+    UserHeaders:
+      name: x-user-permissions
+      in: header
+      schema: { type: string }
+      description: CSV de permisos purchase:* (junto a x-user-id, x-buyer-id, x-scope)
+
+  responses:
+    DomainError:
+      description: Error de dominio (forma pricing-style)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/DomainError' }
+          example:
+            statusCode: 409
+            error:
+              code: CONFLICT_ERROR
+              message: La propuesta no puede aprobarse desde su estado actual.
+              details: { current: draft, allowed: [pending] }
+            timestamp: '2026-07-17T12:00:00Z'
+
+  schemas:
+    DomainError:
+      type: object
+      properties:
+        statusCode: { type: integer }
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION_ERROR, RESOURCE_NOT_FOUND, PERMISSION_DENIED, CONFLICT_ERROR, UNAUTHENTICATED, RATE_LIMITED, INTERNAL_ERROR]
+            message: { type: string }
+            details: {}
+        timestamp: { type: string, format: date-time }
+
+    RecommendationSearch:
+      type: object
+      properties:
+        filters:
+          type: object
+          properties:
+            q: { type: string }
+            categoryIds: { type: array, items: { type: string } }
+            supplierIds: { type: array, items: { type: string } }
+            priority: { type: array, items: { type: string } }
+            status: { type: array, items: { type: string } }
+            buyerId: { type: string }
+        scope: { type: string, enum: [mine, all] }
+        page: { type: integer, default: 1 }
+        pageSize: { type: integer, default: 60, maximum: 500 }
+        sort: { type: array, items: { type: object, properties: { field: { type: string }, order: { type: string } } } }
+
+    RecommendationPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/RecommendationEntity' } }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+
+    RecommendationEntity:
+      type: object
+      properties:
+        id: { type: string }
+        sku: { type: string }
+        supplierId: { type: string }
+        categoryId: { type: string }
+        buyerId: { type: string }
+        priority: { type: string }
+        suggestedQty: { type: integer }
+        coverageDays: { type: number, nullable: true }
+        dailyVelocity: { type: number, nullable: true }
+        velocityAsOf: { type: string, format: date-time, nullable: true }
+        stockSnapshot:
+          type: object
+          properties:
+            available: { type: number }
+            inTransit: { type: number }
+            asOf: { type: string, format: date-time }
+        unitCostClp: { type: integer, nullable: true }
+        status: { type: string, enum: [pending, in_cart, ordered, ignored, snoozed] }
+        version: { type: integer }
+
+    NewLine:
+      type: object
+      required: [sku, qty]
+      properties:
+        sku: { type: string }
+        qty: { type: integer, minimum: 1 }
+        recommendationId: { type: string, nullable: true }
+
+    ProposalEntity:
+      type: object
+      description: Forma cruda; el BFF la traduce a la vista (nunca llega al frontend tal cual)
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [draft, changes_requested, in_review, approved, converted, rejected, cancelled] }
+        version: { type: integer }
+        buyerId: { type: string }
+        title: { type: string }
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              lineId: { type: string }
+              sku: { type: string }
+              supplierId: { type: string }
+              categoryId: { type: string }
+              qty: { type: integer }
+              unitCostClp: { type: integer, nullable: true }
+              landedUnitCostClp: { type: integer, nullable: true }
+              costAsOf: { type: string, format: date-time, nullable: true }
+              recommendationId: { type: string, nullable: true }
+              version: { type: integer }
+        approvalId: { type: string, nullable: true, description: FK real (nunca string legible como clave) }
+        totalsBySupplier: { type: array, items: { type: object } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    PurchaseOrderEntity:
+      type: object
+      properties:
+        id: { type: string }
+        number: { type: string, description: código legible, atributo de presentación }
+        proposalId: { type: string }
+        approvalId: { type: string, nullable: true }
+        supplierId: { type: string }
+        sapCardCode: { type: string, nullable: true }
+        status: { type: string, enum: [approved, sent, confirmed, partially_received, received, closed, cancelled] }
+        version: { type: integer }
+        lines: { type: array, items: { type: object } }
+        sapSync: { $ref: '#/components/schemas/SapSyncPatch' }
+        otbBucketId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    SapSyncPatch:
+      type: object
+      properties:
+        status: { type: string, enum: [pending, processing, posted, failed, rejected, cancelled] }
+        docEntry: { type: integer, nullable: true }
+        docNum: { type: integer, nullable: true }
+        integrationKey: { type: string, example: 'po:po-2026-000789:opor' }
+        attempts: { type: integer }
+        lastError: { type: string, nullable: true }

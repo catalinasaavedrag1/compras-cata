@@ -1,320 +1,83 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { productPath } from "../utils/entityLinks";
 import { Card, CardBody } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
-import { DataTable, makeToggleSort, type Column, type SortState } from "../components/ui/Table";
-import { IconCampaign } from "../components/ui/icons";
-import { formatCurrencyCompact, formatNumber, formatPercent } from "../utils/formatters";
-import {
-  campaignPerformance,
-  PERF_CHANNEL_META,
-  roasTone,
-  type ChannelPerformance,
-  type ProductPerformance,
-} from "../data/mockCampaignPerformance";
-import type { CampaignPlan } from "../data/mockCampaignPlans";
-import { Svg } from "./campaignsShared";
-import { CHANNEL_BG } from "../utils/tone";
+import { formatCurrency, formatDate } from "../utils/formatters";
+import { CAMPAIGN_STATUS_UI, CAMPAIGN_TYPE_UI } from "./campaignsHelpers";
+import type { CampaignView } from "../services/purchaseBff";
 
-/** Vista de rendimiento (simulado) de una campaña: KPIs + tablas por canal y producto. */
-export function CampaignPerformance({ camp }: { camp: CampaignPlan }) {
-  const perf = useMemo(() => campaignPerformance(camp), [camp]);
+// ============================================================================
+//  Rendimiento de una campaña real. El contrato del purchase-bff-service no
+//  expone venta, inversión ejecutada ni atribución por campaña, así que aquí
+//  se muestran solo los datos reales de la campaña y TODA métrica de
+//  desempeño degrada a "—" sin inventar números.
+// ============================================================================
 
-  const channelCols: Column<ChannelPerformance>[] = [
-    {
-      key: "channel",
-      header: "Canal",
-      render: (r) => {
-        const m = PERF_CHANNEL_META[r.channel];
-        return (
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 ${CHANNEL_BG[m.tone] ?? "bg-slate-100 text-slate-600"}`}
-            >
-              <Svg path={m.icon} className="w-3.5 h-3.5" />
-            </span>
-            <span className="text-sm font-semibold text-slate-700">{r.label}</span>
-          </div>
-        );
-      },
-    },
-    {
-      key: "impressions",
-      header: "Impresiones",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.impressions,
-      render: (r) => formatNumber(r.impressions),
-    },
-    {
-      key: "clicks",
-      header: "Clics",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.clicks,
-      render: (r) => formatNumber(r.clicks),
-    },
-    {
-      key: "ctr",
-      header: "CTR",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.ctr,
-      render: (r) => formatPercent(r.ctr),
-    },
-    {
-      key: "conversions",
-      header: "Conversiones",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.conversions,
-      render: (r) => formatNumber(r.conversions),
-    },
-    {
-      key: "revenue",
-      header: "Ingresos",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.revenue,
-      render: (r) => (
-        <span className="font-semibold text-emerald-600">{formatCurrencyCompact(r.revenue)}</span>
-      ),
-    },
-    {
-      key: "spend",
-      header: "Inversión",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.spend,
-      render: (r) => formatCurrencyCompact(r.spend),
-    },
-    {
-      key: "roas",
-      header: "ROAS",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.roas,
-      render: (r) => (
-        <Badge tone={roasTone(r.roas)}>
-          {r.roas.toLocaleString("es-CL", { maximumFractionDigits: 1 })}x
-        </Badge>
-      ),
-    },
-  ];
+const NO_SOURCE = "Disponible cuando exista la fuente de venta por campaña";
 
-  const productCols: Column<ProductPerformance>[] = [
-    {
-      key: "name",
-      header: "Producto",
-      render: (r) => (
-        <div className="min-w-0">
-          <Link
-            to={productPath(r.sku)}
-            className="text-sm font-medium text-slate-800 hover:text-brand-700 hover:underline"
-          >
-            {r.name}
-          </Link>
-          <p className="text-[11px] text-slate-400">
-            {r.sku} · {r.placementLabel}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: "channel",
-      header: "Canal",
-      hideOnMobile: true,
-      render: (r) => {
-        const m = PERF_CHANNEL_META[r.channel];
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-            <span
-              className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${CHANNEL_BG[m.tone] ?? "bg-slate-100 text-slate-600"}`}
-            >
-              <Svg path={m.icon} className="w-3 h-3" />
-            </span>
-            {r.channelLabel}
-          </span>
-        );
-      },
-    },
-    {
-      key: "order",
-      header: "Posición",
-      align: "center",
-      sortable: true,
-      sortValue: (r) => r.order,
-      render: (r) => (
-        <Badge tone={r.order === 1 ? "green" : r.order === 2 ? "amber" : "neutral"}>
-          {r.order}º
-        </Badge>
-      ),
-    },
-    {
-      key: "impressions",
-      header: "Impresiones",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.impressions,
-      render: (r) => formatNumber(r.impressions),
-    },
-    {
-      key: "clicks",
-      header: "Clics",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (r) => r.clicks,
-      render: (r) => formatNumber(r.clicks),
-    },
-    {
-      key: "ctr",
-      header: "CTR",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.ctr,
-      render: (r) => formatPercent(r.ctr),
-    },
-    {
-      key: "conversions",
-      header: "Conversiones",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.conversions,
-      render: (r) => formatNumber(r.conversions),
-    },
-    {
-      key: "revenue",
-      header: "Ingresos",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.revenue,
-      render: (r) => (
-        <span className="font-semibold text-emerald-600">{formatCurrencyCompact(r.revenue)}</span>
-      ),
-    },
-    {
-      key: "roas",
-      header: "ROAS",
-      align: "right",
-      sortable: true,
-      sortValue: (r) => r.roas,
-      render: (r) => (
-        <Badge tone={roasTone(r.roas)}>
-          {r.roas.toLocaleString("es-CL", { maximumFractionDigits: 1 })}x
-        </Badge>
-      ),
-    },
-  ];
+const fmtDate = (iso: string) => (iso ? formatDate(iso.slice(0, 10)) : "—");
 
-  const [chSort, setChSort] = useState<SortState>({ key: "revenue", dir: "desc" });
-  const [prSort, setPrSort] = useState<SortState>({ key: "revenue", dir: "desc" });
+/** Vista de rendimiento de una campaña: ficha real + métricas sin fuente en "—". */
+export function CampaignPerformance({ camp }: { camp: CampaignView }) {
+  const st = CAMPAIGN_STATUS_UI[camp.status];
+  const ty = CAMPAIGN_TYPE_UI[camp.type];
 
   return (
     <>
-      {/* ===================== RENDIMIENTO (simulado) ===================== */}
-      <HelpNote title="Datos simulados (demo)." className="mb-4">
-        Las métricas de rendimiento son una simulación para esta demo. En producción se conectarían
-        con la analítica de la web, Google Ads y la plataforma de mailing, además de Mercado Libre,
-        redes sociales y el punto de venta de la tienda.
+      <HelpNote title="Métricas de desempeño sin fuente todavía." className="mb-4">
+        La analítica de venta, conversión y ROAS por campaña aún no está conectada al servicio de
+        compras. Se muestran los datos reales de la campaña; las métricas aparecerán cuando exista
+        la fuente de venta por campaña.
       </HelpNote>
 
-      {camp.products.length === 0 ? (
-        <Card>
-          <CardBody className="py-12 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 inline-flex items-center justify-center mb-3.5">
-              <IconCampaign className="w-6 h-6" />
+      {/* Ficha real de la campaña */}
+      <Card className="mb-4">
+        <CardBody className="flex flex-wrap items-center gap-7">
+          <div className="min-w-[200px]">
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold text-slate-900">{camp.title}</span>
+              <Badge tone={st.tone} dot>
+                {st.label}
+              </Badge>
             </div>
-            <p className="text-base font-semibold text-slate-800">
-              Todavía no hay rendimiento que mostrar
+            <p className="text-xs text-slate-400 mt-0.5">
+              {fmtDate(camp.startsAt)} → {fmtDate(camp.endsAt)}
             </p>
-            <p className="text-sm text-slate-500 mt-1">
-              Agrega productos a la campaña para ver impresiones, clics, conversiones e ingresos.
-            </p>
-          </CardBody>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {/* KPIs totales */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-            <KpiCard
-              title="Inversión"
-              value={formatCurrencyCompact(perf.totals.spend)}
-              tone="info"
-              description="Gasto en publicidad"
-            />
-            <KpiCard
-              title="Ingresos"
-              value={formatCurrencyCompact(perf.totals.revenue)}
-              tone="good"
-              description="Venta atribuida"
-            />
-            <KpiCard
-              title="ROAS"
-              value={`${perf.totals.roas.toLocaleString("es-CL", { maximumFractionDigits: 1 })}x`}
-              tone={
-                roasTone(perf.totals.roas) === "green"
-                  ? "good"
-                  : roasTone(perf.totals.roas) === "amber"
-                    ? "warn"
-                    : "bad"
-              }
-              description="Retorno por $ invertido"
-            />
-            <KpiCard
-              title="Conversiones"
-              value={formatNumber(perf.totals.conversions)}
-              tone="neutral"
-              description="Ventas generadas"
-            />
-            <KpiCard
-              title="CTR promedio"
-              value={formatPercent(perf.totals.ctr)}
-              tone="neutral"
-              description="Clics sobre impresiones"
-            />
-            <KpiCard
-              title="Impresiones"
-              value={formatNumber(perf.totals.impressions)}
-              tone="neutral"
-              description="Veces exhibido"
-            />
           </div>
+          <div className="flex gap-6 flex-wrap">
+            <div>
+              <p className="text-xs text-slate-400">Tipo</p>
+              <Badge tone={ty.tone} className="mt-1">
+                {ty.label}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Canal</p>
+              <p className="text-sm font-semibold text-slate-800 mt-1">{camp.channelRef ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Presupuesto</p>
+              <p className="text-lg font-semibold text-slate-900">
+                {camp.budgetClp !== null ? formatCurrency(camp.budgetClp) : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Creada por</p>
+              <p className="text-sm font-semibold text-slate-800 mt-1">{camp.userCreated || "—"}</p>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
 
-          {/* por canal */}
-          <div>
-            <p className="text-sm font-semibold text-slate-700 mb-2.5">Rendimiento por canal</p>
-            <Card className="overflow-hidden">
-              <DataTable
-                columns={channelCols}
-                data={perf.byChannel}
-                rowKey={(r) => r.channel}
-                sort={chSort}
-                onSortChange={makeToggleSort(setChSort)}
-                emptyMessage="Sin actividad por canal todavía."
-              />
-            </Card>
-          </div>
-
-          {/* por producto */}
-          <div>
-            <p className="text-sm font-semibold text-slate-700 mb-2.5">Rendimiento por producto</p>
-            <Card className="overflow-hidden">
-              <DataTable
-                columns={productCols}
-                data={perf.byProduct}
-                rowKey={(r) => r.sku}
-                sort={prSort}
-                onSortChange={makeToggleSort(setPrSort)}
-                emptyMessage="Sin productos en la campaña."
-              />
-            </Card>
-          </div>
-        </div>
-      )}
+      {/* KPIs de desempeño: sin fuente real, todos degradan a "—" */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <KpiCard title="Inversión ejecutada" value="—" tone="neutral" description={NO_SOURCE} />
+        <KpiCard title="Ingresos" value="—" tone="neutral" description={NO_SOURCE} />
+        <KpiCard title="ROAS" value="—" tone="neutral" description={NO_SOURCE} />
+        <KpiCard title="Conversiones" value="—" tone="neutral" description={NO_SOURCE} />
+        <KpiCard title="CTR promedio" value="—" tone="neutral" description={NO_SOURCE} />
+        <KpiCard title="Impresiones" value="—" tone="neutral" description={NO_SOURCE} />
+      </div>
     </>
   );
 }

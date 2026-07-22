@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Button } from "../components/ui/Button";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
@@ -6,47 +7,61 @@ import { Tabs } from "../components/ui/Tabs";
 import { Drawer } from "../components/ui/Drawer";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Badge } from "../components/ui/Badge";
+import { Skeleton } from "../components/ui/Skeleton";
 import { FilterBar } from "../components/business/FilterBar";
 import { KpiCard } from "../components/business/KpiCard";
 import { BarList } from "../components/business/BarList";
 import { SignalDetail } from "../components/business/SignalDetail";
-import {
-  ReportSignalModal,
-  type ReportSignalDefaults,
-} from "../components/business/ReportSignalModal";
+import { ReportSignalModal } from "../components/business/ReportSignalModal";
 import {
   SIGNAL_TYPE,
   SIGNAL_STATUS,
   SIGNAL_PRIORITY,
-  SIGNAL_CHANNEL,
   STOCKOUT_TYPES,
+  signalKindMeta,
 } from "../components/business/signalLabels";
 import { useSignals } from "../context/SignalsContext";
-import { useBuyer } from "../context/BuyerContext";
+import { useSignalsList } from "../hooks/useSignals";
 import { useToast } from "../context/ToastContext";
 import { formatCurrencyCompact, formatNumber } from "../utils/formatters";
 import { cn } from "../utils/cn";
-import { inRange, type IsoRange } from "../utils/dateRange";
 import { TODAY_ISO } from "../utils/constants";
 import { IconSignal, IconPlus, IconCheck, IconAlerts, IconChat } from "../components/ui/icons";
-import type { SalesSignal, SignalChannel, SignalPriority, SignalType } from "../types/purchasing";
+import {
+  describePurchaseBffError,
+  type SignalBffPriority,
+  type SignalBffStatus,
+  type SignalView,
+} from "../services/purchaseBff";
+import type { SignalType } from "../types/purchasing";
 
-const TABS = [
-  { value: "to_review", label: "Por revisar" },
-  { value: "in_progress", label: "En gestión" },
-  { value: "accepted", label: "Aprobadas" },
-  { value: "resolved", label: "Resueltas" },
-  { value: "rejected", label: "Rechazadas" },
+// ============================================================================
+//  Señales de Ventas (F13) conectadas al purchase-bff-service.
+//  - Bandeja: GET /signals con filtros que resuelve el backend (pestaña =
+//    status real, tipo = kind, búsqueda = q). La máquina real solo tiene
+//    new → in_review → actioned | dismissed; las sub-etapas del flujo antiguo
+//    (cotizado, esperando cliente, comprado…) se conversan en el hilo.
+//  - KPIs, conteos y analítica salen del SignalsContext (lista completa, la
+//    misma que alimenta los badges del menú y "Mi panel").
+//  - El detalle (SignalDetail) pide GET /signals/:id y ejecuta los comandos.
+// ============================================================================
+
+const TABS: { value: SignalBffStatus | "all"; label: string }[] = [
+  { value: "new", label: "Nuevas" },
+  { value: "in_review", label: "En revisión" },
+  { value: "actioned", label: "Accionadas" },
+  { value: "dismissed", label: "Descartadas" },
   { value: "all", label: "Todas" },
 ];
 
-const IN_PROGRESS_STATUSES = ["sourcing", "quoted", "awaiting_customer", "purchased"];
-
-const PRIORITY_ORDER: Record<SignalPriority, number> = {
+const PRIORITY_ORDER: Record<SignalBffPriority, number> = {
   high: 0,
   medium: 1,
   low: 2,
 };
+
+/** ¿La señal sigue viva? (los estados terminales cierran señal e hilo). */
+const isActive = (s: SignalView) => s.status === "new" || s.status === "in_review";
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split("-");
@@ -58,169 +73,191 @@ function daysAgo(iso: string): number {
 }
 
 export function SalesSignalsPage() {
-  const { signals, addSignal } = useSignals();
-  const { buyer } = useBuyer();
+  const { signals: allSignals, configured, loading, error, refetch, report } = useSignals();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const linkedId = searchParams.get("sig");
 
-  const [tab, setTab] = useState("to_review");
+  // Con deep-link (?sig=…) se parte en "Todas" para no perder la señal enlazada.
+  const [tab, setTab] = useState<SignalBffStatus | "all">(linkedId ? "all" : "new");
   const [query, setQuery] = useState("");
+  const [q, setQ] = useState("");
+  const [kind, setKind] = useState("");
   const [priority, setPriority] = useState("");
-  const [type, setType] = useState("");
-  const [channel, setChannel] = useState("");
-  const [store, setStore] = useState("");
-  const [category, setCategory] = useState("");
-  const [assigned, setAssigned] = useState("");
-  const [dates, setDates] = useState<IsoRange>({ from: "", to: "" });
-  const [onlyStockout, setOnlyStockout] = useState(false);
-  const [mine, setMine] = useState(false);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(linkedId);
   const [mobileDetail, setMobileDetail] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportDefaults] = useState<ReportSignalDefaults | undefined>(undefined);
 
-  const stores = useMemo(
-    () => Array.from(new Set(signals.map((s) => s.store))).sort((a, b) => a.localeCompare(b, "es")),
-    [signals]
-  );
-  const categories = useMemo(
-    () =>
-      Array.from(new Set(signals.map((s) => s.category))).sort((a, b) => a.localeCompare(b, "es")),
-    [signals]
-  );
-  const assignees = useMemo(
-    () =>
-      Array.from(new Set(signals.map((s) => s.assignedBuyer).filter(Boolean) as string[])).sort(
-        (a, b) => a.localeCompare(b, "es")
-      ),
-    [signals]
-  );
+  // La búsqueda la resuelve el backend: se debouncia para no pedir por tecla.
+  useEffect(() => {
+    const t = setTimeout(() => setQ(query.trim()), 350);
+    return () => clearTimeout(t);
+  }, [query]);
 
-  // Filtros (sin la pestaña): controlan KPIs, analítica y conteos.
-  const byFilters = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return signals.filter((s) => {
-      if (
-        q &&
-        !s.productName.toLowerCase().includes(q) &&
-        !(s.sku ?? "").toLowerCase().includes(q) &&
-        !s.category.toLowerCase().includes(q) &&
-        !s.reportedBy.toLowerCase().includes(q)
-      )
-        return false;
-      if (priority && s.priority !== priority) return false;
-      if (type && s.type !== type) return false;
-      if (channel && s.channel !== channel) return false;
-      if (store && s.store !== store) return false;
-      if (category && s.category !== category) return false;
-      if (assigned && s.assignedBuyer !== assigned) return false;
-      if (mine && s.assignedBuyer !== buyer) return false;
-      if (onlyStockout && !STOCKOUT_TYPES.includes(s.type)) return false;
-      if (!inRange(s.date, dates)) return false;
-      return true;
-    });
-  }, [
-    signals,
-    query,
-    priority,
-    type,
-    channel,
-    store,
-    category,
-    assigned,
-    mine,
-    onlyStockout,
-    dates,
-    buyer,
-  ]);
+  // Bandeja filtrada por el backend (status/kind/q).
+  const tray = useSignalsList({
+    status: tab === "all" ? undefined : tab,
+    kind: kind || undefined,
+    q: q || undefined,
+  });
 
+  // Conteos por pestaña y analítica: sobre la lista completa del contexto.
   const counts = useMemo(
     () => ({
-      to_review: byFilters.filter((s) => s.status === "new" || s.status === "in_review").length,
-      in_progress: byFilters.filter((s) => IN_PROGRESS_STATUSES.includes(s.status)).length,
-      accepted: byFilters.filter((s) => s.status === "accepted").length,
-      resolved: byFilters.filter((s) => s.status === "resolved").length,
-      rejected: byFilters.filter((s) => s.status === "rejected").length,
-      all: byFilters.length,
+      new: allSignals.filter((s) => s.status === "new").length,
+      in_review: allSignals.filter((s) => s.status === "in_review").length,
+      actioned: allSignals.filter((s) => s.status === "actioned").length,
+      dismissed: allSignals.filter((s) => s.status === "dismissed").length,
+      all: allSignals.length,
     }),
-    [byFilters]
+    [allSignals]
   );
 
-  // KPIs
-  const kpiNew = byFilters.filter((s) => s.status === "new").length;
-  const kpiStockout = byFilters.filter(
-    (s) => STOCKOUT_TYPES.includes(s.type) && s.status !== "resolved" && s.status !== "rejected"
-  ).length;
-  const kpiPending = counts.to_review;
-  const kpiAccepted = counts.accepted;
-  const kpiLostSale = byFilters
-    .filter((s) => s.status !== "resolved" && s.status !== "rejected")
-    .reduce((acc, s) => acc + (s.estimatedLostSale ?? 0), 0);
+  const kpiStockout = useMemo(
+    () =>
+      allSignals.filter(
+        (s) => STOCKOUT_TYPES.includes(s.kind as SignalType) && isActive(s)
+      ).length,
+    [allSignals]
+  );
+  const kpiLostSale = useMemo(
+    () =>
+      allSignals
+        .filter(isActive)
+        .reduce((acc, s) => acc + (s.details?.estimatedLostSale ?? 0), 0),
+    [allSignals]
+  );
 
-  // Analítica
+  // Analítica: qué se repite y desde dónde (con lo que trae la lista real).
   const topProducts = useMemo(
-    () => aggCount(byFilters, (s) => s.productName).slice(0, 5),
-    [byFilters]
+    () => aggCount(allSignals, (s) => s.sku ?? signalKindMeta(s.kind).label).slice(0, 5),
+    [allSignals]
   );
-  const topStores = useMemo(() => aggCount(byFilters, (s) => s.store).slice(0, 5), [byFilters]);
+  const topStores = useMemo(
+    () => aggCount(allSignals.filter((s) => s.storeRef), (s) => s.storeRef as string).slice(0, 5),
+    [allSignals]
+  );
   const mostAsked = useMemo(
     () =>
       aggSum(
-        byFilters.filter((s) => (s.customersAsking ?? 0) > 0),
-        (s) => s.productName,
-        (s) => s.customersAsking ?? 0
+        allSignals.filter((s) => (s.details?.customersAsking ?? 0) > 0),
+        (s) => s.sku ?? signalKindMeta(s.kind).label,
+        (s) => s.details?.customersAsking ?? 0
       ).slice(0, 5),
-    [byFilters]
+    [allSignals]
   );
 
-  // Listado por pestaña
-  const filtered = useMemo(() => {
-    let base = byFilters;
-    if (tab === "to_review")
-      base = base.filter((s) => s.status === "new" || s.status === "in_review");
-    else if (tab === "in_progress")
-      base = base.filter((s) => IN_PROGRESS_STATUSES.includes(s.status));
-    else if (tab !== "all") base = base.filter((s) => s.status === tab);
+  // Prioridad se filtra client-side (el contrato no la expone como filtro).
+  const rows = useMemo(() => {
+    const base = priority ? tray.signals.filter((s) => s.priority === priority) : tray.signals;
     return [...base].sort((a, b) => {
       const p = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
       if (p !== 0) return p;
-      return a.date < b.date ? 1 : -1;
+      return a.dateCreated < b.dateCreated ? 1 : -1;
     });
-  }, [byFilters, tab]);
+  }, [tray.signals, priority]);
 
-  const selected = filtered.find((s) => s.id === selectedId) ?? filtered[0];
+  const selected = rows.find((s) => s.id === selectedId) ?? rows[0];
 
   const clearFilters = () => {
     setQuery("");
+    setKind("");
     setPriority("");
-    setType("");
-    setChannel("");
-    setStore("");
-    setCategory("");
-    setAssigned("");
-    setDates({ from: "", to: "" });
-    setOnlyStockout(false);
-    setMine(false);
   };
 
-  const handleReport = (input: Parameters<typeof addSignal>[0]) => {
-    const created = addSignal(input);
-    setTab("to_review");
-    setSelectedId(created.id);
+  /** Refresca bandeja + contexto tras cualquier comando del detalle. */
+  const handleMutated = () => {
+    tray.refetch();
+    refetch();
+  };
+
+  const handleReport = async (input: Parameters<typeof report>[0]) => {
+    const result = await report(input);
+    if (!result.ok) {
+      toast.error(describePurchaseBffError(result.error));
+      return;
+    }
+    setTab("new");
+    setSelectedId(result.signal.id);
+    tray.refetch();
     toast.success("Señal enviada al comprador", {
       label: "Ver señal",
       onClick: () => {
-        setSelectedId(created.id);
+        setSelectedId(result.signal.id);
         setMobileDetail(true);
       },
     });
   };
 
+  const pageTitle = "Señales de Ventas";
+  const pageDescription =
+    "Lo que el equipo de ventas detecta en el terreno: quiebres, demanda y oportunidades. Recíbelas, analízalas y decide — todo queda registrado.";
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando y error (patrón flujo 1).
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver las señales reales del equipo de ventas.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && tray.loading && allSignals.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando señales">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const trayError = error ?? tray.error;
+  if (trayError && allSignals.length === 0 && tray.signals.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudieron cargar las señales
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{trayError.message}</p>
+            <Button className="mt-4" onClick={handleMutated}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
-        title="Señales de Ventas"
-        description="Lo que el equipo de ventas detecta en el terreno: quiebres, demanda y oportunidades. Recíbelas, analízalas y decide — todo queda registrado."
+        title={pageTitle}
+        description={pageDescription}
         action={
           <Button icon={<IconPlus className="w-4 h-4" />} onClick={() => setReportOpen(true)}>
             Reportar señal
@@ -231,129 +268,75 @@ export function SalesSignalsPage() {
       {/* Flujo del proceso */}
       <FlowStrip />
 
-      {/* Filtros */}
+      {/* Filtros (búsqueda y tipo los resuelve el backend) */}
       <div className="mb-4">
         <FilterBar
           searchValue={query}
           onSearchChange={setQuery}
-          searchPlaceholder="Buscar por producto, SKU, categoría o vendedor"
-          resultCount={byFilters.length}
-          summary={`${byFilters.length} señal${byFilters.length === 1 ? "" : "es"} · ${kpiPending} por revisar · ${kpiStockout} de quiebre`}
+          searchPlaceholder="Buscar por SKU o texto de la señal"
+          resultCount={rows.length}
+          summary={`${rows.length} señal${rows.length === 1 ? "" : "es"} en la vista · ${counts.new} nueva${counts.new === 1 ? "" : "s"} · ${kpiStockout} de quiebre activas`}
           onClear={clearFilters}
-          toggles={[
-            {
-              key: "mine",
-              label: "Asignadas a mí",
-              active: mine,
-              onToggle: () => setMine((v) => !v),
-            },
-            {
-              key: "stockout",
-              label: "Sólo quiebres",
-              active: onlyStockout,
-              onToggle: () => setOnlyStockout((v) => !v),
-            },
-          ]}
           selects={[
             {
-              key: "priority",
-              placeholder: "Prioridad",
-              value: priority,
-              onChange: setPriority,
-              options: (["high", "medium", "low"] as SignalPriority[]).map((p) => ({
-                value: p,
-                label: SIGNAL_PRIORITY[p].label,
-              })),
-            },
-            {
-              key: "type",
+              key: "kind",
               placeholder: "Tipo de señal",
-              value: type,
-              onChange: setType,
+              value: kind,
+              onChange: setKind,
               options: (Object.keys(SIGNAL_TYPE) as SignalType[]).map((t) => ({
                 value: t,
                 label: SIGNAL_TYPE[t].label,
               })),
             },
             {
-              key: "channel",
-              placeholder: "Canal",
-              value: channel,
-              onChange: setChannel,
-              options: (Object.keys(SIGNAL_CHANNEL) as SignalChannel[]).map((c) => ({
-                value: c,
-                label: SIGNAL_CHANNEL[c],
+              key: "priority",
+              placeholder: "Prioridad",
+              value: priority,
+              onChange: setPriority,
+              options: (["high", "medium", "low"] as SignalBffPriority[]).map((p) => ({
+                value: p,
+                label: SIGNAL_PRIORITY[p].label,
               })),
             },
-            {
-              key: "store",
-              placeholder: "Tienda / punto",
-              value: store,
-              onChange: setStore,
-              options: stores.map((s) => ({ value: s, label: s })),
-            },
-            {
-              key: "category",
-              placeholder: "Categoría",
-              value: category,
-              onChange: setCategory,
-              options: categories.map((c) => ({ value: c, label: c })),
-            },
-            {
-              key: "assigned",
-              placeholder: "Comprador",
-              value: assigned,
-              onChange: setAssigned,
-              options: assignees.map((b) => ({ value: b, label: b })),
-            },
           ]}
-          dateRange={{ value: dates, onChange: setDates, label: "Fecha de la señal" }}
         />
       </div>
 
-      {/* KPIs */}
+      {/* KPIs (la máquina real: nuevas / en revisión / accionadas + quiebre y venta perdida) */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
         <KpiCard
           title="Nuevas"
-          value={formatNumber(kpiNew)}
+          value={formatNumber(counts.new)}
           tone="info"
           icon={<IconSignal className="w-4 h-4" />}
-          description="Ver por revisar"
-          active={tab === "to_review"}
-          onClick={() => setTab("to_review")}
+          description="Sin revisar"
+          active={tab === "new"}
+          onClick={() => setTab("new")}
         />
         <KpiCard
-          title="Quiebres reportados"
+          title="En revisión"
+          value={formatNumber(counts.in_review)}
+          tone="warn"
+          icon={<IconChat className="w-4 h-4" />}
+          description="En manos del comprador"
+          active={tab === "in_review"}
+          onClick={() => setTab("in_review")}
+        />
+        <KpiCard
+          title="Quiebres activos"
           value={formatNumber(kpiStockout)}
           tone="bad"
           icon={<IconAlerts className="w-4 h-4" />}
-          description="Filtrar quiebres"
-          active={onlyStockout}
-          onClick={() => {
-            setOnlyStockout((v) => !v);
-            setTab("to_review");
-          }}
+          description="Señales de quiebre vivas"
         />
         <KpiCard
-          title="Por revisar"
-          value={formatNumber(kpiPending)}
-          tone="warn"
-          icon={<IconChat className="w-4 h-4" />}
-          description="Pendientes de decisión"
-          active={tab === "to_review" && !onlyStockout}
-          onClick={() => {
-            setTab("to_review");
-            setOnlyStockout(false);
-          }}
-        />
-        <KpiCard
-          title="Aceptadas"
-          value={formatNumber(kpiAccepted)}
+          title="Accionadas"
+          value={formatNumber(counts.actioned)}
           tone="good"
           icon={<IconCheck className="w-4 h-4" />}
-          description="Ver aceptadas"
-          active={tab === "accepted"}
-          onClick={() => setTab("accepted")}
+          description="Ver accionadas"
+          active={tab === "actioned"}
+          onClick={() => setTab("actioned")}
         />
         <KpiCard
           title="Venta perdida est."
@@ -406,16 +389,28 @@ export function SalesSignalsPage() {
         </CardBody>
       </Card>
 
-      {/* Tabs */}
+      {/* Tabs = estados reales de la máquina */}
       <div className="mb-4">
         <Tabs
-          tabs={TABS.map((t) => ({ ...t, count: counts[t.value as keyof typeof counts] }))}
+          tabs={TABS.map((t) => ({ ...t, count: counts[t.value] }))}
           value={tab}
-          onChange={setTab}
+          onChange={(v) => setTab(v as SignalBffStatus | "all")}
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {tray.loading && rows.length === 0 ? (
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando señales">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : rows.length === 0 ? (
         <Card>
           <CardBody>
             <EmptyState
@@ -438,7 +433,7 @@ export function SalesSignalsPage() {
         <div className="grid lg:grid-cols-[minmax(330px,400px)_1fr] gap-4">
           {/* Bandeja */}
           <div className="space-y-3 lg:max-h-[74vh] lg:overflow-y-auto no-scrollbar lg:pr-1">
-            {groupByTime(filtered).map((bucket) => (
+            {groupByTime(rows).map((bucket) => (
               <div key={bucket.key}>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-1 mb-1.5">
                   {bucket.label}
@@ -449,7 +444,6 @@ export function SalesSignalsPage() {
                       key={s.id}
                       signal={s}
                       selected={selected?.id === s.id}
-                      mine={s.assignedBuyer === buyer}
                       onClick={() => {
                         setSelectedId(s.id);
                         setMobileDetail(true);
@@ -461,7 +455,9 @@ export function SalesSignalsPage() {
             ))}
           </div>
           {/* Detalle (escritorio) */}
-          <div className="hidden lg:block">{selected && <SignalDetail signal={selected} />}</div>
+          <div className="hidden lg:block">
+            {selected && <SignalDetail id={selected.id} onMutated={handleMutated} />}
+          </div>
         </div>
       )}
 
@@ -471,14 +467,13 @@ export function SalesSignalsPage() {
         onClose={() => setMobileDetail(false)}
         title="Detalle de la señal"
       >
-        {selected && <SignalDetail signal={selected} />}
+        {selected && <SignalDetail id={selected.id} onMutated={handleMutated} />}
       </Drawer>
 
       <ReportSignalModal
         open={reportOpen}
         onClose={() => setReportOpen(false)}
         onSubmit={handleReport}
-        defaults={reportDefaults}
       />
     </div>
   );
@@ -486,7 +481,7 @@ export function SalesSignalsPage() {
 
 // ----------------------------------------------------------------------------
 
-function aggCount(signals: SalesSignal[], key: (s: SalesSignal) => string) {
+function aggCount(signals: SignalView[], key: (s: SignalView) => string) {
   const map = new Map<string, number>();
   for (const s of signals) map.set(key(s), (map.get(key(s)) ?? 0) + 1);
   return [...map.entries()]
@@ -495,9 +490,9 @@ function aggCount(signals: SalesSignal[], key: (s: SalesSignal) => string) {
 }
 
 function aggSum(
-  signals: SalesSignal[],
-  key: (s: SalesSignal) => string,
-  val: (s: SalesSignal) => number
+  signals: SignalView[],
+  key: (s: SignalView) => string,
+  val: (s: SignalView) => number
 ) {
   const map = new Map<string, number>();
   for (const s of signals) map.set(key(s), (map.get(key(s)) ?? 0) + val(s));
@@ -555,15 +550,13 @@ function FlowStrip() {
 function SignalRow({
   signal,
   selected,
-  mine,
   onClick,
 }: {
-  signal: SalesSignal;
+  signal: SignalView;
   selected: boolean;
-  mine: boolean;
   onClick: () => void;
 }) {
-  const meta = SIGNAL_TYPE[signal.type];
+  const meta = signalKindMeta(signal.kind);
   const status = SIGNAL_STATUS[signal.status];
   const unread = signal.status === "new";
   return (
@@ -596,9 +589,8 @@ function SignalRow({
           Terreno
         </span>
         {unread && <span className="w-1.5 h-1.5 rounded-full bg-brand-500" title="Sin revisar" />}
-        {mine && <Badge tone="violet">Para mí</Badge>}
         <div className="flex-1" />
-        <span className="text-xs text-slate-400 flex-shrink-0">{fmtDate(signal.date)}</span>
+        <span className="text-xs text-slate-400 flex-shrink-0">{fmtDate(signal.dateCreated)}</span>
       </div>
       <p
         className={cn(
@@ -606,31 +598,38 @@ function SignalRow({
           unread ? "font-semibold text-slate-900" : "font-medium text-slate-700"
         )}
       >
-        {signal.productName}
+        {signal.sku ?? meta.label}
       </p>
-      <p className="text-xs text-slate-500 line-clamp-2">{signal.comment}</p>
+      <p className="text-xs text-slate-500 line-clamp-2">{signal.body}</p>
       <div className="flex items-center gap-2 mt-1.5">
         <Badge tone={status.tone} dot>
           {status.label}
         </Badge>
         <span className="text-xs text-slate-400 truncate">
-          {SIGNAL_CHANNEL[signal.channel]} · {signal.store}
+          {[signal.storeRef, signal.reporterName ?? signal.reporterUserId]
+            .filter(Boolean)
+            .join(" · ")}
         </span>
+        {(signal.messageCount ?? 0) > 0 && (
+          <span className="ml-auto inline-flex items-center gap-1 text-xs text-slate-400 flex-shrink-0">
+            <IconChat className="w-3.5 h-3.5" /> {signal.messageCount}
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
 /** Agrupa señales por antigüedad (Hoy / Ayer / Esta semana / Anteriores). */
-function groupByTime(items: SalesSignal[]) {
-  const buckets: { key: string; label: string; items: SalesSignal[] }[] = [
+function groupByTime(items: SignalView[]) {
+  const buckets: { key: string; label: string; items: SignalView[] }[] = [
     { key: "hoy", label: "Hoy", items: [] },
     { key: "ayer", label: "Ayer", items: [] },
     { key: "semana", label: "Esta semana", items: [] },
     { key: "antes", label: "Anteriores", items: [] },
   ];
   for (const s of items) {
-    const d = daysAgo(s.date);
+    const d = daysAgo(s.dateCreated);
     if (d <= 0) buckets[0].items.push(s);
     else if (d === 1) buckets[1].items.push(s);
     else if (d <= 7) buckets[2].items.push(s);

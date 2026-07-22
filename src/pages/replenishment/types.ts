@@ -4,18 +4,13 @@ import type { PurchaseRecommendation } from "../../types/purchasing";
 //  Tipos de la vista de Reposición / Decisiones de compra.
 // ============================================================================
 
-export interface RecOverride {
-  suggestedQuantity: number;
-  suggestedPurchaseAmount: number;
-  supplierName: string;
-}
-
 export type DecisionViewMode = "product" | "supplier" | "category";
 
 export interface OpenPoSignal {
   number: string;
   quantity: number;
-  expectedDate: string;
+  /** Fecha esperada de entrega (las OC reales pueden no tenerla aún). */
+  expectedDate: string | null;
   status: string;
 }
 

@@ -2,454 +2,302 @@ import { useMemo, useState } from "react";
 import { CampaignPerformance } from "./CampaignPerformance";
 import {
   CampaignSummaryCard,
-  ChannelBudgetGrid,
   AdSpacesHeader,
   ChannelFilterChips,
   AdSpacesView,
-  CampaignProductsTable,
 } from "./CampaignsSections";
-import { ProductFormModal, CreateCampaignModal } from "./CampaignsModals";
+import { CreateCampaignModal, EditCampaignModal } from "./CampaignsModals";
 import { PageHeader } from "../components/ui/PageHeader";
+import { Card, CardBody } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Tabs } from "../components/ui/Tabs";
-import { IconPlus } from "../components/ui/icons";
+import { Skeleton } from "../components/ui/Skeleton";
+import { EmptyState } from "../components/ui/EmptyState";
+import { HelpNote } from "../components/business/HelpNote";
+import { IconPlus, IconCampaign } from "../components/ui/icons";
 import { useToast } from "../context/ToastContext";
-import { useLocalStorage } from "../utils/useLocalStorage";
+import { useCampaignsList, useCampaignCommands } from "../hooks/useCampaigns";
+import { describePurchaseBffError, type CampaignStatus, type CampaignView } from "../services/purchaseBff";
+import { daysUntil, CAMPAIGN_STATUS_UI } from "./campaignsHelpers";
 
-import { products } from "../data/mockProducts";
-import { CAMPAIGN_PLANS, PLACEMENT_LABELS, SPACE_TYPES, type CampaignPlan, type CampaignProduct, type PromoChannelKey, type PlacementKey } from "../data/mockCampaignPlans";
-import { daysUntil, discountPct, type ProductForm } from "./campaignsHelpers";
+// ============================================================================
+//  Campañas conectadas al purchase-bff-service (F18): GET/POST /campaigns y
+//  PATCH con If-Match para el ciclo planned → active → closed | cancelled.
+//  Los "espacios publicitarios" del mock se modelan como campañas reales
+//  type 'ad_space' con channelRef. Los planes por producto, cupos por
+//  placement y el reparto de presupuesto por canal no existen en el contrato
+//  y se eliminaron (sin números inventados).
+// ============================================================================
 
 export function CampaignsPage() {
   const toast = useToast();
-  const [plans, setPlans] = useLocalStorage<CampaignPlan[]>(
-    "compras:campaign-plans",
-    CAMPAIGN_PLANS
-  );
-  const [selId, setSelId] = useState(plans[0]?.id ?? "cyber");
+  const { campaigns, configured, loading, error, refetch } = useCampaignsList();
+  const commands = useCampaignCommands({ onConflict: refetch });
+
+  const [selId, setSelId] = useState<string | null>(null);
   const [tab, setTab] = useState<"plan" | "perf">("plan");
-  const [spaceView, setSpaceView] = useState<"grid" | "calendar">("grid");
+  const [spaceView, setSpaceView] = useState<"grid" | "list">("grid");
   const [chFilter, setChFilter] = useState<string>("all");
-  const [form, setForm] = useState<ProductForm | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [cmName, setCmName] = useState("");
-  const [cmFrom, setCmFrom] = useState("2026-06-25");
-  const [cmTo, setCmTo] = useState("2026-06-30");
-  const [cmBudget, setCmBudget] = useState("");
+  const [editing, setEditing] = useState<CampaignView | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const camp = plans.find((p) => p.id === selId) ?? plans[0];
+  const sorted = useMemo(
+    () => [...campaigns].sort((a, b) => (a.startsAt < b.startsAt ? 1 : -1)),
+    [campaigns]
+  );
+  const camp = sorted.find((c) => c.id === selId) ?? sorted[0];
 
-  const updateProducts = (fn: (arr: CampaignProduct[]) => CampaignProduct[]) => {
-    setPlans((prev) =>
-      prev.map((p) => (p.id === camp.id ? { ...p, products: fn([...p.products]) } : p))
-    );
-  };
-
-  // Posición efectiva de un producto dentro de su placement (orden ascendente,
-  // con fallback al orden de aparición en el arreglo).
-  const orderOf = (p: CampaignProduct, fallback: number) => p.order ?? fallback + 1;
-
-  // Mueve un producto (por sku+placement) un lugar arriba/abajo dentro de su
-  // placement intercambiando su `order` con el vecino. Persiste vía setPlans.
-  const moveProduct = (sku: string, placement: PlacementKey, dir: -1 | 1) => {
-    updateProducts((arr) => {
-      const group = arr
-        .map((p, i) => ({ p, i }))
-        .filter((x) => x.p.placement === placement)
-        .sort((a, b) => orderOf(a.p, a.i) - orderOf(b.p, b.i));
-      const pos = group.findIndex((x) => x.p.sku === sku);
-      const target = pos + dir;
-      if (pos < 0 || target < 0 || target >= group.length) return arr;
-      const a = group[pos];
-      const b = group[target];
-      const oa = orderOf(a.p, a.i);
-      const ob = orderOf(b.p, b.i);
-      arr[a.i] = { ...a.p, order: ob };
-      arr[b.i] = { ...b.p, order: oa };
-      return arr;
-    });
-  };
-
-  // ---- derived ----
-  const allocated = camp.products.reduce((a, p) => a + p.budget, 0);
-  const estSaleTotal = camp.products.reduce((a, p) => a + p.estSale, 0);
-  const avgDiscount = camp.products.length
-    ? Math.round(
-        camp.products.reduce((a, p) => a + (1 - p.promo / p.normal) * 100, 0) / camp.products.length
-      )
-    : 0;
-  const budgetPct = camp.totalBudget > 0 ? Math.round((allocated / camp.totalBudget) * 100) : 0;
-  const overBudget = allocated > camp.totalBudget;
-
-  const channelOrder: PromoChannelKey[] = ["redes", "ml", "web", "tienda"];
-
-  // ---- ad spaces ----
-  const spaceUsed: Record<string, number> = {};
-  const spaceProducts: Record<string, CampaignProduct[]> = {};
-  camp.products.forEach((p) => {
-    spaceUsed[p.placement] = (spaceUsed[p.placement] ?? 0) + 1;
-    (spaceProducts[p.placement] = spaceProducts[p.placement] ?? []).push(p);
-  });
-  // Ordena cada placement por posición de banner (order asc, fallback al orden
-  // de inserción en el grupo).
-  Object.keys(spaceProducts).forEach((k) => {
-    spaceProducts[k] = spaceProducts[k]
-      .map((p, i) => ({ p, i }))
-      .sort((a, b) => orderOf(a.p, a.i) - orderOf(b.p, b.i))
-      .map((x) => x.p);
-  });
-  const fkOf = (placement: PlacementKey, channel: PromoChannelKey) =>
-    placement === "email" ? "email" : channel;
-
-  const allSpaces = SPACE_TYPES.map((s) => {
-    const used = spaceUsed[s.placement] ?? 0;
-    const avail = Math.max(0, s.total - used);
-    const group = spaceProducts[s.placement] ?? [];
-    const assigned = group.map((p, i) => ({
-      sku: p.sku,
-      name: p.name,
-      disc: `-${discountPct(p.normal, p.promo)}%`,
-      position: i + 1,
-      groupTotal: group.length,
-      isFirst: i === 0,
-      isLast: i === group.length - 1,
-    }));
-    return {
-      ...s,
-      filterKey: fkOf(s.placement, s.channel),
-      used,
-      avail,
-      assigned,
-      statusLabel:
-        avail === 0 ? "Completo" : avail === 1 ? "Último cupo" : `${avail} libres de ${s.total}`,
-      statusTone: (avail === 0 ? "red" : avail === 1 ? "amber" : "green") as
-        | "red"
-        | "amber"
-        | "green",
-      occPct: Math.round((used / s.total) * 100),
-      occBar: avail === 0 ? "#f43f5e" : avail === 1 ? "#f59e0b" : "#10b981",
-    };
-  });
-  const spaces = chFilter === "all" ? allSpaces : allSpaces.filter((s) => s.filterKey === chFilter);
-
-  // Posición de banner por sku (dentro de su placement) para la tabla de productos.
-  const positionBySku: Record<
-    string,
-    { position: number; total: number; isFirst: boolean; isLast: boolean }
-  > = {};
-  Object.values(spaceProducts).forEach((group) => {
-    group.forEach((p, i) => {
-      positionBySku[p.sku] = {
-        position: i + 1,
-        total: group.length,
-        isFirst: i === 0,
-        isLast: i === group.length - 1,
-      };
-    });
-  });
-  const spacesTotal = SPACE_TYPES.reduce((a, s) => a + s.total, 0);
-  const spacesUsed = allSpaces.reduce((a, s) => a + s.used, 0);
-  const spacesFree = spacesTotal - spacesUsed;
-  const freeByKey = (k: string) =>
-    allSpaces.filter((s) => k === "all" || s.filterKey === k).reduce((a, s) => a + s.avail, 0);
-
+  // Espacios publicitarios: campañas reales type 'ad_space'.
+  const adSpaces = useMemo(() => sorted.filter((c) => c.type === "ad_space"), [sorted]);
+  const channels = useMemo(
+    () => [...new Set(adSpaces.map((c) => c.channelRef ?? "sin-canal"))],
+    [adSpaces]
+  );
   const chips = [
     { id: "all", label: "Todos" },
-    { id: "web", label: "Web" },
-    { id: "tienda", label: "Tienda física" },
-    { id: "ml", label: "Mercado Libre" },
-    { id: "redes", label: "Redes" },
-    { id: "email", label: "Email" },
+    ...channels.map((ch) => ({ id: ch, label: ch === "sin-canal" ? "Sin canal" : ch })),
   ];
-
-  // ---- product form ----
-  const retailPrice = (
-    sku: string
-  ): { normal: number; promo: number; name: string; category: string } | null => {
-    const p = products.find((x) => x.sku === sku);
-    if (!p) return null;
-    const r = Math.round(p.cost / (1 - (p.margin || 30) / 100) / 10) * 10;
-    return {
-      normal: r,
-      promo: Math.round((r * 0.85) / 10) * 10,
-      name: p.name,
-      category: p.category,
-    };
-  };
-
-  const openAdd = (preset?: { channel: PromoChannelKey; placement: PlacementKey }) => {
-    setForm({
-      mode: "add",
-      index: -1,
-      sku: "",
-      name: "",
-      category: "",
-      from: camp.from,
-      to: camp.to,
-      normal: "",
-      promo: "",
-      channel: preset?.channel ?? "redes",
-      placement: preset?.placement ?? "reel",
-      budget: "",
-    });
-  };
-  const openEdit = (idx: number) => {
-    const p = camp.products[idx];
-    setForm({
-      mode: "edit",
-      index: idx,
-      sku: p.sku,
-      name: p.name,
-      category: p.category,
-      from: p.from,
-      to: p.to,
-      normal: String(p.normal),
-      promo: String(p.promo),
-      channel: p.channel,
-      placement: p.placement,
-      budget: String(p.budget),
-      status: p.status,
-      isNew: p.isNew,
-    });
-  };
-
-  const fNormal = form ? parseInt(form.normal, 10) || 0 : 0;
-  const fPromo = form ? parseInt(form.promo, 10) || 0 : 0;
-  const fBudget = form ? parseInt(form.budget, 10) || 0 : 0;
-  const fDiscount = discountPct(fNormal, fPromo);
-  const fValid =
-    !!form &&
-    !!form.sku &&
-    !!form.from &&
-    !!form.to &&
-    fNormal > 0 &&
-    fPromo > 0 &&
-    fPromo < fNormal &&
-    fBudget > 0 &&
-    form.to >= form.from;
-
-  const submitForm = () => {
-    if (!form || !fValid) {
-      toast.warning("Completa producto, fechas, precios y presupuesto");
-      return;
-    }
-    // Posición del banner: al final de su placement. Si se edita y el placement
-    // no cambia, se conserva el orden previo.
-    const editing = form.mode === "edit" ? camp.products[form.index] : undefined;
-    const samePlacement = editing && editing.placement === form.placement;
-    const placementCount = camp.products.filter(
-      (x, j) => x.placement === form.placement && (form.mode !== "edit" || j !== form.index)
-    ).length;
-    const nextOrder = samePlacement ? (editing!.order ?? placementCount + 1) : placementCount + 1;
-
-    const prod: CampaignProduct = {
-      name: form.name || form.sku,
-      sku: form.sku,
-      category: form.category,
-      normal: fNormal,
-      promo: fPromo,
-      from: form.from,
-      to: form.to,
-      channel: form.channel,
-      placement: form.placement,
-      placementLabel: PLACEMENT_LABELS[form.placement],
-      budget: fBudget,
-      estSale: Math.round(fBudget * 4),
-      status: form.mode === "edit" ? (form.status ?? "pending") : "pending",
-      isNew: form.mode === "edit" ? form.isNew : true,
-      order: nextOrder,
-    };
-    if (form.mode === "edit") {
-      const i = form.index;
-      updateProducts((arr) => {
-        arr[i] = prod;
-        return arr;
-      });
-      toast.success(`Cambios guardados en ${camp.name}`);
-    } else {
-      updateProducts((arr) => [prod, ...arr]);
-      toast.success(`${prod.name} agregado a ${camp.name} con ${fDiscount}% de descuento`);
-    }
-    setForm(null);
-  };
-
-  const submitCreate = () => {
-    const tb = parseInt(cmBudget, 10) || 0;
-    if (!cmName.trim() || !cmFrom || !cmTo || cmTo < cmFrom || tb <= 0) {
-      toast.warning("Completa nombre, fechas y presupuesto");
-      return;
-    }
-    const id = `c${Date.now()}`;
-    const plan: CampaignPlan = {
-      id,
-      name: cmName.trim(),
-      from: cmFrom,
-      to: cmTo,
-      totalBudget: tb,
-      channelBudget: {
-        redes: Math.round(tb * 0.4),
-        ml: Math.round(tb * 0.3),
-        web: Math.round(tb * 0.2),
-        tienda: Math.round(tb * 0.1),
-      },
-      products: [],
-    };
-    setPlans((prev) => [...prev, plan]);
-    setSelId(id);
-    setCreateOpen(false);
-    setCmName("");
-    setCmBudget("");
-    toast.success(`Campaña "${plan.name}" creada`);
-  };
-
-  const productOptions = useMemo(
-    () => products.map((p) => ({ value: p.sku, label: `${p.sku} — ${p.name}` })),
-    []
+  const countByKey = (k: string) =>
+    adSpaces.filter((c) => k === "all" || (c.channelRef ?? "sin-canal") === k).length;
+  const spaces = adSpaces.filter(
+    (c) => chFilter === "all" || (c.channelRef ?? "sin-canal") === chFilter
   );
+
+  const transition = async (target: CampaignView, status: Exclude<CampaignStatus, "planned">) => {
+    setBusy(true);
+    const res = await commands.transitionCampaign(target.id, target.version, status);
+    setBusy(false);
+    if (res.ok) {
+      toast.success(`"${target.title}" → ${CAMPAIGN_STATUS_UI[status].label.toLowerCase()}`);
+      refetch();
+    } else {
+      toast.error(describePurchaseBffError(res.error));
+    }
+  };
+
+  const create = async (input: Parameters<typeof commands.createCampaign>[0]) => {
+    setBusy(true);
+    const res = await commands.createCampaign(input);
+    setBusy(false);
+    if (res.ok) {
+      toast.success(`Campaña "${res.campaign.title}" creada`);
+      setCreateOpen(false);
+      setSelId(res.campaign.id);
+      refetch();
+    } else {
+      toast.error(describePurchaseBffError(res.error));
+    }
+  };
+
+  const saveEdit = async (body: { budgetClp?: number; endsAt?: string }) => {
+    if (!editing) return;
+    setBusy(true);
+    const res = await commands.updateCampaign(editing.id, editing.version, body);
+    setBusy(false);
+    if (res.ok) {
+      toast.success(`Cambios guardados en "${editing.title}"`);
+      setEditing(null);
+      refetch();
+    } else {
+      toast.error(describePurchaseBffError(res.error));
+    }
+  };
+
+  const pageTitle = "Campañas y descuentos";
+  const pageDescription =
+    "Gestiona cada campaña real: título, canal, presupuesto, vigencia y ciclo de vida. Los espacios publicitarios se administran como campañas por canal.";
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando y error (patrón flujo 1).
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver las campañas reales y gestionarlas contra el servicio de compras.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && campaigns.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando campañas">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error && campaigns.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudieron cargar las campañas
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
       <PageHeader
-        title="Campañas y descuentos"
-        description="Arma cada evento: elige los productos en descuento, reparte el presupuesto por canal y define dónde se exhibe cada uno (reel, banner, góndola o listado destacado)."
+        title={pageTitle}
+        description={pageDescription}
         action={
-          <Button icon={<IconPlus className="w-4 h-4" />} onClick={() => openAdd()}>
-            Agregar producto
+          <Button icon={<IconPlus className="w-4 h-4" />} onClick={() => setCreateOpen(true)}>
+            Crear campaña
           </Button>
         }
       />
 
-      {/* selector de campañas */}
-      <div className="flex flex-wrap gap-2.5 mb-4">
-        {plans.map((p) => {
-          const active = p.id === selId;
-          const du = daysUntil(p.from);
-          return (
-            <button
-              key={p.id}
-              onClick={() => setSelId(p.id)}
-              className={`flex flex-col items-start gap-0.5 rounded-xl border px-4 py-2.5 min-w-[140px] ${active ? "border-brand-400 bg-brand-50" : "border-slate-200 bg-white hover:border-slate-300"}`}
-            >
-              <span
-                className={`text-sm font-semibold ${active ? "text-brand-700" : "text-slate-700"}`}
-              >
-                {p.name}
-              </span>
-              <span className={`text-xs ${active ? "text-brand-500" : "text-slate-400"}`}>
-                {du > 0 ? `en ${du} d` : "en curso"}
-              </span>
-            </button>
-          );
-        })}
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="flex flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-slate-300 px-4 py-2.5 min-w-[130px] text-brand-600 hover:border-brand-400 hover:bg-brand-50/40"
-        >
-          <IconPlus className="w-4 h-4" />
-          <span className="text-xs font-semibold">Crear campaña</span>
-        </button>
-      </div>
-
-      {/* resumen */}
-      <CampaignSummaryCard
-        camp={camp}
-        allocated={allocated}
-        estSaleTotal={estSaleTotal}
-        avgDiscount={avgDiscount}
-        budgetPct={budgetPct}
-        overBudget={overBudget}
-      />
-
-      {/* tabs: planificación vs rendimiento */}
-      <Tabs
-        className="mb-5"
-        value={tab}
-        onChange={(v) => setTab(v as "plan" | "perf")}
-        tabs={[
-          { value: "plan", label: "Planificación", count: camp.products.length },
-          { value: "perf", label: "Rendimiento" },
-        ]}
-      />
-
-      {tab === "plan" ? (
-        <>
-          {/* presupuesto por canal */}
-          <p className="text-sm font-semibold text-slate-700 mb-2.5">Presupuesto por canal</p>
-          <ChannelBudgetGrid camp={camp} channelOrder={channelOrder} />
-
-          {/* espacios publicitarios */}
-          <AdSpacesHeader
-            spacesFree={spacesFree}
-            spacesTotal={spacesTotal}
-            spacesUsed={spacesUsed}
-            spaceView={spaceView}
-            onSpaceViewChange={setSpaceView}
-          />
-
-          {/* filtros por canal */}
-          <ChannelFilterChips
-            chips={chips}
-            chFilter={chFilter}
-            onChange={setChFilter}
-            freeByKey={freeByKey}
-          />
-
-          {/* espacios publicitarios: tarjetas o calendario */}
-          <AdSpacesView
-            spaces={spaces}
-            spaceView={spaceView}
-            campFrom={camp.from}
-            campTo={camp.to}
-            moveProduct={moveProduct}
-            openAdd={openAdd}
-            onInfo={toast.info}
-          />
-
-          {/* productos en descuento */}
-          <p className="text-sm font-semibold text-slate-700 mb-2.5">Productos en descuento</p>
-          <CampaignProductsTable
-            products={camp.products}
-            positionBySku={positionBySku}
-            moveProduct={moveProduct}
-            openEdit={openEdit}
-            onAdd={() => openAdd()}
-          />
-        </>
+      {sorted.length === 0 ? (
+        <Card>
+          <CardBody>
+            <EmptyState
+              icon={<IconCampaign className="w-6 h-6" />}
+              title="Aún no hay campañas"
+              description="Crea la primera campaña: un espacio publicitario por canal con su vigencia y presupuesto. Las campañas ligadas a oportunidades se crean desde Anticipación de campañas."
+              action={
+                <Button onClick={() => setCreateOpen(true)} icon={<IconPlus className="w-4 h-4" />}>
+                  Crear campaña
+                </Button>
+              }
+            />
+          </CardBody>
+        </Card>
       ) : (
-        <CampaignPerformance camp={camp} />
+        <>
+          {/* selector de campañas */}
+          <div className="flex flex-wrap gap-2.5 mb-4">
+            {sorted.map((c) => {
+              const active = camp && c.id === camp.id;
+              const du = daysUntil(c.startsAt);
+              const st = CAMPAIGN_STATUS_UI[c.status];
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelId(c.id)}
+                  className={`flex flex-col items-start gap-0.5 rounded-xl border px-4 py-2.5 min-w-[140px] ${active ? "border-brand-400 bg-brand-50" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                >
+                  <span
+                    className={`text-sm font-semibold ${active ? "text-brand-700" : "text-slate-700"}`}
+                  >
+                    {c.title}
+                  </span>
+                  <span className={`text-xs ${active ? "text-brand-500" : "text-slate-400"}`}>
+                    {c.status === "planned" && du > 0 ? `en ${du} d` : st.label.toLowerCase()}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="flex flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-slate-300 px-4 py-2.5 min-w-[130px] text-brand-600 hover:border-brand-400 hover:bg-brand-50/40"
+            >
+              <IconPlus className="w-4 h-4" />
+              <span className="text-xs font-semibold">Crear campaña</span>
+            </button>
+          </div>
+
+          {/* resumen de la campaña seleccionada */}
+          {camp && (
+            <CampaignSummaryCard
+              camp={camp}
+              busy={busy}
+              onTransition={(status) => transition(camp, status)}
+              onEdit={() => setEditing(camp)}
+            />
+          )}
+
+          {/* tabs: planificación vs rendimiento */}
+          <Tabs
+            className="mb-5"
+            value={tab}
+            onChange={(v) => setTab(v as "plan" | "perf")}
+            tabs={[
+              { value: "plan", label: "Espacios publicitarios", count: adSpaces.length },
+              { value: "perf", label: "Rendimiento" },
+            ]}
+          />
+
+          {tab === "plan" ? (
+            <>
+              <HelpNote className="mb-4">
+                El detalle por producto en descuento, los cupos por ubicación y el reparto de
+                presupuesto por canal no tienen fuente en el servicio de compras todavía; aquí se
+                gestionan los espacios publicitarios reales (campañas por canal).
+              </HelpNote>
+
+              <AdSpacesHeader
+                total={adSpaces.length}
+                active={adSpaces.filter((c) => c.status === "active").length}
+                spaceView={spaceView}
+                onSpaceViewChange={setSpaceView}
+              />
+
+              <ChannelFilterChips
+                chips={chips}
+                chFilter={chFilter}
+                onChange={setChFilter}
+                countByKey={countByKey}
+              />
+
+              <AdSpacesView
+                spaces={spaces}
+                spaceView={spaceView}
+                busy={busy}
+                onTransition={transition}
+                onCreate={() => setCreateOpen(true)}
+              />
+            </>
+          ) : (
+            camp && <CampaignPerformance camp={camp} />
+          )}
+        </>
       )}
 
-      {/* Modal agregar/editar producto */}
-      <ProductFormModal
-        form={form}
-        setForm={setForm}
-        onSubmit={submitForm}
-        onRemove={() => {
-          if (!form) return;
-          const i = form.index;
-          updateProducts((arr) => arr.filter((_, j) => j !== i));
-          setForm(null);
-          toast.success(`Producto quitado de ${camp.name}`);
-        }}
-        fValid={fValid}
-        fDiscount={fDiscount}
-        retailPrice={retailPrice}
-        productOptions={productOptions}
-      />
-
-      {/* Modal crear campaña */}
+      {/* Modal crear espacio publicitario (type 'ad_space') */}
       <CreateCampaignModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        cmName={cmName}
-        setCmName={setCmName}
-        cmFrom={cmFrom}
-        setCmFrom={setCmFrom}
-        cmTo={cmTo}
-        setCmTo={setCmTo}
-        cmBudget={cmBudget}
-        setCmBudget={setCmBudget}
-        onCreate={submitCreate}
+        onCreate={create}
+        busy={busy}
+      />
+
+      {/* Modal editar presupuesto / fecha fin */}
+      <EditCampaignModal
+        camp={editing}
+        onClose={() => setEditing(null)}
+        onSave={saveEdit}
+        busy={busy}
       />
     </div>
   );

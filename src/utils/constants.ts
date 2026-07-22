@@ -4,6 +4,9 @@ export const TODAY_ISO = "2026-06-24";
 // Días objetivo de inventario por defecto cuando una regla no define uno propio.
 export const DEFAULT_TARGET_COVERAGE_DAYS = 45;
 
+// Umbral de margen "bajo" (%) usado en filtros de productos/recomendaciones.
+export const LOW_MARGIN_THRESHOLD = 20;
+
 // Umbral (CLP) sobre el cual el monto pendiente de un proveedor se marca en alerta.
 export const SUPPLIER_PENDING_WARN_CLP = 20_000_000;
 

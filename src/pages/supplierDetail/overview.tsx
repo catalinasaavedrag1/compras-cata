@@ -2,20 +2,20 @@ import { Link } from "react-router-dom";
 import { Card, CardBody, CardHeader } from "../../components/ui/Card";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import { IconAlerts, IconChevronRight, IconSales, IconBox } from "../../components/ui/icons";
-import type { Product } from "../../types/purchasing";
+import type { SupplierCatalogRow, SupplierFichaData } from "../../services/purchaseBff";
 import {
   formatCurrencyCompact,
   formatDays,
-  formatDate,
   formatNumber,
   formatPercent,
 } from "../../utils/formatters";
 import { SUPPLIER_CLASS, type SupplierScore } from "../../utils/supplierScore";
 import {
   SUPPLIER_COMPLIANCE_CRITICAL,
+  SUPPLIER_COMPLIANCE_WARN,
   SUPPLIER_LEAD_TIME_WARN_DAYS,
 } from "../../utils/constants";
-import type { Supplier } from "../../types/purchasing";
+import { productPath } from "../../utils/entityLinks";
 
 /** Un dato de la evaluación de desempeño (label, valor coloreado y pista). */
 function ScoreStat({
@@ -50,12 +50,10 @@ function ScoreStat({
 export function SupplierClaimsAlert({
   totalClaims,
   openCount,
-  claimsValue,
   onNavigate,
 }: {
   totalClaims: number;
   openCount: number;
-  claimsValue: number;
   onNavigate: () => void;
 }) {
   if (totalClaims === 0) return null;
@@ -75,7 +73,7 @@ export function SupplierClaimsAlert({
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-slate-800">
           {openCount > 0
-            ? `${openCount} reclamo${openCount === 1 ? "" : "s"} abierto${openCount === 1 ? "" : "s"} · ${formatCurrencyCompact(claimsValue)} en juego`
+            ? `${openCount} reclamo${openCount === 1 ? "" : "s"} abierto${openCount === 1 ? "" : "s"}`
             : "Sin reclamos abiertos"}
         </span>
         <span className="block text-xs text-slate-500">
@@ -88,44 +86,83 @@ export function SupplierClaimsAlert({
   );
 }
 
-/** Tarjeta de evaluación de desempeño: OTIF, fill rate, lead time y reclamos. */
-export function PerformanceScoreCard({ score }: { score: SupplierScore }) {
+/** Tarjeta de evaluación de desempeño sobre la ficha real (F11). */
+export function PerformanceScoreCard({
+  score,
+  hasEvaluation,
+}: {
+  score: SupplierScore;
+  hasEvaluation: boolean;
+}) {
   return (
     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-card">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-800">Evaluación de desempeño</p>
-        <Badge tone={SUPPLIER_CLASS[score.classification].tone} dot>
-          {SUPPLIER_CLASS[score.classification].label}
-        </Badge>
+        <p className="text-sm font-semibold text-slate-800">
+          Evaluación de desempeño
+          {score.period && (
+            <span className="ml-1.5 text-xs font-normal text-slate-400">
+              período {score.period}
+            </span>
+          )}
+        </p>
+        <div className="flex items-center gap-2">
+          {score.score !== null && (
+            <Badge
+              tone={score.score >= 85 ? "green" : score.score >= 70 ? "amber" : "red"}
+            >
+              {score.score}/100
+            </Badge>
+          )}
+          <Badge tone={SUPPLIER_CLASS[score.classification].tone} dot>
+            {SUPPLIER_CLASS[score.classification].label}
+          </Badge>
+        </div>
       </div>
+      {!hasEvaluation && (
+        <p className="mb-3 text-sm text-slate-500">
+          Evaluación del período no disponible. Se muestran las métricas observadas.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <ScoreStat
-          label="OTIF"
-          value={`${score.otif}%`}
-          tone={score.otif >= 90 ? "good" : score.otif >= 80 ? "warn" : "bad"}
-          hint="A tiempo y completo"
-        />
-        <ScoreStat label="Fill rate" value={`${score.fillRate}%`} hint="Despacho completo" />
-        <ScoreStat
-          label="Lead time prometido→real"
-          value={
-            score.leadPromised !== null
-              ? `${score.leadPromised}→${score.leadReal} d`
-              : `${score.leadReal} d`
+          label="Cumplimiento"
+          value={score.compliancePct !== null ? formatPercent(score.compliancePct, 0) : "—"}
+          tone={
+            score.compliancePct === null
+              ? "neutral"
+              : score.compliancePct >= 90
+                ? "good"
+                : score.compliancePct >= 80
+                  ? "warn"
+                  : "bad"
           }
-          tone={score.leadGap >= 5 ? "bad" : score.leadGap >= 2 ? "warn" : "good"}
-          hint={score.leadGap > 0 ? `+${score.leadGap} d más lento` : "En plazo"}
+          hint="Entregas a tiempo"
+        />
+        <ScoreStat
+          label="Lead time observado"
+          value={score.leadTimeDays !== null ? formatDays(score.leadTimeDays) : "—"}
+          tone={
+            score.leadTimeDays !== null && score.leadTimeDays >= SUPPLIER_LEAD_TIME_WARN_DAYS
+              ? "warn"
+              : "neutral"
+          }
+          hint="Promedio de entrega"
         />
         <ScoreStat
           label="Reclamos abiertos"
-          value={
-            score.claimsOpen > 0
-              ? `${score.claimsOpen} · ${formatCurrencyCompact(score.claimsValue)}`
-              : "0"
-          }
-          tone={score.claimsOpen > 0 ? "bad" : "good"}
+          value={score.claimsOpen !== null ? formatNumber(score.claimsOpen) : "—"}
+          tone={(score.claimsOpen ?? 0) > 0 ? "bad" : "good"}
           hint="Pérdidas operativas"
         />
+        {score.dimensions.map((d) => (
+          <ScoreStat
+            key={d.key}
+            label={d.label}
+            value={formatPercent(d.value, 0)}
+            tone={d.value >= 85 ? "good" : d.value >= 70 ? "warn" : "bad"}
+            hint="Evaluación del período"
+          />
+        ))}
       </div>
       {score.reasons.length > 0 && (
         <p className="mt-2 text-xs text-slate-500">{score.reasons.join(" ")}</p>
@@ -134,45 +171,38 @@ export function PerformanceScoreCard({ score }: { score: SupplierScore }) {
   );
 }
 
-/** Banner ámbar de "revisar proveedor" cuando el cumplimiento o el estado lo ameritan. */
-export function SupplierReviewBanner({
-  supplier,
-  riskProducts,
-}: {
-  supplier: Supplier;
-  riskProducts: number;
-}) {
+/** Banner ámbar de "revisar proveedor" cuando el cumplimiento real lo amerita. */
+export function SupplierReviewBanner({ data }: { data: SupplierFichaData }) {
+  const compliance = data.metrics.compliancePct;
+  const lead = data.metrics.leadTimeDaysObserved;
   const show =
-    supplier.status === "delayed" ||
-    supplier.status === "review" ||
-    supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL;
+    data.status === "blocked" ||
+    (compliance !== null && compliance < SUPPLIER_COMPLIANCE_CRITICAL);
   if (!show) return null;
   return (
     <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-      <b>Revisar proveedor:</b> cumplimiento {formatPercent(supplier.deliveryCompliance, 0)}
-      {supplier.averageLeadTimeDays >= SUPPLIER_LEAD_TIME_WARN_DAYS && (
-        <> · lead time alto ({formatDays(supplier.averageLeadTimeDays)})</>
+      <b>Revisar proveedor:</b>{" "}
+      {compliance !== null ? `cumplimiento ${formatPercent(compliance, 0)}` : "sin cumplimiento medido"}
+      {lead !== null && lead >= SUPPLIER_LEAD_TIME_WARN_DAYS && (
+        <> · lead time alto ({formatDays(lead)})</>
       )}
-      {riskProducts > 0 && <> · {riskProducts} SKU en quiebre</>}
-      {" · "}última compra {formatDate(supplier.lastPurchaseDate)}.
+      {data.status === "blocked" && <> · proveedor bloqueado</>}.
     </div>
   );
 }
 
-/** Franja "Para atender al proveedor": importancia, venta, margen, utilidad y OC atrasadas. */
+/** Franja "Para atender al proveedor": importancia, venta en unidades, margen y OC atrasadas. */
 export function SupplierSummaryStrip({
   importance,
-  ventas30,
-  margenProm,
-  utilidad30,
+  sales30Units,
+  avgMarginPct,
   delayedCount,
   onOpenOrders,
 }: {
   importance: { label: string; tone: BadgeTone };
-  ventas30: number;
-  margenProm: number;
-  utilidad30: number;
-  delayedCount: number;
+  sales30Units: number | null;
+  avgMarginPct: number | null;
+  delayedCount: number | null;
   onOpenOrders: () => void;
 }) {
   return (
@@ -186,18 +216,21 @@ export function SupplierSummaryStrip({
           </div>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-          <p className="text-xs text-slate-400">Venta 30 días</p>
-          <p className="text-lg font-semibold text-slate-800">{formatCurrencyCompact(ventas30)}</p>
+          <p className="text-xs text-slate-400">Venta 30 días (unid.)</p>
+          <p className="text-lg font-semibold text-slate-800">
+            {sales30Units !== null ? formatNumber(sales30Units) : "—"}
+          </p>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-2.5">
           <p className="text-xs text-slate-400">Margen promedio</p>
-          <p className="text-lg font-semibold text-emerald-700">{formatPercent(margenProm, 1)}</p>
+          <p className="text-lg font-semibold text-emerald-700">
+            {avgMarginPct !== null ? formatPercent(avgMarginPct, 1) : "—"}
+          </p>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-2.5">
           <p className="text-xs text-slate-400">Utilidad 30 días</p>
-          <p className="text-lg font-semibold text-emerald-700">
-            {formatCurrencyCompact(utilidad30)}
-          </p>
+          <p className="text-lg font-semibold text-slate-400">—</p>
+          <p className="text-[11px] text-slate-400">Se publica desde analytics</p>
         </div>
         <button
           onClick={onOpenOrders}
@@ -205,9 +238,9 @@ export function SupplierSummaryStrip({
         >
           <p className="text-xs text-slate-400">OC atrasadas</p>
           <p
-            className={`text-lg font-semibold ${delayedCount > 0 ? "text-rose-600" : "text-slate-800"}`}
+            className={`text-lg font-semibold ${(delayedCount ?? 0) > 0 ? "text-rose-600" : "text-slate-800"}`}
           >
-            {formatNumber(delayedCount)}
+            {delayedCount !== null ? formatNumber(delayedCount) : "—"}
           </p>
         </button>
       </div>
@@ -263,39 +296,26 @@ function SupplierCockpitMetric({ label, value }: { label: string; value: string 
   );
 }
 
-/** Cockpit de negociación + posición negociadora (dos tarjetas lado a lado). */
+/** Cockpit de negociación + posición negociadora, alimentados con la ficha real. */
 export function NegotiationCockpit({
-  costIncreaseCount,
-  costImpact,
-  detenidosCount,
+  stalledCount,
   stalledCapital,
-  compliance,
+  compliancePct,
   delayedCount,
-  growingCount,
   negotiationPower,
-  altCount,
-  activeCount,
-  purchased90,
-  topCount,
-  topSalesShare,
-  topProfitShare,
-  complianceWarn,
+  skuCount,
+  purchased90Clp,
+  purchased90Share,
 }: {
-  costIncreaseCount: number;
-  costImpact: number;
-  detenidosCount: number;
-  stalledCapital: number;
-  compliance: number;
-  delayedCount: number;
-  growingCount: number;
+  stalledCount: number;
+  /** Capital inmovilizado a costo (stock × costo de los detenidos); null si no hay costos. */
+  stalledCapital: number | null;
+  compliancePct: number | null;
+  delayedCount: number | null;
   negotiationPower: string;
-  altCount: number;
-  activeCount: number;
-  purchased90: number;
-  topCount: number;
-  topSalesShare: number;
-  topProfitShare: number;
-  complianceWarn: number;
+  skuCount: number;
+  purchased90Clp: number | null;
+  purchased90Share: number | null;
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 mb-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -308,30 +328,41 @@ export function NegotiationCockpit({
           <NegotiationAgendaItem
             index={1}
             title="Costo"
-            detail={`${costIncreaseCount} SKU subieron más de 5%. Impacto potencial en margen: ${formatCurrencyCompact(costImpact)}.`}
-            ask="Pedir recuperación de margen, descuento por volumen o lista escalonada."
-            tone={costIncreaseCount > 0 ? "amber" : "green"}
+            detail="Alzas de costo aún sin fuente: el historial de listas de precio no está publicado."
+            ask="Revisar la lista vigente y acordar preaviso formal ante cambios de costo."
+            tone="neutral"
           />
           <NegotiationAgendaItem
             index={2}
             title="Productos detenidos"
-            detail={`${detenidosCount} SKU · ${formatCurrencyCompact(stalledCapital)} inmovilizados.`}
+            detail={`${formatNumber(stalledCount)} SKU sin venta con stock${
+              stalledCapital !== null
+                ? ` · ${formatCurrencyCompact(stalledCapital)} inmovilizados a costo`
+                : ""
+            }.`}
             ask="Solicitar devolución, nota de crédito, apoyo promocional o cambio por otros SKU."
-            tone={detenidosCount > 0 ? "red" : "green"}
+            tone={stalledCount > 0 ? "red" : "green"}
           />
           <NegotiationAgendaItem
             index={3}
             title="Cumplimiento"
-            detail={`OTIF ${formatPercent(compliance, 0)} · ${delayedCount} OC atrasadas.`}
+            detail={`Cumplimiento ${
+              compliancePct !== null ? formatPercent(compliancePct, 0) : "—"
+            } · ${delayedCount !== null ? formatNumber(delayedCount) : "—"} OC atrasadas.`}
             ask="Acordar objetivo de servicio, lead time realista y plan para atrasos."
-            tone={delayedCount > 0 || compliance < complianceWarn ? "amber" : "green"}
+            tone={
+              (delayedCount ?? 0) > 0 ||
+              (compliancePct !== null && compliancePct < SUPPLIER_COMPLIANCE_WARN)
+                ? "amber"
+                : "green"
+            }
           />
           <NegotiationAgendaItem
             index={4}
             title="Oportunidad"
-            detail={`${growingCount} SKU crecen sobre 25% con cobertura corta.`}
-            ask="Negociar capacidad, prioridad de despacho y precio por volumen."
-            tone={growingCount > 0 ? "blue" : "neutral"}
+            detail="Crecimientos por SKU aún sin fuente: la serie de ventas se publica desde analytics."
+            ask="Repasar en la reunión los SKU que el proveedor ve creciendo en el canal."
+            tone="neutral"
           />
         </CardBody>
       </Card>
@@ -339,27 +370,36 @@ export function NegotiationCockpit({
       <Card>
         <CardHeader
           title="Posición negociadora"
-          description="Dependencia, alternativas y concentración real del proveedor."
+          description="Dependencia y concentración real del proveedor."
         />
         <CardBody className="space-y-3">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Posición</p>
             <div className="mt-1 flex items-center justify-between gap-2">
               <p className="text-xl font-semibold text-slate-900">{negotiationPower}</p>
-              <Badge tone={negotiationPower === "Media-alta" ? "green" : "amber"}>
-                {formatPercent((altCount / Math.max(1, activeCount)) * 100, 0)} con alternativa
-              </Badge>
+              {purchased90Share !== null && (
+                <Badge tone={purchased90Share > 0.3 ? "amber" : "green"}>
+                  {formatPercent(purchased90Share * 100, 0)} de la compra 90d
+                </Badge>
+              )}
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              {topCount} productos concentran {formatPercent(topSalesShare * 100, 0)} de la venta y{" "}
-              {formatPercent(topProfitShare * 100, 0)} de la utilidad del proveedor.
+              Orientativa: derivada solo de la participación en la compra de los últimos 90 días.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <SupplierCockpitMetric label="Compras 90d" value={formatCurrencyCompact(purchased90)} />
-            <SupplierCockpitMetric label="Productos activos" value={formatNumber(activeCount)} />
-            <SupplierCockpitMetric label="Alternativas" value={formatNumber(altCount)} />
-            <SupplierCockpitMetric label="Detenidos" value={formatNumber(detenidosCount)} />
+            <SupplierCockpitMetric
+              label="Compras 90d"
+              value={purchased90Clp !== null ? formatCurrencyCompact(purchased90Clp) : "—"}
+            />
+            <SupplierCockpitMetric label="SKUs conocidos" value={formatNumber(skuCount)} />
+            <SupplierCockpitMetric
+              label="Participación 90d"
+              value={
+                purchased90Share !== null ? formatPercent(purchased90Share * 100, 0) : "—"
+              }
+            />
+            <SupplierCockpitMetric label="Detenidos" value={formatNumber(stalledCount)} />
           </div>
         </CardBody>
       </Card>
@@ -367,13 +407,13 @@ export function NegotiationCockpit({
   );
 }
 
-/** Más vendidos (30 días) y productos detenidos del proveedor, lado a lado. */
+/** Más vendidos (30 días, unidades) y productos detenidos del proveedor, lado a lado. */
 export function SupplierTopProducts({
   topSold,
   detenidos,
 }: {
-  topSold: Product[];
-  detenidos: Product[];
+  topSold: SupplierCatalogRow[];
+  detenidos: SupplierCatalogRow[];
 }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -390,20 +430,23 @@ export function SupplierTopProducts({
               {topSold.map((p, i) => (
                 <Link
                   key={p.sku}
-                  to={`/productos/${p.sku}`}
+                  to={productPath(p.sku)}
                   className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50"
                 >
                   <span className="w-5 text-center text-xs font-bold text-slate-400">{i + 1}</span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-sm font-medium text-slate-800 truncate">
-                      {p.name}
+                      {p.name ?? p.sku}
                     </span>
                     <span className="block text-xs text-slate-400">
-                      {formatNumber(p.salesLast30Days)} u. · margen {formatPercent(p.margin, 0)}
+                      {formatNumber(p.salesLast30d ?? 0)} u.
+                      {p.marginPct !== null && <> · margen {formatPercent(p.marginPct, 0)}</>}
                     </span>
                   </span>
                   <span className="text-sm font-semibold text-slate-700 flex-shrink-0">
-                    {formatCurrencyCompact(p.salesLast30Days * p.price)}
+                    {p.unitCostClp !== null
+                      ? `≈ ${formatCurrencyCompact((p.salesLast30d ?? 0) * p.unitCostClp)} a costo`
+                      : "—"}
                   </span>
                 </Link>
               ))}
@@ -420,32 +463,29 @@ export function SupplierTopProducts({
             {detenidos.length > 0 && <Badge tone="violet">{detenidos.length}</Badge>}
           </div>
           {detenidos.length === 0 ? (
-            <p className="text-sm text-slate-400">Sin sobrestock ni productos sin venta. 👍</p>
+            <p className="text-sm text-slate-400">Sin productos con stock y venta detenida. 👍</p>
           ) : (
             <div className="space-y-1.5">
               {detenidos.slice(0, 5).map((p) => (
                 <Link
                   key={p.sku}
-                  to={`/productos/${p.sku}`}
+                  to={productPath(p.sku)}
                   className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50"
                 >
                   <span className="flex-1 min-w-0">
                     <span className="block text-sm font-medium text-slate-800 truncate">
-                      {p.name}
+                      {p.name ?? p.sku}
                     </span>
                     <span className="block text-xs text-slate-400">
-                      disp. {formatNumber(p.availableStock)} · vende{" "}
-                      {formatNumber(p.salesLast30Days)}/mes
+                      disp. {formatNumber(p.stockAvailable ?? 0)} · sin venta 30d
                     </span>
                   </span>
-                  <Badge tone={p.salesLast30Days === 0 ? "red" : "violet"}>
-                    {p.salesLast30Days === 0 ? "Sin venta" : "Sobrestock"}
-                  </Badge>
+                  <Badge tone="red">Sin venta</Badge>
                 </Link>
               ))}
               {detenidos.length > 5 && (
                 <p className="text-xs text-slate-400 pt-0.5">
-                  +{detenidos.length - 5} más · ver pestaña Productos
+                  +{detenidos.length - 5} más · ver pestaña Catálogo
                 </p>
               )}
             </div>

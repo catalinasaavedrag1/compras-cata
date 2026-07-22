@@ -1,38 +1,89 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useLocalStorage } from "../utils/useLocalStorage";
-import { categories } from "../data/mockCategories";
+import {
+  getCategoriesPanel,
+  isPurchaseBffConfigured,
+  type CategoryPanelRow,
+} from "../services/purchaseBff";
 
 // ============================================================================
 //  Comprador actual de la sesión.
-//  Los compradores se obtienen de las categorías (campo "buyer").
-//  El comprador define qué categorías y productos son "suyos".
+//  Los compradores y su cartera salen del panel REAL de categorías (F12):
+//  cada categoría trae su buyerId asignado. Sin BFF configurado (o mientras
+//  carga) la cartera queda vacía — nunca se inventa un mapa comprador→categoría.
 // ============================================================================
 
-const BUYERS = Array.from(new Set(categories.map((c) => c.buyer))).sort((a, b) =>
-  a.localeCompare(b, "es")
-);
+/** "catalina" -> "Catalina" (presentación de un id real, no dato inventado). */
+function displayBuyer(id: string): string {
+  return id
+    .split(/[.\-_\s]+/)
+    .filter(Boolean)
+    .map((w) => w[0]?.toUpperCase() + w.slice(1))
+    .join(" ");
+}
 
 interface BuyerContextValue {
   buyer: string;
   setBuyer: (name: string) => void;
   buyers: string[];
-  /** Nombres de categorías asignadas al comprador actual. */
+  /** Nombres de categorías asignadas al comprador actual (buyerId). */
   myCategories: string[];
+  /** Presentación legible del buyerId actual. */
+  buyerLabel: string;
+  labelFor: (buyerId: string) => string;
 }
 
 const BuyerContext = createContext<BuyerContextValue | null>(null);
 
 export function BuyerProvider({ children }: { children: ReactNode }) {
-  const [buyer, setBuyer] = useLocalStorage<string>("compras:buyer", "Catalina Saavedra");
+  const [buyer, setBuyer] = useLocalStorage<string>("compras:buyer", "");
+  const [rows, setRows] = useState<CategoryPanelRow[]>([]);
+  const requestSeq = useRef(0);
+
+  useEffect(() => {
+    if (!isPurchaseBffConfigured()) return;
+    const seq = ++requestSeq.current;
+    void getCategoriesPanel()
+      .then((data) => {
+        if (seq === requestSeq.current) setRows(data.items);
+      })
+      .catch(() => {
+        // Sin categorías reales: la cartera queda vacía (degradación honesta).
+        if (seq === requestSeq.current) setRows([]);
+      });
+  }, []);
+
+  const buyers = useMemo(
+    () =>
+      Array.from(
+        new Set(rows.map((r) => r.buyerId).filter((b): b is string => !!b))
+      ).sort((a, b) => a.localeCompare(b, "es")),
+    [rows]
+  );
+
+  // Comprador efectivo: el guardado si sigue existiendo, si no el primero real.
+  const effectiveBuyer = buyer && buyers.includes(buyer) ? buyer : (buyers[0] ?? buyer);
 
   const value = useMemo<BuyerContextValue>(
     () => ({
-      buyer,
+      buyer: effectiveBuyer,
       setBuyer,
-      buyers: BUYERS,
-      myCategories: categories.filter((c) => c.buyer === buyer).map((c) => c.name),
+      buyers,
+      myCategories: rows
+        .filter((r) => r.buyerId === effectiveBuyer)
+        .map((r) => r.name),
+      buyerLabel: effectiveBuyer ? displayBuyer(effectiveBuyer) : "—",
+      labelFor: (id: string) => (id ? displayBuyer(id) : "—"),
     }),
-    [buyer, setBuyer]
+    [effectiveBuyer, setBuyer, buyers, rows]
   );
 
   return <BuyerContext.Provider value={value}>{children}</BuyerContext.Provider>;

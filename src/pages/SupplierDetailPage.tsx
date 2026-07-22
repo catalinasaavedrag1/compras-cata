@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
+import { Card } from "../components/ui/Card";
 import { KpiCard } from "../components/business/KpiCard";
 import { Tabs } from "../components/ui/Tabs";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
+import { Skeleton } from "../components/ui/Skeleton";
 import { StatusBadge } from "../components/business/StatusBadge";
 import { MetricHint } from "../components/business/supplierMetricHelp";
 import {
@@ -21,18 +23,12 @@ import {
   NegotiationCockpit,
   SupplierTopProducts,
 } from "./supplierDetail/overview";
-import { suppliers } from "../data/mockSuppliers";
-import { products } from "../data/mockProducts";
-import { purchaseOrders } from "../data/mockPurchaseOrders";
-import { receptions } from "../data/mockReceptions";
-import { alerts } from "../data/mockAlerts";
 import {
-  SupplierNegotiation,
-  SeasonView,
   SupplierTermsAgreements,
   SupplierNegotiationRecord,
   SupplierMaster,
 } from "./SupplierDetailSections";
+import { useSupplierFicha } from "../hooks/useFichas";
 import {
   formatCurrencyCompact,
   formatDays,
@@ -40,138 +36,166 @@ import {
   formatPercent,
 } from "../utils/formatters";
 import { IconOrders, IconInventory, IconSuppliers } from "../components/ui/icons";
-import { useClaims } from "../context/ClaimsContext";
-import { CLAIM_OPEN_STATES } from "../data/mockClaims";
-import { supplierScore } from "../utils/supplierScore";
 import {
   SUPPLIER_PENDING_WARN_CLP,
   SUPPLIER_COMPLIANCE_CRITICAL,
   SUPPLIER_COMPLIANCE_WARN,
   SUPPLIER_LEAD_TIME_WARN_DAYS,
 } from "../utils/constants";
+import { supplierScoreFromFicha } from "../utils/supplierScore";
+
+// ============================================================================
+//  Ficha de proveedor (F11) conectada al purchase-bff-service: el :id de la
+//  ruta es el supplierId real de la relación (SUP-…). Todo sale de
+//  GET /suppliers/:id (relación indispensable, resto degradable); Órdenes y
+//  Recepciones se piden aparte con su filtro supplierId. Regla de oro: dato
+//  sin fuente real ⇒ "—" o estado vacío honesto, nunca cifras inventadas.
+// ============================================================================
 
 export function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "ficha");
-  const { forSupplier } = useClaims();
 
-  const supplier = suppliers.find((s) => s.id === id);
+  const { data, loading, error, notFound, configured, refetch } = useSupplierFicha(id);
 
-  if (!supplier) {
+  const pageTitle = data?.name ?? id ?? "Proveedor";
+  const breadcrumbs = [{ label: "Proveedores", to: "/proveedores" }, { label: pageTitle }];
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando, error y 404 (patrón F1).
+  // --------------------------------------------------------------------------
+  if (!configured) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver la ficha real del proveedor.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading && !data) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando ficha del proveedor">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (notFound) {
     return (
       <div className="py-10">
         <EmptyState
           title="Proveedor no encontrado"
-          description={`No existe el proveedor "${id}".`}
+          description={`No existe una relación comercial "${id}" en el servicio de compras.`}
           action={<Button onClick={() => navigate("/proveedores")}>Volver a proveedores</Button>}
         />
       </div>
     );
   }
 
-  const supClaims = forSupplier(supplier.name);
-  const openStates = new Set(CLAIM_OPEN_STATES);
-  const openClaims = supClaims.filter((c) => openStates.has(c.estado));
-  const claimsValue = openClaims.reduce((a, c) => a + c.valorReclamado, 0);
-  const score = supplierScore(supplier, supClaims);
+  if (error && !data) {
+    return (
+      <div>
+        <PageHeader breadcrumbs={breadcrumbs} title={pageTitle} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudo cargar la ficha del proveedor
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-  const supProducts = products.filter((p) => p.supplierName === supplier.name);
-  const supSkus = new Set(supProducts.map((p) => p.sku));
-  const supPOs = purchaseOrders.filter((o) => o.supplierName === supplier.name);
-  const openPOs = supPOs.filter((o) => !["received", "cancelled"].includes(o.status));
-  const supReceptions = receptions.filter((r) => r.supplierName === supplier.name);
-  const supAlerts = alerts.filter(
-    (a) => a.relatedEntity === supplier.name || (a.relatedSku && supSkus.has(a.relatedSku))
-  );
-  const riskProducts = supProducts.filter(
-    (p) => p.availableStock <= 0 && p.salesLast30Days > 0
-  ).length;
+  if (!data || !id) return null;
 
-  // ---- Resumen comercial para atender al proveedor ----
-  const sales30Amount = (p: (typeof supProducts)[number]) => p.salesLast30Days * p.price;
-  const utility30 = (p: (typeof supProducts)[number]) => p.salesLast30Days * (p.price - p.cost);
-  const ventas30 = supProducts.reduce((a, p) => a + sales30Amount(p), 0);
-  const utilidad30 = supProducts.reduce((a, p) => a + utility30(p), 0);
-  const margenProm = ventas30 > 0 ? (utilidad30 / ventas30) * 100 : 0;
+  const { metrics, summary, catalog } = data;
+  const score = supplierScoreFromFicha(data);
 
-  const topSold = [...supProducts]
-    .filter((p) => p.salesLast30Days > 0)
-    .sort((a, b) => sales30Amount(b) - sales30Amount(a))
+  // Catálogo: más vendidos (unidades 30d) y detenidos (stock sin venta).
+  const topSold = catalog.items
+    .filter((p) => (p.salesLast30d ?? 0) > 0)
+    .sort((a, b) => (b.salesLast30d ?? 0) - (a.salesLast30d ?? 0))
     .slice(0, 5);
-  const detenidos = supProducts.filter(
-    (p) => p.purchaseStatus === "overstock" || (p.salesLast30Days === 0 && p.availableStock > 0)
+  const detenidos = catalog.items.filter(
+    (p) => p.salesLast30d === 0 && (p.stockAvailable ?? 0) > 0
   );
-  const delayedPOs = supPOs.filter((o) => o.status === "delayed" || o.delayedDays > 0);
-  const topSupplierProducts = [...supProducts]
-    .map((p) => {
-      const expected30 = p.salesLast90Days / 3;
-      const growth = expected30 > 0 ? (p.salesLast30Days - expected30) / expected30 : 0;
-      const inventoryValue = p.availableStock * p.cost;
-      return {
-        product: p,
-        sales: sales30Amount(p),
-        profit: utility30(p),
-        growth,
-        inventoryValue,
-      };
-    })
-    .sort((a, b) => b.sales - a.sales)
-    .slice(0, 10);
-  const topSalesShare =
-    ventas30 > 0 ? topSupplierProducts.reduce((sum, p) => sum + p.sales, 0) / ventas30 : 0;
-  const topProfitShare =
-    utilidad30 > 0 ? topSupplierProducts.reduce((sum, p) => sum + p.profit, 0) / utilidad30 : 0;
-  const stalledCapital = detenidos.reduce((sum, p) => sum + p.availableStock * p.cost, 0);
-  const costIncreaseProducts = supProducts.filter(
-    (p) => p.costoAnterior && p.cost > p.costoAnterior * 1.05
+  // Capital inmovilizado a costo de los detenidos (solo con costo conocido).
+  const stalledWithCost = detenidos.filter(
+    (p) => p.unitCostClp !== null && p.stockAvailable !== null
   );
-  const alternativeProducts = supProducts.filter((p) => (p.equivalencias?.length ?? 0) > 0);
-  const growingConstrained = topSupplierProducts.filter(
-    (r) =>
-      r.growth >= 0.25 &&
-      r.product.salesLast30Days > 0 &&
-      r.product.availableStock / (r.product.salesLast30Days / 30) <=
-        r.product.supplierLeadTimeDays * 2
-  );
-  const negotiationPower =
-    alternativeProducts.length / Math.max(1, supProducts.length) >= 0.45
-      ? "Media-alta"
-      : supplier.purchasedAmountLast90Days > 120000000
-        ? "Media"
-        : "Baja";
+  const stalledCapital =
+    stalledWithCost.length > 0
+      ? stalledWithCost.reduce((a, p) => a + (p.stockAvailable ?? 0) * (p.unitCostClp ?? 0), 0)
+      : null;
 
-  // Nivel de importancia: combina compra (90d) vs el mayor del panel y tamaño del surtido
-  const maxBuy = Math.max(1, ...suppliers.map((s) => s.purchasedAmountLast90Days));
-  const share = supplier.purchasedAmountLast90Days / maxBuy;
+  // Importancia y poder de negociación: derivación simple y orientativa de la
+  // participación real en la compra 90d (sin señales inventadas).
+  const share = summary.purchased90Share;
   const importance =
-    share >= 0.6 || supplier.associatedSkus >= 200
+    share !== null && share >= 0.3
       ? { label: "Estratégico", tone: "violet" as const }
-      : share >= 0.3 || supplier.associatedSkus >= 100
+      : share !== null && share >= 0.1
         ? { label: "Importante", tone: "blue" as const }
         : { label: "Secundario", tone: "neutral" as const };
+  const negotiationPower =
+    share === null ? "—" : share > 0.3 ? "Media-alta" : share > 0.1 ? "Media" : "Baja";
 
   return (
     <div>
       <PageHeader
-        breadcrumbs={[{ label: "Proveedores", to: "/proveedores" }, { label: supplier.name }]}
-        title={supplier.name}
-        description={`${supplier.rut} · ${supplier.categories.join(", ")}`}
-        action={<StatusBadge kind="supplier" value={supplier.status} />}
+        breadcrumbs={breadcrumbs}
+        title={data.name}
+        description={[data.rut, data.sapCardCode].filter(Boolean).join(" · ") || undefined}
+        action={<StatusBadge kind="supplier" value={data.status} />}
       />
+
+      {/* Aviso discreto de composición parcial (secciones degradadas del BFF) */}
+      {data.warnings && data.warnings.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Ficha con datos parciales: {data.warnings.map((w) => w.message).join(" · ")}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <KpiCard
           title="Cumplimiento"
-          value={formatPercent(supplier.deliveryCompliance, 0)}
+          value={metrics.compliancePct !== null ? formatPercent(metrics.compliancePct, 0) : "—"}
           tone={
-            supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_CRITICAL
-              ? "bad"
-              : supplier.deliveryCompliance < SUPPLIER_COMPLIANCE_WARN
-                ? "warn"
-                : "good"
+            metrics.compliancePct === null
+              ? "neutral"
+              : metrics.compliancePct < SUPPLIER_COMPLIANCE_CRITICAL
+                ? "bad"
+                : metrics.compliancePct < SUPPLIER_COMPLIANCE_WARN
+                  ? "warn"
+                  : "good"
           }
           icon={<IconSuppliers className="w-4 h-4" />}
           description="Entregas a tiempo"
@@ -179,15 +203,22 @@ export function SupplierDetailPage() {
         />
         <KpiCard
           title="Lead time"
-          value={formatDays(supplier.averageLeadTimeDays)}
-          tone={supplier.averageLeadTimeDays >= SUPPLIER_LEAD_TIME_WARN_DAYS ? "warn" : "neutral"}
+          value={
+            metrics.leadTimeDaysObserved !== null ? formatDays(metrics.leadTimeDaysObserved) : "—"
+          }
+          tone={
+            metrics.leadTimeDaysObserved !== null &&
+            metrics.leadTimeDaysObserved >= SUPPLIER_LEAD_TIME_WARN_DAYS
+              ? "warn"
+              : "neutral"
+          }
           icon={<IconInventory className="w-4 h-4" />}
-          description="Promedio de entrega"
+          description="Promedio observado"
           info={<MetricHint metric="leadTime" />}
         />
         <KpiCard
           title="OC abiertas"
-          value={formatNumber(openPOs.length)}
+          value={summary.ordersOpen !== null ? formatNumber(summary.ordersOpen) : "—"}
           tone="info"
           icon={<IconOrders className="w-4 h-4" />}
           description="Ver órdenes"
@@ -196,8 +227,16 @@ export function SupplierDetailPage() {
         />
         <KpiCard
           title="Monto pendiente"
-          value={formatCurrencyCompact(supplier.pendingAmount)}
-          tone={supplier.pendingAmount > SUPPLIER_PENDING_WARN_CLP ? "warn" : "neutral"}
+          value={
+            metrics.pendingAmountClp !== null
+              ? formatCurrencyCompact(metrics.pendingAmountClp)
+              : "—"
+          }
+          tone={
+            metrics.pendingAmountClp !== null && metrics.pendingAmountClp > SUPPLIER_PENDING_WARN_CLP
+              ? "warn"
+              : "neutral"
+          }
           icon={<IconOrders className="w-4 h-4" />}
           info={<MetricHint metric="pendiente" />}
         />
@@ -205,47 +244,35 @@ export function SupplierDetailPage() {
 
       {/* Reclamos: el desempeño operativo también pesa en la evaluación */}
       <SupplierClaimsAlert
-        totalClaims={supClaims.length}
-        openCount={openClaims.length}
-        claimsValue={claimsValue}
+        totalClaims={summary.claimsTotal ?? 0}
+        openCount={summary.claimsOpen ?? 0}
         onNavigate={() => navigate("/reclamos")}
       />
 
-      {/* Evaluación de desempeño (OTIF, lead time prometido vs real, reclamos) */}
-      <PerformanceScoreCard score={score} />
+      {/* Evaluación de desempeño (cumplimiento, período y reclamos) */}
+      <PerformanceScoreCard score={score} hasEvaluation={data.evaluation !== null} />
 
       {/* Motivo de revisión si aplica */}
-      <SupplierReviewBanner supplier={supplier} riskProducts={riskProducts} />
+      <SupplierReviewBanner data={data} />
 
       {/* Resumen para atender al proveedor */}
       <SupplierSummaryStrip
         importance={importance}
-        ventas30={ventas30}
-        margenProm={margenProm}
-        utilidad30={utilidad30}
-        delayedCount={delayedPOs.length}
+        sales30Units={catalog.sales30Units}
+        avgMarginPct={catalog.avgMarginPct}
+        delayedCount={summary.ordersDelayed}
         onOpenOrders={() => setTab("ordenes")}
       />
 
       <NegotiationCockpit
-        costIncreaseCount={costIncreaseProducts.length}
-        costImpact={costIncreaseProducts.reduce(
-          (sum, p) => sum + p.salesLast30Days * (p.cost - (p.costoAnterior ?? p.cost)),
-          0
-        )}
-        detenidosCount={detenidos.length}
+        stalledCount={catalog.stalledCount}
         stalledCapital={stalledCapital}
-        compliance={supplier.deliveryCompliance}
-        delayedCount={delayedPOs.length}
-        growingCount={growingConstrained.length}
+        compliancePct={metrics.compliancePct}
+        delayedCount={summary.ordersDelayed}
         negotiationPower={negotiationPower}
-        altCount={alternativeProducts.length}
-        activeCount={supProducts.length}
-        purchased90={supplier.purchasedAmountLast90Days}
-        topCount={topSupplierProducts.length}
-        topSalesShare={topSalesShare}
-        topProfitShare={topProfitShare}
-        complianceWarn={SUPPLIER_COMPLIANCE_WARN}
+        skuCount={catalog.skuCount}
+        purchased90Clp={summary.purchased90Clp}
+        purchased90Share={summary.purchased90Share}
       />
 
       {/* Más vendidos / Productos detenidos */}
@@ -257,36 +284,49 @@ export function SupplierDetailPage() {
         onChange={setTab}
         tabs={[
           { value: "ficha", label: "Ficha" },
-          { value: "negociacion", label: "Negociación" },
+          { value: "negociacion", label: "Negociación", count: data.negotiations.length },
           { value: "temporadas", label: "Temporadas" },
-          { value: "productos", label: "Catálogo", count: supProducts.length },
-          { value: "ordenes", label: "Órdenes", count: supPOs.length },
-          { value: "recepciones", label: "Recepciones", count: supReceptions.length },
-          { value: "alertas", label: "Alertas", count: supAlerts.length },
+          { value: "productos", label: "Catálogo", count: catalog.items.length },
+          { value: "ordenes", label: "Órdenes", count: summary.ordersTotal ?? undefined },
+          { value: "recepciones", label: "Recepciones", count: summary.receptionsTotal ?? undefined },
+          { value: "alertas", label: "Alertas", count: data.alerts.length },
         ]}
       />
 
-      {tab === "ficha" && <SupplierMaster supplier={supplier} />}
+      {tab === "ficha" && <SupplierMaster data={data} />}
 
       {tab === "negociacion" && (
         <div className="space-y-4">
-          <SupplierNegotiation supplier={supplier} />
-          <SupplierNegotiationRecord supplier={supplier} />
-          <SupplierTermsAgreements supplier={supplier} />
+          <SupplierNegotiationRecord
+            supplierId={id}
+            negotiations={data.negotiations}
+            onCreated={refetch}
+          />
+          <SupplierTermsAgreements
+            supplierId={id}
+            terms={data.terms}
+            agreements={data.agreements}
+            onCreated={refetch}
+          />
         </div>
       )}
 
-      {tab === "temporadas" && <SeasonView supplier={supplier} />}
+      {tab === "temporadas" && (
+        <Card>
+          <EmptyState
+            title="Temporadas"
+            description="Las temporadas se conectan en su propio flujo; esta ficha no las compone todavía."
+          />
+        </Card>
+      )}
 
-      {tab === "productos" && <SupplierCatalogTab products={supProducts} />}
+      {tab === "productos" && <SupplierCatalogTab items={catalog.items} />}
 
-      {tab === "ordenes" && <SupplierOrdersTab orders={supPOs} />}
+      {tab === "ordenes" && <SupplierOrdersTab supplierId={id} />}
 
-      {tab === "recepciones" && <SupplierReceptionsTab receptions={supReceptions} />}
+      {tab === "recepciones" && <SupplierReceptionsTab supplierId={id} />}
 
-      {tab === "alertas" && <SupplierAlertsTab alerts={supAlerts} />}
+      {tab === "alertas" && <SupplierAlertsTab alerts={data.alerts} />}
     </div>
   );
 }
-
-

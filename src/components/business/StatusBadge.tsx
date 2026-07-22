@@ -53,8 +53,10 @@ const purchaseOrder: Record<PurchaseOrderStatus, Config> = {
   cancelled: { label: "Cancelada", tone: "neutral" },
 };
 
-const supplier: Record<SupplierStatus, Config> = {
+// Incluye "on_watch" del panel real (GET /suppliers) además de los estados mock.
+const supplier: Record<SupplierStatus | "on_watch", Config> = {
   active: { label: "Activo", tone: "green" },
+  on_watch: { label: "En observación", tone: "amber" },
   review: { label: "Revisar", tone: "amber" },
   delayed: { label: "Atrasado", tone: "red" },
   blocked: { label: "Bloqueado", tone: "neutral" },

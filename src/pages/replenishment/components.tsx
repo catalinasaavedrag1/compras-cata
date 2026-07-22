@@ -4,7 +4,6 @@ import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { RecommendationBadge } from "../../components/business/RecommendationBadge";
 import { IconPlus } from "../../components/ui/icons";
-import { suppliers } from "../../data/mockSuppliers";
 import { coverageDays, coverageSentence } from "../../utils/calculations";
 import { cn } from "../../utils/cn";
 import {
@@ -23,14 +22,6 @@ import {
   salesTrendPct,
 } from "./helpers";
 import { buildRecommendationReasoning } from "../../utils/recommendationReasoning";
-import { buildBuyingAlerts, type BuyingAlert } from "../../utils/buyingAlerts";
-import {
-  skuProfileOf,
-  ABC_LABEL,
-  ABC_DESCRIPTION,
-  XYZ_LABEL,
-  XYZ_DESCRIPTION,
-} from "../../utils/skuProfile";
 
 // ============================================================================
 //  Componentes de la vista de Reposición: agrupación, tarjetas, drawer de
@@ -176,8 +167,8 @@ export function RecommendationMobileCard({
       </div>
       {openPo && (
         <p className="mt-2 rounded-lg bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700">
-          OC abierta {openPo.number} · {formatNumber(openPo.quantity)} u. · entrega{" "}
-          {openPo.expectedDate}
+          OC abierta {openPo.number} · {formatNumber(openPo.quantity)} u. ·{" "}
+          {openPo.expectedDate ? `entrega ${openPo.expectedDate}` : "entrega por confirmar"}
         </p>
       )}
       <p className={cn("mt-1.5 text-xs font-medium leading-snug", coverageToneText(rec))}>
@@ -238,7 +229,7 @@ export function RecommendationDecisionDrawer({
   onViewSku: (rec: PurchaseRecommendation) => void;
   alreadyInOc: boolean;
   openPo?: OpenPoSignal;
-  budgetAvailable: number;
+  budgetAvailable: number | null;
   onViewOpenPo: (openPo: OpenPoSignal) => void;
 }) {
   if (!rec) {
@@ -274,7 +265,8 @@ export function RecommendationDecisionDrawer({
   const protectedSales = protectedUnits * unitPriceEstimate;
   const expectedGrossMargin = protectedSales * (rec.margin / 100);
   const estimatedGmroi = capital > 0 ? (expectedGrossMargin * 12) / capital : 0;
-  const budgetUsePct = budgetAvailable > 0 ? (capital / budgetAvailable) * 100 : 100;
+  const budgetUsePct =
+    budgetAvailable !== null && budgetAvailable > 0 ? (capital / budgetAvailable) * 100 : null;
   const stockoutRisk =
     projectedCoverage <= rec.supplierLeadTimeDays
       ? "Alto"
@@ -296,17 +288,8 @@ export function RecommendationDecisionDrawer({
   const supplierOptions = buildSupplierComparison(rec, safeQty);
 
   // Razonamiento de la cantidad recomendada (anclado a la sugerencia, no a la
-  // simulación) y alertas inteligentes de la cantidad que se agregará ahora.
+  // simulación).
   const reasoning = buildRecommendationReasoning(rec, effectiveIncomingQty);
-  const alerts = buildBuyingAlerts({
-    sku: rec.sku,
-    supplierName: rec.supplierName,
-    quantity: safeQty,
-    availableStock: rec.availableStock,
-    incoming: effectiveIncomingQty,
-    salesLast30Days: rec.salesLast30Days,
-    openPo,
-  });
 
   return (
     <Drawer
@@ -327,9 +310,6 @@ export function RecommendationDecisionDrawer({
               Ver OC relacionada
             </Button>
           )}
-          <Button variant="secondary" onClick={() => onEdit(rec)}>
-            Comparar proveedores
-          </Button>
           <Button
             disabled={alreadyInOc || safeQty <= 0}
             onClick={() => onAdd(rec, safeQty)}
@@ -363,8 +343,6 @@ export function RecommendationDecisionDrawer({
             </div>
           </div>
         </section>
-
-        {alerts.length > 0 && <BuyingAlertsStrip alerts={alerts} />}
 
         <section>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Situación</p>
@@ -414,7 +392,10 @@ export function RecommendationDecisionDrawer({
               <div>
                 <p className="text-sm font-semibold text-slate-900">{openPo.number}</p>
                 <p className="text-sm text-slate-600">
-                  {formatNumber(openPo.quantity)} unidades · entrega esperada {openPo.expectedDate}
+                  {formatNumber(openPo.quantity)} unidades ·{" "}
+                  {openPo.expectedDate
+                    ? `entrega esperada ${openPo.expectedDate}`
+                    : "entrega por confirmar"}
                 </p>
                 {openPo.status === "delayed" && (
                   <p className="mt-1 text-xs font-medium text-amber-700">
@@ -491,8 +472,10 @@ export function RecommendationDecisionDrawer({
             />
             <DecisionMetric
               label="Presupuesto"
-              value={`${formatPercent(budgetUsePct, 0)} disp.`}
-              tone={capital <= budgetAvailable ? "green" : "red"}
+              value={budgetUsePct === null ? "—" : `${formatPercent(budgetUsePct, 0)} disp.`}
+              tone={
+                budgetAvailable === null ? "amber" : capital <= budgetAvailable ? "green" : "red"
+              }
             />
           </div>
         </section>
@@ -554,7 +537,7 @@ export function RecommendationDecisionDrawer({
 
         <section>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Comparar proveedores
+            Condiciones del proveedor
           </p>
           <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full min-w-[520px] text-sm">
@@ -583,8 +566,7 @@ export function RecommendationDecisionDrawer({
             </table>
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Un proveedor más rápido puede costar algo más, pero reduce riesgo de quiebre por llegada
-            anticipada.
+            Para comparar proveedores alternativos con costos reales, levanta una cotización (RFQ).
           </p>
         </section>
 
@@ -596,9 +578,8 @@ export function RecommendationDecisionDrawer({
   );
 }
 
-/** Chips de perfil del SKU: clase ABC, XYZ, rotación y rentabilidad. */
+/** Chips de perfil del SKU: rotación y rentabilidad (datos reales de la fila). */
 function SkuProfileChips({ rec }: { rec: PurchaseRecommendation }) {
-  const profile = skuProfileOf(rec.sku);
   const velocity =
     rec.salesLast30Days >= 60
       ? "Vende a diario"
@@ -610,22 +591,6 @@ function SkuProfileChips({ rec }: { rec: PurchaseRecommendation }) {
   const marginTone = rec.margin >= 30 ? "green" : rec.margin >= 20 ? "amber" : "red";
   return (
     <div className="mt-3 flex flex-wrap gap-1.5">
-      {profile && (
-        <span
-          title={ABC_DESCRIPTION[profile.abc]}
-          className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700"
-        >
-          {ABC_LABEL[profile.abc]} · {Math.round(profile.abcShare * 100)}% venta
-        </span>
-      )}
-      {profile && (
-        <span
-          title={XYZ_DESCRIPTION[profile.xyz]}
-          className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-        >
-          {profile.xyz} · {XYZ_LABEL[profile.xyz]}
-        </span>
-      )}
       <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
         {velocity}
       </span>
@@ -642,37 +607,6 @@ function SkuProfileChips({ rec }: { rec: PurchaseRecommendation }) {
         Margen {formatPercent(rec.margin, 0)}
       </span>
     </div>
-  );
-}
-
-const ALERT_STYLE: Record<BuyingAlert["tone"], { box: string; dot: string; title: string }> = {
-  bad: { box: "border-rose-200 bg-rose-50", dot: "bg-rose-500", title: "text-rose-800" },
-  warn: { box: "border-amber-200 bg-amber-50", dot: "bg-amber-500", title: "text-amber-800" },
-  info: { box: "border-brand-200 bg-brand-50", dot: "bg-brand-500", title: "text-brand-800" },
-};
-
-/** Tira de alertas inteligentes sobre la decisión de compra. */
-function BuyingAlertsStrip({ alerts }: { alerts: BuyingAlert[] }) {
-  return (
-    <section>
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Alertas ({alerts.length})
-      </p>
-      <div className="mt-2 space-y-2">
-        {alerts.map((alert) => {
-          const style = ALERT_STYLE[alert.tone];
-          return (
-            <div key={alert.id} className={cn("flex gap-2.5 rounded-lg border p-3", style.box)}>
-              <span className={cn("mt-1.5 h-2 w-2 flex-shrink-0 rounded-full", style.dot)} />
-              <div>
-                <p className={cn("text-sm font-semibold", style.title)}>{alert.title}</p>
-                {alert.detail && <p className="mt-0.5 text-xs text-slate-600">{alert.detail}</p>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -717,14 +651,6 @@ function ReasoningSection({
           <span className="text-xs text-slate-500">{formatCurrencyCompact(capital)}</span>
         </li>
       </ul>
-
-      {reasoning.promo && (
-        <div className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-xs text-slate-600">
-          <b className="text-slate-800">Promoción «{reasoning.promo.name}»</b> en{" "}
-          {formatDays(reasoning.promo.daysTo)}: +{formatPercent(reasoning.promo.upliftPct, 0)} de
-          demanda esperada, ya considerada en la cobertura objetivo.
-        </div>
-      )}
 
       <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
         <p>
@@ -807,35 +733,23 @@ function buildSimulationScenario(
   return { label, qty, coverage, capital, stockoutRisk, overstockRisk, gmroi };
 }
 
+// Solo el proveedor real de la recomendación: no existe fuente de costos
+// alternativos por SKU (comparar de verdad se hace vía RFQ/cotizaciones).
 function buildSupplierComparison(rec: PurchaseRecommendation, qty: number) {
-  const related = suppliers.filter((supplier) => supplier.categories.includes(rec.category));
-  const fallback = suppliers.filter((supplier) => supplier.name !== rec.supplierName);
-  const candidates = [
-    { name: rec.supplierName, leadTime: rec.supplierLeadTimeDays, costFactor: 1 },
-    ...[...related, ...fallback]
-      .filter((supplier) => supplier.name !== rec.supplierName)
-      .slice(0, 2)
-      .map((supplier, index) => ({
-        name: supplier.name,
-        leadTime: supplier.averageLeadTimeDays,
-        costFactor: index === 0 ? 1.04 : 0.96,
-      })),
-  ];
-
-  return candidates.map((candidate) => {
-    const cost = Math.round(rec.unitCost * candidate.costFactor);
-    const coverage = projectedCoverageDays(
-      rec.availableStock + qty,
-      rec.salesLast30Days / 30,
-      rec.inventoryDays
-    );
-    return {
-      ...candidate,
-      cost,
-      total: cost * qty,
+  const coverage = projectedCoverageDays(
+    rec.availableStock + qty,
+    rec.salesLast30Days / 30,
+    rec.inventoryDays
+  );
+  return [
+    {
+      name: rec.supplierName,
+      leadTime: rec.supplierLeadTimeDays,
+      cost: rec.unitCost,
+      total: rec.unitCost * qty,
       coverage,
-    };
-  });
+    },
+  ];
 }
 
 function extractRiskAmount(risk: string) {

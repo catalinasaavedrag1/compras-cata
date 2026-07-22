@@ -1,20 +1,14 @@
-
 import { VALUE_TONE } from "../../utils/tone";
-import { RecommendationBadge } from "../../components/business/RecommendationBadge";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { IconPlus } from "../../components/ui/icons";
-import { coverageDays } from "../../utils/calculations";
-import { IconCheck } from "../../components/ui/icons";
-import type { Product, PurchaseRecommendation } from "../../types/purchasing";
+import { IconCheck, IconPlus } from "../../components/ui/icons";
+import type { ProductFichaData } from "../../services/purchaseBff";
 import { formatCurrency, formatDays, formatNumber } from "../../utils/formatters";
-import { buildNegotiationData } from "./negotiationData";
-import {
-  NegKpiRow,
-  NegCostPriceRow,
-  NegStockQualityRow,
-  NegDemandRow,
-  NegAltObjectivesRow,
-} from "./negotiation";
+import { productPriorityUi } from "./helpers";
+
+// ============================================================================
+//  Piezas de la ficha de producto (F11) sobre datos reales del BFF.
+// ============================================================================
 
 export function Row({
   label,
@@ -46,49 +40,30 @@ export function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * Panel de negociación: reúne lo que el comprador necesita para llegar a la
- * reunión con argumentos — venta, margen, inventario, proveedor, alternativas,
- * objetivos sugeridos y la próxima decisión.
- */
-export function NegotiationPanel({ product, rec }: { product: Product; rec?: PurchaseRecommendation }) {
-  const data = buildNegotiationData(product, rec);
-  return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-900">
-        <b>Panel de negociación.</b> Todo lo que necesitas para llegar a la reunión con argumentos:
-        cuánto vende, cuánto rinde, qué stock hay, qué tan confiable es el proveedor y qué
-        alternativas tienes.
-      </div>
-      <NegKpiRow product={product} data={data} />
-      <NegCostPriceRow product={product} data={data} />
-      <NegStockQualityRow product={product} data={data} />
-      <NegDemandRow product={product} data={data} />
-      <NegAltObjectivesRow data={data} />
-    </div>
-  );
-}
-
-/**
- * Banner "Decisión recomendada": resume en una frase qué hacer y por qué,
- * con la acción a un clic. Es lo primero que debe ver el comprador.
+ * Banner "Decisión recomendada" sobre la recomendación real del motor:
+ * qué hacer y por qué, con la acción a un clic. Sin recomendación pendiente,
+ * lo dice tal cual (no se inventa una decisión).
  */
 export function DecisionBanner({
-  product,
-  rec,
+  data,
   added,
   onAdd,
 }: {
-  product: Product;
-  rec?: PurchaseRecommendation;
+  data: ProductFichaData;
   added: boolean;
   onAdd: () => void;
 }) {
-  const cover = coverageDays(product.availableStock, product.salesLast30Days);
-  const lead = product.supplierLeadTimeDays;
+  const rec = data.recommendation;
+  const cover =
+    rec?.coverageDays ??
+    (data.stock.available !== null && data.sales.dailyVelocity !== null && data.sales.dailyVelocity > 0
+      ? Math.round(data.stock.available / data.sales.dailyVelocity)
+      : null);
 
-  // Caso 1: hay recomendación de compra
-  if (rec && rec.suggestedQuantity > 0) {
-    const urgent = rec.status === "critical";
+  // Caso 1: hay recomendación de compra pendiente del motor
+  if (rec && rec.suggestedQty > 0) {
+    const urgent = rec.priority === "stockout_imminent";
+    const prio = productPriorityUi(rec.priority);
     return (
       <div
         className={`mb-5 rounded-xl border p-4 ${
@@ -101,16 +76,30 @@ export function DecisionBanner({
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Decisión recomendada
               </span>
-              <RecommendationBadge status={rec.status} />
+              <Badge tone={prio.tone} dot>
+                {prio.label}
+              </Badge>
             </div>
             <p className="text-base font-semibold text-slate-900">
-              Comprar {formatNumber(rec.suggestedQuantity)} unidades a {rec.supplierName} ·{" "}
-              {formatCurrency(rec.suggestedPurchaseAmount)}
+              Comprar {formatNumber(rec.suggestedQty)} unidades
+              {data.supplier.name && <> a {data.supplier.name}</>}
+              {data.cost.unitCostClp !== null && (
+                <> · {formatCurrency(rec.suggestedQty * data.cost.unitCostClp)}</>
+              )}
             </p>
             <p className="text-sm text-slate-600 mt-0.5">
-              El stock disponible cubre {product.salesLast30Days > 0 ? formatDays(cover) : "—"} y el
-              proveedor demora {formatDays(lead)} en entregar. {rec.reason}
+              {cover !== null && <>El stock disponible cubre {formatDays(cover)}. </>}
+              {data.terms.leadTimeDays !== null && (
+                <>El proveedor demora {formatDays(data.terms.leadTimeDays)} en entregar. </>
+              )}
+              {rec.reason}
             </p>
+            {rec.risk && (
+              <p className="text-sm text-rose-700 mt-0.5">
+                <span className="font-medium">Riesgo si no compras: </span>
+                {rec.risk}
+              </p>
+            )}
           </div>
           <Button
             onClick={onAdd}
@@ -125,40 +114,7 @@ export function DecisionBanner({
     );
   }
 
-  // Caso 2: sobrestock — no comprar
-  if (product.purchaseStatus === "overstock" || (rec && rec.status === "overstock")) {
-    return (
-      <div className="mb-5 rounded-xl border border-violet-200 bg-violet-50 p-4">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Decisión recomendada
-        </span>
-        <p className="text-base font-semibold text-slate-900 mt-1">No comprar — hay sobrestock</p>
-        <p className="text-sm text-slate-600 mt-0.5">
-          Hay {formatNumber(product.availableStock)} unidades disponibles para{" "}
-          {formatNumber(product.inventoryDays)} días de venta. Conviene esperar y, si la rotación
-          sigue baja, evaluar promoción o redistribución.
-        </p>
-      </div>
-    );
-  }
-
-  // Caso 3: sin proveedor con venta activa
-  if (!product.supplierName && product.salesLast30Days > 0) {
-    return (
-      <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Decisión recomendada
-        </span>
-        <p className="text-base font-semibold text-slate-900 mt-1">Asignar proveedor</p>
-        <p className="text-sm text-slate-600 mt-0.5">
-          Este producto vende {formatNumber(product.salesLast30Days)} unidades al mes pero no tiene
-          proveedor asignado, por lo que no se puede generar reposición.
-        </p>
-      </div>
-    );
-  }
-
-  // Caso 4: todo en orden
+  // Caso 2: sin recomendación pendiente del motor
   return (
     <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -166,8 +122,8 @@ export function DecisionBanner({
       </span>
       <p className="text-base font-semibold text-slate-900 mt-1">Sin acción por ahora</p>
       <p className="text-sm text-slate-600 mt-0.5">
-        El stock disponible cubre la venta esperada{" "}
-        {product.salesLast30Days > 0 && `(${formatDays(cover)} de cobertura)`}. No requiere compra.
+        El motor de reposición no tiene una recomendación pendiente para este SKU
+        {cover !== null && <> (cobertura estimada {formatDays(cover)})</>}.
       </p>
     </div>
   );

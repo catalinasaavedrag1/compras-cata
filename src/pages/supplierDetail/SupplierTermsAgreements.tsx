@@ -3,162 +3,136 @@ import { Card, CardBody, CardHeader } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
-import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { Input } from "../../components/ui/Input";
-import { useLocalStorage } from "../../utils/useLocalStorage";
+import { Select } from "../../components/ui/Select";
 import { useToast } from "../../context/ToastContext";
-import type { Supplier } from "../../types/purchasing";
-import { formatDate } from "../../utils/formatters";
+import { formatDate, formatPercent } from "../../utils/formatters";
+import {
+  createSupplierAgreement,
+  describePurchaseBffError,
+  toPurchaseBffError,
+  type SupplierAgreementRow,
+  type SupplierTermsVersion,
+} from "../../services/purchaseBff";
 
-interface SupplierTerms {
-  paymentDays: number;
-  freight: string;
-  minOrder: string;
-  baseDiscount: number;
-  rebate: string;
-  returns: string;
-  marketing: string;
-  account: string;
-}
+// ---------------------------------------------------------------------------
+//  Condiciones comerciales (historia append-only, vigente primero) y acuerdos
+//  reales del proveedor. Los acuerdos se registran con
+//  POST /suppliers/:id/agreements (título, tipo y vigencia).
+// ---------------------------------------------------------------------------
 
-interface Agreement {
-  id: string;
-  date: string;
-  objective: string;
-  agreed: string;
-  followUp: string;
-}
+const fmtDate = (iso: string | null | undefined) => (iso ? formatDate(iso.slice(0, 10)) : "—");
 
-const DEFAULT_TERMS: SupplierTerms = {
-  paymentDays: 30,
-  freight: "Por pagar (cliente)",
-  minOrder: "$500.000",
-  baseDiscount: 0,
-  rebate: "Sin rebate vigente",
-  returns: "Solo por falla · 30 días",
-  marketing: "Sin apoyo acordado",
-  account: "—",
-};
+/** Tipos de acuerdo sugeridos (el contrato acepta un string libre). */
+const AGREEMENT_KINDS = [
+  { value: "descuento", label: "Descuento" },
+  { value: "rebate", label: "Rebate / bonificación" },
+  { value: "marketing", label: "Apoyo de marketing" },
+  { value: "logistica", label: "Logística / despacho" },
+  { value: "otro", label: "Otro" },
+];
 
-/** Condiciones comerciales (editables) + acuerdos y seguimiento, persistidos por proveedor. */
-export function SupplierTermsAgreements({ supplier }: { supplier: Supplier }) {
+const AGREEMENT_KIND_LABEL: Record<string, string> = Object.fromEntries(
+  AGREEMENT_KINDS.map((k) => [k.value, k.label])
+);
+
+export function SupplierTermsAgreements({
+  supplierId,
+  terms,
+  agreements,
+  onCreated,
+}: {
+  supplierId: string;
+  terms: SupplierTermsVersion[];
+  agreements: SupplierAgreementRow[];
+  onCreated: () => void;
+}) {
   const toast = useToast();
-  const [terms, setTerms] = useLocalStorage<SupplierTerms>(
-    `compras:terms:${supplier.id}`,
-    DEFAULT_TERMS
-  );
-  const [agreements, setAgreements] = useLocalStorage<Agreement[]>(
-    `compras:agreements:${supplier.id}`,
-    []
-  );
-  const [editTerms, setEditTerms] = useState(false);
-  const [draft, setDraft] = useState<SupplierTerms>(terms);
-  const [newAgr, setNewAgr] = useState<Agreement | null>(null);
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [title, setTitle] = useState("");
+  const [kind, setKind] = useState("descuento");
+  const [validFrom, setValidFrom] = useState("");
+  const [validTo, setValidTo] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
-  const termsDirty = JSON.stringify(draft) !== JSON.stringify(terms);
-  const openTerms = () => {
-    setDraft(terms);
-    setEditTerms(true);
-  };
-  const closeTerms = () => (termsDirty ? setConfirmDiscard(true) : setEditTerms(false));
-  const saveTerms = () => {
-    setTerms(draft);
-    setEditTerms(false);
-    toast.success("Condiciones comerciales actualizadas");
+  const openModal = () => {
+    setTitle("");
+    setKind("descuento");
+    setValidFrom(new Date().toISOString().slice(0, 10));
+    setValidTo("");
+    setFormError("");
+    setCreating(true);
   };
 
-  const openAgr = () =>
-    setNewAgr({
-      id: `ag${Date.now()}`,
-      date: "2026-06-26",
-      objective: "",
-      agreed: "",
-      followUp: "",
-    });
-  const saveAgr = () => {
-    if (!newAgr || !newAgr.objective.trim()) {
-      toast.warning("Indica al menos el objetivo");
+  const submit = async () => {
+    if (!title.trim() || !validFrom) {
+      setFormError("Indica al menos el título y la fecha de inicio.");
       return;
     }
-    setAgreements((prev) => [newAgr, ...prev]);
-    setNewAgr(null);
-    toast.success("Acuerdo registrado");
+    setSaving(true);
+    try {
+      await createSupplierAgreement(supplierId, {
+        title: title.trim(),
+        kind,
+        validFrom,
+        ...(validTo ? { validTo } : {}),
+      });
+      toast.success("Acuerdo registrado");
+      setCreating(false);
+      onCreated();
+    } catch (err) {
+      toast.error(describePurchaseBffError(toPurchaseBffError(err)));
+    } finally {
+      setSaving(false);
+    }
   };
-
-  const termRows: { label: string; value: string }[] = [
-    { label: "Plazo de pago", value: `${terms.paymentDays} días` },
-    { label: "Descuento base", value: `${terms.baseDiscount}%` },
-    { label: "Flete", value: terms.freight },
-    { label: "Mínimo de compra", value: terms.minOrder },
-    { label: "Rebate / bonificación", value: terms.rebate },
-    { label: "Devoluciones", value: terms.returns },
-    { label: "Apoyo marketing", value: terms.marketing },
-    { label: "Ejecutivo asignado", value: terms.account },
-  ];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Condiciones comerciales */}
+      {/* Historia de condiciones comerciales */}
       <Card>
         <CardHeader
           title="Condiciones comerciales"
-          description="La foto completa de lo acordado hoy"
-          action={
-            <button
-              onClick={openTerms}
-              className="text-xs font-medium text-brand-600 hover:text-brand-700"
-            >
-              Editar
-            </button>
-          }
+          description="Historia de versiones (la más reciente es la vigente)."
         />
         <CardBody>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-            {termRows.map((r) => (
-              <div key={r.label} className="flex flex-col">
-                <span className="text-[11px] text-slate-400">{r.label}</span>
-                <span className="text-sm font-medium text-slate-800">{r.value}</span>
-              </div>
-            ))}
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Acuerdos y seguimiento */}
-      <Card>
-        <CardHeader
-          title="Acuerdos y seguimiento"
-          description="Qué se pidió, qué se acordó y el próximo seguimiento"
-          action={
-            <Button size="sm" variant="secondary" onClick={openAgr}>
-              + Registrar
-            </Button>
-          }
-        />
-        <CardBody>
-          {agreements.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              Sin acuerdos registrados. Registra lo conversado en la próxima reunión.
-            </p>
+          {terms.length === 0 ? (
+            <p className="text-sm text-slate-400">Sin condiciones registradas todavía.</p>
           ) : (
             <div className="space-y-2.5">
-              {agreements.map((a) => (
-                <div key={a.id} className="rounded-lg border border-slate-200 px-3 py-2.5">
-                  <div className="flex items-center justify-between gap-2 mb-1">
+              {terms.map((t, i) => (
+                <div key={t.id} className="rounded-lg border border-slate-200 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
                     <span className="text-xs font-semibold text-slate-700">
-                      {formatDate(a.date)}
+                      desde {fmtDate(t.validFrom)}
                     </span>
-                    {a.followUp && <Badge tone="amber">Seguir {formatDate(a.followUp)}</Badge>}
+                    {i === 0 && <Badge tone="green">Vigente</Badge>}
                   </div>
-                  <p className="text-sm text-slate-800">
-                    <span className="text-slate-400">Objetivo:</span> {a.objective}
-                  </p>
-                  {a.agreed && (
-                    <p className="text-sm text-emerald-700 mt-0.5">
-                      <span className="text-slate-400">Acordado:</span> {a.agreed}
-                    </p>
-                  )}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-slate-400">Condición de pago</span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {t.paymentTermRef ?? "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-slate-400">Descuento base</span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {t.discountPct != null ? formatPercent(t.discountPct, 1) : "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-slate-400">Flete</span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {t.freightPolicy ?? "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-slate-400">Notas</span>
+                      <span className="text-sm font-medium text-slate-800">{t.notes ?? "—"}</span>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -166,181 +140,94 @@ export function SupplierTermsAgreements({ supplier }: { supplier: Supplier }) {
         </CardBody>
       </Card>
 
-      {/* Modal editar condiciones */}
+      {/* Acuerdos comerciales reales */}
+      <Card>
+        <CardHeader
+          title="Acuerdos comerciales"
+          description="Acuerdos registrados con su vigencia."
+          action={
+            <Button size="sm" variant="secondary" onClick={openModal}>
+              + Registrar
+            </Button>
+          }
+        />
+        <CardBody>
+          {agreements.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              Sin acuerdos registrados. Registra lo acordado en la próxima reunión.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {agreements.map((a) => (
+                <div key={a.id} className="rounded-lg border border-slate-200 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-sm font-medium text-slate-800">{a.title ?? "Acuerdo"}</span>
+                    {a.kind && (
+                      <Badge tone="blue">{AGREEMENT_KIND_LABEL[a.kind] ?? a.kind}</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    vigencia {fmtDate(a.validFrom)}
+                    {a.validTo ? ` → ${fmtDate(a.validTo)}` : " → sin término"}
+                    {a.status && <> · {a.status}</>}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Modal registrar acuerdo */}
       <Modal
-        open={editTerms}
-        onClose={closeTerms}
-        title="Editar condiciones comerciales"
-        description={supplier.name}
-        size="lg"
+        open={creating}
+        onClose={() => setCreating(false)}
+        title="Registrar acuerdo"
         footer={
           <>
-            <Button variant="secondary" onClick={closeTerms}>
+            <Button variant="secondary" onClick={() => setCreating(false)} disabled={saving}>
               Cancelar
             </Button>
-            <Button onClick={saveTerms} disabled={!termsDirty}>
-              {termsDirty ? "Guardar" : "Sin cambios"}
+            <Button onClick={submit} disabled={saving}>
+              {saving ? "Guardando…" : "Guardar"}
             </Button>
           </>
         }
       >
-        <div className="grid grid-cols-2 gap-3.5">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Plazo de pago (días)
-            </label>
+        <div className="space-y-3.5">
+          {formError && (
+            <p role="alert" className="text-xs text-rose-600">
+              {formError}
+            </p>
+          )}
+          <Input
+            label="Título"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ej: Rebate 2% por volumen anual"
+          />
+          <Select
+            label="Tipo"
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+            options={AGREEMENT_KINDS}
+          />
+          <div className="grid grid-cols-2 gap-3">
             <Input
-              type="number"
-              min={0}
-              value={draft.paymentDays}
-              onChange={(e) => setDraft({ ...draft, paymentDays: Number(e.target.value) })}
+              label="Vigente desde"
+              type="date"
+              value={validFrom}
+              onChange={(e) => setValidFrom(e.target.value)}
             />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Descuento base (%)
-            </label>
             <Input
-              type="number"
-              min={0}
-              value={draft.baseDiscount}
-              onChange={(e) => setDraft({ ...draft, baseDiscount: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Flete</label>
-            <Input
-              value={draft.freight}
-              onChange={(e) => setDraft({ ...draft, freight: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Mínimo de compra
-            </label>
-            <Input
-              value={draft.minOrder}
-              onChange={(e) => setDraft({ ...draft, minOrder: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Rebate / bonificación
-            </label>
-            <Input
-              value={draft.rebate}
-              onChange={(e) => setDraft({ ...draft, rebate: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Devoluciones
-            </label>
-            <Input
-              value={draft.returns}
-              onChange={(e) => setDraft({ ...draft, returns: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Apoyo marketing
-            </label>
-            <Input
-              value={draft.marketing}
-              onChange={(e) => setDraft({ ...draft, marketing: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Ejecutivo asignado
-            </label>
-            <Input
-              value={draft.account}
-              onChange={(e) => setDraft({ ...draft, account: e.target.value })}
+              label="Vigente hasta (opcional)"
+              type="date"
+              value={validTo}
+              onChange={(e) => setValidTo(e.target.value)}
             />
           </div>
         </div>
       </Modal>
-
-      <ConfirmModal
-        open={confirmDiscard}
-        title="Descartar cambios"
-        message="Tienes cambios sin guardar en las condiciones comerciales. Si sales ahora se perderán."
-        confirmLabel="Descartar cambios"
-        cancelLabel="Seguir editando"
-        danger
-        onCancel={() => setConfirmDiscard(false)}
-        onConfirm={() => {
-          setConfirmDiscard(false);
-          setEditTerms(false);
-        }}
-      />
-
-      {/* Modal registrar acuerdo */}
-      <Modal
-        open={!!newAgr}
-        onClose={() => setNewAgr(null)}
-        title="Registrar acuerdo"
-        description={supplier.name}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setNewAgr(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={saveAgr}>Guardar</Button>
-          </>
-        }
-      >
-        {newAgr && (
-          <div className="space-y-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Fecha</label>
-              <Input
-                type="date"
-                value={newAgr.date}
-                onChange={(e) => setNewAgr({ ...newAgr, date: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                Objetivo / lo pedido
-              </label>
-              <Input
-                value={newAgr.objective}
-                onChange={(e) => setNewAgr({ ...newAgr, objective: e.target.value })}
-                placeholder="Ej: Bajar costo 5% y fill 95%"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                Lo acordado
-              </label>
-              <Input
-                value={newAgr.agreed}
-                onChange={(e) => setNewAgr({ ...newAgr, agreed: e.target.value })}
-                placeholder="Ej: 3% + despacho semanal"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                Próximo seguimiento
-              </label>
-              <Input
-                type="date"
-                value={newAgr.followUp}
-                onChange={(e) => setNewAgr({ ...newAgr, followUp: e.target.value })}
-              />
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-//  Evaluación del proveedor (score 0–100). Cumplimiento de fecha y cantidad
-//  usan datos reales; el resto de dimensiones son simuladas (demo) de forma
-//  determinista a partir del id del proveedor.
-// ---------------------------------------------------------------------------
-

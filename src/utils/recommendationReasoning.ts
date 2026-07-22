@@ -15,12 +15,9 @@
 //   − En tránsito (OC en curso)
 //   = Comprar
 //
-//  Si hay una promoción/campaña próxima para el SKU, se anota como factor de
-//  contexto (el alza de demanda ya está reflejada en la cobertura objetivo).
 // ============================================================================
 
 import type { PurchaseRecommendation } from "../types/purchasing";
-import { campaignOpportunities } from "../data/mockCampaignOpportunities";
 
 export interface ReasoningFactor {
   key: string;
@@ -29,12 +26,6 @@ export interface ReasoningFactor {
   detail: string;
   units: number;
   sign: "+" | "−";
-}
-
-export interface PromoContext {
-  name: string;
-  daysTo: number;
-  upliftPct: number;
 }
 
 export interface RecommendationReasoning {
@@ -52,22 +43,12 @@ export interface RecommendationReasoning {
   needFactors: ReasoningFactor[];
   /** Lo que ya se tiene y se descuenta (disponible + en tránsito). */
   haveFactors: ReasoningFactor[];
-  promo?: PromoContext;
   /** Resumen en una línea del motivo principal. */
   summary: string;
 }
 
 function round(n: number): number {
   return Math.round(n);
-}
-
-/** Busca una campaña/promoción próxima (≤ 30 días) para el SKU. */
-function upcomingPromo(sku: string): PromoContext | undefined {
-  const promo = campaignOpportunities
-    .filter((c) => c.sku === sku && c.daysToCampaign >= 0 && c.daysToCampaign <= 30 && c.growthRate > 0)
-    .sort((a, b) => a.daysToCampaign - b.daysToCampaign)[0];
-  if (!promo) return undefined;
-  return { name: promo.campaignName, daysTo: promo.daysToCampaign, upliftPct: promo.growthRate };
 }
 
 /**
@@ -148,8 +129,6 @@ export function buildRecommendationReasoning(
     });
   }
 
-  const promo = upcomingPromo(rec.sku);
-
   const summary =
     netStock <= 0
       ? `Sin stock y vendes ${round(rec.salesLast30Days)} u./mes: el proveedor demora ${leadTimeDays} días en reponer.`
@@ -167,7 +146,6 @@ export function buildRecommendationReasoning(
     suggested,
     needFactors,
     haveFactors,
-    promo,
     summary,
   };
 }

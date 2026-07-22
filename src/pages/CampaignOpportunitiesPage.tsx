@@ -1,458 +1,480 @@
 import { useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { supplierPath, categoryPath, productPath } from "../utils/entityLinks";
+import { Link } from "react-router-dom";
+import { productPath } from "../utils/entityLinks";
 import { PageHeader } from "../components/ui/PageHeader";
 import { KpiCard } from "../components/business/KpiCard";
-import { Card, CardBody, CardHeader } from "../components/ui/Card";
+import { Card } from "../components/ui/Card";
 import { DataTable, makeToggleSort, type Column, type SortState } from "../components/ui/Table";
 import { FilterBar } from "../components/business/FilterBar";
-
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Tabs } from "../components/ui/Tabs";
-
-import { ConfirmModal } from "../components/ui/ConfirmModal";
+import { Modal } from "../components/ui/Modal";
+import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
+import { Skeleton } from "../components/ui/Skeleton";
 import { ExportButton } from "../components/business/ExportButton";
-import { CampaignBuilderModal } from "../components/business/CampaignBuilderModal";
-import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
 import { uniqueValues } from "../utils/filters";
-import { formatCurrency, formatCurrencyCompact, formatDate, formatDays, formatNumber, formatPercent, formatDelta } from "../utils/formatters";
-import { useOcDraft } from "../context/OcDraftContext";
+import { formatDate, formatNumber } from "../utils/formatters";
 import { useToast } from "../context/ToastContext";
-import { useLocalStorage } from "../utils/useLocalStorage";
-import { campaignOpportunities as all } from "../data/mockCampaignOpportunities";
-import { getSupplierByName } from "../data/mockSuppliers";
-import { CHANNEL_LABELS, OPPORTUNITY_TYPE_LABELS, CAMPAIGN_STATUS, TYPE_TONE, STATUS_URGENCY } from "../components/business/campaignLabels";
-import { IconReplenish, IconAlerts, IconBox, IconCheck, IconPlus } from "../components/ui/icons";
-import type { CampaignOpportunity, CreatedCampaign } from "../types/purchasing";
+import { OPPORTUNITY_TYPE_LABELS } from "../components/business/campaignLabels";
+import { IconAlerts, IconCampaign, IconCheck, IconPlus, IconReplenish } from "../components/ui/icons";
+import {
+  describePurchaseBffError,
+  type CampaignOpportunityStatus,
+  type CampaignOpportunityView,
+  type CampaignStatus,
+  type CampaignView,
+} from "../services/purchaseBff";
+import {
+  useCampaignCommands,
+  useCampaignOpportunities,
+  useCampaignsList,
+} from "../hooks/useCampaigns";
+import {
+  OPPORTUNITY_STATUS_UI,
+  daysUntil,
+  evidenceSummary,
+  kindLabel,
+  opportunityRefText,
+} from "./campaignsHelpers";
 import { CreatedCampaignsView } from "./campaignOpportunities/CreatedCampaignsView";
 
-export function CampaignOpportunitiesPage() {
-  const navigate = useNavigate();
-  const { addItem, hasItem } = useOcDraft();
-  const toast = useToast();
-  const { scope, setScope, inScope, myCategories } = useCategoryScope();
+// ============================================================================
+//  Anticipación de campañas conectada al purchase-bff-service (F18).
+//  El pipeline visual de 9 etapas del mock se colapsa a la máquina real de
+//  5 estados: detected → planned → active → closed | dismissed (descartar
+//  exige motivo auditable). Las métricas de stock/venta/margen por SKU del
+//  mock no existen en el contrato y se eliminaron sin inventar números; la
+//  evidencia libre de cada oportunidad se muestra tal cual.
+// ============================================================================
 
-  // Alcance del comprador: por defecto solo oportunidades de sus categorías.
-  const scopedOpps = useMemo(() => all.filter((o) => inScope(o.category)), [inScope]);
+/** Orden de urgencia para la tabla (menor = más urgente). */
+const STATUS_ORDER: Record<CampaignOpportunityStatus, number> = {
+  detected: 0,
+  planned: 1,
+  active: 2,
+  closed: 3,
+  dismissed: 4,
+};
+
+const fmtDate = (iso: string) => (iso ? formatDate(iso.slice(0, 10)) : "—");
+
+/** Texto honesto de la ventana: cuánto falta, en curso o terminada. */
+function windowText(o: CampaignOpportunityView): { label: string; urgent: boolean } {
+  const today = new Date().toISOString().slice(0, 10);
+  if (o.windowTo.slice(0, 10) < today) return { label: "terminó", urgent: false };
+  if (o.windowFrom.slice(0, 10) <= today) return { label: "en curso", urgent: true };
+  const d = daysUntil(o.windowFrom);
+  return { label: `en ${d} d`, urgent: d <= 7 };
+}
+
+interface OpportunityForm {
+  kind: string;
+  sku: string;
+  categoryId: string;
+  channelRef: string;
+  from: string;
+  to: string;
+  note: string;
+}
+
+interface CampaignForm {
+  opportunity: CampaignOpportunityView;
+  title: string;
+  budget: string;
+  from: string;
+  to: string;
+}
+
+export function CampaignOpportunitiesPage() {
+  const toast = useToast();
+  const opps = useCampaignOpportunities();
+  const camps = useCampaignsList();
+  const refetchAll = () => {
+    opps.refetch();
+    camps.refetch();
+  };
+  const commands = useCampaignCommands({ onConflict: refetchAll });
 
   const [view, setView] = useState<"oportunidades" | "campanas">("oportunidades");
-  const [createdCampaigns, setCreatedCampaigns] = useLocalStorage<CreatedCampaign[]>(
-    "compras:campaigns",
-    []
-  );
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const [builderTemplate, setBuilderTemplate] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-
-  const [done, setDone] = useState<string[]>([]); // acciones simuladas ya gestionadas
   const [sort, setSort] = useState<SortState>({ key: null, dir: "desc" });
   const [query, setQuery] = useState("");
-  const [channel, setChannel] = useState("");
-  const [type, setType] = useState("");
+  const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
-  const [category, setCategory] = useState("");
-  const [supplier, setSupplier] = useState("");
-  const [toggles, setToggles] = useState({
-    risk: false,
-    growth: false,
-    liquidation: false,
-    lowMargin: false,
-  });
+  const [busy, setBusy] = useState(false);
+  const [oppForm, setOppForm] = useState<OpportunityForm | null>(null);
+  const [dismissing, setDismissing] = useState<CampaignOpportunityView | null>(null);
+  const [dismissReason, setDismissReason] = useState("");
+  const [campForm, setCampForm] = useState<CampaignForm | null>(null);
+
+  const all = opps.opportunities;
 
   const filtered = useMemo(() => {
-    const result = scopedOpps.filter((o) => {
+    const result = all.filter((o) => {
       if (query.trim()) {
         const q = query.toLowerCase();
-        if (!`${o.sku} ${o.productName} ${o.campaignName}`.toLowerCase().includes(q)) return false;
+        const hay = `${o.sku ?? ""} ${o.categoryId ?? ""} ${o.channelRef ?? ""} ${o.kind} ${kindLabel(o.kind)}`;
+        if (!hay.toLowerCase().includes(q)) return false;
       }
-      if (channel && o.channel !== channel) return false;
-      if (type && o.opportunityType !== type) return false;
+      if (kind && o.kind !== kind) return false;
       if (status && o.status !== status) return false;
-      if (category && o.category !== category) return false;
-      if (supplier && o.supplierName !== supplier) return false;
-      if (toggles.risk && o.status !== "stockout_risk" && o.status !== "buy_before_campaign")
-        return false;
-      if (toggles.growth && o.opportunityType !== "accelerated_growth") return false;
-      if (toggles.liquidation && o.status !== "liquidate") return false;
-      if (toggles.lowMargin && o.margin >= 25) return false;
       return true;
     });
     return [...result].sort(
       (a, b) =>
-        STATUS_URGENCY[a.status] - STATUS_URGENCY[b.status] || a.daysToCampaign - b.daysToCampaign
+        STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+        (a.windowFrom < b.windowFrom ? -1 : 1)
     );
-  }, [scopedOpps, query, channel, type, status, category, supplier, toggles]);
+  }, [all, query, kind, status]);
 
-  // KPIs
-  const stockoutRisk = scopedOpps.filter((o) => o.status === "stockout_risk").length;
-  const buyBefore = scopedOpps.filter((o) => o.status === "buy_before_campaign").length;
-  const toLiquidateList = scopedOpps.filter((o) => o.status === "liquidate");
-  const suggestedBuyTotal = scopedOpps.reduce(
-    (a, o) => a + o.suggestedPurchaseQuantity * o.unitCost,
-    0
-  );
+  // KPIs sobre la máquina real de estados.
+  const detected = all.filter((o) => o.status === "detected").length;
+  const planned = all.filter((o) => o.status === "planned").length;
+  const active = all.filter((o) => o.status === "active").length;
+  const withCampaigns = all.filter((o) => o.campaignCount > 0).length;
 
-  // Campañas próximas (agrupadas)
-  const upcoming = useMemo(() => {
-    const map = new Map<
-      string,
-      { name: string; days: number; date: string; count: number; channels: Set<string> }
-    >();
-    for (const o of scopedOpps) {
-      const e = map.get(o.campaignName);
-      if (e) {
-        e.count += 1;
-        e.channels.add(CHANNEL_LABELS[o.channel]);
-        if (o.daysToCampaign < e.days) {
-          e.days = o.daysToCampaign;
-          e.date = o.campaignDate;
-        }
-      } else {
-        map.set(o.campaignName, {
-          name: o.campaignName,
-          days: o.daysToCampaign,
-          date: o.campaignDate,
-          count: 1,
-          channels: new Set([CHANNEL_LABELS[o.channel]]),
-        });
-      }
+  const countBy = (s: CampaignOpportunityStatus) => all.filter((o) => o.status === s).length;
+
+  // ---- comandos ----
+  const transitionOpp = async (
+    o: CampaignOpportunityView,
+    target: Exclude<CampaignOpportunityStatus, "detected">,
+    reason?: string
+  ): Promise<boolean> => {
+    setBusy(true);
+    const res = await commands.transitionOpportunity(o.id, o.version, target, reason);
+    setBusy(false);
+    if (res.ok) {
+      toast.success(
+        `${opportunityRefText(o)}: ${OPPORTUNITY_STATUS_UI[target].label.toLowerCase()}`
+      );
+      opps.refetch();
+      return true;
     }
-    return Array.from(map.values()).sort((a, b) => a.days - b.days);
-  }, [scopedOpps]);
-
-  // Consolidación de compras de campaña por proveedor (una OC por proveedor),
-  // con alerta de lead time crítico (no alcanza a llegar antes de la campaña).
-  const bySupplier = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        supplier: string;
-        items: CampaignOpportunity[];
-        units: number;
-        amount: number;
-        minDays: number;
-        leadTime: number;
-      }
-    >();
-    for (const o of scopedOpps) {
-      if (o.suggestedPurchaseQuantity <= 0) continue;
-      const e = map.get(o.supplierName);
-      if (e) {
-        e.items.push(o);
-        e.units += o.suggestedPurchaseQuantity;
-        e.amount += o.suggestedPurchaseQuantity * o.unitCost;
-        e.minDays = Math.min(e.minDays, o.daysToCampaign);
-      } else {
-        map.set(o.supplierName, {
-          supplier: o.supplierName,
-          items: [o],
-          units: o.suggestedPurchaseQuantity,
-          amount: o.suggestedPurchaseQuantity * o.unitCost,
-          minDays: o.daysToCampaign,
-          leadTime: getSupplierByName(o.supplierName)?.averageLeadTimeDays ?? 0,
-        });
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => {
-      const ar = a.leadTime >= a.minDays ? 0 : 1;
-      const br = b.leadTime >= b.minDays ? 0 : 1;
-      return ar - br || a.minDays - b.minDays;
-    });
-  }, [scopedOpps]);
-  const ocCount = bySupplier.length;
-  const criticalLeadCount = bySupplier.filter((s) => s.leadTime >= s.minDays).length;
-
-  const createSupplierOc = (group: (typeof bySupplier)[number]) => {
-    let added = 0;
-    for (const o of group.items) {
-      if (hasItem(o.sku)) continue;
-      addItem({
-        sku: o.sku,
-        productName: o.productName,
-        supplierName: o.supplierName,
-        quantity: o.suggestedPurchaseQuantity,
-        unitCost: o.unitCost,
-      });
-      added++;
-    }
-    toast.success(
-      added > 0
-        ? `${added} producto${added === 1 ? "" : "s"} de ${group.supplier} agregado${added === 1 ? "" : "s"} al borrador de OC`
-        : `Ya estaban en el borrador`,
-      { label: "Ver borrador OC", onClick: () => navigate("/comprar/borradores") }
-    );
+    toast.error(describePurchaseBffError(res.error));
+    return false;
   };
 
-  const handleAction = (o: CampaignOpportunity) => {
-    if (o.suggestedPurchaseQuantity > 0 && o.actionLabel === "Agregar a OC") {
-      addItem({
-        sku: o.sku,
-        productName: o.productName,
-        supplierName: o.supplierName,
-        quantity: o.suggestedPurchaseQuantity,
-        unitCost: o.unitCost,
-      });
-      toast.success(`${o.productName} agregado al borrador de OC`, {
-        label: "Ver borrador OC",
-        onClick: () => navigate("/comprar/borradores"),
-      });
+  const submitOppForm = async () => {
+    if (!oppForm) return;
+    const f = oppForm;
+    const hasTarget = !!(f.sku.trim() || f.categoryId.trim() || f.channelRef.trim());
+    if (!f.kind || !hasTarget || !f.from || !f.to || f.to < f.from) {
+      toast.warning("Completa tipo, ventana y al menos SKU, categoría o canal");
       return;
     }
-    if (o.actionLabel === "Revisar proveedor") return navigate("/proveedores");
-    // Resto (potenciar, liquidación, excluir, revisar margen): se marca como gestionado
-    setDone((prev) => (prev.includes(o.id) ? prev : [...prev, o.id]));
-    toast.success(`${o.actionLabel}: ${o.productName}`);
+    setBusy(true);
+    const res = await commands.createOpportunity({
+      kind: f.kind,
+      ...(f.sku.trim() ? { sku: f.sku.trim() } : {}),
+      ...(f.categoryId.trim() ? { categoryId: f.categoryId.trim() } : {}),
+      ...(f.channelRef.trim() ? { channelRef: f.channelRef.trim() } : {}),
+      windowFrom: f.from,
+      windowTo: f.to,
+      evidence: f.note.trim() ? { note: f.note.trim() } : {},
+    });
+    setBusy(false);
+    if (res.ok) {
+      toast.success(`Oportunidad ${opportunityRefText(res.opportunity)} registrada`);
+      setOppForm(null);
+      opps.refetch();
+    } else {
+      // Duplicada viva ⇒ 409 con el mensaje del backend (details.existingId).
+      toast.error(describePurchaseBffError(res.error));
+    }
   };
 
-  const saveCampaign = (c: CreatedCampaign) => {
-    setCreatedCampaigns((prev) => [c, ...prev]);
-    setBuilderOpen(false);
-    setView("campanas");
-    toast.success(
-      `Campaña "${c.name}" creada con ${c.products.length} producto${c.products.length === 1 ? "" : "s"}`
-    );
+  const submitDismiss = async () => {
+    if (!dismissing) return;
+    if (dismissReason.trim().length < 5) {
+      toast.warning("El motivo del descarte debe tener al menos 5 caracteres");
+      return;
+    }
+    const ok = await transitionOpp(dismissing, "dismissed", dismissReason.trim());
+    if (ok) {
+      setDismissing(null);
+      setDismissReason("");
+    }
   };
 
-  const deleteCampaign = (id: string) => {
-    setCreatedCampaigns((prev) => prev.filter((x) => x.id !== id));
-    toast.info("Campaña eliminada");
+  const openCampaignForm = (o: CampaignOpportunityView) => {
+    setCampForm({
+      opportunity: o,
+      title: "",
+      budget: "",
+      from: o.windowFrom.slice(0, 10),
+      to: o.windowTo.slice(0, 10),
+    });
   };
 
-  const openBuilder = (template = "") => {
-    setBuilderTemplate(template);
-    setBuilderOpen(true);
+  const submitCampaignForm = async () => {
+    if (!campForm) return;
+    const f = campForm;
+    if (!f.title.trim() || !f.from || !f.to || f.to < f.from) {
+      toast.warning("Completa título y fechas de la campaña");
+      return;
+    }
+    const budgetClp = parseInt(f.budget, 10) || 0;
+    setBusy(true);
+    const res = await commands.createCampaign({
+      type: "opportunity",
+      title: f.title.trim(),
+      opportunityId: f.opportunity.id,
+      startsAt: f.from,
+      endsAt: f.to,
+      ...(budgetClp > 0 ? { budgetClp } : {}),
+    });
+    setBusy(false);
+    if (res.ok) {
+      toast.success(`Campaña "${res.campaign.title}" creada desde la oportunidad`);
+      setCampForm(null);
+      setView("campanas");
+      refetchAll();
+    } else {
+      toast.error(describePurchaseBffError(res.error));
+    }
+  };
+
+  const transitionCampaign = async (c: CampaignView, target: Exclude<CampaignStatus, "planned">) => {
+    setBusy(true);
+    const res = await commands.transitionCampaign(c.id, c.version, target);
+    setBusy(false);
+    if (res.ok) {
+      toast.success(`"${c.title}" actualizada`);
+      refetchAll();
+    } else {
+      toast.error(describePurchaseBffError(res.error));
+    }
+  };
+
+  const opportunityRefById = (opportunityId: string | null): string | null => {
+    if (!opportunityId) return null;
+    const o = all.find((x) => x.id === opportunityId);
+    return o ? `${kindLabel(o.kind)} · ${opportunityRefText(o)}` : null;
+  };
+
+  const openOppForm = () => {
+    setOppForm({
+      kind: "planned_campaign",
+      sku: "",
+      categoryId: "",
+      channelRef: "",
+      from: "",
+      to: "",
+      note: "",
+    });
   };
 
   const handleSort = makeToggleSort(setSort);
 
   const clearFilters = () => {
     setQuery("");
-    setChannel("");
-    setType("");
+    setKind("");
     setStatus("");
-    setCategory("");
-    setSupplier("");
-    setToggles({ risk: false, growth: false, liquidation: false, lowMargin: false });
   };
 
-  const columns: Column<CampaignOpportunity>[] = [
-    {
-      key: "product",
-      header: "Producto",
-      sortable: true,
-      sortValue: (o) => o.productName,
-      render: (o) => (
-        <div className="min-w-[200px]">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-slate-400">{o.sku}</span>
-            <span className="text-xs text-slate-400">{o.brand}</span>
+  const pageTitle = "Anticipación de campañas";
+  const pageDescription =
+    "Oportunidades comerciales detectadas por SKU, categoría o canal: decide cuáles planificar, actívalas en su ventana y crea campañas ligadas a cada una.";
+
+  // --------------------------------------------------------------------------
+  //  Estados de conexión: sin configurar, cargando y error (patrón flujo 1).
+  // --------------------------------------------------------------------------
+  if (!opps.configured) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver las oportunidades de campaña reales y gestionarlas contra el servicio de compras.
+            </p>
           </div>
-          <Link
-            to={productPath(o.sku)}
-            className="font-medium text-slate-800 leading-snug hover:text-brand-700 hover:underline block"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {o.productName}
-          </Link>
-          <p className="text-xs text-slate-500">
+        </Card>
+      </div>
+    );
+  }
+
+  if (opps.loading && all.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando oportunidades">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (opps.error && all.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudieron cargar las oportunidades
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{opps.error.message}</p>
+            <Button className="mt-4" onClick={opps.refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const columns: Column<CampaignOpportunityView>[] = [
+    {
+      key: "ref",
+      header: "Referencia",
+      sortable: true,
+      sortValue: (o) => opportunityRefText(o),
+      render: (o) => (
+        <div className="min-w-[180px]">
+          {o.sku ? (
             <Link
-              to={categoryPath(o.category)}
-              className="hover:text-brand-700 hover:underline"
+              to={productPath(o.sku)}
+              className="font-medium text-slate-800 leading-snug hover:text-brand-700 hover:underline block"
               onClick={(e) => e.stopPropagation()}
             >
-              {o.category}
-            </Link>{" "}
-            ·{" "}
-            {o.supplierName ? (
-              <Link
-                to={supplierPath(o.supplierName)}
-                className="hover:text-brand-700 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {o.supplierName}
-              </Link>
-            ) : (
-              "Sin proveedor"
-            )}
+              {o.sku}
+            </Link>
+          ) : (
+            <p className="font-medium text-slate-800 leading-snug">{opportunityRefText(o)}</p>
+          )}
+          <p className="text-xs text-slate-500">
+            {[
+              o.sku ? "SKU" : null,
+              o.categoryId ? `Categoría ${o.categoryId}` : null,
+              o.channelRef ? `Canal ${o.channelRef}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Sin referencia"}
           </p>
         </div>
       ),
     },
     {
-      key: "type",
+      key: "kind",
       header: "Oportunidad",
-      render: (o) => (
-        <Badge tone={TYPE_TONE[o.opportunityType]}>
-          {OPPORTUNITY_TYPE_LABELS[o.opportunityType]}
-        </Badge>
-      ),
+      render: (o) => <Badge tone="blue">{kindLabel(o.kind)}</Badge>,
     },
     {
-      key: "campaign",
-      header: "Canal / Campaña",
+      key: "window",
+      header: "Ventana",
       hideOnMobile: true,
+      sortable: true,
+      sortValue: (o) => o.windowFrom,
       render: (o) => (
-        <div className="text-sm min-w-[150px]">
-          <p className="text-slate-700">{o.campaignName}</p>
-          <p className="text-xs text-slate-400">
-            {CHANNEL_LABELS[o.channel]} · {formatDate(o.campaignDate)}
+        <div className="text-sm min-w-[140px]">
+          <p className="text-slate-700">
+            {fmtDate(o.windowFrom)} → {fmtDate(o.windowTo)}
           </p>
+          {(() => {
+            const w = windowText(o);
+            return (
+              <p className={`text-xs ${w.urgent ? "text-rose-600 font-medium" : "text-slate-400"}`}>
+                {w.label}
+              </p>
+            );
+          })()}
         </div>
       ),
     },
     {
-      key: "days",
-      header: "Falta",
-      align: "right",
-      sortable: true,
-      sortValue: (o) => o.daysToCampaign,
-      render: (o) => (
-        <span className={o.daysToCampaign <= 7 ? "text-rose-600 font-medium" : "text-slate-600"}>
-          {formatDays(o.daysToCampaign)}
-        </span>
-      ),
-    },
-    {
-      key: "stock",
-      header: "Stock disp.",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (o) => o.availableStock,
-      render: (o) => (
-        <span className={o.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>
-          {formatNumber(o.availableStock)}
-        </span>
-      ),
-    },
-    {
-      key: "sales",
-      header: "Venta 30d / Var.",
-      align: "right",
-      hideOnMobile: true,
-      sortValue: (o) => o.growthRate,
-      sortable: true,
-      render: (o) => (
-        <div className="text-sm">
-          <p className="text-slate-700">{formatNumber(o.salesLast30Days)}</p>
-          <p className={`text-xs ${o.growthRate >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-            {formatDelta(o.growthRate)}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: "estimated",
-      header: "Venta est. campaña",
-      align: "right",
+      key: "evidence",
+      header: "Evidencia",
       hideOnMobile: true,
       render: (o) => (
-        <span className="text-slate-700">{formatNumber(o.estimatedCampaignSales)} u.</span>
+        <p className="max-w-xs text-xs text-slate-600 leading-snug">
+          {evidenceSummary(o.evidence)}
+        </p>
       ),
     },
     {
-      key: "gap",
-      header: "Brecha stock",
+      key: "campaigns",
+      header: "Campañas",
       align: "right",
       sortable: true,
-      sortValue: (o) => o.stockGap,
+      sortValue: (o) => o.campaignCount,
       render: (o) =>
-        o.stockGap > 0 ? (
-          <span className="text-rose-600 font-medium">-{formatNumber(o.stockGap)} u.</span>
-        ) : (
-          <span className="text-emerald-600">OK</span>
-        ),
-    },
-    {
-      key: "buy",
-      header: "Compra sugerida",
-      align: "right",
-      sortable: true,
-      sortValue: (o) => o.suggestedPurchaseQuantity * o.unitCost,
-      render: (o) =>
-        o.suggestedPurchaseQuantity > 0 ? (
-          <div className="text-sm">
-            <p className="font-semibold text-slate-900">
-              {formatNumber(o.suggestedPurchaseQuantity)} u.
-            </p>
-            <p className="text-xs text-slate-400">
-              {formatCurrency(o.suggestedPurchaseQuantity * o.unitCost)}
-            </p>
-          </div>
+        o.campaignCount > 0 ? (
+          <span className="font-semibold text-slate-800">{formatNumber(o.campaignCount)}</span>
         ) : (
           <span className="text-slate-300">—</span>
         ),
     },
     {
-      key: "margin",
-      header: "Margen",
-      align: "right",
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (o) => o.margin,
-      render: (o) => (
-        <span className={o.margin < 25 ? "text-amber-600 font-medium" : "text-slate-700"}>
-          {formatPercent(o.margin)}
-        </span>
-      ),
-    },
-    {
       key: "status",
       header: "Estado",
       render: (o) => (
-        <Badge tone={CAMPAIGN_STATUS[o.status].tone} dot>
-          {CAMPAIGN_STATUS[o.status].label}
+        <Badge tone={OPPORTUNITY_STATUS_UI[o.status].tone} dot>
+          {OPPORTUNITY_STATUS_UI[o.status].label}
         </Badge>
       ),
     },
     {
-      key: "reason",
-      header: "Riesgo / Recomendación",
+      key: "modified",
+      header: "Actualizada",
       hideOnMobile: true,
-      render: (o) => (
-        <div className="max-w-xs">
-          <p className="text-xs text-rose-500 leading-snug">⚠ {o.risk}</p>
-          <p className="text-xs text-slate-600 mt-1 leading-snug">{o.recommendation}</p>
-        </div>
-      ),
+      sortable: true,
+      sortValue: (o) => o.dateModified,
+      render: (o) => <span className="text-xs text-slate-500">{fmtDate(o.dateModified)}</span>,
     },
     {
       key: "actions",
       header: "",
       render: (o) => {
-        const isOc = o.actionLabel === "Agregar a OC";
-        const added = isOc && hasItem(o.sku);
-        const gestionado = done.includes(o.id);
+        const buttons: { label: string; primary?: boolean; onClick: () => void }[] = [];
+        if (o.status === "detected")
+          buttons.push({
+            label: "Planificar",
+            primary: true,
+            onClick: () => void transitionOpp(o, "planned"),
+          });
+        if (o.status === "planned")
+          buttons.push({
+            label: "Activar",
+            primary: true,
+            onClick: () => void transitionOpp(o, "active"),
+          });
+        if (o.status === "planned" || o.status === "active")
+          buttons.push({ label: "Crear campaña", onClick: () => openCampaignForm(o) });
+        if (o.status === "active")
+          buttons.push({ label: "Cerrar", onClick: () => void transitionOpp(o, "closed") });
+        if (o.status === "detected" || o.status === "planned" || o.status === "active")
+          buttons.push({ label: "Descartar", onClick: () => setDismissing(o) });
+        if (buttons.length === 0) return <span className="text-slate-300 text-xs">—</span>;
         return (
-          <div className="flex flex-col gap-1 items-stretch min-w-[150px]">
-            <Button
-              size="sm"
-              variant={added || gestionado ? "secondary" : "primary"}
-              disabled={added || gestionado}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAction(o);
-              }}
-              icon={
-                added || gestionado ? (
-                  <IconCheck className="w-3.5 h-3.5" />
-                ) : isOc ? (
-                  <IconPlus className="w-3.5 h-3.5" />
-                ) : undefined
-              }
-            >
-              {added ? "En OC" : gestionado ? "Gestionado" : o.actionLabel}
-            </Button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/productos/${o.sku}`);
-              }}
-              className="text-xs text-slate-500 hover:text-brand-600 border border-slate-200 rounded-md py-1"
-            >
-              Ver producto
-            </button>
+          <div className="flex flex-col gap-1 items-stretch min-w-[140px]">
+            {buttons.map((b) => (
+              <Button
+                key={b.label}
+                size="sm"
+                variant={b.primary ? "primary" : "secondary"}
+                disabled={busy}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  b.onClick();
+                }}
+                icon={b.primary ? <IconCheck className="w-3.5 h-3.5" /> : undefined}
+              >
+                {b.label}
+              </Button>
+            ))}
           </div>
         );
       },
@@ -462,203 +484,124 @@ export function CampaignOpportunitiesPage() {
   return (
     <div>
       <PageHeader
-        title="Anticipación de campañas"
-        description="Comprar antes del peak, liquidar y detectar crecimiento por canal: productos que irán a campañas, oportunidades de liquidación, crecimiento acelerado y riesgos de quiebre."
+        title={pageTitle}
+        description={pageDescription}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <ScopeToggle scope={scope} onChange={setScope} myCount={myCategories.length} />
             <ExportButton
               filename="campanas-oportunidades"
               rows={filtered}
               columns={[
-                { label: "SKU", value: (o) => o.sku },
-                { label: "Producto", value: (o) => o.productName },
-                { label: "Categoría", value: (o) => o.category },
-                { label: "Proveedor", value: (o) => o.supplierName },
-                { label: "Oportunidad", value: (o) => OPPORTUNITY_TYPE_LABELS[o.opportunityType] },
-                { label: "Canal", value: (o) => CHANNEL_LABELS[o.channel] },
-                { label: "Campaña", value: (o) => o.campaignName },
-                { label: "Fecha campaña", value: (o) => o.campaignDate },
-                { label: "Stock disponible", value: (o) => o.availableStock },
-                { label: "Venta 30 días", value: (o) => o.salesLast30Days },
-                { label: "Crecimiento %", value: (o) => o.growthRate },
-                { label: "Venta estimada campaña", value: (o) => o.estimatedCampaignSales },
-                { label: "Brecha stock", value: (o) => o.stockGap },
-                { label: "Compra sugerida", value: (o) => o.suggestedPurchaseQuantity },
-                { label: "Margen %", value: (o) => o.margin },
-                { label: "Estado", value: (o) => CAMPAIGN_STATUS[o.status].label },
+                { label: "ID", value: (o) => o.id },
+                { label: "Tipo", value: (o) => kindLabel(o.kind) },
+                { label: "SKU", value: (o) => o.sku ?? "" },
+                { label: "Categoría", value: (o) => o.categoryId ?? "" },
+                { label: "Canal", value: (o) => o.channelRef ?? "" },
+                { label: "Ventana desde", value: (o) => o.windowFrom.slice(0, 10) },
+                { label: "Ventana hasta", value: (o) => o.windowTo.slice(0, 10) },
+                { label: "Estado", value: (o) => OPPORTUNITY_STATUS_UI[o.status].label },
+                { label: "Campañas", value: (o) => o.campaignCount },
               ]}
             />
-            <Button onClick={() => openBuilder("")} icon={<IconPlus className="w-4 h-4" />}>
-              Crear campaña
+            <Button onClick={openOppForm} icon={<IconPlus className="w-4 h-4" />}>
+              Registrar oportunidad
             </Button>
           </div>
         }
       />
-
-      {/* Plantillas rápidas de campaña */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <span className="text-xs font-medium text-slate-500">Plantillas rápidas:</span>
-        {[
-          "Cyber herramientas",
-          "Especial construcción",
-          "Liquidación stock lento",
-          "Campaña jardín primavera",
-        ].map((t) => (
-          <button
-            key={t}
-            onClick={() => openBuilder(t)}
-            className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
-          >
-            <IconPlus className="w-3 h-3" /> {t}
-          </button>
-        ))}
-      </div>
 
       <Tabs
         className="mb-5"
         value={view}
         onChange={(v) => setView(v as typeof view)}
         tabs={[
-          { value: "oportunidades", label: "Oportunidades detectadas", count: scopedOpps.length },
-          { value: "campanas", label: "Mis campañas", count: createdCampaigns.length },
+          { value: "oportunidades", label: "Oportunidades detectadas", count: all.length },
+          { value: "campanas", label: "Campañas creadas", count: camps.campaigns.length },
         ]}
       />
 
       {view === "campanas" ? (
-        <CreatedCampaignsView
-          campaigns={createdCampaigns}
-          onCreate={() => openBuilder("")}
-          onDelete={setPendingDelete}
-          onAddToOc={(sku) => navigate(`/productos/${sku}`)}
-        />
+        camps.loading && camps.campaigns.length === 0 ? (
+          <Card>
+            <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando campañas">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              ))}
+            </div>
+          </Card>
+        ) : camps.error && camps.campaigns.length === 0 ? (
+          <Card>
+            <div className="p-6 text-center">
+              <p className="text-sm font-semibold text-slate-800">
+                No se pudieron cargar las campañas
+              </p>
+              <p className="mt-1 text-sm text-slate-500">{camps.error.message}</p>
+              <Button className="mt-4" onClick={camps.refetch}>
+                Reintentar
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <CreatedCampaignsView
+            campaigns={camps.campaigns}
+            opportunityRef={opportunityRefById}
+            busy={busy}
+            onCreate={openOppForm}
+            onTransition={transitionCampaign}
+          />
+        )
       ) : (
         <>
-          {/* Campañas próximas (chips compactos) */}
-          <div className="flex flex-wrap items-center gap-2 -mx-1 px-1 mb-3">
-            <span className="text-xs font-medium text-slate-500 flex-shrink-0">Próximas:</span>
-            {upcoming.map((c) => (
-              <span
-                key={c.name}
-                className="whitespace-nowrap flex-shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-600"
-              >
-                {c.name} · {c.count} SKU ·{" "}
-                <span className={c.days <= 7 ? "text-rose-600 font-medium" : "text-amber-600"}>
-                  en {formatDays(c.days)}
-                </span>
-              </span>
-            ))}
-          </div>
-
-          {/* KPIs compactos (escritorio), cliqueables → filtran */}
+          {/* KPIs compactos (escritorio), cliqueables → filtran por estado real */}
           <div className="hidden md:grid md:grid-cols-4 gap-3 mb-4">
             <KpiCard
-              title="Riesgo de quiebre"
-              value={formatNumber(stockoutRisk)}
-              tone="bad"
+              title="Detectadas"
+              value={formatNumber(detected)}
+              tone="warn"
               icon={<IconAlerts className="w-4 h-4" />}
-              description="Campaña sin stock"
-              active={status === "stockout_risk"}
-              onClick={() => setStatus(status === "stockout_risk" ? "" : "stockout_risk")}
+              description="Por decidir"
+              active={status === "detected"}
+              onClick={() => setStatus(status === "detected" ? "" : "detected")}
             />
             <KpiCard
-              title="Comprar antes"
-              value={formatNumber(buyBefore)}
-              tone="warn"
-              icon={<IconReplenish className="w-4 h-4" />}
-              description="Abastecer evento"
-              active={status === "buy_before_campaign"}
-              onClick={() =>
-                setStatus(status === "buy_before_campaign" ? "" : "buy_before_campaign")
-              }
-            />
-            <KpiCard
-              title="Sugeridos para liquidar"
-              value={formatNumber(toLiquidateList.length)}
-              tone="warn"
-              icon={<IconBox className="w-4 h-4" />}
-              description="Sobrestock"
-              active={status === "liquidate"}
-              onClick={() => setStatus(status === "liquidate" ? "" : "liquidate")}
-            />
-            <KpiCard
-              title="Compra sugerida campañas"
-              value={formatCurrencyCompact(suggestedBuyTotal)}
+              title="Planificadas"
+              value={formatNumber(planned)}
               tone="info"
               icon={<IconReplenish className="w-4 h-4" />}
-              description="Total a comprar"
+              description="Listas para campaña"
+              active={status === "planned"}
+              onClick={() => setStatus(status === "planned" ? "" : "planned")}
+            />
+            <KpiCard
+              title="En campaña"
+              value={formatNumber(active)}
+              tone="good"
+              icon={<IconCampaign className="w-4 h-4" />}
+              description="Ventana en curso"
+              active={status === "active"}
+              onClick={() => setStatus(status === "active" ? "" : "active")}
+            />
+            <KpiCard
+              title="Con campañas creadas"
+              value={formatNumber(withCampaigns)}
+              tone="neutral"
+              icon={<IconCheck className="w-4 h-4" />}
+              description="Ya tienen campaña asociada"
             />
           </div>
 
-          {/* Consolidación de OC por proveedor para las campañas */}
-          {bySupplier.length > 0 && (
-            <Card className="mb-4">
-              <CardHeader
-                title={`OC a generar por proveedor (${ocCount})`}
-                description={`Consolida las compras de campaña en una OC por proveedor.${criticalLeadCount > 0 ? ` ${criticalLeadCount} con lead time crítico: no alcanza a llegar antes de la campaña.` : ""}`}
-              />
-              <CardBody className="space-y-2">
-                {bySupplier.map((g) => {
-                  const critical = g.leadTime >= g.minDays;
-                  return (
-                    <div
-                      key={g.supplier}
-                      className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            to={supplierPath(g.supplier)}
-                            className="text-sm font-medium text-slate-800 truncate hover:text-brand-700 hover:underline"
-                          >
-                            {g.supplier}
-                          </Link>
-                          <Badge tone={critical ? "red" : "green"}>
-                            {critical
-                              ? `Lead ${formatDays(g.leadTime)} ≥ ${formatDays(g.minDays)} a campaña`
-                              : `Lead ${formatDays(g.leadTime)} OK`}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {g.items.length} SKU · {formatNumber(g.units)} u. ·{" "}
-                          {formatCurrencyCompact(g.amount)} · campaña en {formatDays(g.minDays)}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={critical ? "primary" : "secondary"}
-                        icon={<IconPlus className="w-4 h-4" />}
-                        onClick={() => createSupplierOc(g)}
-                      >
-                        Crear OC
-                      </Button>
-                    </div>
-                  );
-                })}
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Foco por estado (reduce el listado con un clic) */}
+          {/* Foco por estado (máquina real de 5 estados) */}
           <Tabs
             className="mb-4"
             value={status || "all"}
             onChange={(v) => setStatus(v === "all" ? "" : v)}
             tabs={[
-              { value: "all", label: "Todos", count: scopedOpps.length },
-              { value: "buy_before_campaign", label: "Comprar antes", count: buyBefore },
-              { value: "stockout_risk", label: "Riesgo de quiebre", count: stockoutRisk },
-              { value: "liquidate", label: "Liquidar", count: toLiquidateList.length },
-              {
-                value: "boost",
-                label: "Potenciar",
-                count: scopedOpps.filter((o) => o.status === "boost").length,
-              },
-              {
-                value: "not_recommended",
-                label: "No recomendado",
-                count: scopedOpps.filter((o) => o.status === "not_recommended").length,
-              },
+              { value: "all", label: "Todas", count: all.length },
+              { value: "detected", label: "Detectadas", count: countBy("detected") },
+              { value: "planned", label: "Planificadas", count: countBy("planned") },
+              { value: "active", label: "En campaña", count: countBy("active") },
+              { value: "closed", label: "Cerradas", count: countBy("closed") },
+              { value: "dismissed", label: "Descartadas", count: countBy("dismissed") },
             ]}
           />
 
@@ -667,28 +610,18 @@ export function CampaignOpportunitiesPage() {
             <FilterBar
               searchValue={query}
               onSearchChange={setQuery}
-              searchPlaceholder="Buscar por SKU, producto o campaña"
+              searchPlaceholder="Buscar por SKU, categoría, canal o tipo"
               resultCount={filtered.length}
               onClear={clearFilters}
               selects={[
                 {
-                  key: "channel",
-                  placeholder: "Canal",
-                  value: channel,
-                  onChange: setChannel,
-                  options: Object.entries(CHANNEL_LABELS).map(([value, label]) => ({
-                    value,
-                    label,
-                  })),
-                },
-                {
-                  key: "type",
+                  key: "kind",
                   placeholder: "Tipo de oportunidad",
-                  value: type,
-                  onChange: setType,
-                  options: Object.entries(OPPORTUNITY_TYPE_LABELS).map(([value, label]) => ({
-                    value,
-                    label,
+                  value: kind,
+                  onChange: setKind,
+                  options: uniqueValues(all, (o) => o.kind).map((k) => ({
+                    value: k,
+                    label: kindLabel(k),
                   })),
                 },
                 {
@@ -696,56 +629,9 @@ export function CampaignOpportunitiesPage() {
                   placeholder: "Estado",
                   value: status,
                   onChange: setStatus,
-                  options: Object.entries(CAMPAIGN_STATUS).map(([value, cfg]) => ({
-                    value,
-                    label: cfg.label,
-                  })),
-                },
-                {
-                  key: "cat",
-                  placeholder: "Categoría",
-                  value: category,
-                  onChange: setCategory,
-                  options: uniqueValues(scopedOpps, (o) => o.category).map((c) => ({
-                    value: c,
-                    label: c,
-                  })),
-                },
-                {
-                  key: "sup",
-                  placeholder: "Proveedor",
-                  value: supplier,
-                  onChange: setSupplier,
-                  options: uniqueValues(
-                    scopedOpps.filter((o) => o.supplierName),
-                    (o) => o.supplierName
-                  ).map((c) => ({ value: c, label: c })),
-                },
-              ]}
-              toggles={[
-                {
-                  key: "risk",
-                  label: "Riesgo de quiebre",
-                  active: toggles.risk,
-                  onToggle: () => setToggles((t) => ({ ...t, risk: !t.risk })),
-                },
-                {
-                  key: "growth",
-                  label: "Crecimiento acelerado",
-                  active: toggles.growth,
-                  onToggle: () => setToggles((t) => ({ ...t, growth: !t.growth })),
-                },
-                {
-                  key: "liq",
-                  label: "Sobrestock / liquidar",
-                  active: toggles.liquidation,
-                  onToggle: () => setToggles((t) => ({ ...t, liquidation: !t.liquidation })),
-                },
-                {
-                  key: "lm",
-                  label: "Margen bajo",
-                  active: toggles.lowMargin,
-                  onToggle: () => setToggles((t) => ({ ...t, lowMargin: !t.lowMargin })),
+                  options: (
+                    Object.keys(OPPORTUNITY_STATUS_UI) as CampaignOpportunityStatus[]
+                  ).map((s) => ({ value: s, label: OPPORTUNITY_STATUS_UI[s].label })),
                 },
               ]}
             />
@@ -756,53 +642,40 @@ export function CampaignOpportunitiesPage() {
               columns={columns}
               data={filtered}
               rowKey={(o) => o.id}
-              onRowClick={(o) => navigate(`/productos/${o.sku}`)}
               sort={sort}
               onSortChange={handleSort}
-              rowClassName={(o) => (o.status === "stockout_risk" ? "bg-rose-50/40" : undefined)}
+              rowClassName={(o) => (o.status === "detected" ? "bg-amber-50/40" : undefined)}
               emptyMessage="No hay oportunidades que coincidan con los filtros."
               mobileCard={(o) => (
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="text-xs font-mono text-slate-400">{o.sku}</span>
-                      <p className="font-medium text-slate-800 leading-snug">{o.productName}</p>
+                      <p className="font-medium text-slate-800 leading-snug">
+                        {opportunityRefText(o)}
+                      </p>
                       <p className="text-xs text-slate-500">
-                        {CHANNEL_LABELS[o.channel]} · {o.campaignName} · en{" "}
-                        {formatDays(o.daysToCampaign)}
+                        {kindLabel(o.kind)} · {fmtDate(o.windowFrom)} → {fmtDate(o.windowTo)}
                       </p>
                     </div>
-                    <Badge tone={CAMPAIGN_STATUS[o.status].tone} dot>
-                      {CAMPAIGN_STATUS[o.status].label}
+                    <Badge tone={OPPORTUNITY_STATUS_UI[o.status].tone} dot>
+                      {OPPORTUNITY_STATUS_UI[o.status].label}
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
                     <div>
-                      <p className="text-xs text-slate-400">Stock</p>
-                      <p
-                        className={
-                          o.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"
-                        }
-                      >
-                        {formatNumber(o.availableStock)}
+                      <p className="text-xs text-slate-400">Campañas</p>
+                      <p className="text-slate-700">
+                        {o.campaignCount > 0 ? formatNumber(o.campaignCount) : "—"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400">Brecha</p>
-                      <p className={o.stockGap > 0 ? "text-rose-600" : "text-emerald-600"}>
-                        {o.stockGap > 0 ? `-${formatNumber(o.stockGap)}` : "OK"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400">Sugerido</p>
-                      <p className="font-semibold text-slate-900">
-                        {o.suggestedPurchaseQuantity > 0
-                          ? `${formatNumber(o.suggestedPurchaseQuantity)} u.`
-                          : "—"}
-                      </p>
+                      <p className="text-xs text-slate-400">Ventana</p>
+                      <p className="text-slate-700">{windowText(o).label}</p>
                     </div>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1.5">{o.recommendation}</p>
+                  {evidenceSummary(o.evidence) !== "—" && (
+                    <p className="text-xs text-slate-500 mt-1.5">{evidenceSummary(o.evidence)}</p>
+                  )}
                 </div>
               )}
             />
@@ -810,36 +683,223 @@ export function CampaignOpportunitiesPage() {
         </>
       )}
 
-      <CampaignBuilderModal
-        open={builderOpen}
-        onClose={() => setBuilderOpen(false)}
-        onSave={saveCampaign}
-        initialName={builderTemplate}
-      />
+      {/* Modal registrar oportunidad (POST /campaign-opportunities) */}
+      <Modal
+        open={!!oppForm}
+        onClose={() => setOppForm(null)}
+        title="Registrar oportunidad"
+        description="Exige al menos un SKU, categoría o canal, más la ventana comercial. Una oportunidad viva duplicada es rechazada por el servicio."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOppForm(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void submitOppForm()} disabled={busy}>
+              {busy ? "Registrando…" : "Registrar"}
+            </Button>
+          </>
+        }
+      >
+        {oppForm && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                Tipo de oportunidad
+              </label>
+              <Select
+                value={oppForm.kind}
+                onChange={(e) => setOppForm((f) => f && { ...f, kind: e.target.value })}
+                options={Object.entries(OPPORTUNITY_TYPE_LABELS).map(([value, label]) => ({
+                  value,
+                  label,
+                }))}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">SKU</label>
+                <Input
+                  value={oppForm.sku}
+                  onChange={(e) => setOppForm((f) => f && { ...f, sku: e.target.value })}
+                  placeholder="Opcional"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  Categoría
+                </label>
+                <Input
+                  value={oppForm.categoryId}
+                  onChange={(e) => setOppForm((f) => f && { ...f, categoryId: e.target.value })}
+                  placeholder="Opcional"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Canal</label>
+                <Input
+                  value={oppForm.channelRef}
+                  onChange={(e) => setOppForm((f) => f && { ...f, channelRef: e.target.value })}
+                  placeholder="Opcional"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  Ventana desde
+                </label>
+                <Input
+                  type="date"
+                  value={oppForm.from}
+                  onChange={(e) => setOppForm((f) => f && { ...f, from: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  Ventana hasta
+                </label>
+                <Input
+                  type="date"
+                  value={oppForm.to}
+                  onChange={(e) => setOppForm((f) => f && { ...f, to: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                Evidencia (nota)
+              </label>
+              <textarea
+                value={oppForm.note}
+                onChange={(e) => setOppForm((f) => f && { ...f, note: e.target.value })}
+                rows={3}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none"
+                placeholder="Por qué es una oportunidad (opcional)"
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
 
-      {(() => {
-        const c = createdCampaigns.find((x) => x.id === pendingDelete);
-        return (
-          <ConfirmModal
-            open={pendingDelete !== null}
-            title="Eliminar campaña"
-            message={
-              c
-                ? `Vas a eliminar la campaña "${c.name}" con ${c.products.length} producto${c.products.length === 1 ? "" : "s"} y ${c.channels.length} canal${c.channels.length === 1 ? "" : "es"}. Esta acción no se puede deshacer.`
-                : "Esta acción no se puede deshacer."
-            }
-            confirmLabel="Eliminar campaña"
-            danger
-            onCancel={() => setPendingDelete(null)}
-            onConfirm={() => {
-              if (pendingDelete) deleteCampaign(pendingDelete);
-              setPendingDelete(null);
-            }}
+      {/* Modal descartar con motivo auditable (PATCH dismissed) */}
+      <Modal
+        open={!!dismissing}
+        onClose={() => {
+          setDismissing(null);
+          setDismissReason("");
+        }}
+        title="Descartar oportunidad"
+        description={
+          dismissing
+            ? `Vas a descartar ${opportunityRefText(dismissing)} (${kindLabel(dismissing.kind)}). El motivo queda auditado.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDismissing(null);
+                setDismissReason("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void submitDismiss()}
+              disabled={busy || dismissReason.trim().length < 5}
+            >
+              {busy ? "Descartando…" : "Descartar"}
+            </Button>
+          </>
+        }
+      >
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+            Motivo (mínimo 5 caracteres)
+          </label>
+          <textarea
+            value={dismissReason}
+            onChange={(e) => setDismissReason(e.target.value)}
+            rows={3}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none"
+            placeholder="Ej: sin stock del proveedor para la ventana"
           />
-        );
-      })()}
+        </div>
+      </Modal>
+
+      {/* Modal crear campaña desde la oportunidad (POST /campaigns type 'opportunity') */}
+      <Modal
+        open={!!campForm}
+        onClose={() => setCampForm(null)}
+        title="Crear campaña desde la oportunidad"
+        description={
+          campForm
+            ? `Ligada a ${opportunityRefText(campForm.opportunity)} (${kindLabel(campForm.opportunity.kind)}).`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCampForm(null)}>
+              Cancelar
+            </Button>
+            <Button
+              icon={<IconPlus className="w-4 h-4" />}
+              onClick={() => void submitCampaignForm()}
+              disabled={busy}
+            >
+              {busy ? "Creando…" : "Crear campaña"}
+            </Button>
+          </>
+        }
+      >
+        {campForm && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Título</label>
+              <Input
+                value={campForm.title}
+                onChange={(e) => setCampForm((f) => f && { ...f, title: e.target.value })}
+                placeholder="Ej: Cyber herramientas"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Desde</label>
+                <Input
+                  type="date"
+                  value={campForm.from}
+                  onChange={(e) => setCampForm((f) => f && { ...f, from: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Hasta</label>
+                <Input
+                  type="date"
+                  value={campForm.to}
+                  onChange={(e) => setCampForm((f) => f && { ...f, to: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                Presupuesto (CLP, opcional)
+              </label>
+              <div className="max-w-[240px]">
+                <Input
+                  inputMode="numeric"
+                  value={campForm.budget}
+                  onChange={(e) =>
+                    setCampForm((f) => f && { ...f, budget: e.target.value.replace(/[^0-9]/g, "") })
+                  }
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
-
-/** Vista "Mis campañas": campañas creadas por el comprador. */

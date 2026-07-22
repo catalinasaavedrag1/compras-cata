@@ -3,28 +3,20 @@ import { Modal } from "../ui/Modal";
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
-import { IconSearch, IconBox, IconBulb } from "../ui/icons";
-import { productService } from "../../services";
+import { IconBox } from "../ui/icons";
 import { cn } from "../../utils/cn";
 import { DOT_TONE as TONE_DOT } from "../../utils/tone";
 import { SIGNAL_TYPE, SIGNAL_CHANNEL, SIGNAL_PRIORITY, suggestPriority } from "./signalLabels";
 import type { SignalChannel, SignalPriority, SignalType } from "../../types/purchasing";
-import type { NewSignalInput } from "../../context/SignalsContext";
+import type { SignalDetails } from "../../services/purchaseBff";
+import type { CreateSignalInput } from "../../hooks/useSignals";
 
 // ============================================================================
-//  Captura rápida de una señal (modo vendedor). Pensada para reportar en
-//  menos de 30 segundos: primero el tipo, luego el producto, y listo.
-//  La evidencia es opcional y va plegada para no alargar el formulario.
+//  Captura rápida de una señal (modo vendedor) contra POST /signals.
+//  Pensada para reportar en menos de 30 segundos: tipo, qué pasó y listo.
+//  La evidencia y la solicitud formal son opcionales y van plegadas; viajan
+//  como datos en `details` (no como estados: la máquina real solo tiene 4).
 // ============================================================================
-
-const SELLERS = [
-  "Rodrigo Fuentes",
-  "Camila Tapia",
-  "Sebastián Reyes",
-  "Paola Núñez",
-  "Diego Carrasco",
-  "Valentina Soto",
-];
 
 const TYPE_ORDER: SignalType[] = [
   "stockout",
@@ -41,38 +33,21 @@ const TYPE_ORDER: SignalType[] = [
 
 export interface ReportSignalDefaults {
   sku?: string;
-  productName?: string;
-  category?: string;
-  brand?: string;
 }
 
 interface ReportSignalModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (input: NewSignalInput) => void;
+  onSubmit: (input: CreateSignalInput) => void;
   defaults?: ReportSignalDefaults;
 }
 
 export function ReportSignalModal({ open, onClose, onSubmit, defaults }: ReportSignalModalProps) {
-  const products = productService.list();
-  const categories = useMemo(
-    () =>
-      Array.from(new Set(products.map((p) => p.category))).sort((a, b) => a.localeCompare(b, "es")),
-    [products]
-  );
-
   const [type, setType] = useState<SignalType>("stockout");
-  const [sku, setSku] = useState<string | undefined>(defaults?.sku);
-  const [productName, setProductName] = useState(defaults?.productName ?? "");
-  const [category, setCategory] = useState(defaults?.category ?? "");
-  const [brand, setBrand] = useState(defaults?.brand ?? "");
-  const [query, setQuery] = useState(defaults?.productName ?? "");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isNewProduct, setIsNewProduct] = useState(false);
+  const [sku, setSku] = useState(defaults?.sku ?? "");
 
   const [channel, setChannel] = useState<SignalChannel>("store");
   const [store, setStore] = useState("Balmaceda San Javier");
-  const [reportedBy, setReportedBy] = useState(SELLERS[0]);
   const [comment, setComment] = useState("");
   const [priority, setPriority] = useState<SignalPriority>("high");
   const [priorityTouched, setPriorityTouched] = useState(false);
@@ -82,68 +57,46 @@ export function ReportSignalModal({ open, onClose, onSubmit, defaults }: ReportS
   const [estimatedLostSale, setEstimatedLostSale] = useState("");
   const [evidenceNote, setEvidenceNote] = useState("");
 
+  const [showRequest, setShowRequest] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [requestedQty, setRequestedQty] = useState("");
+  const [requiredDate, setRequiredDate] = useState("");
+  const [targetPrice, setTargetPrice] = useState("");
+  const [suggestedSupplier, setSuggestedSupplier] = useState("");
+
   // Reset al abrir
   useEffect(() => {
     if (!open) return;
-    setType(defaults?.sku || defaults?.productName ? "stockout" : "stockout");
-    setSku(defaults?.sku);
-    setProductName(defaults?.productName ?? "");
-    setCategory(defaults?.category ?? "");
-    setBrand(defaults?.brand ?? "");
-    setQuery(defaults?.productName ?? "");
-    setIsNewProduct(false);
+    setType("stockout");
+    setSku(defaults?.sku ?? "");
     setChannel("store");
     setStore("Balmaceda San Javier");
-    setReportedBy(SELLERS[0]);
     setComment("");
     setPriorityTouched(false);
     setShowEvidence(false);
     setCustomersAsking("");
     setEstimatedLostSale("");
     setEvidenceNote("");
+    setShowRequest(false);
+    setCustomerName("");
+    setRequestedQty("");
+    setRequiredDate("");
+    setTargetPrice("");
+    setSuggestedSupplier("");
   }, [open, defaults]);
 
-  // Cuando se elige "Sugerido por cliente" se asume producto nuevo (sin SKU)
-  useEffect(() => {
-    if (type === "customer_suggested") setIsNewProduct(true);
-  }, [type]);
-
   // Prioridad sugerida (recalcula salvo que el usuario la haya tocado)
-  const stock = sku ? (productService.getBySku(sku)?.availableStock ?? 0) : 0;
   const suggestion = useMemo(
     () =>
       suggestPriority({
         type,
         customersAsking: customersAsking ? Number(customersAsking) : undefined,
-        stock,
       }),
-    [type, customersAsking, stock]
+    [type, customersAsking]
   );
   useEffect(() => {
     if (!priorityTouched) setPriority(suggestion.priority);
   }, [suggestion.priority, priorityTouched]);
-
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q || isNewProduct) return [];
-    return products
-      .filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q)
-      )
-      .slice(0, 6);
-  }, [query, products, isNewProduct]);
-
-  const pickProduct = (p: (typeof products)[number]) => {
-    setSku(p.sku);
-    setProductName(p.name);
-    setCategory(p.category);
-    setBrand(p.brand);
-    setQuery(p.name);
-    setShowSuggestions(false);
-  };
 
   const storeForChannel =
     channel === "store"
@@ -154,28 +107,33 @@ export function ReportSignalModal({ open, onClose, onSubmit, defaults }: ReportS
           ? "Marketplace"
           : "Call center";
 
-  const canSubmit =
-    productName.trim().length > 1 &&
-    comment.trim().length > 2 &&
-    (isNewProduct ? category.trim().length > 0 : true);
+  const canSubmit = comment.trim().length > 2;
 
   const submit = () => {
     if (!canSubmit) return;
-    onSubmit({
-      type,
-      priority,
-      sku: isNewProduct ? undefined : sku,
-      productName: productName.trim(),
-      category: category || "Sin categoría",
-      brand: brand || undefined,
+    const request = {
+      customerName: customerName.trim() || undefined,
+      requestedQty: requestedQty ? Number(requestedQty) : undefined,
+      requiredDate: requiredDate || undefined,
+      targetPrice: targetPrice ? Number(targetPrice) : undefined,
+      suggestedSupplier: suggestedSupplier.trim() || undefined,
+    };
+    const hasRequest = Object.values(request).some((v) => v !== undefined);
+    const details: SignalDetails = {
       channel,
-      store: storeForChannel,
-      reportedBy,
-      comment: comment.trim(),
       recommendedAction: SIGNAL_TYPE[type].hint,
       customersAsking: customersAsking ? Number(customersAsking) : undefined,
       estimatedLostSale: estimatedLostSale ? Number(estimatedLostSale) : undefined,
       evidenceNote: evidenceNote.trim() || undefined,
+      request: hasRequest ? request : undefined,
+    };
+    onSubmit({
+      kind: type,
+      body: comment.trim(),
+      sku: sku.trim() || undefined,
+      storeRef: storeForChannel,
+      priority,
+      details,
     });
     onClose();
   };
@@ -237,89 +195,17 @@ export function ReportSignalModal({ open, onClose, onSubmit, defaults }: ReportS
           <p className="text-xs text-slate-500 mt-1.5">{SIGNAL_TYPE[type].hint}.</p>
         </div>
 
-        {/* 2. Producto */}
+        {/* 2. Producto (SKU opcional: puede ser algo que no está en el surtido) */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              2 · Producto
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setIsNewProduct((v) => !v);
-                setSku(undefined);
-              }}
-              className="text-xs font-medium text-brand-600 hover:text-brand-700"
-            >
-              {isNewProduct ? "Buscar en el surtido" : "Producto nuevo (sin SKU)"}
-            </button>
-          </div>
-
-          {isNewProduct ? (
-            <div className="space-y-2">
-              <Input
-                placeholder="Nombre del producto sugerido"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                icon={<IconBulb className="w-4 h-4" />}
-              />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
-              >
-                <option value="">Categoría…</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="relative">
-              <Input
-                placeholder="Buscar por nombre, SKU o marca"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setShowSuggestions(true);
-                  setSku(undefined);
-                  setProductName(e.target.value);
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                icon={<IconSearch className="w-4 h-4" />}
-              />
-              {sku && (
-                <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1">
-                  <IconBox className="w-3.5 h-3.5" /> {sku} · {category}
-                  {brand ? ` · ${brand}` : ""}
-                </p>
-              )}
-              {showSuggestions && matches.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg max-h-56 overflow-y-auto">
-                  {matches.map((p) => (
-                    <button
-                      key={p.sku}
-                      type="button"
-                      onClick={() => pickProduct(p)}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-sm text-slate-700 truncate">{p.name}</span>
-                        <span className="block text-xs text-slate-400">
-                          {p.category} · {p.brand}
-                        </span>
-                      </span>
-                      <span className="text-xs font-mono text-slate-400 flex-shrink-0">
-                        {p.sku}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+            2 · Producto
+          </p>
+          <Input
+            placeholder="SKU (opcional; déjalo vacío si el producto no está en el surtido)"
+            value={sku}
+            onChange={(e) => setSku(e.target.value)}
+            icon={<IconBox className="w-4 h-4" />}
+          />
         </div>
 
         {/* 3. Origen + prioridad */}
@@ -449,18 +335,60 @@ export function ReportSignalModal({ open, onClose, onSubmit, defaults }: ReportS
           )}
         </div>
 
-        {/* Reportado por */}
-        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-          <span className="text-xs text-slate-500">Reportado por</span>
-          <select
-            value={reportedBy}
-            onChange={(e) => setReportedBy(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:border-brand-400 focus:outline-none"
+        {/* Solicitud formal opcional (cliente, cantidad, fecha, precio, proveedor) */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowRequest((v) => !v)}
+            className="text-xs font-medium text-brand-600 hover:text-brand-700"
           >
-            {SELLERS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
+            {showRequest ? "− Ocultar solicitud de compra" : "+ Solicitud de compra (opcional)"}
+          </button>
+          {showRequest && (
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Cliente"
+                placeholder="Ej: Constructora Andes"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+              />
+              <Input
+                type="number"
+                min={0}
+                label="Cantidad requerida"
+                placeholder="0"
+                value={requestedQty}
+                onChange={(e) => setRequestedQty(e.target.value)}
+              />
+              <Input
+                type="date"
+                label="Fecha requerida"
+                value={requiredDate}
+                onChange={(e) => setRequiredDate(e.target.value)}
+              />
+              <Input
+                type="number"
+                min={0}
+                label="Precio objetivo (CLP)"
+                placeholder="0"
+                value={targetPrice}
+                onChange={(e) => setTargetPrice(e.target.value)}
+              />
+              <div className="sm:col-span-2">
+                <Input
+                  label="Proveedor sugerido"
+                  placeholder="Opcional"
+                  value={suggestedSupplier}
+                  onChange={(e) => setSuggestedSupplier(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* La señal queda a nombre del usuario de la sesión */}
+        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+          <span className="text-xs text-slate-500">Se reporta con tu usuario de la sesión</span>
           <Badge tone="blue" className="ml-auto">
             Modo vendedor
           </Badge>

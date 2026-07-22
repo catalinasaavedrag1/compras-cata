@@ -7,10 +7,9 @@ import { DataTable, type Column } from "../../components/ui/Table";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { StatusBadge } from "../../components/business/StatusBadge";
 import { CollapsibleSection } from "../../components/ui/CollapsibleSection";
-import { SIGNAL_TYPE, SIGNAL_STATUS, SIGNAL_PRIORITY } from "../../components/business/signalLabels";
+import { SIGNAL_STATUS, SIGNAL_PRIORITY, signalKindMeta } from "../../components/business/signalLabels";
 import { IconCheck, IconPlus, IconSignal } from "../../components/ui/icons";
 import {
-  capitalize,
   formatCurrencyCompact,
   formatDate,
   formatDays,
@@ -19,161 +18,109 @@ import {
 } from "../../utils/formatters";
 import { coverageSentence } from "../../utils/calculations";
 import { cn } from "../../utils/cn";
-import type { LostOpportunity } from "../../utils/lostOpportunities";
-import type { Category, Product, PurchaseOrder, SalesSignal, Supplier } from "../../types/purchasing";
+import type { PurchaseOrder } from "../../types/purchasing";
 import type {
-  BrandPortfolioRow,
-  KeyProductRow,
+  CategoryPanelRow,
+  GoalKind,
+  GoalView,
+  MyPerformanceView,
+  SignalView,
+  SupplierPanelRow,
+} from "../../services/purchaseBff";
+import type { ReplenishmentRecommendation } from "../../hooks/useReplenishment";
+import type {
+  OpportunitySummaryItem,
+  PortfolioFoco,
   PortfolioFocus,
   PortfolioOpportunity,
-  PortfolioProductRole,
   RiskRow,
   SalesPaceRow,
-  SupplierPortfolioRow,
 } from "./types";
 
 // ============================================================================
 //  Componentes de presentación de "Mi cartera".
-//  Piezas puras (sin estado ni cálculo): reciben filas ya derivadas y las
-//  pintan. El cálculo vive en el orquestador de la página.
+//  Piezas puras (sin estado ni cálculo): reciben filas ya derivadas de las
+//  fuentes reales del purchase-bff y las pintan. Las secciones cuyo dato no
+//  existe en el contrato degradan a "—" o a un estado vacío honesto.
 // ============================================================================
+
+/** Nota de sección sin fuente en el contrato actual (degradación honesta). */
+function NoDataCard({ title, description, note }: { title: string; description: string; note: string }) {
+  return (
+    <section className="mb-4">
+      <Card>
+        <CardHeader title={title} description={description} />
+        <CardBody>
+          <EmptyState title="Sin datos disponibles" description={note} />
+        </CardBody>
+      </Card>
+    </section>
+  );
+}
 
 export function PortfolioFocusWorkspace({
   focus,
-  productRows,
-  brandRows,
   supplierRows,
   opportunities,
 }: {
   focus: Exclude<PortfolioFocus, "resumen">;
-  productRows: KeyProductRow[];
-  brandRows: BrandPortfolioRow[];
-  supplierRows: SupplierPortfolioRow[];
+  supplierRows: SupplierPanelRow[];
   opportunities: PortfolioOpportunity[];
 }) {
   if (focus === "productos-clave") {
-    const roles: PortfolioProductRole[] = [
-      "Estrella",
-      "Tractor",
-      "Margen",
-      "Emergente",
-      "Deterioro",
-      "Detenido",
-      "Riesgo",
-    ];
-    const topSales = [...productRows].sort((a, b) => b.salesValue - a.salesValue).slice(0, 5);
-    const topProfit = [...productRows].sort((a, b) => b.grossProfit - a.grossProfit).slice(0, 5);
-    const topGmroi = [...productRows].sort((a, b) => b.gmroi - a.gmroi).slice(0, 5);
-
     return (
-      <section className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card>
-          <CardHeader
-            title="Mapa de roles comerciales"
-            description="El mismo SKU puede ser importante por venta, margen, tráfico, crecimiento o riesgo."
-          />
-          <CardBody>
-            <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-              {roles.map((role) => (
-                <div
-                  key={role}
-                  className="min-w-[128px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-                >
-                  <Badge tone={roleTone(role)}>{role}</Badge>
-                  <p className="mt-1 text-xl font-semibold text-slate-900">
-                    {productRows.filter((row) => row.role === role).length}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-2">
-              {productRows.slice(0, 10).map((row) => (
-                <KeyProductItem key={row.product.sku} row={row} />
-              ))}
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Rankings para decidir"
-            description="Cada lista responde una pregunta distinta antes de comprar o negociar."
-          />
-          <CardBody className="space-y-4">
-            <ProductRank title="Más vendidos" rows={topSales} metric="sales" />
-            <ProductRank title="Mayor utilidad" rows={topProfit} metric="profit" />
-            <ProductRank title="Mayor GMROI" rows={topGmroi} metric="gmroi" />
-          </CardBody>
-        </Card>
-      </section>
+      <NoDataCard
+        title="Productos clave"
+        description="Clasifica qué SKU mueven venta, margen, tráfico, crecimiento o riesgo."
+        note="El servicio de compras aún no entrega venta, margen ni GMROI por SKU de la cartera, así que esta clasificación no puede calcularse con datos reales."
+      />
     );
   }
 
   if (focus === "marcas") {
-    const growing = brandRows.filter((row) => row.growth > 0.08).length;
-    const pressured = brandRows.filter((row) => row.growth < -0.08 || row.stockouts > 0).length;
-
     return (
-      <section className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-        <Card>
-          <CardHeader
-            title="Lectura de marcas"
-            description="Participación, crecimiento, margen e inventario para decidir qué proteger."
-          />
-          <CardBody className="grid grid-cols-2 gap-3">
-            <PortfolioMetric label="Marcas activas" value={formatNumber(brandRows.length)} />
-            <PortfolioMetric label="Creciendo" value={formatNumber(growing)} />
-            <PortfolioMetric label="Con presión" value={formatNumber(pressured)} />
-            <PortfolioMetric
-              label="Venta líder"
-              value={formatCurrencyCompact(brandRows[0]?.sales ?? 0)}
-            />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Desempeño por marca"
-            description="Detecta marcas que crecen consumiendo capital o que sostienen margen."
-          />
-          <CardBody className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-            {brandRows.map((row) => (
-              <BrandHealthItem key={row.brand} row={row} />
-            ))}
-          </CardBody>
-        </Card>
-      </section>
+      <NoDataCard
+        title="Marcas"
+        description="Participación, crecimiento y margen por marca."
+        note="El servicio de compras aún no entrega venta ni margen por marca, así que esta lectura no puede calcularse con datos reales."
+      />
     );
   }
 
   if (focus === "proveedores") {
-    const highDependency = supplierRows.filter((row) => row.dependency > 0.35).length;
-    const withAlternatives = supplierRows.filter((row) => row.alternatives > 0).length;
-    const stalled = supplierRows.reduce((sum, row) => sum + row.stalled, 0);
+    const watched = supplierRows.filter(
+      (row) => row.status === "on_watch" || row.status === "blocked"
+    ).length;
+    const openOrders = supplierRows.reduce((sum, row) => sum + (row.openOrders ?? 0), 0);
 
     return (
       <section className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
         <Card>
           <CardHeader
-            title="Prioridad de negociación"
-            description="Dónde hay dependencia, alternativas y productos que llevar a reunión."
+            title="Prioridad de revisión"
+            description="Qué proveedores requieren atención según el panel real."
           />
           <CardBody className="space-y-3">
-            <PortfolioMetric label="Dependencia alta" value={formatNumber(highDependency)} />
-            <PortfolioMetric label="Con alternativas" value={formatNumber(withAlternatives)} />
-            <PortfolioMetric label="SKU detenidos" value={formatNumber(stalled)} />
+            <PortfolioMetric label="Proveedores" value={formatNumber(supplierRows.length)} />
+            <PortfolioMetric label="En observación o bloqueados" value={formatNumber(watched)} />
+            <PortfolioMetric label="OC abiertas" value={formatNumber(openOrders)} />
           </CardBody>
         </Card>
 
         <Card>
           <CardHeader
             title="Proveedores de cartera"
-            description="Entra al proveedor para preparar costo, detenidos, cumplimiento y oportunidad."
+            description="Entra al proveedor para preparar costo, cumplimiento y negociación."
           />
           <CardBody className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-            {supplierRows.map((row) => (
-              <SupplierPortfolioItem key={row.supplier.id} row={row} />
-            ))}
+            {supplierRows.length === 0 ? (
+              <EmptyState
+                title="Sin proveedores"
+                description="El panel de proveedores no devolvió filas para tu cartera."
+              />
+            ) : (
+              supplierRows.map((row) => <SupplierPortfolioItem key={row.supplierId} row={row} />)
+            )}
           </CardBody>
         </Card>
       </section>
@@ -185,13 +132,13 @@ export function PortfolioFocusWorkspace({
       <Card>
         <CardHeader
           title="Radar de oportunidades"
-          description="Crecimiento con poca cobertura, margen por potenciar y alternativas para negociar."
+          description="Oportunidades de compra detectadas por el motor de reposición."
         />
         <CardBody>
           {opportunities.length === 0 ? (
             <EmptyState
-              title="Sin oportunidades fuertes"
-              description="No hay señales comerciales destacadas en este momento."
+              title="Sin oportunidades del motor"
+              description="El motor de reposición no tiene recomendaciones de tipo oportunidad en este momento."
             />
           ) : (
             <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 xl:grid-cols-3">
@@ -203,45 +150,6 @@ export function PortfolioFocusWorkspace({
         </CardBody>
       </Card>
     </section>
-  );
-}
-
-function ProductRank({
-  title,
-  rows,
-  metric,
-}: {
-  title: string;
-  rows: KeyProductRow[];
-  metric: "sales" | "profit" | "gmroi";
-}) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
-      <div className="space-y-1.5">
-        {rows.map((row) => {
-          const value =
-            metric === "gmroi"
-              ? row.gmroi.toFixed(1).replace(".", ",")
-              : formatCurrencyCompact(metric === "sales" ? row.salesValue : row.grossProfit);
-          return (
-            <Link
-              key={`${title}-${row.product.sku}`}
-              to={`/productos/${row.product.sku}`}
-              className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-slate-800">
-                  {row.product.name}
-                </span>
-                <span className="text-xs text-slate-500">{row.role}</span>
-              </span>
-              <span className="flex-shrink-0 text-sm font-semibold text-slate-900">{value}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -258,14 +166,14 @@ export function PortfolioCountLink({
 }: {
   to: string;
   label: string;
-  count: number;
+  count: number | null;
 }) {
   return (
     <Link
       to={to}
       className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600 hover:border-brand-300 hover:text-brand-700"
     >
-      {label} ({count})
+      {label} ({count ?? "—"})
     </Link>
   );
 }
@@ -315,14 +223,12 @@ export function GoalBar({
   metaText,
   pct,
   good,
-  invert,
 }: {
   label: string;
   valueText: string;
   metaText: string;
   pct: number;
   good: boolean;
-  invert?: boolean;
 }) {
   const clamped = Math.min(100, Math.max(0, Math.round(pct)));
   const bar = good ? "bg-emerald-500" : "bg-amber-500";
@@ -336,24 +242,7 @@ export function GoalBar({
       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
         <div className={cn("h-full rounded-full", bar)} style={{ width: `${clamped}%` }} />
       </div>
-      <p className="mt-1 text-[11px] text-slate-400">
-        {invert ? (good ? "Dentro de la meta" : "Sobre la meta") : `${clamped}% de la meta`}
-      </p>
-    </div>
-  );
-}
-
-export function MiniDim({ label, value }: { label: string; value: number }) {
-  const tone = value >= 75 ? "bg-emerald-500" : value >= 50 ? "bg-amber-500" : "bg-rose-500";
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs text-slate-500">{capitalize(label)}</span>
-        <span className="text-xs font-semibold text-slate-700">{value}</span>
-      </div>
-      <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-slate-100">
-        <div className={cn("h-full rounded-full", tone)} style={{ width: `${value}%` }} />
-      </div>
+      <p className="mt-1 text-[11px] text-slate-400">{`${clamped}% de la meta`}</p>
     </div>
   );
 }
@@ -371,23 +260,13 @@ export function FocoCard({ dot, text, to }: { dot: string; text: string; to: str
   );
 }
 
-export function Delta({ pct }: { pct: number }) {
-  const up = pct >= 0;
-  return (
-    <span className={cn("text-xs font-medium", up ? "text-emerald-600" : "text-rose-600")}>
-      {up ? "+" : ""}
-      {formatPercent(pct, 0)}
-    </span>
-  );
-}
-
 export function TrendRow({ row, up }: { row: SalesPaceRow; up?: boolean }) {
   return (
     <Link
-      to={`/productos/${row.product.sku}`}
+      to={`/productos/${row.rec.sku}`}
       className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 hover:bg-slate-50"
     >
-      <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{row.product.name}</span>
+      <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{row.rec.productName}</span>
       <span
         className={cn(
           "flex-shrink-0 text-xs font-medium",
@@ -401,141 +280,40 @@ export function TrendRow({ row, up }: { row: SalesPaceRow; up?: boolean }) {
   );
 }
 
-export function QualityItem({
-  label,
-  value,
-  hint,
-  to,
-}: {
-  label: string;
-  value: number;
-  hint: string;
-  to: string;
-}) {
+function SupplierPortfolioItem({ row }: { row: SupplierPanelRow }) {
   return (
     <Link
-      to={to}
-      className="rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
-    >
-      <p className={cn("text-2xl font-bold", value > 0 ? "text-slate-900" : "text-slate-300")}>
-        {formatNumber(value)}
-      </p>
-      <p className="text-sm font-medium text-slate-700">{label}</p>
-      <p className="text-[11px] text-slate-400">{hint}</p>
-    </Link>
-  );
-}
-
-function roleTone(role: PortfolioProductRole): "green" | "blue" | "amber" | "red" | "violet" {
-  if (role === "Estrella") return "green";
-  if (role === "Tractor") return "blue";
-  if (role === "Margen") return "violet";
-  if (role === "Emergente") return "blue";
-  if (role === "Detenido" || role === "Deterioro") return "red";
-  return "amber";
-}
-
-function KeyProductItem({ row }: { row: KeyProductRow }) {
-  return (
-    <Link
-      to={`/productos/${row.product.sku}`}
-      className="block rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Badge tone={roleTone(row.role)}>{row.role}</Badge>
-            <span className="text-xs font-mono text-slate-400">{row.product.sku}</span>
-          </div>
-          <p className="mt-1 text-sm font-medium text-slate-800">{row.product.name}</p>
-          <p className="mt-0.5 text-xs text-slate-500 line-clamp-2">{row.reason}</p>
-        </div>
-        <div className="flex-shrink-0 text-right">
-          <p className="text-sm font-semibold text-slate-900">
-            {formatCurrencyCompact(row.salesValue)}
-          </p>
-          <p className="text-xs text-slate-500">
-            margen {formatPercent(row.product.margin, 0)} · GMROI {row.gmroi.toFixed(1)}
-          </p>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function BrandHealthItem({ row }: { row: BrandPortfolioRow }) {
-  const conclusion =
-    row.growth > 0.15 && row.inventory > row.sales
-      ? "crece, pero consume capital"
-      : row.growth < -0.12
-        ? "se está frenando"
-        : row.margin >= 34
-          ? "protege rentabilidad"
-          : "monitorear mix";
-  return (
-    <div className="rounded-lg border border-slate-200 px-3 py-2">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-slate-800">{row.brand}</p>
-          <p className="text-xs text-slate-500">
-            {row.skus} SKU · {conclusion}
-          </p>
-        </div>
-        {row.stockouts > 0 && <Badge tone="red">{row.stockouts} quiebre</Badge>}
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-        <span>
-          <b className="block text-slate-800">{formatCurrencyCompact(row.sales)}</b>
-          venta
-        </span>
-        <span>
-          <b className="block text-slate-800">{formatPercent(row.margin, 0)}</b>
-          margen
-        </span>
-        <span>
-          <b className={row.growth >= 0 ? "block text-emerald-700" : "block text-rose-600"}>
-            {formatPercent(row.growth * 100, 0)}
-          </b>
-          crecimiento
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function SupplierPortfolioItem({ row }: { row: SupplierPortfolioRow }) {
-  const position =
-    row.dependency > 0.35 && row.alternatives / Math.max(1, row.skus) > 0.4
-      ? "posición negociadora media-alta"
-      : row.dependency > 0.35
-        ? "dependencia alta"
-        : "relación diversificada";
-  return (
-    <Link
-      to={`/proveedores/${row.supplier.id}?tab=negociacion`}
+      to={`/proveedores/${row.supplierId}`}
       className="block rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-800 truncate">{row.supplier.name}</p>
-          <p className="text-xs text-slate-500">{position}</p>
+          <p className="text-sm font-semibold text-slate-800 truncate">{row.name}</p>
+          <p className="text-xs text-slate-500">
+            {row.skuCount !== null ? `${formatNumber(row.skuCount)} SKU` : "SKU —"}
+            {row.categories.length > 0 ? ` · ${row.categories.slice(0, 2).join(", ")}` : ""}
+          </p>
         </div>
-        <StatusBadge kind="supplier" value={row.supplier.status} dot={false} />
+        <StatusBadge kind="supplier" value={row.status} dot={false} />
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
         <span>
-          <b className="block text-slate-800">{formatCurrencyCompact(row.sales)}</b>
-          venta
-        </span>
-        <span>
-          <b className="block text-slate-800">{formatPercent(row.dependency * 100, 0)}</b>
-          dependencia
-        </span>
-        <span>
-          <b className={row.stalled > 0 ? "block text-rose-600" : "block text-emerald-700"}>
-            {row.stalled}
+          <b className="block text-slate-800">
+            {row.purchased90Clp !== null ? formatCurrencyCompact(row.purchased90Clp) : "—"}
           </b>
-          detenidos
+          compra 90d
+        </span>
+        <span>
+          <b className="block text-slate-800">
+            {row.compliancePct !== null ? formatPercent(row.compliancePct, 0) : "—"}
+          </b>
+          cumplimiento
+        </span>
+        <span>
+          <b className="block text-slate-800">
+            {row.openOrders !== null ? formatNumber(row.openOrders) : "—"}
+          </b>
+          OC abiertas
         </span>
       </div>
     </Link>
@@ -566,55 +344,18 @@ function PortfolioMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function AgendaStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-0.5 truncate text-sm font-semibold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-export function SignalSummary({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "red" | "amber" | "blue" | "violet";
-}) {
-  const toneClass = {
-    red: "border-rose-200 bg-rose-50 text-rose-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
-    blue: "border-brand-200 bg-brand-50 text-brand-700",
-    violet: "border-violet-200 bg-violet-50 text-violet-700",
-  }[tone];
-
-  return (
-    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-75">{label}</p>
-      <p className="mt-1 text-lg font-semibold leading-none">{value}</p>
-    </div>
-  );
-}
-
 /**
- * Cabecera de "Mi cartera": categorías administradas y accesos rápidos a
- * categorías / marcas / proveedores. (Extraído de MyPanelPage.)
+ * Cabecera de "Mi cartera": categorías asignadas (panel real F12) y accesos
+ * rápidos. Subcategorías y marcas no existen en el contrato → se omiten.
  */
 export function PortfolioHeaderCard({
   catNames,
   skuCount,
-  subcatCount,
   supplierCount,
-  brandCount,
 }: {
   catNames: string[];
-  skuCount: number;
-  subcatCount: number;
-  supplierCount: number;
-  brandCount: number;
+  skuCount: number | null;
+  supplierCount: number | null;
 }) {
   return (
     <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-card">
@@ -625,16 +366,15 @@ export function PortfolioHeaderCard({
             {catNames.join(" • ") || "Sin categorías asignadas"}
           </h2>
           <p className="mt-0.5 text-sm text-slate-500">
-            {skuCount} SKU · {subcatCount} subcategorías · {supplierCount} proveedores ·{" "}
-            {brandCount} marcas
+            {skuCount !== null ? formatNumber(skuCount) : "—"} SKU ·{" "}
+            {supplierCount !== null ? formatNumber(supplierCount) : "—"} proveedores
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <PortfolioCountLink to="/categorias" label="Categorías" count={catNames.length} />
-          <PortfolioCountLink to="/productos" label="Marcas" count={brandCount} />
           <PortfolioCountLink to="/proveedores" label="Proveedores" count={supplierCount} />
           <Link
-            to="/mi-cartera/productos-clave"
+            to="/mi-cartera/oportunidades"
             className="font-medium text-brand-600 hover:text-brand-700"
           >
             Ver detalle →
@@ -645,273 +385,171 @@ export function PortfolioHeaderCard({
   );
 }
 
-interface Goal {
-  actual: number;
-  meta: number;
+const GOAL_LABEL: Record<GoalKind, string> = {
+  order_count: "Órdenes emitidas",
+  hit_rate: "Tasa de acierto",
+  claims_resolved: "Reclamos resueltos",
+  signals_actioned: "Señales gestionadas",
+};
+
+function goalValueText(kind: GoalKind, value: number | undefined): string {
+  if (value === undefined) return "—";
+  return kind === "hit_rate" ? formatPercent(value, 0) : formatNumber(value);
 }
 
 /**
- * "Objetivos del mes": venta, margen, sobrestock y disponibilidad vs su meta.
- * (Extraído de MyPanelPage.)
+ * "Objetivos del mes": metas reales del comprador (F19, GET /performance/me).
+ * Reemplaza las metas inventadas de venta/margen del prototipo.
  */
-export function MonthGoalsCard({
-  goals,
-}: {
-  goals: { venta: Goal; margen: Goal; sobrestock: Goal; disponibilidad: Goal };
-}) {
+export function MonthGoalsCard({ goals }: { goals: GoalView[] }) {
   return (
     <Card className="mb-4">
       <CardHeader
         title="Objetivos del mes"
         description="Un comprador trabaja contra metas, no solo mirando el estado actual."
       />
-      <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <GoalBar
-          label="Venta"
-          valueText={formatCurrencyCompact(goals.venta.actual)}
-          metaText={`meta ${formatCurrencyCompact(goals.venta.meta)}`}
-          pct={goals.venta.meta > 0 ? (goals.venta.actual / goals.venta.meta) * 100 : 0}
-          good={goals.venta.actual >= goals.venta.meta * 0.9}
-        />
-        <GoalBar
-          label="Margen"
-          valueText={formatPercent(goals.margen.actual)}
-          metaText={`meta ${goals.margen.meta}%`}
-          pct={(goals.margen.actual / goals.margen.meta) * 100}
-          good={goals.margen.actual >= goals.margen.meta}
-        />
-        <GoalBar
-          label="Sobrestock"
-          valueText={formatCurrencyCompact(goals.sobrestock.actual)}
-          metaText={`meta < ${formatCurrencyCompact(goals.sobrestock.meta)}`}
-          pct={Math.min(100, (goals.sobrestock.actual / goals.sobrestock.meta) * 100)}
-          good={goals.sobrestock.actual <= goals.sobrestock.meta}
-          invert
-        />
-        <GoalBar
-          label="Disponibilidad"
-          valueText={formatPercent(goals.disponibilidad.actual, 0)}
-          metaText={`meta ${goals.disponibilidad.meta}%`}
-          pct={(goals.disponibilidad.actual / goals.disponibilidad.meta) * 100}
-          good={goals.disponibilidad.actual >= goals.disponibilidad.meta}
-        />
-      </CardBody>
+      {goals.length === 0 ? (
+        <CardBody>
+          <EmptyState
+            title="Sin metas para este período"
+            description="Tu líder aún no define metas en el servicio de compras."
+          />
+        </CardBody>
+      ) : (
+        <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {goals.map((goal) => {
+            const value = goal.progress?.value;
+            const target = goal.target?.value;
+            const label = GOAL_LABEL[goal.kind] ?? goal.kind;
+            const pct =
+              value !== undefined && target !== undefined && target > 0
+                ? (value / target) * 100
+                : 0;
+            return (
+              <GoalBar
+                key={goal.id}
+                label={label}
+                valueText={goalValueText(goal.kind, value)}
+                metaText={
+                  target !== undefined ? `meta ${goalValueText(goal.kind, target)}` : "sin meta"
+                }
+                pct={pct}
+                good={goal.status === "on_track" || goal.status === "achieved"}
+              />
+            );
+          })}
+        </CardBody>
+      )}
     </Card>
   );
 }
 
 /**
- * "Resumen ejecutivo": KPIs de cartera con tendencia (venta, margen, GMROI,
- * rotación, cobertura, sobrestock, quiebres, inventario). (Extraído de MyPanelPage.)
+ * "Resumen ejecutivo": el contrato actual solo permite calcular los quiebres
+ * (motor de reposición). Venta, margen, GMROI, rotación, cobertura, sobrestock
+ * e inventario valorizado no existen en el BFF y se muestran como "—".
  */
-export function ExecutiveSummary({
-  portfolio,
-  story,
-  riskCount,
-}: {
-  portfolio: {
-    salesValue: number;
-    marginPct: number;
-    gmroi: number;
-    rotation: number;
-    coverageWeighted: number;
-    overstockValue: number;
-    inventoryValue: number;
-  };
-  story: {
-    salesTrendPct: number;
-    marginDelta: number;
-    gmroiDelta: number;
-    rotationDelta: number;
-    coverageDelta: number;
-  };
-  riskCount: number;
-}) {
+export function ExecutiveSummary({ riskCount }: { riskCount: number | null }) {
   return (
     <section className="mb-4">
       <SectionLabel>Resumen ejecutivo</SectionLabel>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <TrendKpi label="Venta 30d" value="—" />
+        <TrendKpi label="Margen" value="—" />
+        <TrendKpi label="GMROI" value="—" />
+        <TrendKpi label="Rotación" value="—" />
+        <TrendKpi label="Cobertura" value="—" />
+        <TrendKpi label="Sobrestock" value="—" />
         <TrendKpi
-          label="Venta 30d"
-          value={formatCurrencyCompact(portfolio.salesValue)}
-          delta={story.salesTrendPct}
-          unit="%"
+          label="Quiebres"
+          value={riskCount !== null ? `${formatNumber(riskCount)} SKU` : "—"}
         />
-        <TrendKpi
-          label="Margen"
-          value={formatPercent(portfolio.marginPct)}
-          delta={story.marginDelta}
-          unit="pp"
-        />
-        <TrendKpi
-          label="GMROI"
-          value={portfolio.gmroi.toFixed(1).replace(".", ",")}
-          delta={story.gmroiDelta}
-        />
-        <TrendKpi
-          label="Rotación"
-          value={`${formatNumber(portfolio.rotation)}x`}
-          delta={story.rotationDelta}
-        />
-        <TrendKpi
-          label="Cobertura"
-          value={formatDays(Math.round(portfolio.coverageWeighted))}
-          delta={story.coverageDelta}
-          unit="d"
-          invert
-        />
-        <TrendKpi label="Sobrestock" value={formatCurrencyCompact(portfolio.overstockValue)} />
-        <TrendKpi label="Quiebres" value={`${formatNumber(riskCount)} SKU`} />
-        <TrendKpi label="Inventario" value={formatCurrencyCompact(portfolio.inventoryValue)} />
+        <TrendKpi label="Inventario" value="—" />
       </div>
+      <p className="mt-2 text-[11px] text-slate-400">
+        Venta, margen, rotación e inventario valorizado de la cartera aún no están disponibles en
+        el servicio de compras.
+      </p>
     </section>
   );
 }
 
 /**
- * "Productos estratégicos": top 3 por aporte a la utilidad, con GMROI y margen.
- * (Extraído de MyPanelPage.)
- */
-export function StrategicProductsCard({
-  strategic,
-}: {
-  strategic: { row: KeyProductRow; utilShare: number }[];
-}) {
-  return (
-    <Card className="mb-4">
-      <CardHeader
-        title="Productos estratégicos"
-        description="Los que más aportan a tu utilidad."
-        action={
-          <Link
-            to="/mi-cartera/productos-clave"
-            className="text-xs font-medium text-brand-600 hover:text-brand-700"
-          >
-            Ver todos
-          </Link>
-        }
-      />
-      <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {strategic.map(({ row, utilShare }) => (
-          <Link
-            key={row.product.sku}
-            to={`/productos/${row.product.sku}`}
-            className="rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
-          >
-            <p className="truncate text-sm font-medium text-slate-800">{row.product.name}</p>
-            <p className="mt-0.5 text-xs text-slate-400">{row.role}</p>
-            <div className="mt-2 grid grid-cols-3 gap-1 text-center">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">{formatPercent(utilShare, 0)}</p>
-                <p className="text-[10px] text-slate-400">utilidad</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">{row.gmroi.toFixed(1)}</p>
-                <p className="text-[10px] text-slate-400">GMROI</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  {formatPercent(row.product.margin, 0)}
-                </p>
-                <p className="text-[10px] text-slate-400">margen</p>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </CardBody>
-    </Card>
-  );
-}
-
-/**
- * "Salud de cartera" (score + fortaleza/problema + dimensiones) junto a
- * "Principales focos" (dónde actuar primero). (Extraído de MyPanelPage.)
+ * "Mi puntaje del mes" (score real de F19, con delta vs mes anterior) junto a
+ * "Principales focos" (conteos reales calculables; los no calculables se omiten).
  */
 export function PortfolioHealthFocus({
-  score,
-  best,
-  worst,
-  health,
-  riskCount,
-  overstockValue,
-  opportunityCount,
-  suppliersToReviewCount,
-  newProductsCount,
+  performance,
+  focos,
 }: {
-  score: number;
-  best: [string, number];
-  worst: [string, number];
-  health: Record<string, number>;
-  riskCount: number;
-  overstockValue: number;
-  opportunityCount: number;
-  suppliersToReviewCount: number;
-  newProductsCount: number;
+  performance: MyPerformanceView | null;
+  focos: PortfolioFoco[];
 }) {
+  const metrics = performance?.current?.metrics ?? null;
+  const prevScore = performance?.previous?.metrics?.score ?? null;
+  const delta = metrics !== null && prevScore !== null ? metrics.score - prevScore : null;
+
   return (
     <section className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[0.9fr_1.1fr]">
       <Card>
-        <CardHeader title="Salud de cartera" description="Qué está sano y cuál es tu mayor problema." />
+        <CardHeader
+          title="Mi puntaje del mes"
+          description="Score de desempeño del servicio de compras (actividad + calidad)."
+        />
         <CardBody>
           <div className="flex items-center gap-4">
             <div className="text-center">
               <p className="text-3xl font-bold leading-none text-slate-900">
-                {score}
+                {metrics !== null ? formatNumber(metrics.score) : "—"}
                 <span className="text-base font-normal text-slate-400">/100</span>
               </p>
-              <p className="mt-1 text-xs font-medium text-emerald-600">↑ +3 vs mes anterior</p>
+              {delta !== null ? (
+                <p
+                  className={cn(
+                    "mt-1 text-xs font-medium",
+                    delta >= 0 ? "text-emerald-600" : "text-rose-600"
+                  )}
+                >
+                  {delta >= 0 ? "↑ +" : "↓ "}
+                  {formatNumber(Math.abs(delta))} vs mes anterior
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-400">Sin mes anterior comparable</p>
+              )}
             </div>
             <div className="grid flex-1 grid-cols-2 gap-2">
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-emerald-700">Fortaleza</p>
+                <p className="text-[11px] uppercase tracking-wide text-emerald-700">Actividad</p>
                 <p className="text-sm font-semibold text-emerald-800">
-                  {capitalize(best[0])} · {best[1]}
+                  {metrics !== null ? `${formatNumber(metrics.activityPoints)} pts` : "—"}
                 </p>
               </div>
-              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-rose-700">Mayor problema</p>
-                <p className="text-sm font-semibold text-rose-800">
-                  {capitalize(worst[0])} · {worst[1]}
+              <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-brand-700">Calidad</p>
+                <p className="text-sm font-semibold text-brand-800">
+                  {metrics !== null ? `${formatNumber(metrics.qualityPoints)} pts` : "—"}
                 </p>
               </div>
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-            {Object.entries(health).map(([label, value]) => (
-              <MiniDim key={label} label={label} value={value} />
-            ))}
-          </div>
+          {metrics === null && (
+            <p className="mt-3 text-xs text-slate-400">
+              El puntaje del mes no está disponible por ahora.
+            </p>
+          )}
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader title="Principales focos" description="Dónde actuar primero, en un solo lugar." />
         <CardBody className="space-y-2">
-          <FocoCard
-            dot="bg-rose-500"
-            text={`${formatNumber(riskCount)} SKU con riesgo de quiebre`}
-            to="/comprar/decisiones"
-          />
-          <FocoCard
-            dot="bg-amber-500"
-            text={`${formatCurrencyCompact(overstockValue)} en sobrestock`}
-            to="/inventario"
-          />
-          <FocoCard
-            dot="bg-emerald-500"
-            text={`${formatNumber(opportunityCount)} oportunidades comerciales`}
-            to="/mi-cartera/oportunidades"
-          />
-          <FocoCard
-            dot="bg-orange-500"
-            text={`${formatNumber(suppliersToReviewCount)} proveedores por revisar`}
-            to="/proveedores"
-          />
-          <FocoCard
-            dot="bg-brand-500"
-            text={`${formatNumber(newProductsCount)} productos nuevos por evaluar`}
-            to="/productos"
-          />
+          {focos.length === 0 ? (
+            <p className="py-2 text-sm text-slate-400">Sin focos calculables por ahora.</p>
+          ) : (
+            focos.map((foco) => (
+              <FocoCard key={foco.text} dot={foco.dot} text={foco.text} to={foco.to} />
+            ))
+          )}
         </CardBody>
       </Card>
     </section>
@@ -919,65 +557,26 @@ export function PortfolioHealthFocus({
 }
 
 /**
- * Tablas compactas de "Marcas" y "Proveedores" de la cartera (top 5 cada una).
- * (Extraído de MyPanelPage.)
+ * Tablas compactas de "Marcas" y "Proveedores". La de proveedores usa el panel
+ * real (F12); la de marcas no tiene fuente en el contrato y lo dice.
  */
-export function BrandsSuppliersTables({
-  brandRows,
-  supplierRows,
-}: {
-  brandRows: BrandPortfolioRow[];
-  supplierRows: SupplierPortfolioRow[];
-}) {
+export function BrandsSuppliersTables({ supplierRows }: { supplierRows: SupplierPanelRow[] }) {
   return (
     <section className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card>
-        <CardHeader
-          title="Marcas"
-          description="Venta, margen y crecimiento."
-          action={
-            <Link
-              to="/mi-cartera/marcas"
-              className="text-xs font-medium text-brand-600 hover:text-brand-700"
-            >
-              Ver todas
-            </Link>
-          }
-        />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
-                <th className="px-4 py-2 font-medium">Marca</th>
-                <th className="px-2 py-2 text-right font-medium">Venta</th>
-                <th className="px-2 py-2 text-right font-medium">Margen</th>
-                <th className="px-4 py-2 text-right font-medium">Crec.</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {brandRows.slice(0, 5).map((r) => (
-                <tr key={r.brand} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-2 font-medium text-slate-800">{r.brand}</td>
-                  <td className="px-2 py-2 text-right text-slate-700">
-                    {formatCurrencyCompact(r.sales)}
-                  </td>
-                  <td className="px-2 py-2 text-right text-slate-700">
-                    {formatPercent(r.margin, 0)}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <Delta pct={r.growth * 100} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <CardHeader title="Marcas" description="Venta, margen y crecimiento." />
+        <CardBody>
+          <EmptyState
+            title="Sin datos de marcas"
+            description="El servicio de compras no entrega venta ni margen por marca."
+          />
+        </CardBody>
       </Card>
 
       <Card>
         <CardHeader
           title="Proveedores"
-          description="Venta, dependencia y estado."
+          description="Compra 90 días, cumplimiento y estado."
           action={
             <Link
               to="/mi-cartera/proveedores"
@@ -992,23 +591,23 @@ export function BrandsSuppliersTables({
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
                 <th className="px-4 py-2 font-medium">Proveedor</th>
-                <th className="px-2 py-2 text-right font-medium">Venta</th>
-                <th className="px-2 py-2 text-right font-medium">Depend.</th>
+                <th className="px-2 py-2 text-right font-medium">Compra 90d</th>
+                <th className="px-2 py-2 text-right font-medium">Cumpl.</th>
                 <th className="px-4 py-2 text-right font-medium">Estado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {supplierRows.slice(0, 5).map((r) => (
-                <tr key={r.supplier.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-2 font-medium text-slate-800">{r.supplier.name}</td>
+                <tr key={r.supplierId} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-2 font-medium text-slate-800">{r.name}</td>
                   <td className="px-2 py-2 text-right text-slate-700">
-                    {formatCurrencyCompact(r.sales)}
+                    {r.purchased90Clp !== null ? formatCurrencyCompact(r.purchased90Clp) : "—"}
                   </td>
                   <td className="px-2 py-2 text-right text-slate-700">
-                    {formatPercent(r.dependency * 100, 0)}
+                    {r.compliancePct !== null ? formatPercent(r.compliancePct, 0) : "—"}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <StatusBadge kind="supplier" value={r.supplier.status} dot={false} />
+                    <StatusBadge kind="supplier" value={r.status} dot={false} />
                   </td>
                 </tr>
               ))}
@@ -1020,23 +619,21 @@ export function BrandsSuppliersTables({
   );
 }
 
-/** Resumen de oportunidades de cartera en 4 contadores. (Extraído de MyPanelPage.) */
-export function OpportunitiesSummary({
-  oppSummary,
-}: {
-  oppSummary: { label: string; count: number }[];
-}) {
+/** Resumen de oportunidades y pendientes reales en 4 contadores. */
+export function OpportunitiesSummary({ items }: { items: OpportunitySummaryItem[] }) {
   return (
     <section className="mb-4">
       <SectionLabel>Oportunidades</SectionLabel>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {oppSummary.map((o) => (
+        {items.map((o) => (
           <Link
             key={o.label}
-            to="/mi-cartera/oportunidades"
+            to={o.to}
             className="rounded-xl border border-slate-200 bg-white p-3 shadow-card hover:border-brand-300 hover:bg-brand-50/40"
           >
-            <p className="text-2xl font-bold text-slate-900">{formatNumber(o.count)}</p>
+            <p className="text-2xl font-bold text-slate-900">
+              {o.count !== null ? formatNumber(o.count) : "—"}
+            </p>
             <p className="mt-0.5 text-xs text-slate-500">{o.label}</p>
           </Link>
         ))}
@@ -1046,8 +643,8 @@ export function OpportunitiesSummary({
 }
 
 /**
- * "Tendencias": productos acelerando vs desacelerando (top 3 cada uno).
- * (Extraído de MyPanelPage.)
+ * "Tendencias": SKU acelerando vs desacelerando, derivado de la venta real
+ * 30d vs 90d de las filas del motor de reposición.
  */
 export function TrendsCard({
   faster,
@@ -1060,7 +657,7 @@ export function TrendsCard({
     <Card className="mb-4">
       <CardHeader
         title="Tendencias"
-        description="Qué acelera y qué se frena en tus categorías."
+        description="Qué acelera y qué se frena entre tus SKU con recomendación del motor."
         action={
           <Link to="/ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
             Ver análisis →
@@ -1077,7 +674,7 @@ export function TrendsCard({
           ) : (
             <div className="space-y-1">
               {faster.slice(0, 3).map((r) => (
-                <TrendRow key={r.product.sku} row={r} up />
+                <TrendRow key={r.rec.sku} row={r} up />
               ))}
             </div>
           )}
@@ -1091,7 +688,7 @@ export function TrendsCard({
           ) : (
             <div className="space-y-1">
               {slower.slice(0, 3).map((r) => (
-                <TrendRow key={r.product.sku} row={r} />
+                <TrendRow key={r.rec.sku} row={r} />
               ))}
             </div>
           )}
@@ -1102,10 +699,10 @@ export function TrendsCard({
 }
 
 /**
- * "Categorías": tarjetas comparables (venta, margen, quiebres y riesgo) con
- * enlace a la ficha de cada categoría. (Extraído de MyPanelPage.)
+ * "Categorías": tarjetas comparables desde el panel real (F12): pendientes del
+ * motor, quiebres/stock bajo, venta 30d en unidades y margen promedio.
  */
-export function CategoriesCard({ cats }: { cats: Category[] }) {
+export function CategoriesCard({ cats }: { cats: CategoryPanelRow[] }) {
   return (
     <Card className="mb-4">
       <CardHeader
@@ -1116,34 +713,42 @@ export function CategoriesCard({ cats }: { cats: Category[] }) {
         {cats.length === 0 ? (
           <EmptyState
             title="Sin categorías asignadas"
-            description="Cambia de comprador en la barra superior para ver sus categorías."
+            description="El panel de categorías no devolvió filas para tu sesión."
           />
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {cats.map((c) => (
               <Link
-                key={c.id}
-                to={`/categorias/${c.id}`}
+                key={c.categoryId}
+                to={`/categorias/${c.categoryId}`}
                 className="group rounded-lg border border-slate-200 p-3 hover:border-brand-300 hover:bg-brand-50/40"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium text-slate-800">{c.name}</span>
-                  <StatusBadge kind="category" value={c.status} dot={false} />
+                  {c.pendingCount > 0 && <Badge tone="blue">{c.pendingCount} pend.</Badge>}
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="flex gap-4 text-sm">
                     <span>
-                      <span className="text-xs text-slate-400">Venta </span>
-                      <b className="text-slate-800">{formatCurrencyCompact(c.salesLast30Days)}</b>
+                      <span className="text-xs text-slate-400">Venta 30d </span>
+                      <b className="text-slate-800">
+                        {c.sales30Units !== null ? `${formatNumber(c.sales30Units)} u.` : "—"}
+                      </b>
                     </span>
                     <span>
                       <span className="text-xs text-slate-400">Margen </span>
-                      <b className="text-slate-800">{formatPercent(c.averageMargin, 0)}</b>
+                      <b className="text-slate-800">
+                        {c.avgMarginPct !== null ? formatPercent(c.avgMarginPct, 0) : "—"}
+                      </b>
                     </span>
                   </div>
                   <div className="flex gap-1.5">
-                    {c.stockoutSkus > 0 && <Badge tone="red">{c.stockoutSkus}</Badge>}
-                    {c.riskSkus > 0 && <Badge tone="amber">{c.riskSkus}</Badge>}
+                    {c.byPriority.stockout_imminent > 0 && (
+                      <Badge tone="red">{c.byPriority.stockout_imminent}</Badge>
+                    )}
+                    {c.byPriority.low_stock > 0 && (
+                      <Badge tone="amber">{c.byPriority.low_stock}</Badge>
+                    )}
                   </div>
                 </div>
               </Link>
@@ -1155,58 +760,7 @@ export function CategoriesCard({ cats }: { cats: Category[] }) {
   );
 }
 
-/**
- * "Calidad de cartera": mantenimiento de datos (costo sin actualizar, margen
- * bajo, productos nuevos, atributos incompletos). (Extraído de MyPanelPage.)
- */
-export function PortfolioQualityCard({
-  outdatedCostCount,
-  lowMarginCount,
-  newProductsCount,
-  incompleteAttributes,
-}: {
-  outdatedCostCount: number;
-  lowMarginCount: number;
-  newProductsCount: number;
-  incompleteAttributes: number;
-}) {
-  return (
-    <Card className="mb-4">
-      <CardHeader
-        title="Calidad de cartera"
-        description="Mantenimiento de datos: lo que conviene corregir para decidir mejor."
-      />
-      <CardBody className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <QualityItem
-          label="Costo sin actualizar"
-          value={outdatedCostCount}
-          hint="más de 90 días"
-          to="/productos"
-        />
-        <QualityItem
-          label="Margen bajo"
-          value={lowMarginCount}
-          hint="bajo 20%"
-          to="/analisis-compra"
-        />
-        <QualityItem
-          label="Productos nuevos"
-          value={newProductsCount}
-          hint="por revisar surtido"
-          to="/productos"
-        />
-        <QualityItem
-          label="Atributos incompletos"
-          value={incompleteAttributes}
-          hint="sin código o unidad"
-          to="/productos"
-        />
-      </CardBody>
-    </Card>
-  );
-}
-
-/** "Órdenes de compra sin recibir": lista con proveedor, fecha y atraso. (Extraído de MyPanelPage.) */
+/** "Órdenes de compra sin recibir": lista con proveedor, fecha y atraso. */
 export function OpenOrdersList({ orders }: { orders: PurchaseOrder[] }) {
   return (
     <div id="ordenes">
@@ -1231,7 +785,8 @@ export function OpenOrdersList({ orders }: { orders: PurchaseOrder[] }) {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-800">{o.number}</p>
                     <p className="text-xs text-slate-500 truncate">
-                      {o.supplierName} · espera {formatDate(o.expectedDate)}
+                      {o.supplierName}
+                      {o.expectedDate ? ` · espera ${formatDate(o.expectedDate)}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1247,8 +802,8 @@ export function OpenOrdersList({ orders }: { orders: PurchaseOrder[] }) {
   );
 }
 
-/** "Proveedores por revisar": lista ordenada por cumplimiento. (Extraído de MyPanelPage.) */
-export function SuppliersToReviewList({ suppliers }: { suppliers: Supplier[] }) {
+/** "Proveedores por revisar": panel real (F12), en observación o bloqueados. */
+export function SuppliersToReviewList({ suppliers }: { suppliers: SupplierPanelRow[] }) {
   return (
     <div id="proveedores">
       <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Proveedores por revisar</h3>
@@ -1258,26 +813,27 @@ export function SuppliersToReviewList({ suppliers }: { suppliers: Supplier[] }) 
             <EmptyState
               icon={<IconCheck className="w-6 h-6" />}
               title="Proveedores al día"
-              description="Ninguno de tus proveedores requiere revisión ahora."
+              description="Ninguno de tus proveedores está en observación ni bloqueado."
             />
           ) : (
-            [...suppliers]
-              .sort((a, b) => a.deliveryCompliance - b.deliveryCompliance)
-              .map((s) => (
-                <Link
-                  key={s.id}
-                  to="/proveedores"
-                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{s.name}</p>
-                    <p className="text-xs text-slate-500">
-                      Cumple {s.deliveryCompliance}% · última compra {formatDate(s.lastPurchaseDate)}
-                    </p>
-                  </div>
-                  <StatusBadge kind="supplier" value={s.status} dot={false} />
-                </Link>
-              ))
+            suppliers.map((s) => (
+              <Link
+                key={s.supplierId}
+                to={`/proveedores/${s.supplierId}`}
+                className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{s.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {s.compliancePct !== null
+                      ? `Cumple ${formatPercent(s.compliancePct, 0)}`
+                      : "Cumplimiento —"}
+                    {s.openOrders !== null ? ` · ${formatNumber(s.openOrders)} OC abiertas` : ""}
+                  </p>
+                </div>
+                <StatusBadge kind="supplier" value={s.status} dot={false} />
+              </Link>
+            ))
           )}
         </CardBody>
       </Card>
@@ -1285,98 +841,14 @@ export function SuppliersToReviewList({ suppliers }: { suppliers: Supplier[] }) 
   );
 }
 
-/** "Mi inventario con sobrestock": lista por capital inmovilizado. (Extraído de MyPanelPage.) */
-export function OverstockList({ products }: { products: Product[] }) {
-  return (
-    <div id="sobrestock">
-      <h3 className="text-sm font-semibold text-slate-800 mb-2.5">Mi inventario con sobrestock</h3>
-      <Card>
-        <CardBody className="space-y-2">
-          {products.length === 0 ? (
-            <EmptyState
-              icon={<IconCheck className="w-6 h-6" />}
-              title="Sin sobrestock"
-              description="No tienes capital inmovilizado relevante."
-            />
-          ) : (
-            [...products]
-              .sort((a, b) => b.availableStock * b.cost - a.availableStock * a.cost)
-              .map((p) => (
-                <Link
-                  key={p.sku}
-                  to={`/productos/${p.sku}`}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
-                    <p className="text-xs text-slate-500">
-                      Disp. {formatNumber(p.availableStock)} · {formatNumber(p.inventoryDays)} días inv.
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold text-violet-600 flex-shrink-0">
-                    {formatCurrencyCompact(p.availableStock * p.cost)}
-                  </span>
-                </Link>
-              ))
-          )}
-        </CardBody>
-      </Card>
-    </div>
-  );
-}
-
-/** "Venta no capturada": top 4 oportunidades perdidas por no reponer. (Extraído de MyPanelPage.) */
-export function LostSalesCard({
-  lostOpps,
-  lostRevenue,
-}: {
-  lostOpps: LostOpportunity[];
-  lostRevenue: number;
-}) {
-  return (
-    <Card className="mb-4">
-      <CardHeader
-        title="Venta no capturada"
-        description={`${formatCurrencyCompact(lostRevenue)}/mes que dejas de vender por no reponer`}
-        action={
-          <Link to="/venta-no-capturada">
-            <span className="text-xs font-medium text-brand-600 hover:text-brand-700">
-              Ver todas
-            </span>
-          </Link>
-        }
-      />
-      <CardBody className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-        {lostOpps.slice(0, 4).map((o) => (
-          <Link
-            key={o.sku}
-            to={`/productos/${o.sku}`}
-            className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-slate-800">{o.name}</span>
-              <span className="block text-xs text-slate-400">
-                {o.motivo} · vendía ~{formatNumber(o.histMonthly)}/mes
-              </span>
-            </span>
-            <span className="flex-shrink-0 text-sm font-semibold text-rose-600">
-              {formatCurrencyCompact(o.ventaPerdida)}/mes
-            </span>
-          </Link>
-        ))}
-      </CardBody>
-    </Card>
-  );
-}
-
-/** "Señales de ventas para mí": lo que ventas reportó y espera decisión. (Extraído de MyPanelPage.) */
-export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
+/** "Señales de ventas pendientes": lo que ventas reportó (backend) y espera decisión. */
+export function SalesSignalsCard({ signals }: { signals: SignalView[] }) {
   return (
     <CollapsibleSection
       id="panel-senales"
       className="mb-4"
-      title="Señales de ventas para mí"
-      description="Lo que ventas reportó en tus categorías y aún espera tu decisión"
+      title="Señales de ventas pendientes"
+      description="Lo que ventas reportó desde el terreno y aún espera decisión"
       hint={`${signals.length} pendiente${signals.length === 1 ? "" : "s"}`}
       action={
         <Link to="/senales-ventas" className="text-xs font-medium text-brand-600 hover:text-brand-700">
@@ -1387,7 +859,7 @@ export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
       {signals.length === 0 ? (
         <EmptyState
           title="Todo al día"
-          description="No tienes señales de ventas pendientes en tus categorías."
+          description="No hay señales de ventas pendientes de decisión."
           icon={<IconCheck className="w-6 h-6" />}
         />
       ) : (
@@ -1395,7 +867,7 @@ export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
           {signals.map((s) => (
             <Link
               key={s.id}
-              to="/senales-ventas"
+              to={`/senales-ventas?sig=${encodeURIComponent(s.id)}`}
               className="flex items-start gap-2 rounded-lg border border-slate-200 p-2.5 hover:border-brand-300 hover:bg-brand-50/40"
             >
               <IconSignal className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
@@ -1404,12 +876,12 @@ export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
                   <Badge tone={SIGNAL_PRIORITY[s.priority].tone}>
                     {SIGNAL_PRIORITY[s.priority].label}
                   </Badge>
-                  <Badge tone={SIGNAL_TYPE[s.type].tone}>{SIGNAL_TYPE[s.type].short}</Badge>
+                  <Badge tone={signalKindMeta(s.kind).tone}>{signalKindMeta(s.kind).short}</Badge>
                   <span className="text-sm font-medium text-slate-800 truncate">
-                    {s.productName}
+                    {s.sku ?? signalKindMeta(s.kind).label}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 truncate mt-0.5">{s.comment}</p>
+                <p className="text-xs text-slate-500 truncate mt-0.5">{s.body}</p>
               </div>
               <Badge tone={SIGNAL_STATUS[s.status].tone} dot>
                 {SIGNAL_STATUS[s.status].label}
@@ -1423,8 +895,9 @@ export function SalesSignalsCard({ signals }: { signals: SalesSignal[] }) {
 }
 
 /**
- * "Mis productos en riesgo de quiebre": tabla con acción de agregar a la OC.
- * Recibe las filas ya calculadas y las acciones (agregar/abrir). (Extraído de MyPanelPage.)
+ * "Mis productos en riesgo de quiebre": tabla sobre las recomendaciones reales
+ * del motor (prioridades quiebre inminente / stock bajo) con acción de agregar
+ * la cantidad sugerida por el motor al borrador de OC.
  */
 export function StockoutRiskCard({
   rows,
@@ -1434,22 +907,22 @@ export function StockoutRiskCard({
 }: {
   rows: RiskRow[];
   hasItem: (sku: string) => boolean;
-  onAdd: (product: Product, qty: number) => void;
+  onAdd: (rec: ReplenishmentRecommendation, qty: number) => void;
   onOpenProduct: (sku: string) => void;
 }) {
   const columns: Column<RiskRow>[] = [
     {
       key: "product",
       header: "Producto",
-      render: ({ product: p }) => (
+      render: ({ rec }) => (
         <div className="min-w-[150px]">
-          <span className="text-xs font-mono text-slate-400">{p.sku}</span>
-          <p className="font-medium text-slate-800 leading-snug">{p.name}</p>
+          <span className="text-xs font-mono text-slate-400">{rec.sku}</span>
+          <p className="font-medium text-slate-800 leading-snug">{rec.productName}</p>
           <p className="text-xs text-slate-500">
-            {p.category} · {p.supplierName || "Sin proveedor"}
+            {rec.category} · {rec.supplierName}
           </p>
           <p className="text-xs mt-0.5 leading-snug text-rose-600">
-            {coverageSentence(p.availableStock, p.salesLast30Days)}
+            {coverageSentence(rec.availableStock, rec.salesLast30Days)}
           </p>
         </div>
       ),
@@ -1458,9 +931,9 @@ export function StockoutRiskCard({
       key: "stock",
       header: "Stock disp.",
       align: "right",
-      render: ({ product: p }) => (
-        <span className={p.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>
-          {formatNumber(p.availableStock)}
+      render: ({ rec }) => (
+        <span className={rec.availableStock <= 0 ? "text-rose-600 font-semibold" : "text-slate-700"}>
+          {formatNumber(rec.availableStock)}
         </span>
       ),
     },
@@ -1469,7 +942,7 @@ export function StockoutRiskCard({
       header: "Venta 30d",
       align: "right",
       hideOnMobile: true,
-      render: ({ product: p }) => formatNumber(p.salesLast30Days),
+      render: ({ rec }) => formatNumber(rec.salesLast30Days),
     },
     {
       key: "stockout",
@@ -1479,15 +952,19 @@ export function StockoutRiskCard({
         <div className="text-sm">
           <p
             className={
-              r.coverage <= r.product.supplierLeadTimeDays
+              r.coverage <= r.rec.supplierLeadTimeDays
                 ? "text-rose-600 font-semibold"
                 : "text-amber-600 font-medium"
             }
           >
-            {r.product.availableStock <= 0 ? "En quiebre" : formatDate(r.stockoutDate ?? "")}
+            {r.rec.availableStock <= 0
+              ? "En quiebre"
+              : r.stockoutDate
+                ? formatDate(r.stockoutDate)
+                : "—"}
           </p>
           <p className="text-xs text-slate-400">
-            cubre {formatDays(r.coverage)} · lead {formatDays(r.product.supplierLeadTimeDays)}
+            cubre {formatDays(r.coverage)} · lead {formatDays(r.rec.supplierLeadTimeDays)}
           </p>
         </div>
       ),
@@ -1510,21 +987,21 @@ export function StockoutRiskCard({
         <div className="flex flex-col items-end gap-1">
           <Button
             size="sm"
-            variant={hasItem(r.product.sku) ? "secondary" : "primary"}
-            disabled={hasItem(r.product.sku) || r.suggestedQty <= 0}
+            variant={hasItem(r.rec.sku) ? "secondary" : "primary"}
+            disabled={hasItem(r.rec.sku) || r.suggestedQty <= 0}
             onClick={(e) => {
               e.stopPropagation();
-              onAdd(r.product, r.suggestedQty);
+              onAdd(r.rec, r.suggestedQty);
             }}
             icon={
-              hasItem(r.product.sku) ? (
+              hasItem(r.rec.sku) ? (
                 <IconCheck className="w-3.5 h-3.5" />
               ) : (
                 <IconPlus className="w-3.5 h-3.5" />
               )
             }
           >
-            {hasItem(r.product.sku) ? "En OC" : "Agregar a OC"}
+            {hasItem(r.rec.sku) ? "En OC" : "Agregar a OC"}
           </Button>
         </div>
       ),
@@ -1546,25 +1023,25 @@ export function StockoutRiskCard({
         <DataTable
           columns={columns}
           data={rows}
-          rowKey={(r) => r.product.sku}
-          onRowClick={(r) => onOpenProduct(r.product.sku)}
-          rowClassName={(r) => (r.product.availableStock <= 0 ? "bg-rose-50/40" : undefined)}
+          rowKey={(r) => r.rec.sku}
+          onRowClick={(r) => onOpenProduct(r.rec.sku)}
+          rowClassName={(r) => (r.rec.availableStock <= 0 ? "bg-rose-50/40" : undefined)}
           emptyMessage="No tienes productos en riesgo de quiebre. ¡Bien!"
           mobileCard={(r) => (
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="text-xs font-mono text-slate-400">{r.product.sku}</span>
-                  <p className="font-medium text-slate-800 leading-snug">{r.product.name}</p>
+                  <span className="text-xs font-mono text-slate-400">{r.rec.sku}</span>
+                  <p className="font-medium text-slate-800 leading-snug">{r.rec.productName}</p>
                   <p className="text-xs text-slate-500">
-                    {r.product.category} · {r.product.supplierName || "Sin proveedor"}
+                    {r.rec.category} · {r.rec.supplierName}
                   </p>
                   <p className="text-xs mt-0.5 leading-snug text-rose-600 font-medium">
-                    {coverageSentence(r.product.availableStock, r.product.salesLast30Days)}
+                    {coverageSentence(r.rec.availableStock, r.rec.salesLast30Days)}
                   </p>
                 </div>
                 <Badge tone="red" dot>
-                  {r.product.availableStock <= 0 ? "Quiebre" : "Riesgo"}
+                  {r.rec.availableStock <= 0 ? "Quiebre" : "Riesgo"}
                 </Badge>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
@@ -1572,18 +1049,22 @@ export function StockoutRiskCard({
                   <p className="text-xs text-slate-400">Stock</p>
                   <p
                     className={
-                      r.product.availableStock <= 0
+                      r.rec.availableStock <= 0
                         ? "text-rose-600 font-semibold"
                         : "text-slate-700"
                     }
                   >
-                    {formatNumber(r.product.availableStock)}
+                    {formatNumber(r.rec.availableStock)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Quiebre</p>
                   <p className="text-slate-700">
-                    {r.product.availableStock <= 0 ? "hoy" : formatDate(r.stockoutDate ?? "")}
+                    {r.rec.availableStock <= 0
+                      ? "hoy"
+                      : r.stockoutDate
+                        ? formatDate(r.stockoutDate)
+                        : "—"}
                   </p>
                 </div>
                 <div>
@@ -1592,26 +1073,26 @@ export function StockoutRiskCard({
                 </div>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Cubre ~{formatDays(r.coverageAfter)} · lead {formatDays(r.product.supplierLeadTimeDays)}
+                Cubre ~{formatDays(r.coverageAfter)} · lead {formatDays(r.rec.supplierLeadTimeDays)}
               </p>
               <Button
                 size="sm"
                 className="mt-2 w-full"
-                variant={hasItem(r.product.sku) ? "secondary" : "primary"}
-                disabled={hasItem(r.product.sku) || r.suggestedQty <= 0}
+                variant={hasItem(r.rec.sku) ? "secondary" : "primary"}
+                disabled={hasItem(r.rec.sku) || r.suggestedQty <= 0}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAdd(r.product, r.suggestedQty);
+                  onAdd(r.rec, r.suggestedQty);
                 }}
                 icon={
-                  hasItem(r.product.sku) ? (
+                  hasItem(r.rec.sku) ? (
                     <IconCheck className="w-3.5 h-3.5" />
                   ) : (
                     <IconPlus className="w-3.5 h-3.5" />
                   )
                 }
               >
-                {hasItem(r.product.sku) ? "En OC" : "Agregar a OC"}
+                {hasItem(r.rec.sku) ? "En OC" : "Agregar a OC"}
               </Button>
             </div>
           )}

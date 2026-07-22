@@ -3,7 +3,7 @@
 // ============================================================================
 
 import type { CommercialAlert, Product, PurchaseRecommendation } from "../types/purchasing";
-import { LOW_MARGIN_THRESHOLD } from "../data/mockPriceLists";
+import { LOW_MARGIN_THRESHOLD } from "./constants";
 
 function matchesText(haystack: string[], query: string): boolean {
   if (!query.trim()) return true;

@@ -1,117 +1,206 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
-import { Card, CardBody, CardHeader } from "../components/ui/Card";
-import { Select } from "../components/ui/Select";
+import { Card, CardHeader } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Skeleton } from "../components/ui/Skeleton";
+import { EmptyState } from "../components/ui/EmptyState";
+import { DataTable, type Column } from "../components/ui/Table";
 import { KpiCard } from "../components/business/KpiCard";
 import { HelpNote } from "../components/business/HelpNote";
 import { InfoHint } from "../components/business/InfoHint";
-import { ScopeToggle, useCategoryScope } from "../components/business/ScopeToggle";
-import {
-  MonthlyBars,
-  StackedChannelBars,
-  ChannelLegend,
-} from "../components/business/SeasonalityChart";
-import { categories as allCategories } from "../data/mockCategories";
-import { products as allProducts } from "../data/mockProducts";
-import {
-  channelDemandForCategory,
-  splitPurchaseByChannel,
-  CHANNEL_META,
-} from "../utils/channelDemand";
-import { seasonalFactor, demandType } from "../utils/seasonality";
-import {
-  formatCurrency,
-  formatCurrencyCompact,
-  formatNumber,
-  formatPercent,
-} from "../utils/formatters";
-import { IconSales, IconCampaign, IconBox, IconSuppliers } from "../components/ui/icons";
+import { useSeasons } from "../hooks/useSeasons";
+import type { SeasonView } from "../services/purchaseBff";
+import { hasPlanContent, planForScenario } from "../utils/seasonPlan";
+import { formatCurrencyCompact, formatDate, formatNumber } from "../utils/formatters";
+import { IconCalendar, IconCart, IconSales, IconBox } from "../components/ui/icons";
+import { SCENARIO_ORDER, SEASON_STATUS_META } from "./seasonPlanner/constants";
 
-const DEMAND_TYPE_LABEL: Record<
-  ReturnType<typeof demandType>,
-  { label: string; tone: "slate" | "blue" | "violet" }
-> = {
-  constante: { label: "Demanda constante", tone: "slate" },
-  estacional: { label: "Demanda estacional", tone: "violet" },
-  permanente_peak: { label: "Permanente con peak", tone: "blue" },
-};
+// ============================================================================
+//  Temporadas conectadas al purchase-bff-service (F18): calendario comercial
+//  real (ventana de venta, ventana de compra y estado del ciclo por temporada),
+//  con el comprometido real del escenario base cuando existe tracking.
+//  La mezcla de demanda por canal, los peaks mensuales y la compra sugerida por
+//  canal del mock se eliminaron: no existe una fuente real por canal en el
+//  contrato, así que no se muestran números inventados.
+// ============================================================================
+
+const fmtDay = (iso: string) => formatDate(iso.slice(0, 10));
 
 export function SeasonsChannelsPage() {
-  const { scope, setScope, inScope, myCategories } = useCategoryScope();
+  const { seasons, loading, error, configured, refetch } = useSeasons();
 
-  const categories = useMemo(() => allCategories.filter((c) => inScope(c.name)), [inScope]);
-  const [categoria, setCategoria] = useState<string>("");
-  const selected = categories.find((c) => c.name === categoria) ?? categories[0];
-
-  const products = useMemo(
-    () => (selected ? allProducts.filter((p) => p.category === selected.name) : []),
-    [selected]
+  const kpis = useMemo(
+    () => ({
+      total: seasons.length,
+      buying: seasons.filter((s) => s.status === "buying").length,
+      selling: seasons.filter((s) => s.status === "selling").length,
+      planned: seasons.filter((s) => s.status === "planned").length,
+    }),
+    [seasons]
   );
 
-  const demand = useMemo(
-    () => (selected ? channelDemandForCategory(selected.name, products) : null),
-    [selected, products]
-  );
+  const pageTitle = "Temporadas y canales";
+  const pageDescription =
+    "Calendario comercial de las temporadas: cuándo se vende, cuándo hay que comprar y en qué punto del ciclo está cada una.";
 
-  if (!selected || !demand) {
+  // --------------------------------------------------------------------------
+  //  Estados de conexión (patrón ClaimsPage)
+  // --------------------------------------------------------------------------
+  if (!configured) {
     return (
       <div>
-        <PageHeader
-          title="Temporadas y canales"
-          description="Cuándo sube la demanda y por qué canal se compra: tienda, ecommerce, marketplace, empresa y licitaciones."
-          action={<ScopeToggle scope={scope} onChange={setScope} myCount={myCategories.length} />}
-        />
+        <PageHeader title={pageTitle} description={pageDescription} />
         <Card>
-          <CardBody className="text-center text-sm text-slate-500">
-            No hay categorías en tu alcance. Cambia a “Todas” para explorar la demanda por canal.
-          </CardBody>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Conexión no configurada</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Configura <code className="font-mono text-slate-700">VITE_PURCHASE_BFF_URL</code> para
+              ver el calendario comercial real de temporadas del servicio de compras.
+            </p>
+          </div>
         </Card>
       </div>
     );
   }
 
-  const factor = seasonalFactor(selected.name);
-  const dtype = demandType(selected.name);
-  const seasonUp = factor >= 1.05;
-  const seasonDown = factor <= 0.95;
+  if (loading && seasons.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="space-y-2.5 p-4" aria-busy="true" aria-label="Cargando temporadas">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-  const totalMonthly = demand.monthly.map((m) => ({
-    label: m.label,
-    value: m.total,
-    highlight: m.label === demand.peakMonth,
-  }));
+  if (error && seasons.length === 0) {
+    return (
+      <div>
+        <PageHeader title={pageTitle} description={pageDescription} />
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              No se pudieron cargar las temporadas
+            </p>
+            <p className="mt-1 text-sm text-slate-500">{error.message}</p>
+            <Button className="mt-4" onClick={refetch}>
+              Reintentar
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-  const purchaseSplit = splitPurchaseByChannel(demand, selected.suggestedPurchase);
+  const columns: Column<SeasonView>[] = [
+    {
+      key: "season",
+      header: "Temporada",
+      render: (s) => (
+        <div className="min-w-[170px]">
+          <p className="font-medium text-slate-800">{s.name}</p>
+          <p className="text-xs text-slate-400">{s.code}</p>
+        </div>
+      ),
+    },
+    {
+      key: "sales",
+      header: "Ventana de venta",
+      render: (s) => (
+        <span className="text-slate-700">
+          {fmtDay(s.salesFrom)} → {fmtDay(s.salesTo)}
+        </span>
+      ),
+    },
+    {
+      key: "buy",
+      header: "Ventana de compra",
+      hideOnMobile: true,
+      render: (s) => (
+        <span className="text-slate-700">
+          {fmtDay(s.buyFrom)} → {fmtDay(s.buyTo)}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Estado del ciclo",
+      align: "center",
+      render: (s) => (
+        <Badge tone={SEASON_STATUS_META[s.status].tone}>
+          {SEASON_STATUS_META[s.status].label}
+        </Badge>
+      ),
+    },
+    {
+      key: "plans",
+      header: "Escenarios con plan",
+      align: "right",
+      hideOnMobile: true,
+      render: (s) => {
+        const withPlan = SCENARIO_ORDER.filter((sc) =>
+          hasPlanContent(planForScenario(s, sc))
+        ).length;
+        return withPlan > 0 ? (
+          <span className="text-slate-700">
+            {formatNumber(withPlan)} de {SCENARIO_ORDER.length}
+          </span>
+        ) : (
+          <span className="text-slate-400" title="Sin plan en ningún escenario">
+            —
+          </span>
+        );
+      },
+    },
+    {
+      key: "committed",
+      header: "Comprometido (base)",
+      align: "right",
+      render: (s) => {
+        const tracking = planForScenario(s, "base")?.tracking ?? null;
+        return tracking ? (
+          <span className="font-semibold text-slate-900">
+            {formatCurrencyCompact(tracking.totalCommittedClp)}
+          </span>
+        ) : (
+          <span className="text-slate-400" title="Aún sin tracking de OC">
+            —
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
     <div>
       <PageHeader
-        title="Temporadas y canales"
-        description="Cuándo sube la demanda y por qué canal se compra: tienda, ecommerce, marketplace, empresa (B2B) y licitaciones."
+        title={pageTitle}
+        description={pageDescription}
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <ScopeToggle scope={scope} onChange={setScope} myCount={myCategories.length} />
-            <Select
-              aria-label="Categoría"
-              value={selected.name}
-              onChange={(e) => setCategoria(e.target.value)}
-              options={categories.map((c) => ({ value: c.name, label: c.name }))}
-              className="sm:w-56"
-            />
-          </div>
+          <Link to="/comprar/temporada">
+            <Button icon={<IconCart className="w-4 h-4" />}>Planificar temporada</Button>
+          </Link>
         }
         help={
           <InfoHint label="Temporadas y canales">
             <p>
-              La misma categoría se vende por varios canales y cada uno tiene su propia temporada:
-              el <b>ecommerce</b> y el <b>marketplace</b> suben en CyberDay y fin de año, las{" "}
-              <b>licitaciones</b> se concentran cuando se ejecuta presupuesto (marzo-abril,
-              oct-nov) y la <b>venta empresa</b> sigue la temporada de obra.
+              Cada temporada define una <b>ventana de venta</b> (cuándo se espera vender) y una{" "}
+              <b>ventana de compra</b> (cuándo hay que emitir las OC para llegar a tiempo). El
+              ciclo avanza: planificada → en compra → en venta → cerrada.
             </p>
             <p>
-              Este es el <b>diagnóstico</b>; para convertirlo en compra, usa{" "}
+              Este es el <b>calendario</b>; para asignar presupuesto por categoría y escenario, usa{" "}
               <Link to="/comprar/temporada" className="font-medium text-brand-700 hover:underline">
                 Planificar temporada
               </Link>
@@ -123,157 +212,89 @@ export function SeasonsChannelsPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <KpiCard
-          title="Demanda mensual"
-          value={`${formatNumber(demand.baseUnitsPerMonth)} u.`}
+          title="Temporadas"
+          value={formatNumber(kpis.total)}
           tone="info"
-          icon={<IconBox className="w-4 h-4" />}
-          description={selected.name}
+          icon={<IconCalendar className="w-4 h-4" />}
+          description="registradas en el servicio"
         />
         <KpiCard
-          title="Mes peak"
-          value={demand.peakMonth}
-          tone={seasonUp ? "warn" : "neutral"}
+          title="En compra"
+          value={formatNumber(kpis.buying)}
+          tone={kpis.buying > 0 ? "warn" : "neutral"}
+          icon={<IconCart className="w-4 h-4" />}
+          description="ventana de compra activa"
+        />
+        <KpiCard
+          title="En venta"
+          value={formatNumber(kpis.selling)}
+          tone={kpis.selling > 0 ? "good" : "neutral"}
           icon={<IconSales className="w-4 h-4" />}
-          description={
-            seasonUp
-              ? `Entra en temporada (×${factor.toFixed(2)})`
-              : seasonDown
-                ? `Sale de temporada (×${factor.toFixed(2)})`
-                : "Demanda pareja"
-          }
+          description="ventana de venta activa"
         />
         <KpiCard
-          title="Canales digitales"
-          value={formatPercent(demand.digitalPct, 0)}
+          title="Planificadas"
+          value={formatNumber(kpis.planned)}
           tone="neutral"
-          icon={<IconCampaign className="w-4 h-4" />}
-          description="Ecommerce + marketplace"
-        />
-        <KpiCard
-          title="Proyectos"
-          value={formatPercent(demand.projectPct, 0)}
-          tone="neutral"
-          icon={<IconSuppliers className="w-4 h-4" />}
-          description="Empresa + licitaciones"
+          icon={<IconBox className="w-4 h-4" />}
+          description="aún sin comprar"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        {/* Temporada: demanda total por mes */}
-        <Card>
-          <CardHeader
-            title="Temporada del año"
-            description="Demanda total por mes (unidades). Barra oscura = mes peak."
-            action={
-              <Badge tone={DEMAND_TYPE_LABEL[dtype].tone}>{DEMAND_TYPE_LABEL[dtype].label}</Badge>
-            }
-          />
-          <CardBody>
-            <MonthlyBars data={totalMonthly} format={(n) => `${formatNumber(n)} u.`} />
-          </CardBody>
-        </Card>
-
-        {/* Mezcla de canales por mes (apilado) */}
-        <Card>
-          <CardHeader
-            title="Demanda por canal y mes"
-            description="Por qué sube cada mes: qué canal aporta la demanda."
-          />
-          <CardBody>
-            <StackedChannelBars
-              monthly={demand.monthly}
-              formatUnits={(n) => `${formatNumber(n)} u.`}
-            />
-            <ChannelLegend className="mt-3" />
-          </CardBody>
-        </Card>
-      </div>
-
-      {/* Mezcla de canales: participación + timing */}
       <Card className="mb-4">
         <CardHeader
-          title="Mezcla de canales"
-          description="Cuánto pesa cada canal en la demanda anual y cuándo es su peak"
+          title="Calendario comercial"
+          description="Ventanas reales de venta y compra por temporada, estado del ciclo y comprometido en OC del escenario base"
         />
-        <CardBody>
-          <div className="space-y-3">
-            {demand.channels.map((c) => (
-              <div
-                key={c.channel}
-                className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3"
-              >
-                <div className="flex w-full items-center gap-2 sm:w-56">
-                  <span
-                    className="h-3 w-3 flex-shrink-0 rounded-sm"
-                    style={{ background: CHANNEL_META[c.channel].color }}
-                  />
-                  <span className="text-sm font-medium text-slate-800">
-                    {CHANNEL_META[c.channel].label}
-                  </span>
+        {seasons.length === 0 ? (
+          <EmptyState
+            icon={<IconCalendar className="h-6 w-6" />}
+            title="Sin temporadas registradas"
+            description="Cuando existan temporadas en el servicio de compras aparecerán aquí con sus ventanas de venta y compra."
+          />
+        ) : (
+          <DataTable
+            columns={columns}
+            data={seasons}
+            rowKey={(s) => s.id}
+            emptyMessage="Sin temporadas registradas."
+            mobileCard={(s) => (
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-800">{s.name}</p>
+                    <p className="text-xs text-slate-400">{s.code}</p>
+                  </div>
+                  <Badge tone={SEASON_STATUS_META[s.status].tone}>
+                    {SEASON_STATUS_META[s.status].label}
+                  </Badge>
                 </div>
-                <div className="h-2 flex-1 rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.round(c.mixPct)}%`,
-                      background: CHANNEL_META[c.channel].color,
-                    }}
-                  />
-                </div>
-                <div className="flex flex-shrink-0 items-center gap-3 text-xs text-slate-500 sm:w-72 sm:justify-end">
-                  <span className="font-semibold text-slate-800">{formatPercent(c.mixPct, 0)}</span>
-                  <span>{formatNumber(c.unitsPerMonth)} u./mes</span>
-                  <span className="hidden sm:inline">
-                    peak {c.peakMonths.length ? c.peakMonths.join(", ") : "—"}
-                  </span>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-xs text-slate-400">Venta</p>
+                    <p className="text-slate-700">
+                      {fmtDay(s.salesFrom)} → {fmtDay(s.salesTo)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Compra</p>
+                    <p className="text-slate-700">
+                      {fmtDay(s.buyFrom)} → {fmtDay(s.buyTo)}
+                    </p>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-slate-400">
-            {CHANNEL_META[demand.channels[0].channel].description}
-          </p>
-        </CardBody>
+            )}
+          />
+        )}
       </Card>
 
-      {/* Cuánto comprar y por qué */}
-      <Card>
-        <CardHeader
-          title="Compra sugerida por canal"
-          description="Cómo se reparte la compra sugerida de la categoría según la demanda de cada canal"
-        />
-        <CardBody>
-          <div className="mb-3 flex items-baseline justify-between gap-2">
-            <span className="text-sm text-slate-500">Compra sugerida del mes</span>
-            <span className="text-lg font-semibold text-slate-900">
-              {formatCurrency(selected.suggestedPurchase)}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-            {purchaseSplit.map((s) => (
-              <div key={s.channel} className="rounded-lg border border-slate-200 bg-white p-3">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="h-2.5 w-2.5 rounded-sm"
-                    style={{ background: CHANNEL_META[s.channel].color }}
-                  />
-                  <span className="text-xs text-slate-500">{CHANNEL_META[s.channel].short}</span>
-                </div>
-                <p className="mt-1 text-base font-semibold text-slate-900">
-                  {formatCurrencyCompact((selected.suggestedPurchase * s.pct) / 100)}
-                </p>
-                <p className="text-[11px] text-slate-400">{formatPercent(s.pct, 0)} de la compra</p>
-              </div>
-            ))}
-          </div>
-          <HelpNote variant="tip" className="mt-4">
-            Considera el canal al decidir: para{" "}
-            <b>{demand.channels[0] && CHANNEL_META[demand.channels[0].channel].label}</b> (tu canal
-            principal) asegura stock antes de su peak; la demanda de <b>licitaciones</b> es
-            escalonada, así que confírmala antes de comprar contra ella.
-          </HelpNote>
-        </CardBody>
-      </Card>
+      <HelpNote>
+        La mezcla de demanda por canal (tienda, ecommerce, marketplace, empresa y licitaciones),
+        los peaks mensuales y la compra sugerida por canal aún no tienen fuente en el servicio de
+        compras, por lo que dejaron de mostrarse aquí. Cuando exista esa señal real, volverá a esta
+        pantalla.
+      </HelpNote>
     </div>
   );
 }
