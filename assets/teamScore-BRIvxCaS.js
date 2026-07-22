@@ -1,0 +1,1 @@
+function n(r){return r>=90?"#059669":r>=80?"#1b3bad":r>=70?"#b45309":r>=55?"#d97706":"#be123c"}function e(r){return r>=90?"#f43f5e":r>=75?"#f59e0b":"#10b981"}function t(r){return r>0?`+${r} pts`:r<0?`${r} pts`:"Sin cambio"}function u(r){return r>0?"#059669":r<0?"#e11d48":"#94a3b8"}export{u as a,n as s,t,e as w};
