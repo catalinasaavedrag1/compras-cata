@@ -14,14 +14,22 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
       setError("Ingresa tu correo y contraseña.");
       return;
     }
-    login(email.trim());
+    setError("");
+    setSubmitting(true);
+    const result = await login(email.trim(), password);
+    setSubmitting(false);
+    if (!result.ok) {
+      setError(result.error ?? "No se pudo iniciar sesión.");
+      return;
+    }
     navigate(from, { replace: true });
   };
 
@@ -122,8 +130,12 @@ export function LoginPage() {
             </p>
           )}
 
-          <Button type="submit" className="w-full justify-center">
-            Iniciar sesión
+          <Button
+            type="submit"
+            className="w-full justify-center"
+            disabled={submitting}
+          >
+            {submitting ? "Iniciando sesión…" : "Iniciar sesión"}
           </Button>
 
           <p className="text-[11px] text-slate-400 text-center leading-snug">
