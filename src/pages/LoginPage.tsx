@@ -15,6 +15,22 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // id-service reporta sesión activa: ofrecemos cerrarla e iniciar aquí.
+  const [sessionExists, setSessionExists] = useState(false);
+
+  const attempt = async (force: boolean) => {
+    setError("");
+    setSubmitting(true);
+    const result = await login(email.trim(), password, force);
+    setSubmitting(false);
+    if (result.ok) {
+      setSessionExists(false);
+      navigate(from, { replace: true });
+      return;
+    }
+    setSessionExists(!!result.sessionExists);
+    setError(result.error ?? "No se pudo iniciar sesión.");
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,15 +38,7 @@ export function LoginPage() {
       setError("Ingresa tu correo y contraseña.");
       return;
     }
-    setError("");
-    setSubmitting(true);
-    const result = await login(email.trim(), password);
-    setSubmitting(false);
-    if (!result.ok) {
-      setError(result.error ?? "No se pudo iniciar sesión.");
-      return;
-    }
-    navigate(from, { replace: true });
+    await attempt(false);
   };
 
   return (
@@ -130,13 +138,29 @@ export function LoginPage() {
             </p>
           )}
 
-          <Button
-            type="submit"
-            className="w-full justify-center"
-            disabled={submitting}
-          >
-            {submitting ? "Iniciando sesión…" : "Iniciar sesión"}
-          </Button>
+          {sessionExists ? (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                className="w-full justify-center"
+                disabled={submitting}
+                onClick={() => void attempt(true)}
+              >
+                {submitting ? "Iniciando sesión…" : "Cerrar la otra sesión e iniciar aquí"}
+              </Button>
+              <p className="text-center text-xs text-slate-400">
+                Ya tienes una sesión activa en otro dispositivo.
+              </p>
+            </div>
+          ) : (
+            <Button
+              type="submit"
+              className="w-full justify-center"
+              disabled={submitting}
+            >
+              {submitting ? "Iniciando sesión…" : "Iniciar sesión"}
+            </Button>
+          )}
 
           <p className="text-[11px] text-slate-400 text-center leading-snug">
             Demo sin backend: cualquier correo y contraseña inician sesión.
