@@ -43,7 +43,8 @@ const BFF_URL = import.meta.env.VITE_PURCHASE_BFF_URL as string | undefined;
 /** Endpoint de login efectivo (o null en modo desarrollo sin backend). */
 function loginEndpoint(): string | null {
   if (AUTH_URL) return AUTH_URL;
-  if (BFF_URL) return `${BFF_URL.replace(/\/$/, "")}/auth/login`;
+  // El BFF expone /auth/login bajo su prefijo de API (igual que el resto).
+  if (BFF_URL) return `${BFF_URL.replace(/\/$/, "")}/api/purchase-bff/v1/auth/login`;
   return null;
 }
 
