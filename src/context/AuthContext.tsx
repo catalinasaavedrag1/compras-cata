@@ -31,6 +31,8 @@ export interface LoginResult {
 interface AuthValue {
   authenticated: boolean;
   email: string;
+  /** true = sin backend de identidad: el login no valida credenciales (dev). */
+  devMode: boolean;
   login: (email: string, password: string, force?: boolean) => Promise<LoginResult>;
   logout: () => void;
 }
@@ -85,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       authenticated: state.authenticated,
       email: state.email,
+      devMode: loginEndpoint() === null,
       login: async (email: string, password: string, force = false): Promise<LoginResult> => {
         const endpoint = loginEndpoint();
         // Modo desarrollo: sin backend configurado no se validan credenciales.

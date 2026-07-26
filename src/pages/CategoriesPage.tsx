@@ -227,6 +227,7 @@ export function CategoriesPage() {
             scope={scope}
             onChange={setScope}
             myCount={buyerId ? myRows.length : undefined}
+            loading={loading}
           />
         }
         help={

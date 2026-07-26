@@ -5,7 +5,7 @@ import { Button } from "../components/ui/Button";
 import { IconEye, IconEyeOff, IconMail, IconLock } from "../components/ui/icons";
 
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, devMode } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? "/";
@@ -162,9 +162,11 @@ export function LoginPage() {
             </Button>
           )}
 
-          <p className="text-[11px] text-slate-400 text-center leading-snug">
-            Demo sin backend: cualquier correo y contraseña inician sesión.
-          </p>
+          {devMode && (
+            <p className="text-[11px] text-slate-400 text-center leading-snug">
+              Demo sin backend: cualquier correo y contraseña inician sesión.
+            </p>
+          )}
         </form>
       </div>
     </div>

@@ -35,7 +35,8 @@ function useTeamCriticalAlertsCount(): number {
           pageSize: TEAM_ALERTS_PAGE_SIZE,
         });
         if (seq !== requestSeq.current) return;
-        setCount(page.items.length);
+        // meta.total = total real (page.items está topado por pageSize).
+        setCount(page.meta?.total ?? page.items.length);
       } catch {
         if (seq === requestSeq.current) setCount(0);
       }
