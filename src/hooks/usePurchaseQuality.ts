@@ -27,7 +27,13 @@ export interface UsePurchaseQualityResult {
  */
 export function usePurchaseQuality(): UsePurchaseQualityResult {
   const catalog = useProductsCatalog();
-  const { rules, configured: rulesConfigured } = useRules();
+  const {
+    rules,
+    configured: rulesConfigured,
+    loading: rulesLoading,
+    error: rulesError,
+    refetch: refetchRules,
+  } = useRules();
 
   // Objetivo global + overrides por categoría desde las reglas reales activas.
   const { globalTarget, byCategory } = useMemo(() => {
@@ -72,9 +78,12 @@ export function usePurchaseQuality(): UsePurchaseQualityResult {
 
   return {
     lines,
-    loading: catalog.loading,
-    error: catalog.error,
+    loading: catalog.loading || rulesLoading,
+    error: catalog.error ?? rulesError,
     configured: catalog.configured && rulesConfigured,
-    refetch: catalog.refetch,
+    refetch: () => {
+      catalog.refetch();
+      refetchRules();
+    },
   };
 }

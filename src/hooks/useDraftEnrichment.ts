@@ -97,50 +97,58 @@ export function useDraftEnrichment(items: OcDraftItem[]): UseDraftEnrichmentResu
     const newSkus = skus.filter((s) => !attemptedSkus.current.has(s));
     const newSuppliers = supplierNames.filter((s) => !attemptedSuppliers.current.has(s));
     if (newSkus.length === 0 && newSuppliers.length === 0) return;
+    // Se marcan en vuelo para no re-pedir en paralelo; una falla puntual se
+    // desmarca abajo para que un próximo montaje pueda reintentarla.
     newSkus.forEach((s) => attemptedSkus.current.add(s));
     newSuppliers.forEach((s) => attemptedSuppliers.current.add(s));
     setPending((p) => p + 1);
     void (async () => {
-      const [skuSettled, supplierSettled] = await Promise.all([
-        Promise.allSettled(newSkus.map(fetchRowForSku)),
-        Promise.allSettled(newSuppliers.map(fetchPanelForSupplier)),
-      ]);
-      let unauthenticated = false;
-      const nextRows: Array<[string, ReplenishmentRow | null]> = [];
-      skuSettled.forEach((res, i) => {
-        const sku = newSkus[i];
-        if (res.status === "fulfilled") {
-          skuRowCache.set(sku, res.value);
-          nextRows.push([sku, res.value]);
-        } else {
-          if (toPurchaseBffError(res.reason).code === "UNAUTHENTICATED") unauthenticated = true;
-          // Falla puntual: la línea queda sin contexto ("—"), no se inventa.
-          nextRows.push([sku, null]);
+      try {
+        const [skuSettled, supplierSettled] = await Promise.all([
+          Promise.allSettled(newSkus.map(fetchRowForSku)),
+          Promise.allSettled(newSuppliers.map(fetchPanelForSupplier)),
+        ]);
+        let unauthenticated = false;
+        const nextRows: Array<[string, ReplenishmentRow | null]> = [];
+        skuSettled.forEach((res, i) => {
+          const sku = newSkus[i];
+          if (res.status === "fulfilled") {
+            skuRowCache.set(sku, res.value);
+            nextRows.push([sku, res.value]);
+          } else {
+            if (toPurchaseBffError(res.reason).code === "UNAUTHENTICATED") unauthenticated = true;
+            // Falla puntual: se desmarca para poder reintentar; la línea queda "—".
+            attemptedSkus.current.delete(sku);
+            nextRows.push([sku, null]);
+          }
+        });
+        const nextPanels: Array<[string, SupplierPanelRow | null]> = [];
+        supplierSettled.forEach((res, i) => {
+          const name = newSuppliers[i];
+          if (res.status === "fulfilled") {
+            supplierPanelCache.set(name, res.value);
+            nextPanels.push([name, res.value]);
+          } else {
+            if (toPurchaseBffError(res.reason).code === "UNAUTHENTICATED") unauthenticated = true;
+            attemptedSuppliers.current.delete(name);
+            nextPanels.push([name, null]);
+          }
+        });
+        if (unauthenticated) {
+          logout();
+          navigate("/login");
+          return;
         }
-      });
-      const nextPanels: Array<[string, SupplierPanelRow | null]> = [];
-      supplierSettled.forEach((res, i) => {
-        const name = newSuppliers[i];
-        if (res.status === "fulfilled") {
-          supplierPanelCache.set(name, res.value);
-          nextPanels.push([name, res.value]);
-        } else {
-          if (toPurchaseBffError(res.reason).code === "UNAUTHENTICATED") unauthenticated = true;
-          nextPanels.push([name, null]);
+        if (nextRows.length > 0) {
+          setRows((prev) => new Map([...prev, ...nextRows]));
         }
-      });
-      if (unauthenticated) {
-        logout();
-        navigate("/login");
-        return;
+        if (nextPanels.length > 0) {
+          setPanels((prev) => new Map([...prev, ...nextPanels]));
+        }
+      } finally {
+        // Siempre se baja el contador (incluso ante UNAUTHENTICATED): loading no se traba.
+        setPending((p) => p - 1);
       }
-      if (nextRows.length > 0) {
-        setRows((prev) => new Map([...prev, ...nextRows]));
-      }
-      if (nextPanels.length > 0) {
-        setPanels((prev) => new Map([...prev, ...nextPanels]));
-      }
-      setPending((p) => p - 1);
     })();
   }, [configured, skus, supplierNames, logout, navigate]);
 

@@ -39,6 +39,8 @@ interface BuyerContextValue {
   /** Presentación legible del buyerId actual. */
   buyerLabel: string;
   labelFor: (buyerId: string) => string;
+  /** true mientras se carga el panel de categorías: la cartera aún no es fiable. */
+  loading: boolean;
 }
 
 const BuyerContext = createContext<BuyerContextValue | null>(null);
@@ -46,11 +48,14 @@ const BuyerContext = createContext<BuyerContextValue | null>(null);
 export function BuyerProvider({ children }: { children: ReactNode }) {
   const [buyer, setBuyer] = useLocalStorage<string>("compras:buyer", "");
   const [rows, setRows] = useState<CategoryPanelRow[]>([]);
+  // Sin BFF no hay carga pendiente; con BFF arranca cargando hasta la 1ª respuesta.
+  const [loading, setLoading] = useState(isPurchaseBffConfigured());
   const requestSeq = useRef(0);
 
   useEffect(() => {
     if (!isPurchaseBffConfigured()) return;
     const seq = ++requestSeq.current;
+    setLoading(true);
     void getCategoriesPanel()
       .then((data) => {
         if (seq === requestSeq.current) setRows(data.items);
@@ -58,6 +63,9 @@ export function BuyerProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         // Sin categorías reales: la cartera queda vacía (degradación honesta).
         if (seq === requestSeq.current) setRows([]);
+      })
+      .finally(() => {
+        if (seq === requestSeq.current) setLoading(false);
       });
   }, []);
 
@@ -82,8 +90,9 @@ export function BuyerProvider({ children }: { children: ReactNode }) {
         .map((r) => r.name),
       buyerLabel: effectiveBuyer ? displayBuyer(effectiveBuyer) : "—",
       labelFor: (id: string) => (id ? displayBuyer(id) : "—"),
+      loading,
     }),
-    [effectiveBuyer, setBuyer, buyers, rows]
+    [effectiveBuyer, setBuyer, buyers, rows, loading]
   );
 
   return <BuyerContext.Provider value={value}>{children}</BuyerContext.Provider>;

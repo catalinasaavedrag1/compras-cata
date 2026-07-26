@@ -25,11 +25,13 @@ export interface CategoryScope {
   /** ¿La categoría entra en el alcance actual? (sin categoría → fuera si scoped). */
   inScope: (category?: string) => boolean;
   myCategories: string[];
+  /** true mientras la cartera del comprador aún se está cargando (no fiable). */
+  loading: boolean;
 }
 
 export function useCategoryScope(): CategoryScope {
   const { role } = useRole();
-  const { myCategories } = useBuyer();
+  const { myCategories, loading } = useBuyer();
   const [scope, setScope] = useLocalStorage<Scope>(
     "compras:scope",
     role === "lider" ? "all" : "mine"
@@ -43,8 +45,9 @@ export function useCategoryScope(): CategoryScope {
       scoped,
       inScope: (category?: string) => !scoped || (!!category && myCategories.includes(category)),
       myCategories,
+      loading,
     };
-  }, [scope, setScope, myCategories]);
+  }, [scope, setScope, myCategories, loading]);
 }
 
 interface ScopeToggleProps {
@@ -52,15 +55,18 @@ interface ScopeToggleProps {
   onChange: (s: Scope) => void;
   /** Nº de categorías del comprador, para dar contexto. */
   myCount?: number;
+  /** true mientras la cartera carga: se muestra "—" en vez de un conteo aún vacío. */
+  loading?: boolean;
   className?: string;
 }
 
 /** Segmentado "Mi cartera / Todas" para acotar una vista al alcance del comprador. */
-export function ScopeToggle({ scope, onChange, myCount, className }: ScopeToggleProps) {
+export function ScopeToggle({ scope, onChange, myCount, loading, className }: ScopeToggleProps) {
+  const countLabel = loading ? "—" : myCount != null ? `${myCount}` : null;
   const options: { value: Scope; label: string }[] = [
     {
       value: "mine",
-      label: myCount != null ? `Mi cartera · ${myCount} cat.` : "Mi cartera",
+      label: countLabel != null ? `Mi cartera · ${countLabel} cat.` : "Mi cartera",
     },
     { value: "all", label: "Todas" },
   ];
